@@ -1,9 +1,13 @@
 {
-  // Python analysis paths and type-checking mode are set in pyrightconfig.json
-  // (Pylance ignores the python.analysis.* equivalents when that file exists).
+  // Pylance analysis paths / type-checking mode live in pyrightconfig.json.
   "python.testing.pytestEnabled": true,
   "python.testing.cwd": "${workspaceFolder}/backend",
   "python.testing.pytestArgs": ["tests"],
+
+  // The mypy config is backend/pyproject.toml, so run the checker from there.
+  "mypy-type-checker.cwd": "${workspaceFolder}/backend",
+  "mypy-type-checker.args": ["--config-file=${workspaceFolder}/backend/pyproject.toml"],
+
   "[python]": {
     "editor.defaultFormatter": "charliermarsh.ruff",
     "editor.formatOnSave": true

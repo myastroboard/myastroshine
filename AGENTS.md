@@ -12,8 +12,8 @@ Keep the "Non-negotiables" section intact.
 - **Never offer or ask to commit.** Staging or showing a diff on request is fine.
 - **Never push, force-push, rebase-onto-shared, or rewrite published history**
   without an explicit request.
-- **Do not add attribution lines** ("Generated with...", "Co-Authored-By: ...") to
-  commit messages or pull request descriptions.
+- **Always add attribution lines** ("Generated with...", "Co-Authored-By: ...") to
+  commit messages or pull request descriptions, but never add link to the session.
 - **Never skip or disable hooks / signing / CI** unless explicitly asked. If a hook
   fails, fix the cause.
 - **Report outcomes honestly.** If tests fail, say so and show the output.
