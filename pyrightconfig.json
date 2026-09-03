@@ -1,0 +1,16 @@
+{
+  "include": ["backend/app", "backend/tests", "backend/migrations", "scripts"],
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    "**/.venv",
+    "**/venv",
+    "**/data",
+    "frontend",
+    "initial_plan"
+  ],
+  "extraPaths": ["backend"],
+  "pythonVersion": "3.13",
+  "typeCheckingMode": "standard",
+  "reportMissingModuleSource": "none"
+}

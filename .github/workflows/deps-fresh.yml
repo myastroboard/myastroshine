@@ -1,0 +1,20 @@
+name: Dependency freshness
+
+# Fails when any pinned dependency in backend/requirements*.txt or
+# frontend/package.json is behind its registry. Runs weekly and on demand.
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install packaging
+      - run: python scripts/check_deps_fresh.py

@@ -1,0 +1,32 @@
+# MyAstroShine backend - runtime dependencies
+# Pins are kept at the latest release; scripts/check_deps_fresh.py enforces this.
+
+# Web framework
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+python-multipart==0.0.32
+websockets==17.1
+
+# Configuration
+pydantic==2.13.5
+pydantic-settings==2.15.0
+
+# Image processing
+opencv-python-headless==5.0.0.93
+scikit-image==0.26.0
+Pillow==12.3.0
+numpy==2.5.2
+
+# Database
+SQLAlchemy==2.0.52
+alembic==1.19.1
+
+# HTTP client (AstroDex webhooks)
+httpx==0.28.1
+
+# Logging
+structlog==26.1.0
+
+# Job queue (optional, phase 2+)
+celery==5.6.3
+redis==8.1.0

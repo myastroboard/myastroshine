@@ -1,0 +1,11 @@
+{
+  // Python analysis paths and type-checking mode are set in pyrightconfig.json
+  // (Pylance ignores the python.analysis.* equivalents when that file exists).
+  "python.testing.pytestEnabled": true,
+  "python.testing.cwd": "${workspaceFolder}/backend",
+  "python.testing.pytestArgs": ["tests"],
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true
+  }
+}

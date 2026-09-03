@@ -1,0 +1,69 @@
+# MyAstroShine - full stack orchestration.
+# Redis is only required from phase 2+ (Celery job queue); it is harmless to run now.
+
+services:
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: myastroshine-api
+    environment:
+      - PYTHONUNBUFFERED=1
+      - APP_ENV=production
+      - LOG_LEVEL=info
+      - DATABASE_URL=sqlite:////data/db/myastroshine.db
+      - STORAGE_PATH=/data/images
+      - API_CORS_ORIGINS=http://localhost:3000,http://myastroshine.local
+      - ASTRODEX_WEBHOOK_SECRET=${ASTRODEX_WEBHOOK_SECRET:-change-me}
+      - ASTRODEX_CALLBACK_URLS=${ASTRODEX_CALLBACK_URLS:-}
+      - REDIS_URL=redis://redis:6379/0
+    ports:
+      - "8002:8002"
+    volumes:
+      - myastroshine_images:/data/images
+      - myastroshine_db:/data/db
+    depends_on:
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: myastroshine-web
+    environment:
+      - VITE_API_URL=http://localhost:8002/api
+      - VITE_WS_URL=ws://localhost:8002/ws
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: myastroshine-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - myastroshine_redis:/data
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+
+volumes:
+  myastroshine_images:
+    driver: local
+  myastroshine_db:
+    driver: local
+  myastroshine_redis:
+    driver: local
+
+networks:
+  default:
+    name: myastroshine

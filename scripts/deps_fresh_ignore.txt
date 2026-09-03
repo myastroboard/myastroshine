@@ -1,0 +1,15 @@
+# Dependencies that check_deps_fresh.py should not flag as outdated.
+# One package name per line (PyPI or npm). Lines starting with '#' are comments.
+#
+# Use this only for a deliberate, documented hold - e.g. a major bump that needs
+# migration work - and remove the entry once the upgrade lands.
+#
+# examples:
+#   numpy        # pinned to 2.x until scikit-image supports 3.x
+#   react        # holding on 19 until the router upgrade is done
+
+# TypeScript 7 (the native port) is out, but typescript-eslint 8 caps at
+# `typescript <6.1.0` and most editor tooling has not caught up. Hold at 5.9.x
+# until typescript-eslint ships TS 7 support, then bump both together.
+typescript
+

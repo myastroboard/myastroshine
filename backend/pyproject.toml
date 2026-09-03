@@ -1,0 +1,46 @@
+[project]
+name = "myastroshine-backend"
+version = "0.1.0"
+description = "MyAstroShine - astronomical image processing engine"
+requires-python = ">=3.13"
+license = { text = "AGPL-3.0-or-later" }
+
+[tool.ruff]
+extend = "../ruff.toml"
+src = ["app", "tests"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI relies on function calls in argument defaults.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.File",
+    "fastapi.Form",
+    "fastapi.Query",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests: magic values, assert, deferred imports, and subprocess calls are all fine.
+"tests/*" = ["PLR2004", "S101", "PLC0415", "S603"]
+
+[tool.mypy]
+python_version = "3.13"
+packages = ["app"]
+strict = true
+plugins = ["pydantic.mypy"]
+disallow_untyped_decorators = false
+
+[[tool.mypy.overrides]]
+module = ["cv2.*", "skimage.*", "celery.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-ra --cov=app --cov-report=term-missing"
+filterwarnings = [
+    # Emitted only when a newer starlette than we pin is installed locally.
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+]
