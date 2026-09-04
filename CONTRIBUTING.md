@@ -76,6 +76,18 @@ pytest                 # test suite (target: 85%+ coverage)
 `pytest` includes `test_deps_fresh.py`, which queries PyPI/npm; it skips itself
 when offline or when `SKIP_DEPS_FRESH=1` is set.
 
+`tests/benchmarks/` (full-res enhance < 5s, slider response < 500ms, stacking
+SNR gain ~sqrt(N)) is the opposite: skipped by default, since wall-clock
+budgets are sensitive to the machine running them. Run explicitly, without
+coverage (which measurably slows CPython down):
+
+```bash
+RUN_BENCHMARKS=1 pytest tests/benchmarks --no-cov -v
+```
+
+Runs weekly in CI (`.github/workflows/benchmarks.yml`) as a signal to
+investigate, not a merge gate.
+
 - Tests mirror the source tree: `app/services/foo.py` -> `tests/services/test_foo.py`.
 - Validate all external input through `app/utils/validators.py`.
 

@@ -61,7 +61,7 @@ Celery job queue (`PROCESSING_MODE=queue`), and the progress WebSockets.
 | POST | `/admin/logs/clear` | Empty `myastroshine.log` | 1 |
 | GET | `/admin/logs/export` | ZIP of the logs (main + rotations + worker) | 1 |
 | POST | `/upload` | Upload an image, open a session | 1 |
-| GET | `/preview/{session_id}` | Session image: `?full=true` full-res result, `?original=true` untouched upload, default downscaled result | 1 |
+| GET | `/preview/{session_id}` | Session image: `?full=true` full-res result, `?original=true` untouched upload (add `&geometry=true` to apply the session's current crop/rotate/flip/straighten, no colour/tone enhancement - keeps the before/after comparison aligned once geometry has changed the result's frame), default downscaled result | 1 |
 | POST | `/process/{session_id}` | Apply enhancement parameters | 1 / 3 |
 | WS | `/ws/processing-status/{job_id}` | Real-time job progress | 3 |
 | POST | `/download/{session_id}` | Download the processed image | 2 |

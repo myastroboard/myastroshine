@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import cv2
 import numpy as np
 import pytest
 
@@ -30,14 +31,8 @@ def _synthetic_astro_image(height: int, width: int, *, seed: int) -> np.ndarray:
         y, x = int(rng.integers(0, height)), int(rng.integers(0, width))
         radius = int(rng.integers(1, 5))
         brightness = int(rng.integers(180, 255))
-        cv2_circle(image, (x, y), radius, brightness)
+        cv2.circle(image, (x, y), radius, (brightness, brightness, brightness), -1)
     return image
-
-
-def cv2_circle(image: np.ndarray, center: tuple[int, int], radius: int, brightness: int) -> None:
-    import cv2
-
-    cv2.circle(image, center, radius, (brightness, brightness, brightness), -1)
 
 
 @pytest.fixture(scope="module")

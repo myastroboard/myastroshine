@@ -131,6 +131,18 @@ tagged yet.
   their files, regardless of `PROCESSING_MODE`. Schedule state persisted at
   `DATA_DIR/celerybeat-schedule`.
 
+#### Performance benchmark suite
+
+- `backend/tests/benchmarks/`: codifies the Success Metrics acceptance
+  criteria as runnable checks - full-res (~24MP) enhance (measured 3.0s vs a
+  5s budget), preview (512px) reprocess (38ms vs 500ms), and an empirical
+  stacking-SNR check (16 synthetic frames with known noise through
+  `combine(..., "mean")`, measured 3.99x vs a theoretical 4.00x). Opt-in
+  (`RUN_BENCHMARKS=1 pytest tests/benchmarks --no-cov`) rather than part of
+  the default suite, since wall-clock budgets are sensitive to the machine and
+  to coverage instrumentation; runs weekly via
+  `.github/workflows/benchmarks.yml`, not on every push/PR.
+
 ### Changed
 
 #### Configuration moved out of the environment (PASSATION alignment, part 1)
@@ -209,6 +221,10 @@ tagged yet.
   `GET /preview/{id}?original=true` serves the untouched original, and the two
   images share one box via `clip-path` so they stay aligned. The preview frame
   now takes the image's real aspect ratio instead of a fixed 16:9 letterbox.
+  Once a crop/rotate/flip/straighten changes the result's frame, the "before"
+  side switches to `?original=true&geometry=true`, which applies that same
+  geometry to the original on the fly (no colour/tone enhancement) so the two
+  stay aligned instead of the split disappearing.
 - Depth Shift viewer is a centred modal (was an inline block pushed off-screen)
   and closes on Escape / backdrop click.
 - Docker dev stack: Vite proxies `/api` and `/ws` to the `api` service
@@ -219,6 +235,5 @@ tagged yet.
 
 ### Known gaps
 
-- No load/performance benchmark suite.
 - The slider panel has no per-parameter tooltips.
 - Nothing is tagged yet; no published Docker images or GitHub release.
