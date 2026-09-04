@@ -29,6 +29,7 @@ jobs:
         env:
           # The dependency-freshness check runs on its own schedule, not on every PR.
           SKIP_DEPS_FRESH: "1"
+      - run: pip-audit -r requirements.txt -r requirements-dev.txt
 
   frontend:
     runs-on: ubuntu-latest
@@ -47,6 +48,7 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - run: npm audit --audit-level=high
 
   e2e:
     runs-on: ubuntu-latest

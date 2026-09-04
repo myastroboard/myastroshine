@@ -7,6 +7,13 @@
 # allowlist, upload limits, stacking defaults, log levels - is auto-generated or
 # edited from Settings in the UI and persisted under the data volume
 # (app_settings.json, secret_key.txt). See docs/DEPLOYMENT.md.
+#
+# `api` carries both `image:` and `build:`. On a clean machine (no repo
+# clone), `docker compose up -d` pulls the published `image:` from ghcr.io -
+# one image serves both the API and the web UI on :8002. If you've cloned the
+# repo, `docker compose up -d --build` (or `build` first) uses the local
+# Dockerfile instead. Pin a version with `MYASTROSHINE_VERSION=0.1.0 docker
+# compose up -d` (default: `latest`).
 
 x-backend-env: &backend-env
   PYTHONUNBUFFERED: "1"
@@ -19,8 +26,9 @@ x-backend-env: &backend-env
 
 services:
   api:
+    image: ghcr.io/myastroboard/myastroshine:${MYASTROSHINE_VERSION:-latest}
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
     container_name: myastroshine-api
     environment: *backend-env
@@ -39,9 +47,12 @@ services:
       start_period: 10s
 
   worker:
+    image: ghcr.io/myastroboard/myastroshine:${MYASTROSHINE_VERSION:-latest}
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
+      # Never serves HTTP/static - skip the frontend-builder stage entirely.
+      target: backend
     container_name: myastroshine-worker
     # -B: embedded beat scheduler (expired-session cleanup). Do not scale this
     # service past one replica without moving beat to its own service first.
@@ -51,20 +62,6 @@ services:
       - myastroshine_data:/data
     depends_on:
       - redis
-      - api
-    restart: unless-stopped
-
-  web:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: myastroshine-web
-    environment:
-      - VITE_API_URL=http://localhost:8002/api
-      - VITE_WS_URL=ws://localhost:8002/ws
-    ports:
-      - "3000:3000"
-    depends_on:
       - api
     restart: unless-stopped
 

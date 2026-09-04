@@ -31,7 +31,6 @@ class Settings(BaseSettings):
 
     # Deployment shape
     app_env: str = "development"  # development | production | test
-    debug: bool = True
     log_level: str = "info"  # bootstrap level; the runtime level lives in app_settings
 
     # The single persistence root. Everything the app writes is derived from it.
@@ -50,7 +49,7 @@ class Settings(BaseSettings):
     # Tied to whether the compose worker/redis services run, so it stays here.
     processing_mode: str = "sync"
 
-    # Gates writes to /api/admin/*. Single-user local deployments leave it on.
+    # Gates /api/admin/* and /api/tokens. Single-user local deployments leave it on.
     admin_enabled: bool = True
 
     @property

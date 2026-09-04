@@ -12,6 +12,7 @@ from app.services.astrodex_integration import AstroDexService
 from app.services.session import SessionService
 from app.services.storage import StorageService
 from app.services.token import TokenService
+from app.utils.app_settings import save_app_settings
 
 _CALLBACK = "http://astrodex.test/api/webhooks/enhanced-images"
 
@@ -52,6 +53,24 @@ def test_queue_send_rejects_unlisted_url(
             session_id=session_id,
             astrodex_image_id="x",
             callback_url="http://evil.test/x",
+            signing_token=token,
+        )
+
+
+def test_queue_send_rejects_everything_when_allowlist_empty(
+    dispatch: AstroDexDispatch, db_session, sample_image: np.ndarray
+) -> None:
+    """An empty allowlist fails closed - it used to allow any callback URL."""
+    save_app_settings({"astrodex_callback_urls": []})
+    token, _ = TokenService(db_session).create_token("t")
+    session_id = dispatch.sessions.create_session(image_path="").session_id
+    dispatch.storage.save_original(session_id, sample_image)
+
+    with pytest.raises(ForbiddenError):
+        dispatch.queue_send(
+            session_id=session_id,
+            astrodex_image_id="x",
+            callback_url=_CALLBACK,  # would have matched a non-empty allowlist
             signing_token=token,
         )
 

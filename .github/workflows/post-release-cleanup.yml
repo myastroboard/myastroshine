@@ -1,0 +1,107 @@
+name: Post-Release Cleanup
+
+# After a successful publish, files this release's CHANGELOG.md content under
+# a dated heading and resets [Unreleased] to empty, via a PR (never a direct
+# push to main). See scripts/changelog_release.py.
+
+on:
+  release:
+    types: [published]
+  workflow_run:
+    workflows: ["Build and Publish Docker Images"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to file (e.g. 0.1.0) - leave empty to use the latest tag"
+        required: false
+
+jobs:
+  update-changelog:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          WORKFLOW_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          TAG=""
+
+          if [ "$EVENT_NAME" = "release" ] && printf '%s' "$RELEASE_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            TAG="$RELEASE_TAG"
+          elif [ "$EVENT_NAME" = "workflow_run" ] && printf '%s' "$WORKFLOW_HEAD_BRANCH" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            TAG="$WORKFLOW_HEAD_BRANCH"
+          elif printf '%s' "$INPUT_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            TAG="v$INPUT_VERSION"
+          else
+            TAG=$(git tag --sort=-version:refname | head -1)
+          fi
+
+          if ! printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            TAG=$(git tag --sort=-version:refname | head -1)
+          fi
+
+          if [ -z "$TAG" ]; then
+            echo "No valid release tag found."
+            exit 1
+          fi
+
+          echo "value=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      - name: Create branch and PR to file the changelog
+        env:
+          # A PAT (not the default GITHUB_TOKEN) so CI actually runs on this PR -
+          # GitHub doesn't trigger workflows from pushes/PRs made with the
+          # automatic token, to avoid recursive runs. Same pattern as
+          # myastroboard's GH_PAT. See CONTRIBUTING.md "Cutting a release" for
+          # how to create it.
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          set -euo pipefail
+
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Invalid version: $VERSION"
+            exit 1
+          fi
+
+          BRANCH="bot/post-release-v${VERSION}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git checkout -b "$BRANCH"
+          python3 scripts/changelog_release.py --finalize "$VERSION"
+          git add CHANGELOG.md
+
+          if git diff --staged --quiet; then
+            echo "CHANGELOG.md is already up to date, nothing to do."
+            exit 0
+          fi
+
+          git commit -m "chore: file changelog for release v${VERSION}"
+          git push origin "$BRANCH"
+
+          gh pr create \
+            --title "chore: file changelog for release v${VERSION}" \
+            --body "Automated cleanup after tagging release v${VERSION} - files the [Unreleased] section under [${VERSION}] and resets it to empty." \
+            --base main \
+            --head "$BRANCH"

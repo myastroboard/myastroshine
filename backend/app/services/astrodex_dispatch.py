@@ -19,15 +19,14 @@ from app.services.astrodex_integration import AstroDexService
 from app.services.session import SessionService
 from app.services.storage import StorageService
 from app.utils import image_utils
-from app.utils.app_settings import get_app_settings, load_or_generate_secret_key
+from app.utils.app_settings import load_or_generate_secret_key
 from app.utils.validators import is_allowed_callback_url
 
 logger = get_logger(__name__)
 
 
 def _check_callback_url(url: str) -> None:
-    allowlist = get_app_settings().astrodex_callback_urls
-    if allowlist and not is_allowed_callback_url(url):
+    if not is_allowed_callback_url(url):
         raise ForbiddenError(f"Callback URL {url} is not on the allowlist")
 
 

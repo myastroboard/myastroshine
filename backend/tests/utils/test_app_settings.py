@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import json
 
+import pytest
+from pydantic import ValidationError
+
 from app.config import get_settings
 from app.utils import app_settings
 from app.utils.app_settings import (
@@ -64,3 +67,15 @@ def test_reload_picks_up_an_external_write() -> None:
     reload_app_settings()
 
     assert get_app_settings().session_expiry_hours == 72
+
+
+def test_cors_origins_rejects_wildcard() -> None:
+    """allow_credentials=True is always on (main.py) - a "*" origin is a real
+    hole, not just a combination browsers already reject."""
+    with pytest.raises(ValidationError, match="cors_origins"):
+        AppSettings(cors_origins=["*"])
+
+
+def test_cors_origins_still_allows_specific_hosts() -> None:
+    settings = AppSettings(cors_origins=["http://localhost:3000", "https://app.example.com"])
+    assert settings.cors_origins == ["http://localhost:3000", "https://app.example.com"]

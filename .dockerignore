@@ -1,0 +1,67 @@
+# Repo root .dockerignore - the build context for the single top-level
+# Dockerfile. Keep this in sync with .gitignore's intent (not a copy: we also
+# exclude things git tracks but the image never needs, like docs/ and CI).
+
+.git/
+.github/
+
+# Planning docs (local only, also gitignored)
+initial_plan/
+
+# ---------------------------------------------------------------------------
+# Python / backend
+# ---------------------------------------------------------------------------
+**/__pycache__/
+**/*.py[cod]
+**/*.egg-info/
+**/.eggs/
+backend/.venv/
+backend/venv/
+backend/.pytest_cache/
+backend/.ruff_cache/
+backend/.mypy_cache/
+backend/.coverage
+backend/.coverage.*
+backend/htmlcov/
+backend/coverage.xml
+backend/tests/
+
+# ---------------------------------------------------------------------------
+# Node / frontend
+# ---------------------------------------------------------------------------
+**/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
+frontend/playwright/.cache/
+frontend/e2e/
+
+# ---------------------------------------------------------------------------
+# Environment / secrets / data
+# ---------------------------------------------------------------------------
+.env
+*.env
+!.env.example
+!*.env.example
+data/
+*.db
+*.sqlite3
+.e2e-tmp/
+backend/.e2e-tmp/
+
+# ---------------------------------------------------------------------------
+# Docs (not needed at runtime)
+# ---------------------------------------------------------------------------
+*.md
+docs/
+
+# ---------------------------------------------------------------------------
+# Editors / OS
+# ---------------------------------------------------------------------------
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp

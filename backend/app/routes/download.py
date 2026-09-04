@@ -9,7 +9,7 @@ from fastapi import APIRouter
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from app.dependencies import SessionServiceDep, StorageDep
+from app.dependencies import RequireRateLimit, SessionServiceDep, StorageDep
 from app.exceptions import SessionNotFoundError
 from app.logging_config import get_logger
 from app.utils import image_utils
@@ -36,6 +36,7 @@ async def download_image(
     request: DownloadRequest,
     sessions: SessionServiceDep,
     storage: StorageDep,
+    _rate_limit: RequireRateLimit,
 ) -> Response:
     """Return the enhanced image as a downloadable file."""
     if not is_valid_session_id(session_id):

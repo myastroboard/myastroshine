@@ -1,0 +1,23 @@
+name: Update Docker Hub Description
+
+on:
+  workflow_dispatch: # Manual only
+
+jobs:
+  update-description:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Update Docker Hub description
+        uses: peter-evans/dockerhub-description@v5
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: myastroboard/myastroshine
+          readme-filepath: ./DOCKER_HUB.md
+          short-description: "🔭 Self-hosted astronomical image processing - enhancement, stacking, depth effects"

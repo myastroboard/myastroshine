@@ -48,25 +48,9 @@ updates:
       prefix-development: "chore"
       include: "scope"
 
-  # Enable version updates for Docker (backend image)
+  # Enable version updates for Docker (single root Dockerfile, all stages)
   - package-ecosystem: "docker"
-    directory: "/backend"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-    open-pull-requests-limit: 5
-    labels:
-      - "dependencies"
-      - "docker"
-    commit-message:
-      prefix: "chore"
-      prefix-development: "chore"
-      include: "scope"
-
-  # Enable version updates for Docker (frontend image)
-  - package-ecosystem: "docker"
-    directory: "/frontend"
+    directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"

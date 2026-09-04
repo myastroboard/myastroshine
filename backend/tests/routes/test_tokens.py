@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import pytest
+
+from app.config import get_settings
+
 
 def test_create_lists_and_revoke(client) -> None:
     """A created token appears in the listing and can be revoked."""
@@ -34,3 +38,18 @@ def test_revoke_unknown_is_404(client) -> None:
 def test_expiry_is_returned(client) -> None:
     created = client.post("/api/tokens", json={"name": "temp", "expires_in_days": 30}).json()
     assert created["expires_at"] is not None
+
+
+def test_all_routes_403_when_admin_disabled(client, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Minting/listing/revoking a webhook token is an admin action, same as
+    the app-settings routes - it must respect ADMIN_ENABLED too."""
+    created = client.post("/api/tokens", json={"name": "before disabling"}).json()
+
+    monkeypatch.setenv("ADMIN_ENABLED", "false")
+    get_settings.cache_clear()
+
+    assert client.get("/api/tokens").status_code == 403
+    assert client.post("/api/tokens", json={"name": "should fail"}).status_code == 403
+    assert client.delete(f"/api/tokens/{created['id']}").status_code == 403
+
+    get_settings.cache_clear()

@@ -11,13 +11,14 @@ session secret is generated on first start.
 
 ## Services
 
-`docker-compose.yml` defines four services on the `myastroshine` network:
+`docker-compose.yml` defines three services on the `myastroshine` network. A
+single image (FastAPI + OpenCV, serving the built React UI alongside the API)
+backs both `api` and `worker`:
 
 | Service | Image / build | Port | Volumes |
 |---------|---------------|------|---------|
-| `api` | `./backend` (FastAPI + OpenCV) | 8002 | `myastroshine_data:/data` |
-| `worker` | `./backend` (Celery worker + embedded beat) | - | `myastroshine_data:/data` |
-| `web` | `./frontend` (Vite build served by nginx) | 3000 | - |
+| `api` | `.` (API + web UI) | 8002 | `myastroshine_data:/data` |
+| `worker` | `.` (Celery worker + embedded beat, `target: backend`) | - | `myastroshine_data:/data` |
 | `redis` | `redis:7-alpine` | 6379 | `myastroshine_redis:/data` |
 
 This stack sets `PROCESSING_MODE=queue`, so `/api/process` and
@@ -37,6 +38,33 @@ their files) regardless of `PROCESSING_MODE`. Its schedule state lives at
 `DATA_DIR/celerybeat-schedule`. Beat only ever runs once as long as `worker`
 stays at one replica; scaling it out would run the schedule multiple times, so
 move beat to its own service first if you ever do that.
+
+## Clean-machine quick start (no repo clone)
+
+Every tagged release publishes one image - `ghcr.io/myastroboard/myastroshine`
+(also mirrored to Docker Hub as `myastroboard/myastroshine`) - covering both
+the API and the web UI. If you just want to run MyAstroShine and don't need
+the source, grab `docker-compose.yml` on its own and start it - `docker
+compose up -d` pulls the published image by default (`api`'s `image:` line),
+it does not need `build:` or a local Dockerfile:
+
+```bash
+curl -O https://raw.githubusercontent.com/myastroboard/myastroshine/main/docker-compose.yml
+docker compose up -d
+
+curl http://localhost:8002/api/health
+open http://localhost:8002
+```
+
+Pin a specific release instead of `latest`:
+
+```bash
+MYASTROSHINE_VERSION=0.1.0 docker compose up -d
+```
+
+Cloned the repo instead? `docker compose up -d --build` (or `docker compose
+build` first) builds from the local `Dockerfile`, ignoring the published
+image - see the main [Quick start](../README.md#quick-start-docker).
 
 ## The data volume
 
@@ -64,7 +92,6 @@ Set only to change the deployment shape (see `backend/.env.example`):
 | Variable | Default | Notes |
 |----------|---------|-------|
 | `APP_ENV` | `development` | `development` renders logs for humans; `production` emits JSON |
-| `DEBUG` | `true` | |
 | `DATA_DIR` | `./data` (local), `/data` (image) | the single persistence root |
 | `PROCESSING_MODE` | `sync` | `sync` or `queue` (compose sets `queue`) |
 | `REDIS_URL` / `CELERY_BROKER_URL` | `redis://localhost:6379/0` `/1` | only used with `queue`; compose points them at the `redis` service |
@@ -103,13 +130,14 @@ Frontend (`frontend/.env`, see `frontend/.env.example`):
 | `VITE_WS_URL` | `/ws` on the page origin | as above |
 | `VITE_PROXY_TARGET` | `http://localhost:8002` | dev-server only: where `/api` + `/ws` proxy (the dev compose sets `http://api:8002`) |
 | `VITE_APP_NAME` | `MyAstroShine` | |
-| `VITE_APP_VERSION` | `0.1.0` | |
+| `VITE_APP_VERSION` | resolved automatically | see `vite.config.ts`; only set this to override |
 
 Leave `VITE_API_URL` / `VITE_WS_URL` unset unless the backend really is on a
-different origin: the app then uses same-origin `/api` and `/ws`, which the dev
-server (via `VITE_PROXY_TARGET`) and the production nginx both proxy to the API.
-Setting an absolute `VITE_API_URL` makes `fetch` bypass that proxy while
-`<img src="/api/...">` does not, which breaks image loads in Docker.
+different origin: the app then uses same-origin `/api` and `/ws`. In
+production the API *is* the same origin (one image serves both), so there's
+nothing to proxy; in dev the Vite dev server (via `VITE_PROXY_TARGET`) proxies
+both to the API. Setting an absolute `VITE_API_URL` makes `fetch` bypass that
+proxy while `<img src="/api/...">` does not, which breaks image loads in dev.
 
 ## Startup (production-like)
 
@@ -184,9 +212,10 @@ broker and does not need backing up.
 
 ## Reverse proxy
 
-The `web` container already proxies `/api/` and `/ws/` to `api:8002` (see
-`frontend/nginx.conf`). For production place Caddy or nginx in front for TLS and
-rate limiting (`/api/* 10r/m` planned for v1.5+).
+The `api` container serves the web UI, the API, and the WebSocket endpoints
+directly on :8002 - there's no internal proxy to configure. For anything
+beyond localhost, place Caddy or nginx in front of it for TLS (application-
+level rate limiting is already in place, see `docs/API.md` "Rate Limiting").
 
 ## Health checks
 

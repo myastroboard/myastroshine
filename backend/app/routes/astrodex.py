@@ -12,7 +12,7 @@ from __future__ import annotations
 from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile, status
 from pydantic import BaseModel
 
-from app.dependencies import AstroDexDispatchDep, RequireToken
+from app.dependencies import AstroDexDispatchDep, RequireRateLimit, RequireToken
 from app.exceptions import UnsupportedImageError
 from app.logging_config import get_logger
 from app.services.astrodex_dispatch import deliver_webhook
@@ -37,6 +37,7 @@ class SendToAstroDexRequest(BaseModel):
 async def receive_from_astrodex(
     token: RequireToken,
     dispatch: AstroDexDispatchDep,
+    _rate_limit: RequireRateLimit,
     image_id: str = Form(...),
     image: UploadFile = File(...),
     callback_url: str = Form(...),
@@ -69,6 +70,7 @@ async def send_to_astrodex(
     token: RequireToken,
     dispatch: AstroDexDispatchDep,
     background: BackgroundTasks,
+    _rate_limit: RequireRateLimit,
 ) -> JsonDict:
     """Queue a signed ``image_enhanced`` webhook to AstroDex."""
     link = dispatch.queue_send(

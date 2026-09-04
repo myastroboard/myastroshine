@@ -145,6 +145,35 @@ tagged yet.
   to coverage instrumentation; runs weekly via
   `.github/workflows/benchmarks.yml`, not on every push/PR.
 
+#### Release mechanics
+
+- Root `VERSION` file is now the single source of truth for the app version
+  (previously hardcoded separately in the backend and frontend); read via a
+  build-time `APP_VERSION` / `VITE_APP_VERSION` Docker build argument, or
+  straight from the file for local dev.
+- **Single Docker image**: the root `Dockerfile` (multi-stage: Node builds
+  the frontend, Python runs the API) replaces the previous two-image split
+  (`backend/Dockerfile` + `frontend/Dockerfile` behind nginx). FastAPI now
+  serves the built React SPA directly (`StaticFiles`, mounted after every
+  `/api`/`/ws` route - the frontend's hash-based routing needs no
+  SPA-fallback handling), with `GZipMiddleware` and the security response
+  headers nginx used to add (`X-Frame-Options`, `X-Content-Type-Options`,
+  `Referrer-Policy`) moved into `app/main.py`. A `target: backend` build
+  (skips the frontend stage) serves `worker` and the dev `api` service, which
+  never need the built UI. One less container, one URL (`:8002`) for
+  everything instead of `:8002` (API) + `:3000` (nginx).
+- `.github/workflows/release.yml`: tag-triggered (`v*.*.*`) multi-arch build
+  and push of the one image to **both** `ghcr.io/myastroboard/myastroshine`
+  and Docker Hub's `myastroboard/myastroshine`, a Trivy scan, and a GitHub
+  Release generated from this changelog.
+- `.github/workflows/post-release-cleanup.yml`: opens a PR that files this
+  section under a dated release heading after a successful publish
+  (`scripts/changelog_release.py`).
+- `CODE_OF_CONDUCT.md`, `SECURITY.md`.
+- `docker-compose.yml` gained `image:` alongside `build:` on `api` so a clean
+  machine can `docker compose up` from the published image without cloning
+  the repo; see `docs/DEPLOYMENT.md`.
+
 ### Changed
 
 #### Configuration moved out of the environment (PASSATION alignment, part 1)
@@ -242,6 +271,30 @@ tagged yet.
   false positives; the handful of real ones left (a couple of loosely-typed
   numpy assignments, a duck-typed fake `Request` in the rate-limit tests) were
   fixed properly instead of suppressed.
+
+### Security
+
+#### Release-hardening pass
+
+- AstroDex callback-URL allowlist now fails closed: an empty
+  `astrodex_callback_urls` rejects every callback URL (previously it allowed
+  any), closing an SSRF path through `/api/send-to-astrodex` and
+  `/api/astrodex/receive`.
+- `/api/tokens` and the previously-ungated `GET /api/admin/app-settings` /
+  `GET /api/admin/logs*` now require `ADMIN_ENABLED` like their sibling write
+  routes already did.
+- `cors_origins` rejects a literal `"*"` entry - the API always sets
+  `allow_credentials=True`, so a wildcard origin would be a real hole, not
+  just a combination browsers already reject.
+- Decoded image dimensions are capped (`MAX_IMAGE_PIXELS`, 64MP) in addition
+  to the existing compressed-upload-size limit, closing a decompression-bomb
+  path in `decode_image`.
+- Rate limiting now covers `/api/tokens`, `/api/admin/*`, `/api/download/*`,
+  and the AstroDex routes (previously only upload/process/stack/preset-apply).
+- Removed the dead `DEBUG` setting (never read anywhere; misleadingly implied
+  a debug mode that didn't exist).
+- `pip-audit` and `npm audit --audit-level=high` run in CI; a Trivy scan runs
+  against every published image. See `SECURITY.md` for the full policy.
 
 ### Known gaps
 

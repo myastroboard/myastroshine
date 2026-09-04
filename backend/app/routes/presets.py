@@ -36,7 +36,9 @@ async def list_presets(presets: PresetServiceDep) -> PresetListResponse:
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=SavePresetResponse)
-async def save_preset(request: SavePresetRequest, presets: PresetServiceDep) -> SavePresetResponse:
+async def save_preset(
+    request: SavePresetRequest, presets: PresetServiceDep, _rate_limit: RequireRateLimit
+) -> SavePresetResponse:
     """Create and store a new user preset."""
     record = presets.save_preset(
         name=request.name,
@@ -52,7 +54,9 @@ async def save_preset(request: SavePresetRequest, presets: PresetServiceDep) -> 
 
 
 @router.delete("/{preset_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_preset(preset_id: str, presets: PresetServiceDep) -> None:
+async def delete_preset(
+    preset_id: str, presets: PresetServiceDep, _rate_limit: RequireRateLimit
+) -> None:
     """Delete a user preset (built-in presets cannot be deleted)."""
     presets.delete_preset(preset_id)
 

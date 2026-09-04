@@ -46,6 +46,10 @@ def validate_image_extension(filename: str) -> str:
 
 
 def is_allowed_callback_url(url: str) -> bool:
-    """True if ``url`` is on the AstroDex callback allowlist."""
+    """True if ``url`` is on the AstroDex callback allowlist.
+
+    An empty allowlist allows nothing (fail closed) - configure at least one
+    entry in Settings before enabling AstroDex webhook delivery.
+    """
     allowlist = get_app_settings().astrodex_callback_urls
-    return any(url.startswith(allowed) for allowed in allowlist)
+    return bool(allowlist) and any(url.startswith(allowed) for allowed in allowlist)

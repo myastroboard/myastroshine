@@ -10,7 +10,6 @@
 x-backend-env: &backend-env
   PYTHONUNBUFFERED: "1"
   APP_ENV: development
-  DEBUG: "true"
   LOG_LEVEL: debug
   DATA_DIR: /data
   REDIS_URL: redis://redis:6379/0
@@ -20,8 +19,10 @@ x-backend-env: &backend-env
 services:
   api:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
+      # Vite (the web service below) serves the frontend live - skip building it.
+      target: backend
     container_name: myastroshine-api-dev
     command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8002
     environment: *backend-env
@@ -36,8 +37,9 @@ services:
 
   worker:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
+      target: backend
     container_name: myastroshine-worker-dev
     # -B: embedded beat scheduler (expired-session cleanup) - see docker-compose.yml.
     command: >

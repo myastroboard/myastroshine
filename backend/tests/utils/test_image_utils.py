@@ -25,6 +25,18 @@ def test_decode_rejects_garbage() -> None:
         image_utils.decode_image(b"not an image")
 
 
+def test_decode_rejects_images_over_the_pixel_cap(
+    sample_jpeg: bytes, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A decoded image over MAX_IMAGE_PIXELS is rejected - guards against a
+    small (compressed) upload decompressing into a huge array. Uses the small
+    sample fixture against a lowered cap rather than building a real huge
+    image, which would be slow and memory-heavy for no extra coverage."""
+    monkeypatch.setattr(image_utils, "MAX_IMAGE_PIXELS", 100)
+    with pytest.raises(UnsupportedImageError, match="exceeding"):
+        image_utils.decode_image(sample_jpeg)
+
+
 def test_save_and_load(tmp_path: Path, sample_image: np.ndarray) -> None:
     """A saved image loads back with the same dimensions."""
     path = tmp_path / "out.jpg"

@@ -1,0 +1,218 @@
+name: Build and Publish Docker Image
+
+# Builds and publishes the single MyAstroShine image (API + web UI) to
+# ghcr.io and Docker Hub on a version tag, then creates a GitHub Release.
+# See CONTRIBUTING.md "Release build" for the pre-tag local smoke test, and
+# docs/DEPLOYMENT.md for the published-image quick start this produces.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+env:
+  REGISTRY: ghcr.io
+  DOCKERHUB_IMAGE: myastroboard/myastroshine
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - linux/amd64
+          - linux/arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Normalize image name (lowercase)
+        id: repo
+        run: echo "name=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Read and validate version
+        id: version
+        run: |
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          if ! [[ "$TAG_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid tag format: v$TAG_VERSION"
+            exit 1
+          fi
+          FILE_VERSION=$(tr -d '[:space:]' < VERSION)
+          if [ "$TAG_VERSION" != "$FILE_VERSION" ]; then
+            echo "Tag v$TAG_VERSION does not match the VERSION file ($FILE_VERSION)."
+            echo "Update VERSION and merge to main before tagging."
+            exit 1
+          fi
+          echo "value=$TAG_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Platform slug
+        id: platform
+        run: echo "slug=$(echo '${{ matrix.platform }}' | tr '/' '-')" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+        with:
+          cache-binary: false
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: backend-with-frontend
+          push: true
+          platforms: ${{ matrix.platform }}
+          build-args: |
+            APP_VERSION=${{ steps.version.outputs.value }}
+            VITE_APP_VERSION=${{ steps.version.outputs.value }}
+          tags: "${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:${{ steps.platform.outputs.slug }}-build"
+          labels: |
+            org.opencontainers.image.title=MyAstroShine
+            org.opencontainers.image.description=Astronomical image processing tool - enhancement, stacking, depth shift
+            org.opencontainers.image.url=https://github.com/myastroboard/myastroshine
+            org.opencontainers.image.source=https://github.com/myastroboard/myastroshine
+            org.opencontainers.image.licenses=AGPL-3.0
+            org.opencontainers.image.version=${{ steps.version.outputs.value }}
+          cache-from: type=gha,scope=${{ steps.platform.outputs.slug }}
+          cache-to: type=gha,scope=${{ steps.platform.outputs.slug }},mode=max
+
+  merge-and-release:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Normalize image name (lowercase)
+        id: repo
+        run: echo "name=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Read version
+        id: version
+        run: echo "value=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Create and push multi-arch manifests
+        env:
+          GHCR_IMAGE: ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}
+          DOCKERHUB_IMAGE: ${{ env.DOCKERHUB_IMAGE }}
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          set -euo pipefail
+
+          ANNOTATIONS=(
+            --annotation "index:org.opencontainers.image.title=MyAstroShine"
+            --annotation "index:org.opencontainers.image.source=https://github.com/myastroboard/myastroshine"
+            --annotation "index:org.opencontainers.image.licenses=AGPL-3.0"
+            --annotation "index:org.opencontainers.image.version=$VERSION"
+          )
+
+          echo "Publishing to ghcr.io ..."
+          docker buildx imagetools create "${ANNOTATIONS[@]}" \
+            -t "$GHCR_IMAGE:latest" \
+            -t "$GHCR_IMAGE:$VERSION" \
+            -t "$GHCR_IMAGE:${VERSION%.*}" \
+            -t "$GHCR_IMAGE:${VERSION%%.*}" \
+            "$GHCR_IMAGE:linux-amd64-build" \
+            "$GHCR_IMAGE:linux-arm64-build"
+
+          echo "Publishing to Docker Hub ..."
+          docker buildx imagetools create "${ANNOTATIONS[@]}" \
+            -t "$DOCKERHUB_IMAGE:latest" \
+            -t "$DOCKERHUB_IMAGE:$VERSION" \
+            -t "$DOCKERHUB_IMAGE:${VERSION%.*}" \
+            -t "$DOCKERHUB_IMAGE:${VERSION%%.*}" \
+            "$GHCR_IMAGE:linux-amd64-build" \
+            "$GHCR_IMAGE:linux-arm64-build"
+
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:${{ steps.version.outputs.value }}
+          format: table
+          exit-code: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      - name: Generate release notes
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+          GHCR_IMAGE: ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}
+          DOCKERHUB_IMAGE: ${{ env.DOCKERHUB_IMAGE }}
+        run: |
+          set -euo pipefail
+          PREVIOUS_TAG=$(git tag --sort=-version:refname | sed -n 2p)
+
+          {
+            echo "## What's changed"
+            echo
+            python3 scripts/changelog_release.py --extract
+            echo
+            if [ -n "$PREVIOUS_TAG" ]; then
+              echo "### Commits since $PREVIOUS_TAG"
+              git log "$PREVIOUS_TAG..v$VERSION" --reverse --date-order \
+                --pretty=format:"- %s (%h)" --invert-grep --grep="^Merge" || true
+            else
+              echo "### Commits"
+              git log --reverse --date-order \
+                --pretty=format:"- %s (%h)" --invert-grep --grep="^Merge" || true
+            fi
+            echo
+            echo
+            echo "## Docker image"
+            echo
+            echo '```bash'
+            echo "docker pull $GHCR_IMAGE:$VERSION       # GitHub Container Registry"
+            echo "docker pull $DOCKERHUB_IMAGE:$VERSION  # Docker Hub"
+            echo '```'
+            echo
+            echo "| Platform | Architecture |"
+            echo "|----------|-------------|"
+            echo "| \`linux/amd64\` | x86_64 |"
+            echo "| \`linux/arm64\` | ARM 64-bit (Raspberry Pi 4/5, Apple Silicon) |"
+          } > release_notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3.0.2
+        with:
+          body_path: release_notes.md
+          generate_release_notes: false
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

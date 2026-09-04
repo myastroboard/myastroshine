@@ -96,7 +96,7 @@ export default function App() {
               Settings
             </button>
             <span className="text-xs tabular-nums text-ghost">
-              v{import.meta.env.VITE_APP_VERSION ?? '0.1.0'}
+              v{import.meta.env.VITE_APP_VERSION ?? '0.0.0-dev'}
             </span>
           </div>
         </div>

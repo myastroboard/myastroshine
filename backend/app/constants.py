@@ -24,3 +24,9 @@ LOG_LEVELS = ("debug", "info", "warning", "error", "critical")
 # Independent of session_expiry_hours (app_settings.json): that decides which sessions are
 # due for cleanup, this decides how often we look. Not user-tunable - nobody needs to.
 SESSION_CLEANUP_INTERVAL_SECONDS = 60 * 60  # hourly
+
+# Decoded-pixel-count cap (app/utils/image_utils.py:decode_image), independent of the
+# compressed upload byte-size limit (max_image_size_mb) - guards against a small file
+# that decompresses into a huge array (decompression bomb). 8000x8000, comfortably above
+# the ~24MP frame used in tests/benchmarks/.
+MAX_IMAGE_PIXELS = 8000 * 8000

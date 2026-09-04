@@ -7,15 +7,18 @@ envelope (see docs/API.md) together.
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app import __version__
 from app.config import get_settings
@@ -42,6 +45,12 @@ from app.types import JsonDict
 from app.utils.app_settings import get_app_settings, load_or_generate_secret_key
 
 logger = get_logger(__name__)
+
+# The built React SPA, baked into the image by the frontend-builder Dockerfile
+# stage (COPY --from=frontend-builder .../dist ./static). Absent in local
+# `uvicorn --reload` dev (the Vite dev server serves the frontend instead) and
+# in tests - the mount below is skipped when this doesn't exist.
+STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
 
 def _error_body(code: str, message: str, details: JsonDict, status_code: int) -> JSONResponse:
@@ -86,6 +95,20 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # gzip + the security headers a reverse proxy would usually add - this app
+    # is served directly (no nginx in front of it).
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+    @app.middleware("http")
+    async def _security_headers(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        response = await call_next(request)
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "no-referrer-when-downgrade"
+        return response
+
     @app.exception_handler(AppError)
     async def _handle_app_error(_request: Request, exc: AppError) -> JSONResponse:
         return _error_body(exc.error_code, exc.message, exc.details, exc.status_code)
@@ -110,8 +133,16 @@ def create_app() -> FastAPI:
     ):
         app.include_router(router, prefix="/api")
 
-    # WebSocket routes are mounted at the root to match the /ws/ nginx proxy.
     app.include_router(websockets.router)
+
+    # The built frontend, if this image was built with the frontend-builder
+    # stage (see Dockerfile). Mounted *last*: Starlette tries routes in
+    # registration order, so every /api and /ws route above still takes
+    # priority over this catch-all. The frontend uses hash-based routing
+    # (#/settings), so a plain static mount is enough - no SPA-fallback
+    # rewriting for arbitrary paths is needed.
+    if STATIC_DIR.is_dir():
+        app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="frontend")
 
     return app
 

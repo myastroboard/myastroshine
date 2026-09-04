@@ -11,6 +11,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from app.constants import MAX_IMAGE_PIXELS
 from app.exceptions import UnsupportedImageError
 from app.logging_config import get_logger
 
@@ -24,12 +25,20 @@ _ENCODE_EXT = {"jpeg": ".jpg", "jpg": ".jpg", "png": ".png", "tiff": ".tif", "ti
 def decode_image(data: bytes) -> np.ndarray:
     """Decode raw image bytes into a BGR ``uint8`` array.
 
-    Raises :class:`UnsupportedImageError` if the bytes are not a readable image.
+    Raises :class:`UnsupportedImageError` if the bytes are not a readable image, or
+    if the decoded pixel count exceeds ``MAX_IMAGE_PIXELS`` (a decompression bomb -
+    the compressed upload can be small while the decoded array is huge).
     """
     buffer = np.frombuffer(data, dtype=np.uint8)
     image = cv2.imdecode(buffer, cv2.IMREAD_COLOR)
     if image is None:
         raise UnsupportedImageError("Could not decode image data")
+    height, width = image.shape[:2]
+    if height * width > MAX_IMAGE_PIXELS:
+        raise UnsupportedImageError(
+            f"Decoded image is {width}x{height} ({height * width:,} px), "
+            f"exceeding the {MAX_IMAGE_PIXELS:,} px limit"
+        )
     return image
 
 

@@ -50,11 +50,11 @@ docker compose build
 docker compose up -d
 
 curl http://localhost:8002/api/health
-open http://localhost:3000
+open http://localhost:8002
 ```
 
-For development with hot reload (uvicorn `--reload` + Vite HMR, source
-bind-mounted):
+One image serves both the API and the web UI. For development with hot
+reload (uvicorn `--reload` + Vite HMR, source bind-mounted):
 
 ```bash
 docker compose -f docker-compose.dev.yml up

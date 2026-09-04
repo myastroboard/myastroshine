@@ -7,7 +7,9 @@ import uuid
 import pytest
 
 from app.exceptions import PayloadTooLargeError, UnsupportedImageError
+from app.utils.app_settings import save_app_settings
 from app.utils.validators import (
+    is_allowed_callback_url,
     is_valid_session_id,
     validate_image_extension,
     validate_upload_size,
@@ -41,3 +43,15 @@ def test_validate_upload_size_enforces_limit() -> None:
     """An oversized upload raises PayloadTooLargeError."""
     with pytest.raises(PayloadTooLargeError, match="exceeds"):
         validate_upload_size(500 * 1024 * 1024)
+
+
+def test_is_allowed_callback_url_fails_closed_when_allowlist_empty() -> None:
+    """An empty allowlist allows nothing - it must be configured explicitly."""
+    save_app_settings({"astrodex_callback_urls": []})
+    assert not is_allowed_callback_url("http://anything.test/webhook")
+
+
+def test_is_allowed_callback_url_matches_configured_prefix() -> None:
+    save_app_settings({"astrodex_callback_urls": ["http://astrodex.test/"]})
+    assert is_allowed_callback_url("http://astrodex.test/api/webhooks/enhanced-images")
+    assert not is_allowed_callback_url("http://evil.test/x")

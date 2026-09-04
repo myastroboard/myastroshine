@@ -84,6 +84,16 @@ class AppSettings(BaseModel):
         """Trim entries and drop blanks - an empty prefix would match every URL."""
         return [item.strip() for item in value if item and item.strip()]
 
+    @field_validator("cors_origins", mode="after")
+    @classmethod
+    def _reject_cors_wildcard(cls, value: list[str]) -> list[str]:
+        """The CORS middleware always sets allow_credentials=True (main.py) - a
+        literal "*" origin paired with credentials is a real hole, not just a
+        combination browsers happen to reject."""
+        if "*" in value:
+            raise ValueError('cors_origins cannot contain "*" (credentials are always allowed)')
+        return value
+
 
 def load_or_generate_secret_key() -> str:
     """Return the session secret, generating and persisting it on first run.

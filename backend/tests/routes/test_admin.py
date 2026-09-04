@@ -54,6 +54,38 @@ def test_post_app_settings_403_when_admin_disabled(client, monkeypatch: pytest.M
     get_settings.cache_clear()
 
 
+def test_post_app_settings_rejects_cors_wildcard(client) -> None:
+    current = client.get("/api/admin/app-settings").json()
+    current["cors_origins"] = ["*"]
+
+    response = client.post("/api/admin/app-settings", json=current)
+
+    assert response.status_code == 400
+
+
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [
+        ("GET", "/api/admin/app-settings"),
+        ("GET", "/api/admin/logs"),
+        ("GET", "/api/admin/logs/level"),
+        ("GET", "/api/admin/logs/export"),
+    ],
+)
+def test_reads_403_when_admin_disabled(
+    client, monkeypatch: pytest.MonkeyPatch, method: str, path: str
+) -> None:
+    """Reads used to be reachable regardless of ADMIN_ENABLED - they must be
+    gated the same as the sibling write routes."""
+    monkeypatch.setenv("ADMIN_ENABLED", "false")
+    get_settings.cache_clear()
+
+    response = client.request(method, path)
+
+    assert response.status_code == 403
+    get_settings.cache_clear()
+
+
 # --- logs ---------------------------------------------------------------
 
 
