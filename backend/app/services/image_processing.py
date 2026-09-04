@@ -23,6 +23,7 @@ logger = get_logger(__name__)
 _EPS = 1e-3  # a parameter within this of its default is treated as "unchanged"
 _NEUTRAL_KELVIN = 6500
 _DENOISE_MORPH_THRESHOLD = 50
+_STAR_KERNEL_SIZE = 9  # px; compact bright features up to this size read as stars
 
 
 def _unchanged(value: float, default: float) -> bool:
@@ -114,6 +115,41 @@ class ImageProcessingService:
             out = cv2.morphologyEx(out, cv2.MORPH_CLOSE, kernel)
         return out
 
+    def apply_star_reduction(self, image: np.ndarray, amount: int) -> np.ndarray:
+        """Shrink and dim compact bright points (stars) to emphasise the DSO.
+
+        Stars are isolated with a white top-hat: small bright features on a
+        smoothly varying background. Diffuse nebulosity varies slowly, so the
+        top-hat leaves it near zero and it stays out of the mask. Inside the
+        mask the image is blended toward an eroded, slightly darkened copy, so
+        star disks contract while the object is untouched. 0 = off .. 100 = strong.
+        """
+        if amount <= 0:
+            return image
+        strength = amount / 100.0
+
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        kernel = cv2.getStructuringElement(
+            cv2.MORPH_ELLIPSE, (_STAR_KERNEL_SIZE, _STAR_KERNEL_SIZE)
+        )
+        tophat = cv2.morphologyEx(gray, cv2.MORPH_TOPHAT, kernel).astype(np.float32)
+        peak = float(tophat.max())
+        if peak < 1.0:
+            return image
+
+        mask = np.clip(tophat / peak, 0.0, 1.0)
+        # Grow then feather so star cores keep full weight after blurring.
+        grown = cv2.dilate(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
+        mask = cv2.GaussianBlur(np.sqrt(np.maximum(mask, grown)), (0, 0), sigmaX=1.2)
+        weight = np.clip(mask * (0.4 + 0.6 * strength), 0.0, 1.0)[:, :, np.newaxis]
+
+        small = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+        reduced = cv2.erode(image, small, iterations=1 + round(strength * 3)).astype(np.float32)
+        reduced *= 1.0 - 0.6 * strength
+
+        blended = image.astype(np.float32) * (1.0 - weight) + reduced * weight
+        return to_uint8(blended)
+
     def apply_sharpness(self, image: np.ndarray, sharpness: float) -> np.ndarray:
         """Blur below 1.0, Laplacian-kernel sharpen above (0.0..2.0)."""
         if _unchanged(sharpness, 1.0):
@@ -152,6 +188,7 @@ class ImageProcessingService:
             ("vibrance", lambda r: self.apply_vibrance(r, params.vibrance)),
             ("clarity", lambda r: self.apply_clarity(r, params.clarity)),
             ("denoise", lambda r: self.apply_denoise(r, params.denoise)),
+            ("star_reduction", lambda r: self.apply_star_reduction(r, params.star_reduction)),
             ("sharpness", lambda r: self.apply_sharpness(r, params.sharpness)),
         ]
 

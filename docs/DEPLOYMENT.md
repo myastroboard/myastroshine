@@ -43,12 +43,19 @@ Backend (`backend/.env`, see `backend/.env.example`):
 
 Frontend (`frontend/.env`, see `frontend/.env.example`):
 
-| Variable | Default |
-|----------|---------|
-| `VITE_API_URL` | `http://localhost:8002/api` |
-| `VITE_WS_URL` | `ws://localhost:8002/ws` |
-| `VITE_APP_NAME` | `MyAstroShine` |
-| `VITE_APP_VERSION` | `0.1.0` |
+| Variable | Default | Notes |
+|----------|---------|-------|
+| `VITE_API_URL` | `/api` | absolute only when the API is on another origin |
+| `VITE_WS_URL` | `/ws` on the page origin | as above |
+| `VITE_PROXY_TARGET` | `http://localhost:8002` | dev-server only: where `/api` + `/ws` proxy (the dev compose sets `http://api:8002`) |
+| `VITE_APP_NAME` | `MyAstroShine` | |
+| `VITE_APP_VERSION` | `0.1.0` | |
+
+Leave `VITE_API_URL` / `VITE_WS_URL` unset unless the backend really is on a
+different origin: the app then uses same-origin `/api` and `/ws`, which the dev
+server (via `VITE_PROXY_TARGET`) and the production nginx both proxy to the API.
+Setting an absolute `VITE_API_URL` makes `fetch` bypass that proxy while
+`<img src="/api/...">` does not, which breaks image loads in Docker.
 
 ## Startup (production-like)
 

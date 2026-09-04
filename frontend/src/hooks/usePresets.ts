@@ -42,11 +42,24 @@ export function usePresets(sessionId: string) {
 
   const deletePreset = useCallback(
     async (presetId: string) => {
+      setActivePreset((current) => (current === presetId ? undefined : current));
       await apiClient.deletePreset(presetId);
       await refresh();
     },
     [refresh],
   );
 
-  return { presets, activePreset, applyPreset, savePreset, deletePreset, isLoading, refresh };
+  /** Drop the active-preset highlight once the parameters diverge from it. */
+  const clearActivePreset = useCallback(() => setActivePreset(undefined), []);
+
+  return {
+    presets,
+    activePreset,
+    applyPreset,
+    savePreset,
+    deletePreset,
+    clearActivePreset,
+    isLoading,
+    refresh,
+  };
 }

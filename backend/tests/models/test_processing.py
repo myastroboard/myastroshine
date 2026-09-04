@@ -21,6 +21,7 @@ _WIRE = {
     "clarity": 0.8,
     "vibrance": 1.1,
     "denoise": 30,
+    "star_reduction": 20,
     "sharpness": 1.2,
     "temperature": 5500,
     "tint": 5,

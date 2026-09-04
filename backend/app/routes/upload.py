@@ -72,13 +72,24 @@ async def get_preview(
     sessions: SessionServiceDep,
     storage: StorageDep,
     full: bool = False,
+    original: bool = False,
 ) -> FileResponse:
-    """Return the current preview JPEG for a session."""
+    """Return an image for a session.
+
+    ``original=true`` serves the untouched upload (for before/after views);
+    otherwise the current result - ``full=true`` for full resolution, the
+    downscaled preview by default.
+    """
     if not is_valid_session_id(session_id):
         raise SessionNotFoundError(f"Session {session_id} not found")
     sessions.get_session(session_id)
 
-    path = storage.processed_path(session_id) if full else storage.preview_path(session_id)
+    if original:
+        path = storage.original_path(session_id)
+    elif full:
+        path = storage.processed_path(session_id)
+    else:
+        path = storage.preview_path(session_id)
     if not path.exists():
         raise SessionNotFoundError(f"No preview for session {session_id}")
 

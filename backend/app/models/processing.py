@@ -25,6 +25,7 @@ class ProcessingParameters(BaseModel):
     clarity: float = Field(default=0.0, ge=-1.0, le=1.0)
     vibrance: float = Field(default=1.0, ge=0.0, le=2.0)
     denoise: int = Field(default=0, ge=0, le=100)
+    star_reduction: int = Field(default=0, ge=0, le=100)
     sharpness: float = Field(default=1.0, ge=0.0, le=2.0)
     temperature: int = Field(default=6500, ge=2000, le=8000)
     tint: int = Field(default=0, ge=-50, le=50)

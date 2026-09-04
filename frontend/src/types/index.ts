@@ -21,6 +21,7 @@ export interface ProcessingParameters {
   clarity: number;
   vibrance: number;
   denoise: number;
+  starReduction: number;
   sharpness: number;
   temperature: number;
   tint: number;
@@ -36,6 +37,7 @@ export const DEFAULT_PARAMETERS: ProcessingParameters = {
   clarity: 0.0,
   vibrance: 1.0,
   denoise: 0,
+  starReduction: 0,
   sharpness: 1.0,
   temperature: 6500,
   tint: 0,
@@ -48,7 +50,7 @@ export interface ParameterBound {
   min: number;
   max: number;
   step: number;
-  group: 'basic' | 'tone' | 'noise' | 'sharp' | 'color' | 'depth';
+  group: 'basic' | 'tone' | 'noise' | 'star' | 'sharp' | 'color' | 'depth';
 }
 
 export const PARAMETER_BOUNDS: ParameterBound[] = [
@@ -58,6 +60,7 @@ export const PARAMETER_BOUNDS: ParameterBound[] = [
   { key: 'shadows', label: 'Shadows', min: -1.0, max: 1.0, step: 0.01, group: 'tone' },
   { key: 'clarity', label: 'Clarity', min: -1.0, max: 1.0, step: 0.01, group: 'tone' },
   { key: 'denoise', label: 'Denoise', min: 0, max: 100, step: 1, group: 'noise' },
+  { key: 'starReduction', label: 'Star reduction', min: 0, max: 100, step: 1, group: 'star' },
   { key: 'sharpness', label: 'Sharpness', min: 0.0, max: 2.0, step: 0.01, group: 'sharp' },
   { key: 'vibrance', label: 'Vibrance', min: 0.0, max: 2.0, step: 0.01, group: 'sharp' },
   { key: 'saturation', label: 'Saturation', min: 0.0, max: 2.0, step: 0.01, group: 'color' },
@@ -101,6 +104,7 @@ export interface ProcessResponse {
 export interface EditorSession {
   sessionId: string;
   histogram?: HistogramData;
+  dimensions?: Dimensions;
 }
 
 export type JobStatus = 'queued' | 'processing' | 'completed' | 'failed';

@@ -6,6 +6,7 @@ of effect, and output validity (BGR uint8, same shape, in range).
 
 from __future__ import annotations
 
+import cv2
 import numpy as np
 import pytest
 
@@ -83,6 +84,37 @@ def test_sharpness_identity_at_one(
     assert np.array_equal(service.apply_sharpness(sample_image, 1.0), sample_image)
 
 
+def test_star_reduction_off_is_identity(
+    service: ImageProcessingService, sample_image: np.ndarray
+) -> None:
+    """star_reduction=0 returns the input untouched."""
+    assert np.array_equal(service.apply_star_reduction(sample_image, 0), sample_image)
+
+
+def test_star_reduction_dims_stars_more_than_the_object(
+    service: ImageProcessingService,
+) -> None:
+    """Star points lose brightness while a diffuse disc is left alone."""
+    image = np.zeros((200, 200, 3), dtype=np.uint8)
+    cv2.circle(image, (100, 100), 45, (120, 120, 130), -1)
+    image = cv2.GaussianBlur(image, (0, 0), sigmaX=12)
+    object_before = int(image[100, 100].astype(int).sum())
+
+    stars = [(20, 20), (180, 20), (20, 180), (180, 180), (100, 25)]
+    for x, y in stars:
+        cv2.circle(image, (x, y), 3, (255, 255, 255), -1)
+    stars_before = float(np.mean([image[y, x].astype(int).sum() for x, y in stars]))
+
+    out = service.apply_star_reduction(image, 80)
+
+    stars_after = float(np.mean([out[y, x].astype(int).sum() for x, y in stars]))
+    object_after = int(out[100, 100].astype(int).sum())
+    assert out.shape == image.shape
+    assert out.dtype == np.uint8
+    assert stars_after < stars_before * 0.7
+    assert object_after >= object_before * 0.9
+
+
 def test_white_balance_neutral_is_identity(
     service: ImageProcessingService, sample_image: np.ndarray
 ) -> None:
@@ -111,6 +143,7 @@ def test_full_pipeline_stays_in_range(
         clarity=0.6,
         vibrance=1.3,
         denoise=40,
+        star_reduction=50,
         sharpness=1.5,
         temperature=4200,
         tint=10,

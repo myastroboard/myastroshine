@@ -36,7 +36,7 @@ Celery job queue (`PROCESSING_MODE=queue`), and the progress WebSockets.
 |--------|------|---------|--------|
 | GET | `/health` | System health | 1 |
 | POST | `/upload` | Upload an image, open a session | 1 |
-| GET | `/preview/{session_id}` | Current preview JPEG (`?full=true` for full res) | 1 |
+| GET | `/preview/{session_id}` | Session image: `?full=true` full-res result, `?original=true` untouched upload, default downscaled result | 1 |
 | POST | `/process/{session_id}` | Apply enhancement parameters | 1 / 3 |
 | WS | `/ws/processing-status/{job_id}` | Real-time job progress | 3 |
 | POST | `/download/{session_id}` | Download the processed image | 2 |
@@ -71,6 +71,7 @@ Celery job queue (`PROCESSING_MODE=queue`), and the progress WebSockets.
 | clarity | -1.0 | 1.0 | 0.0 | float |
 | vibrance | 0.0 | 2.0 | 1.0 | float |
 | denoise | 0 | 100 | 0 | int |
+| star_reduction | 0 | 100 | 0 | int |
 | sharpness | 0.0 | 2.0 | 1.0 | float |
 | temperature | 2000 | 8000 | 6500 | int (Kelvin) |
 | tint | -50 | 50 | 0 | int |
@@ -100,8 +101,9 @@ relays live events from Redis until a terminal status arrives, then closes.
 `status`: `queued`, `processing`, `completed`, `failed` (or `unknown` if the
 `job_id` is not found). Image steps: `color_correction`, `contrast`,
 `brightness`, `highlights_shadows`, `saturation`, `vibrance`, `clarity`,
-`denoise`, `sharpness`, `rendering`, `done`. Stack steps: `registration`,
-`background_normalization`, `cosmic_ray_rejection`, `combination`, `done`.
+`denoise`, `star_reduction`, `sharpness`, `rendering`, `done`. Stack steps:
+`registration`, `background_normalization`, `cosmic_ray_rejection`,
+`combination`, `done`.
 
 In the default `PROCESSING_MODE=sync`, the job is already `completed` when
 `/process` returns; the WebSocket just replays that final state.
@@ -125,6 +127,9 @@ DUPLICATE_RESOURCE`; more than 50 user presets gives `413 PAYLOAD_TOO_LARGE`.
 
 `POST /presets/{preset_id}/apply/{session_id}` runs the pipeline with that
 preset's parameters and returns the same body as `POST /process`.
+
+`DELETE /presets/{preset_id}` returns `204`; deleting a built-in gives `403`.
+The editor shows a delete affordance only on `author != "system"` presets.
 
 ## Depth shift
 

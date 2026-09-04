@@ -22,8 +22,15 @@ Applied in this order to minimize artifacts (`apply_parameters`):
    sharpens, negative softens.
 8. **Denoise** (0-100) - bilateral filter; map to diameter 5-20 and
    sigma_color / sigma_space 75-150. Above 50, add a 3x3 morphological close.
-9. **Sharpness** (0-2) - below 1.0 Gaussian blur, above 1.0 Laplacian-kernel
-   sharpen blended by `(sharpness - 1) * 0.5`.
+9. **Star reduction** (0-100) - shrink and dim compact bright points to
+   emphasise the diffuse object. A white top-hat (9x9 ellipse) isolates small
+   bright features: nebulosity varies too slowly to register, so it stays out
+   of the mask. The mask is dilated (5x5), feathered (`sqrt`, then a 1.2 sigma
+   blur) and scaled by `0.4 + 0.6 * amount`. Inside it the image is blended
+   toward an eroded (1-4 iterations of a 3x3 ellipse), `1 - 0.6 * amount`
+   darkened copy, so star disks contract while the object is untouched.
+10. **Sharpness** (0-2) - below 1.0 Gaussian blur, above 1.0 Laplacian-kernel
+    sharpen blended by `(sharpness - 1) * 0.5`.
 
 Preview path downscales to 512 px (`preview_max_size`) for instant feedback; the
 full-resolution result is computed on demand or via the job queue.

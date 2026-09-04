@@ -36,6 +36,21 @@ def test_process_changes_the_preview(client, sample_jpeg: bytes) -> None:
     assert before != after
 
 
+def test_preview_original_is_untouched_by_processing(client, sample_jpeg: bytes) -> None:
+    """``?original=true`` keeps serving the upload even after processing."""
+    session_id = _upload(client, sample_jpeg)
+    original = client.get(f"/api/preview/{session_id}", params={"original": "true"})
+    assert original.status_code == 200
+    original_bytes = original.content
+
+    client.post(f"/api/process/{session_id}", json={"parameters": {"contrast": 2.5}})
+
+    after_original = client.get(f"/api/preview/{session_id}", params={"original": "true"}).content
+    after_full = client.get(f"/api/preview/{session_id}", params={"full": "true"}).content
+    assert after_original == original_bytes
+    assert after_full != original_bytes
+
+
 def test_process_unknown_session_is_404(client) -> None:
     """Processing a missing session returns 404."""
     response = client.post(

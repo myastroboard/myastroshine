@@ -11,6 +11,7 @@ const GROUP_LABELS: Record<ParameterBound['group'], string> = {
   basic: 'Basic',
   tone: 'Tone',
   noise: 'Noise',
+  star: 'Stars',
   sharp: 'Sharpness',
   color: 'Color',
   depth: 'Depth',

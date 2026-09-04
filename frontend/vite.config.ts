@@ -3,6 +3,10 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { configDefaults, defineConfig } from 'vitest/config';
 
+// Where the dev server proxies /api and /ws. Local dev hits the host; the Docker
+// dev stack sets this to the api service on the compose network.
+const PROXY_TARGET = process.env.VITE_PROXY_TARGET ?? 'http://localhost:8002';
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -17,8 +21,8 @@ export default defineConfig({
     // Bind-mounted source in Docker (esp. on Windows/macOS) needs polling for HMR.
     watch: process.env.VITE_USE_POLLING ? { usePolling: true } : undefined,
     proxy: {
-      '/api': { target: 'http://localhost:8002', changeOrigin: true },
-      '/ws': { target: 'ws://localhost:8002', ws: true },
+      '/api': { target: PROXY_TARGET, changeOrigin: true },
+      '/ws': { target: PROXY_TARGET, ws: true, changeOrigin: true },
     },
   },
   test: {

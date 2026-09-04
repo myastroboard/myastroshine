@@ -17,7 +17,8 @@ tagged yet.
   histogram, and session tracking (`POST /api/upload`, `GET /api/preview/{id}`).
 - `ImageProcessingService` pipeline: white balance (temperature/tint), contrast,
   brightness, highlights/shadows recovery, saturation, vibrance, clarity, denoise
-  (bilateral), sharpness. Twelve parameters, validated against documented bounds.
+  (bilateral), star reduction (top-hat star mask + morphological erosion),
+  sharpness. Thirteen parameters, validated against documented bounds.
 - `POST /api/process/{id}` applies parameters and returns a job handle.
 - `GET /api/health` system health check.
 - Alembic migration scaffolding; `init_db()` creates tables for local/dev use.
@@ -78,6 +79,8 @@ tagged yet.
 - Single-image editor: drag-and-drop upload, before/after split preview with zoom
   controls, histogram, grouped parameter sliders (500 ms debounce), preset
   buttons, "save as preset" dialog, download.
+- Preset chips: apply, plus a two-step delete on user presets (built-ins have no
+  delete affordance; the backend also rejects it with 403).
 - Interactive Depth Shift viewer (pointer-driven parallax, intensity slider).
 - Multi-frame stacking mode: frame upload list, settings panel (alignment,
   combination, cosmic-ray/background toggles), step-by-step progress over the
@@ -98,6 +101,31 @@ tagged yet.
 - GitHub Actions: backend (ruff, mypy, pytest), frontend (lint, typecheck, test,
   build), and e2e (Playwright) jobs, plus the dependency-freshness cron.
 - API listens on port 8002.
+
+### Fixed
+
+- Editor preview now refreshes after every adjustment: `useImageProcessing`
+  exposes a `previewVersion` that the processed-image URL carries as a
+  cache-buster (the URL was otherwise constant, so the browser kept the first
+  render).
+- Applying a preset now also moves the sliders to the preset's values
+  (`syncParameters`), so a follow-up tweak starts from the preset; a manual
+  slider edit (or Reset all) drops the preset highlight (`clearActivePreset`).
+- Before/after divider: the whole frame is a grab zone with an `ew-resize`
+  cursor and a centre handle; dragging no longer selects the page (images are
+  `draggable={false}` / `pointer-events-none`, container is `select-none` and
+  captures the pointer).
+- Before/after view compares the true upload against the result:
+  `GET /preview/{id}?original=true` serves the untouched original, and the two
+  images share one box via `clip-path` so they stay aligned. The preview frame
+  now takes the image's real aspect ratio instead of a fixed 16:9 letterbox.
+- Depth Shift viewer is a centred modal (was an inline block pushed off-screen)
+  and closes on Escape / backdrop click.
+- Docker dev stack: Vite proxies `/api` and `/ws` to the `api` service
+  (`VITE_PROXY_TARGET`), so backend-relative image URLs (depth layers, stacked
+  composite) load instead of 502-ing. `VITE_API_URL`/`VITE_WS_URL` dropped from
+  `docker-compose.dev.yml`; `ws.ts` builds an absolute ws:// URL from the page
+  origin when unset.
 
 ### Known gaps
 

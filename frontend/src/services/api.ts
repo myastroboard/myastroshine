@@ -102,8 +102,28 @@ export const apiClient = {
     });
   },
 
-  previewUrl(sessionId: string, full = false): string {
-    return `${API_URL}/preview/${sessionId}${full ? '?full=true' : ''}`;
+  /**
+   * URL for a session image.
+   * - `original`: the untouched upload (before/after "before" side)
+   * - `full`: full-resolution current result (default: downscaled preview)
+   * - `v`: cache-busting token; bump it when the result changes so the
+   *   browser re-fetches an otherwise-identical URL.
+   */
+  previewUrl(
+    sessionId: string,
+    opts: { full?: boolean; original?: boolean; v?: number | string } = {},
+  ): string {
+    const params = new URLSearchParams();
+    if (opts.original) {
+      params.set('original', 'true');
+    } else if (opts.full) {
+      params.set('full', 'true');
+    }
+    if (opts.v !== undefined) {
+      params.set('v', String(opts.v));
+    }
+    const query = params.toString();
+    return `${API_URL}/preview/${sessionId}${query ? `?${query}` : ''}`;
   },
 
   async downloadImage(sessionId: string, format = 'jpeg', quality = 95): Promise<Blob> {

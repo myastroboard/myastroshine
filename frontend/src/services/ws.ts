@@ -5,7 +5,18 @@ import type { ProcessingStatus } from '@/types';
 
 import { keysToCamelCase } from './caseConvert';
 
-const WS_URL = import.meta.env.VITE_WS_URL ?? '/ws';
+/** Absolute ws:// base. `VITE_WS_URL` wins; otherwise `/ws` on the page origin. */
+const WS_URL = ((): string => {
+  const configured = import.meta.env.VITE_WS_URL;
+  if (configured) {
+    return configured;
+  }
+  if (typeof window === 'undefined') {
+    return 'ws://localhost:3000/ws';
+  }
+  const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${scheme}//${window.location.host}/ws`;
+})();
 
 type StatusListener = (status: ProcessingStatus) => void;
 
