@@ -1,7 +1,6 @@
 import { useCallback, useState } from 'react';
 
 import { apiClient } from '@/services/api';
-import type { ProcessingParameters } from '@/types';
 
 /** Sends the enhanced image back to AstroDex via the backend webhook route. */
 export function useAstroDexIntegration() {
@@ -10,17 +9,12 @@ export function useAstroDexIntegration() {
   const [error, setError] = useState<string | null>(null);
 
   const sendImage = useCallback(
-    async (
-      sessionId: string,
-      astrodexImageId: string,
-      parameters: ProcessingParameters,
-      callbackUrl: string,
-    ) => {
+    async (sessionId: string, astrodexImageId: string, callbackUrl: string, token: string) => {
       setIsLoading(true);
       setSuccess(false);
       setError(null);
       try {
-        await apiClient.sendToAstroDex(sessionId, astrodexImageId, parameters, callbackUrl);
+        await apiClient.sendToAstroDex(sessionId, astrodexImageId, callbackUrl, token);
         setSuccess(true);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to send to AstroDex');

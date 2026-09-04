@@ -3,6 +3,8 @@
 
 import type { ProcessingStatus } from '@/types';
 
+import { keysToCamelCase } from './caseConvert';
+
 const WS_URL = import.meta.env.VITE_WS_URL ?? '/ws';
 
 type StatusListener = (status: ProcessingStatus) => void;
@@ -22,7 +24,7 @@ export class WebSocketClient {
 
     this.socket.addEventListener('message', (event) => {
       try {
-        const status = JSON.parse(event.data as string) as ProcessingStatus;
+        const status = keysToCamelCase<ProcessingStatus>(JSON.parse(event.data as string));
         this.listeners.forEach((listener) => listener(status));
       } catch {
         // Ignore malformed frames.

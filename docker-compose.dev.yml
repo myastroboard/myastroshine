@@ -2,9 +2,23 @@
 #
 #   docker compose -f docker-compose.dev.yml up
 #
-# - api: uvicorn --reload, source bind-mounted, code changes restart the server
+# - api: uvicorn --reload, source bind-mounted
+# - worker: celery worker, restarted on code change by watchmedo (source bind-mounted)
 # - web: Vite dev server with HMR, source bind-mounted
 # - data and the SQLite db live in ./data on the host
+
+x-backend-env: &backend-env
+  PYTHONUNBUFFERED: "1"
+  APP_ENV: development
+  DEBUG: "true"
+  LOG_LEVEL: debug
+  DATABASE_URL: sqlite:////data/db/myastroshine.db
+  STORAGE_PATH: /data/images
+  API_CORS_ORIGINS: http://localhost:3000
+  ASTRODEX_WEBHOOK_SECRET: ${ASTRODEX_WEBHOOK_SECRET:-dev-secret}
+  REDIS_URL: redis://redis:6379/0
+  CELERY_BROKER_URL: redis://redis:6379/1
+  PROCESSING_MODE: ${PROCESSING_MODE:-sync}
 
 services:
   api:
@@ -13,18 +27,26 @@ services:
       dockerfile: Dockerfile
     container_name: myastroshine-api-dev
     command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8002
-    environment:
-      - PYTHONUNBUFFERED=1
-      - APP_ENV=development
-      - DEBUG=true
-      - LOG_LEVEL=debug
-      - DATABASE_URL=sqlite:////data/db/myastroshine.db
-      - STORAGE_PATH=/data/images
-      - API_CORS_ORIGINS=http://localhost:3000
-      - ASTRODEX_WEBHOOK_SECRET=${ASTRODEX_WEBHOOK_SECRET:-dev-secret}
-      - REDIS_URL=redis://redis:6379/0
+    environment: *backend-env
     ports:
       - "8002:8002"
+    volumes:
+      - ./backend:/app
+      - ./data:/data
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: myastroshine-worker-dev
+    command: >
+      sh -c "pip install --quiet watchdog &&
+      watchmedo auto-restart --directory=/app/app --pattern='*.py' --recursive --
+      celery -A app.tasks.celery_app worker --loglevel=info --concurrency=1"
+    environment: *backend-env
     volumes:
       - ./backend:/app
       - ./data:/data

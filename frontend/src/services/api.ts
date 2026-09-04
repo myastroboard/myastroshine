@@ -1,28 +1,87 @@
 // HTTP client for the MyAstroShine backend.
 // One method per API endpoint; see docs/API.md for the contracts.
+//
+// The backend uses snake_case; request bodies and responses are converted at
+// this boundary (see caseConvert.ts) so the rest of the app stays camelCase.
 
 import type {
+  CreatedToken,
+  DepthShiftResult,
   Preset,
   ProcessResponse,
   ProcessingParameters,
   StackResult,
+  StackSession,
   StackSettings,
+  UploadFrameResult,
   UploadResponse,
   WebhookResponse,
+  WebhookToken,
 } from '@/types';
+
+import { keysToCamelCase, keysToSnakeCase } from './caseConvert';
 
 const API_URL = import.meta.env.VITE_API_URL ?? '/api';
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
-    ...init,
-  });
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`${response.status} ${response.statusText}: ${detail}`);
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+    readonly errorCode?: string,
+  ) {
+    super(message);
+    this.name = 'ApiError';
   }
-  return response.json() as Promise<T>;
+}
+
+async function readError(response: Response): Promise<ApiError> {
+  const text = await response.text();
+  try {
+    const body = JSON.parse(text) as { error?: string; error_code?: string };
+    return new ApiError(response.status, body.error ?? text, body.error_code);
+  } catch {
+    return new ApiError(response.status, text || response.statusText);
+  }
+}
+
+interface RequestOptions {
+  method?: string;
+  json?: unknown;
+  bearer?: string;
+}
+
+async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const headers: Record<string, string> = {};
+  const init: RequestInit = { method: options.method ?? 'GET', headers };
+  if (options.json !== undefined) {
+    headers['Content-Type'] = 'application/json';
+    init.body = JSON.stringify(keysToSnakeCase(options.json));
+  }
+  if (options.bearer) {
+    headers.Authorization = `Bearer ${options.bearer}`;
+  }
+
+  const response = await fetch(`${API_URL}${path}`, init);
+  if (!response.ok) {
+    throw await readError(response);
+  }
+  if (response.status === 204) {
+    return undefined as T;
+  }
+  return keysToCamelCase<T>(await response.json());
+}
+
+export interface SavePresetInput {
+  name: string;
+  category?: string;
+  description?: string;
+  parameters: ProcessingParameters;
+}
+
+export interface SavePresetResult {
+  presetId: string;
+  name: string;
+  createdAt: string;
 }
 
 export const apiClient = {
@@ -31,15 +90,15 @@ export const apiClient = {
     form.append('file', file);
     const response = await fetch(`${API_URL}/upload`, { method: 'POST', body: form });
     if (!response.ok) {
-      throw new Error(`Upload failed: ${response.status}`);
+      throw await readError(response);
     }
-    return response.json() as Promise<UploadResponse>;
+    return keysToCamelCase<UploadResponse>(await response.json());
   },
 
   processImage(sessionId: string, parameters: ProcessingParameters): Promise<ProcessResponse> {
     return request<ProcessResponse>(`/process/${sessionId}`, {
       method: 'POST',
-      body: JSON.stringify({ parameters }),
+      json: { parameters },
     });
   },
 
@@ -54,7 +113,7 @@ export const apiClient = {
       body: JSON.stringify({ format, quality }),
     });
     if (!response.ok) {
-      throw new Error(`Download failed: ${response.status}`);
+      throw await readError(response);
     }
     return response.blob();
   },
@@ -62,34 +121,87 @@ export const apiClient = {
   sendToAstroDex(
     sessionId: string,
     astrodexImageId: string,
-    parametersUsed: ProcessingParameters,
     callbackUrl: string,
+    token: string,
   ): Promise<WebhookResponse> {
     return request<WebhookResponse>('/send-to-astrodex', {
       method: 'POST',
-      body: JSON.stringify({
-        session_id: sessionId,
-        astrodex_image_id: astrodexImageId,
-        parameters_used: parametersUsed,
-        astrodex_callback_url: callbackUrl,
-      }),
+      bearer: token,
+      json: { sessionId, astrodexImageId, astrodexCallbackUrl: callbackUrl },
     });
+  },
+
+  // --- Webhook tokens (created from Settings) ---
+  listTokens(): Promise<{ tokens: WebhookToken[]; total: number }> {
+    return request('/tokens');
+  },
+
+  createToken(name: string, expiresInDays?: number): Promise<CreatedToken> {
+    return request<CreatedToken>('/tokens', {
+      method: 'POST',
+      json: { name, expiresInDays },
+    });
+  },
+
+  revokeToken(tokenId: string): Promise<void> {
+    return request<void>(`/tokens/${tokenId}`, { method: 'DELETE' });
   },
 
   listPresets(): Promise<{ presets: Preset[]; total: number }> {
     return request('/presets');
   },
 
-  savePreset(preset: Omit<Preset, 'presetId' | 'author' | 'isFavorite'>): Promise<Preset> {
-    return request<Preset>('/presets', { method: 'POST', body: JSON.stringify(preset) });
+  savePreset(preset: SavePresetInput): Promise<SavePresetResult> {
+    return request<SavePresetResult>('/presets', { method: 'POST', json: preset });
   },
 
-  // --- Stacking (v1.1+) ---
-  initiateStack(frameCount: number, settings: StackSettings): Promise<{ stackSessionId: string }> {
-    return request('/stack/initiate', {
+  deletePreset(presetId: string): Promise<void> {
+    return request<void>(`/presets/${presetId}`, { method: 'DELETE' });
+  },
+
+  applyPreset(presetId: string, sessionId: string): Promise<ProcessResponse> {
+    return request<ProcessResponse>(`/presets/${presetId}/apply/${sessionId}`, { method: 'POST' });
+  },
+
+  generateDepthShift(
+    sessionId: string,
+    numLayers = 7,
+    intensity = 50,
+  ): Promise<DepthShiftResult> {
+    return request<DepthShiftResult>(`/depth-shift/${sessionId}`, {
       method: 'POST',
-      body: JSON.stringify({ frame_count: frameCount, ...settings }),
+      json: { numLayers, intensity },
     });
+  },
+
+  // --- Stacking (v1.1) ---
+  initiateStack(frameCount: number, settings: StackSettings): Promise<StackSession> {
+    return request<StackSession>('/stack/initiate', {
+      method: 'POST',
+      json: { frameCount, ...settings },
+    });
+  },
+
+  async uploadStackFrame(
+    stackId: string,
+    frameIndex: number,
+    file: File,
+  ): Promise<UploadFrameResult> {
+    const form = new FormData();
+    form.append('frame_index', String(frameIndex));
+    form.append('file', file);
+    const response = await fetch(`${API_URL}/stack/${stackId}/upload-frame`, {
+      method: 'POST',
+      body: form,
+    });
+    if (!response.ok) {
+      throw await readError(response);
+    }
+    return keysToCamelCase<UploadFrameResult>(await response.json());
+  },
+
+  processStack(stackId: string): Promise<StackResult> {
+    return request<StackResult>(`/stack/${stackId}/process`, { method: 'POST' });
   },
 
   getStack(stackId: string): Promise<StackResult> {

@@ -1,5 +1,18 @@
 # MyAstroShine - full stack orchestration.
-# Redis is only required from phase 2+ (Celery job queue); it is harmless to run now.
+
+x-backend-env: &backend-env
+  PYTHONUNBUFFERED: "1"
+  APP_ENV: production
+  LOG_LEVEL: info
+  DATABASE_URL: sqlite:////data/db/myastroshine.db
+  STORAGE_PATH: /data/images
+  API_CORS_ORIGINS: http://localhost:3000,http://myastroshine.local
+  ASTRODEX_WEBHOOK_SECRET: ${ASTRODEX_WEBHOOK_SECRET:-change-me}
+  ASTRODEX_CALLBACK_URLS: ${ASTRODEX_CALLBACK_URLS:-}
+  REDIS_URL: redis://redis:6379/0
+  CELERY_BROKER_URL: redis://redis:6379/1
+  # queue mode: /process and /stack/*/process run on the worker, progress on the WS
+  PROCESSING_MODE: queue
 
 services:
   api:
@@ -7,16 +20,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: myastroshine-api
-    environment:
-      - PYTHONUNBUFFERED=1
-      - APP_ENV=production
-      - LOG_LEVEL=info
-      - DATABASE_URL=sqlite:////data/db/myastroshine.db
-      - STORAGE_PATH=/data/images
-      - API_CORS_ORIGINS=http://localhost:3000,http://myastroshine.local
-      - ASTRODEX_WEBHOOK_SECRET=${ASTRODEX_WEBHOOK_SECRET:-change-me}
-      - ASTRODEX_CALLBACK_URLS=${ASTRODEX_CALLBACK_URLS:-}
-      - REDIS_URL=redis://redis:6379/0
+    environment: *backend-env
     ports:
       - "8002:8002"
     volumes:
@@ -31,6 +35,21 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: myastroshine-worker
+    command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=2
+    environment: *backend-env
+    volumes:
+      - myastroshine_images:/data/images
+      - myastroshine_db:/data/db
+    depends_on:
+      - redis
+      - api
+    restart: unless-stopped
 
   web:
     build:

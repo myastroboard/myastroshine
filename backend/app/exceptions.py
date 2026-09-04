@@ -42,8 +42,33 @@ class InvalidParameterError(AppError):
 
 
 class PayloadTooLargeError(AppError):
-    status_code = 400
+    status_code = 413
     error_code = "PAYLOAD_TOO_LARGE"
+
+
+class DuplicateResourceError(AppError):
+    status_code = 400
+    error_code = "DUPLICATE_RESOURCE"
+
+
+class ResourceNotFoundError(AppError):
+    status_code = 404
+    error_code = "NOT_FOUND"
+
+
+class ForbiddenError(AppError):
+    status_code = 403
+    error_code = "FORBIDDEN"
+
+
+class UnauthorizedError(AppError):
+    status_code = 401
+    error_code = "UNAUTHORIZED"
+
+
+class UpstreamUnavailableError(AppError):
+    status_code = 503
+    error_code = "ASTRODEX_UNREACHABLE"
 
 
 class ImageProcessingError(AppError):

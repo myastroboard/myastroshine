@@ -1,6 +1,8 @@
 # MyAstroShine
 
-**Status:** Implementation - Sprint 1 done (upload -> enhance -> download)
+**Status:** Implementation - all v1.0 + v1.1 API routes implemented (enhance,
+presets, depth shift, AstroDex webhooks, stacking, Celery queue + progress WS);
+frontend wired end to end for both single-image and multi-frame stacking
 **License:** AGPL-3.0-or-later
 **Ecosystem:** MyAstroBoard / AstroDex integration + Standalone
 

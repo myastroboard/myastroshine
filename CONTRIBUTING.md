@@ -8,6 +8,48 @@ Thanks for helping build MyAstroShine. This guide covers the practical workflow;
 - Python 3.13, Node.js 24+, Docker Desktop 4.0+
 - See `README.md` for backend and frontend setup.
 
+## Docker
+
+Both stacks build from the same `backend/` and `frontend/` Dockerfiles; the
+compose file decides the command, mounts, and environment.
+
+### Debug stack (hot reload)
+
+```bash
+docker compose -f docker-compose.dev.yml up          # add --build after editing a Dockerfile or requirements
+```
+
+- API under `uvicorn --reload`, worker restarted by `watchmedo`, web on the Vite
+  dev server - all with the source bind-mounted from the host.
+- `APP_ENV=development`, `DEBUG=true`, `LOG_LEVEL=debug`, `PROCESSING_MODE=sync`.
+  Prefix with `PROCESSING_MODE=queue` to exercise the Celery + Redis path.
+- Data and the SQLite DB land in `./data/` on the host.
+- Follow one service: `docker compose -f docker-compose.dev.yml logs -f api`
+- Tear down: `docker compose -f docker-compose.dev.yml down` (`-v` also drops the
+  `node_modules` volume).
+
+### Release build (production image check)
+
+Run this before tagging a release to confirm the shipped images build clean and
+boot:
+
+```bash
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+
+docker compose build --no-cache --pull              # baked images, no bind mount
+docker compose up -d
+
+curl -f http://localhost:8002/api/health            # -> {"status": "healthy", ...}
+docker compose ps                                   # api must reach "healthy"
+# open http://localhost:3000                        # web served by nginx, proxies /api and /ws
+
+docker compose down -v                              # clean up (drops data volumes)
+```
+
+This runs `APP_ENV=production` with `PROCESSING_MODE=queue`, so it also covers the
+worker and Redis services that the debug stack skips by default.
+
 ## Dependencies
 
 All dependencies are pinned to their latest release. `scripts/check_deps_fresh.py`
@@ -48,12 +90,20 @@ Run from `frontend/`:
 ```bash
 npm run lint           # eslint
 npm run typecheck      # tsc --noEmit
-npm test               # vitest
+npm test               # vitest (unit + component)
 npm run build          # production build must succeed
+npm run test:e2e       # Playwright (boots the backend + Vite, drives Chromium)
 ```
+
+`test:e2e` needs the browser (`npx playwright install chromium`, once) and the
+backend importable (`pip install -r ../backend/requirements.txt`). It runs as its
+own `e2e` CI job.
 
 - No `innerHTML`, no static inline styles (see `AGENTS.md` section 5).
 - Components are function components with typed props; hooks live in `src/hooks/`.
+- All frontend types are camelCase. The backend speaks snake_case; conversion
+  happens only in `src/services/api.ts` / `ws.ts` via `caseConvert.ts`. Do not
+  add snake_case to component/hook/type code.
 - Tailwind v4 is configured CSS-first in `src/styles/index.css` (`@theme`), loaded
   by the `@tailwindcss/vite` plugin - there is no `tailwind.config.js`.
 

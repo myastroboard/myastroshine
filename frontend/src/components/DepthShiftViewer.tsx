@@ -51,7 +51,7 @@ export function DepthShiftViewer({
   return (
     <div
       ref={containerRef}
-      className="relative h-[70vh] w-full overflow-hidden rounded-lg bg-black"
+      className="relative h-[70vh] w-full overflow-hidden rounded-xl border border-hairline bg-black"
       onMouseMove={handleMouseMove}
     >
       {depthLayerUrls.map((url, index) => (
@@ -64,25 +64,23 @@ export function DepthShiftViewer({
         />
       ))}
 
-      <div className="absolute bottom-4 left-4 rounded bg-black/70 p-3">
-        <label className="flex items-center gap-2 text-xs">
-          Intensity
-          <input
-            type="range"
-            className="slider-input w-40"
-            min={0}
-            max={100}
-            value={intensity}
-            aria-label="Depth shift intensity"
-            onChange={(event) => onIntensityChange(Number(event.target.value))}
-          />
-          <span className="tabular-nums">{intensity}%</span>
-        </label>
+      <div className="absolute bottom-4 left-4 flex items-center gap-3 rounded-lg border border-white/10 bg-black/60 px-3 py-2 text-xs text-white/85 backdrop-blur-sm">
+        <span className="uppercase tracking-wide text-white/60">Intensity</span>
+        <input
+          type="range"
+          className="slider w-40"
+          min={0}
+          max={100}
+          value={intensity}
+          aria-label="Depth shift intensity"
+          onChange={(event) => onIntensityChange(Number(event.target.value))}
+        />
+        <span className="w-9 tabular-nums text-right">{intensity}%</span>
       </div>
 
       <button
         type="button"
-        className="absolute right-4 top-4 rounded bg-black/70 px-3 py-1 text-sm"
+        className="absolute right-4 top-4 rounded-md border border-white/10 bg-black/60 px-3 py-1.5 text-sm text-white/85 backdrop-blur-sm transition-colors hover:bg-black/80"
         onClick={onClose}
       >
         Close

@@ -5,11 +5,17 @@ Constraints mirror docs/API.md. Keep the two in sync.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ProcessingParameters(BaseModel):
-    """Enhancement parameters applied by the processing pipeline."""
+    """Enhancement parameters applied by the processing pipeline.
+
+    ``extra="forbid"``: an unknown key (e.g. a mis-cased ``depthShiftIntensity``)
+    is a 400, not a silently-ignored field.
+    """
+
+    model_config = ConfigDict(extra="forbid")
 
     contrast: float = Field(default=1.0, ge=0.5, le=3.0)
     brightness: float = Field(default=0.0, ge=-1.0, le=1.0)

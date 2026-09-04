@@ -6,34 +6,29 @@ export interface PresetButtonsProps {
   onPresetApply: (presetId: string) => void;
 }
 
-const PRESET_ICONS: Record<string, string> = {
-  Nebula: 'star',
-  Galaxy: 'galaxy',
-  'Deep Field': 'telescope',
-  Lunar: 'moon',
-  Cluster: 'sparkles',
-};
-
 /** Quick-apply preset buttons. */
 export function PresetButtons({ presets, activePreset, onPresetApply }: PresetButtonsProps) {
   return (
     <div className="flex flex-wrap gap-2">
-      {presets.map((preset) => (
-        <button
-          key={preset.presetId}
-          type="button"
-          className={`preset-button border ${
-            activePreset === preset.presetId ? 'border-primary bg-primary/20' : 'border-white/15'
-          }`}
-          onClick={() => onPresetApply(preset.presetId)}
-          title={preset.description}
-        >
-          <span aria-hidden className="text-xs text-gray-400">
-            {PRESET_ICONS[preset.name] ?? 'preset'}
-          </span>
-          {preset.name}
-        </button>
-      ))}
+      {presets.map((preset) => {
+        const active = activePreset === preset.presetId;
+        return (
+          <button
+            key={preset.presetId}
+            type="button"
+            className={`chip ${active ? 'chip-active' : ''}`}
+            aria-pressed={active}
+            onClick={() => onPresetApply(preset.presetId)}
+            title={preset.description}
+          >
+            <span
+              aria-hidden
+              className={`h-1.5 w-1.5 rounded-full ${active ? 'bg-accent' : 'bg-line-strong'}`}
+            />
+            {preset.name}
+          </button>
+        );
+      })}
     </div>
   );
 }

@@ -29,6 +29,13 @@ frontend/dist/
 frontend/.vite/
 *.local
 
+# Playwright (e2e)
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
+frontend/playwright/.cache/
+.e2e-tmp/
+
 # ---------------------------------------------------------------------------
 # Environment / secrets
 # ---------------------------------------------------------------------------

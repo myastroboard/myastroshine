@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import get_settings
+from app.db import database
 from app.db.database import init_db
 from app.exceptions import AppError, InvalidParameterError
 from app.logging_config import configure_logging, get_logger
@@ -29,9 +30,11 @@ from app.routes import (
     presets,
     processing,
     stack,
+    tokens,
     upload,
     websockets,
 )
+from app.services.preset import PresetService
 from app.types import JsonDict
 
 logger = get_logger(__name__)
@@ -57,6 +60,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     settings.storage_path.mkdir(parents=True, exist_ok=True)
     init_db()
+    with database.SessionLocal() as db:
+        PresetService(db).ensure_defaults()
+
     logger.info("startup complete", env=settings.app_env, version=settings.api_version)
     yield
     logger.info("shutdown")
@@ -93,6 +99,7 @@ def create_app() -> FastAPI:
         download.router,
         astrodex.router,
         presets.router,
+        tokens.router,
         stack.router,
     ):
         app.include_router(router, prefix="/api")

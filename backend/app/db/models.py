@@ -1,6 +1,7 @@
 """SQLAlchemy ORM models.
 
-Tables (see docs/ARCHITECTURE): sessions, jobs, presets, astrodex_links.
+Tables (see docs/ARCHITECTURE): sessions, jobs, presets, astrodex_links,
+webhook_tokens, stacks.
 """
 
 from __future__ import annotations
@@ -33,9 +34,6 @@ class SessionRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
-    jobs: Mapped[list[JobRecord]] = relationship(
-        back_populates="session", cascade="all, delete-orphan"
-    )
     astrodex_link: Mapped[AstroDexLink | None] = relationship(
         back_populates="session", cascade="all, delete-orphan", uselist=False
     )
@@ -47,7 +45,7 @@ class JobRecord(Base):
     __tablename__ = "jobs"
 
     job_id: Mapped[str] = mapped_column(String(36), primary_key=True)
-    session_id: Mapped[str] = mapped_column(ForeignKey("sessions.session_id"))
+    session_id: Mapped[str | None] = mapped_column(String(36))
     status: Mapped[str] = mapped_column(String(16), default="queued")
     progress_percent: Mapped[int] = mapped_column(Integer, default=0)
     current_step: Mapped[str | None] = mapped_column(String(32))
@@ -56,8 +54,6 @@ class JobRecord(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
     )
-
-    session: Mapped[SessionRecord] = relationship(back_populates="jobs")
 
 
 class PresetRecord(Base):
@@ -84,7 +80,49 @@ class AstroDexLink(Base):
     session_id: Mapped[str] = mapped_column(ForeignKey("sessions.session_id"), unique=True)
     astrodex_image_id: Mapped[str] = mapped_column(String(64))
     callback_url: Mapped[str] = mapped_column(String(512))
+    callback_token: Mapped[str | None] = mapped_column(String(512))
     webhook_status: Mapped[str] = mapped_column(String(16), default="pending")
+    webhook_error: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
     session: Mapped[SessionRecord] = relationship(back_populates="astrodex_link")
+
+
+class StackRecord(Base):
+    """A multi-frame stacking session (v1.1)."""
+
+    __tablename__ = "stacks"
+
+    stack_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    frame_count: Mapped[int] = mapped_column(Integer)
+    received_frames: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[str] = mapped_column(String(24), default="waiting_for_frames")
+    registration_method: Mapped[str] = mapped_column(String(8), default="orb")
+    combination_method: Mapped[str] = mapped_column(String(16), default="median")
+    cosmic_ray_rejection: Mapped[bool] = mapped_column(default=True)
+    background_normalization: Mapped[bool] = mapped_column(default=True)
+    result: Mapped[JsonDict | None] = mapped_column(JSON)
+    session_id: Mapped[str | None] = mapped_column(String(36))
+    error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class WebhookToken(Base):
+    """A long-lived bearer token that authenticates AstroDex to this instance.
+
+    Created and revoked from the UI. The raw value is shown once; only its hash
+    is stored. ``signing_secret`` is used to HMAC-sign outbound webhooks.
+    """
+
+    __tablename__ = "webhook_tokens"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    token_prefix: Mapped[str] = mapped_column(String(16), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    signing_secret: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked: Mapped[bool] = mapped_column(default=False)

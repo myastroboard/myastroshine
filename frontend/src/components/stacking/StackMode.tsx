@@ -5,24 +5,30 @@ export interface StackModeProps {
   onModeChange: (mode: EditorMode) => void;
 }
 
+const MODES: { value: EditorMode; label: string }[] = [
+  { value: 'single', label: 'Single Image' },
+  { value: 'stack', label: 'Multi-Image Stack' },
+];
+
 /** Mode selector: single-image enhancement vs multi-frame stacking (v1.1+). */
 export function StackMode({ mode, onModeChange }: StackModeProps) {
   return (
-    <div className="flex gap-2 rounded-lg border border-white/10 p-1 text-sm">
-      <button
-        type="button"
-        className={`flex-1 rounded px-3 py-2 ${mode === 'single' ? 'bg-primary/20' : ''}`}
-        onClick={() => onModeChange('single')}
-      >
-        Single Image
-      </button>
-      <button
-        type="button"
-        className={`flex-1 rounded px-3 py-2 ${mode === 'stack' ? 'bg-primary/20' : ''}`}
-        onClick={() => onModeChange('stack')}
-      >
-        Multi-Image Stack
-      </button>
+    <div className="segmented self-start" role="tablist" aria-label="Editor mode">
+      {MODES.map((entry) => {
+        const active = mode === entry.value;
+        return (
+          <button
+            key={entry.value}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            className={`segmented-item ${active ? 'segmented-item-active' : ''}`}
+            onClick={() => onModeChange(entry.value)}
+          >
+            {entry.label}
+          </button>
+        );
+      })}
     </div>
   );
 }

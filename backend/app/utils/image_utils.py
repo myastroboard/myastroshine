@@ -41,6 +41,14 @@ def load_image(path: Path) -> np.ndarray:
     return image
 
 
+def load_image_gray(path: Path) -> np.ndarray:
+    """Load an image file as a single-channel ``uint8`` array."""
+    image = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        raise UnsupportedImageError(f"Could not read image at {path}")
+    return image
+
+
 def save_image(image: np.ndarray, path: Path, quality: int = 95) -> None:
     """Write a BGR array to disk, inferring the format from ``path``."""
     path.parent.mkdir(parents=True, exist_ok=True)

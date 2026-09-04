@@ -1,8 +1,10 @@
 # MyAstroShine API
 
 Base URL: `http://localhost:8002/api` (configurable via `VITE_API_URL` on the
-frontend). No authentication in v1 (local deployment); token-based auth is planned
-for v1.5+.
+frontend). Most routes are unauthenticated (local deployment). The AstroDex
+routes (`/astrodex/receive`, `/send-to-astrodex`) require a long-lived webhook
+token: `Authorization: Bearer <token>`, created and revoked from the Settings UI
+(`/api/tokens`).
 
 All error responses share this shape:
 
@@ -16,15 +18,17 @@ All error responses share this shape:
 }
 ```
 
-Common codes: `INVALID_PARAMETER` (400), `UNSUPPORTED_FORMAT` (415),
-`SESSION_NOT_FOUND` (404), `SESSION_EXPIRED` (410), `PROCESSING_FAILED` (500),
-`ASTRODEX_UNREACHABLE` (503).
+Common codes: `INVALID_PARAMETER` (400), `UNAUTHORIZED` (401), `FORBIDDEN` (403),
+`NOT_FOUND` / `SESSION_NOT_FOUND` (404), `UNSUPPORTED_FORMAT` (415),
+`DUPLICATE_RESOURCE` (400), `PAYLOAD_TOO_LARGE` (413), `SESSION_EXPIRED` (410),
+`PROCESSING_FAILED` (500), `ASTRODEX_UNREACHABLE` (503).
 
 ## Status
 
-Implemented and tested end to end: `GET /health`, `POST /upload`,
-`GET /preview/{id}`, `POST /process/{id}` (synchronous), `POST /download/{id}`.
-Everything below marked Sprint 3+ still answers `501 Not Implemented`.
+Every route is implemented and tested end to end: health,
+upload/preview/process/download, presets, depth-shift, webhook tokens, AstroDex
+integration (signed background webhook + retry), the full stacking pipeline, the
+Celery job queue (`PROCESSING_MODE=queue`), and the progress WebSockets.
 
 ## Endpoints
 
@@ -38,11 +42,16 @@ Everything below marked Sprint 3+ still answers `501 Not Implemented`.
 | POST | `/download/{session_id}` | Download the processed image | 2 |
 | POST | `/depth-shift/{session_id}` | Generate depth map + parallax layers | 4 |
 | GET | `/depth-shift/{session_id}/metadata` | Depth statistics + layer URLs | 4 |
-| GET | `/depth-shift/{session_id}/layer_{index}` | Single layer PNG (alpha) | 4 |
-| POST | `/astrodex/receive` | Receive an image pushed from AstroDex | 4 |
-| POST | `/send-to-astrodex` | Send the enhanced image back (signed webhook) | 4 |
-| GET | `/presets` | List presets | 3 |
-| POST | `/presets` | Save a preset | 3 |
+| GET | `/depth-shift/{session_id}/depth_map` | Depth map as a grayscale PNG | 4 |
+| GET | `/depth-shift/{session_id}/layer_{index}` | Single BGRA layer PNG | 4 |
+| GET | `/tokens` | List webhook tokens (metadata only) | 4 |
+| POST | `/tokens` | Create a webhook token (raw value shown once) | 4 |
+| DELETE | `/tokens/{token_id}` | Revoke a token | 4 |
+| POST | `/astrodex/receive` | Receive an image pushed from AstroDex (bearer auth) | 4 |
+| POST | `/send-to-astrodex` | Send the enhanced image back (bearer auth, signed webhook) | 4 |
+| GET | `/presets` | List presets (5 built-ins + user presets) | 3 |
+| POST | `/presets` | Save a user preset | 3 |
+| DELETE | `/presets/{preset_id}` | Delete a user preset (403 for built-ins) | 3 |
 | POST | `/presets/{preset_id}/apply/{session_id}` | Apply a preset | 3 |
 | POST | `/stack/initiate` | Open a stacking session | 6 |
 | POST | `/stack/{stack_id}/upload-frame` | Upload one frame | 6 |
@@ -71,26 +80,101 @@ The canonical model is `app/models/processing.py`; keep this table in sync with 
 
 ## WebSocket messages
 
-`/ws/processing-status/{job_id}` emits:
+`/ws/processing-status/{job_id}` and `/ws/stack-status/{job_id}` behave the same:
+on connect the server sends the current job state from the DB (catch-up for late
+subscribers), then, if the job is still running and `PROCESSING_MODE=queue`,
+relays live events from Redis until a terminal status arrives, then closes.
 
 ```json
 {
-  "job_id": "job_abc123",
+  "job_id": "job-abc123def456",
+  "session_id": "550e8400-...",
   "status": "processing",
   "progress_percent": 45,
   "current_step": "denoise",
-  "message": "Denoising in progress...",
+  "error": null,
   "timestamp": "2026-09-03T14:32:15Z"
 }
 ```
 
-Status values: `queued`, `processing`, `completed`, `failed`.
-Step values: `stretching`, `contrast`, `highlights_shadows`, `clarity`, `denoise`,
-`sharpness`, `color_correction`, `depth_estimation`, `rendering`.
+`status`: `queued`, `processing`, `completed`, `failed` (or `unknown` if the
+`job_id` is not found). Image steps: `color_correction`, `contrast`,
+`brightness`, `highlights_shadows`, `saturation`, `vibrance`, `clarity`,
+`denoise`, `sharpness`, `rendering`, `done`. Stack steps: `registration`,
+`background_normalization`, `cosmic_ray_rejection`, `combination`, `done`.
 
-## AstroDex webhook
+In the default `PROCESSING_MODE=sync`, the job is already `completed` when
+`/process` returns; the WebSocket just replays that final state.
 
-`POST /send-to-astrodex` queues a signed `POST` to the AstroDex callback URL:
+`POST /process` / `POST /presets/{id}/apply/{sid}` return
+`{ session_id, job_id, status, preview_url, estimated_time_seconds, ws_status_url }`.
+
+## Presets
+
+`GET /presets` returns `{ "presets": [...], "total": N }`. Each preset is
+`{ preset_id, name, category, description, parameters, author, is_favorite }`
+where `parameters` is a full `ProcessingParameters` object (missing fields filled
+with their defaults).
+
+Five built-ins are always present (`author: "system"`): **Nebula**, **Galaxy**,
+**Deep Field**, **Lunar**, **Cluster**. They cannot be deleted (403).
+
+`POST /presets` takes `{ name, parameters, description?, category? }` and returns
+`201 { preset_id, name, created_at }`. Duplicate names give `400
+DUPLICATE_RESOURCE`; more than 50 user presets gives `413 PAYLOAD_TOO_LARGE`.
+
+`POST /presets/{preset_id}/apply/{session_id}` runs the pipeline with that
+preset's parameters and returns the same body as `POST /process`.
+
+## Depth shift
+
+`POST /depth-shift/{session_id}` takes `{ intensity?, focus_point?, num_layers? }`
+(`num_layers` 2-12, default 7) and returns:
+
+```json
+{
+  "session_id": "...",
+  "num_layers": 7,
+  "depth_map_url": "/api/depth-shift/{id}/depth_map",
+  "depth_layers": [
+    { "layer_id": 0, "depth_range": [0.0, 0.143], "image_url": "/api/depth-shift/{id}/layer_0" }
+  ],
+  "statistics": { "min_depth": 0, "max_depth": 255, "mean_depth": 40,
+                  "median_depth": 12, "bright_areas_percent": 6.2 }
+}
+```
+
+Layers are ordered far (index 0, shifts most in the parallax) to near. Each
+`/layer_{index}` is a BGRA PNG (transparent outside its depth band);
+`/depth_map` is a grayscale PNG. `GET /depth-shift/{id}/metadata` reports
+`depth_map_generated` and, once generated, the statistics and layer URLs.
+
+## Webhook tokens
+
+Long-lived bearer tokens authenticate AstroDex to this instance. Create from the
+Settings UI or `POST /tokens { name, expires_in_days? }` -> `201`:
+
+```json
+{
+  "id": "...", "name": "AstroDex prod", "token_prefix": "mas_1wZcTkdO",
+  "created_at": "...", "expires_at": null, "revoked": false,
+  "token": "mas_<long secret>",        // bearer credential
+  "signing_secret": "<64 hex chars>"   // configure in AstroDex to verify webhooks
+}
+```
+
+`token` and `signing_secret` are shown **only** in this response. `GET /tokens`
+never returns them. `DELETE /tokens/{id}` revokes immediately (`401` on next use).
+
+## AstroDex integration
+
+**Inbound** - `POST /astrodex/receive` (multipart: `image_id`, `image`,
+`callback_url`, `callback_token?`; `Authorization: Bearer <token>`) opens a
+session and records the callback. Returns `201 { session_id, image_url, ... }`.
+
+**Outbound** - `POST /send-to-astrodex` (`{ session_id, astrodex_image_id,
+astrodex_callback_url }`; bearer auth) returns `202` immediately and delivers
+this signed payload in the background:
 
 ```json
 {
@@ -99,16 +183,50 @@ Step values: `stretching`, `contrast`, `highlights_shadows`, `clarity`, `denoise
   "timestamp": "2026-09-03T14:32:20Z",
   "data": {
     "original_image_id": "astrodex_img_12345",
-    "enhanced_image": { "blob": "<base64>", "format": "jpeg", "width": 3840, "height": 2160 },
+    "enhanced_image": { "blob": "<base64>", "format": "jpeg", "width": 3840,
+                        "height": 2160, "file_size_bytes": 5242880 },
     "processing_metadata": { "session_id": "...", "parameters": { } },
-    "preview_url": "http://myastroshine.local/api/preview/..."
-  },
-  "signature": "sha256=...",
-  "signature_algorithm": "HMAC-SHA256"
+    "preview_url": "/api/preview/...?full=true"
+  }
 }
 ```
 
-The signature is `HMAC-SHA256(secret, canonical_json(payload))` where canonical
-JSON uses sorted keys and `(',', ':')` separators. The shared secret is
-`ASTRODEX_WEBHOOK_SECRET`. Delivery retries with exponential backoff
-(5s, 10s, 20s) before the webhook is stored as failed.
+Headers: `X-Webhook-Signature: sha256=<hmac>`,
+`X-Webhook-Signature-Algorithm: HMAC-SHA256`. The HMAC is over
+`canonical_json(payload)` (sorted keys, `(",", ":")` separators) keyed by the
+token's `signing_secret` (or `ASTRODEX_WEBHOOK_SECRET` as fallback). Delivery
+retries `ASTRODEX_MAX_RETRIES` times with exponential backoff; the
+`astrodex_links` row tracks `webhook_status` (`pending` / `sent` / `failed`).
+`astrodex_callback_url` must match `ASTRODEX_CALLBACK_URLS` when that allowlist
+is set (else `403`).
+
+## Stacking (v1.1)
+
+1. `POST /stack/initiate` `{ frame_count, registration_method?, combination_method?,
+   cosmic_ray_rejection?, background_normalization? }` -> `202 { stack_id, status:
+   "waiting_for_frames", frame_count, received_frames }`.
+2. `POST /stack/{stack_id}/upload-frame` (multipart: `frame_index`, `file`) ->
+   `202 { frame_index, received_frames, frame_count, status }`. `status` becomes
+   `"ready"` once every frame is in.
+3. `POST /stack/{stack_id}/process` runs the pipeline synchronously and returns
+   `200`:
+
+```json
+{
+  "stack_id": "...",
+  "status": "completed",
+  "session_id": "<composite session>",
+  "stacked_image_url": "/api/preview/<session_id>?full=true",
+  "statistics": {
+    "frames_stacked": 15, "frames_rejected": 0, "combination_method": "median",
+    "cosmic_rays_removed": 42, "registration_success_rate": 100.0,
+    "snr_improvement": 3.87
+  }
+}
+```
+
+The composite is a normal session: enhance it with `POST /process`, fetch it with
+`GET /preview`, download it with `POST /download`. `GET /stack/{stack_id}` returns
+the same body at any time (`error` is set when `status` is `"failed"`).
+`registration_method` is `sift` / `orb`; `combination_method` is `median` / `mean`
+/ `sigma_clip`. See docs/ALGORITHMS.md for the pipeline.

@@ -46,11 +46,14 @@ class Settings(BaseSettings):
     astrodex_max_retries: int = 3
     astrodex_retry_delay_seconds: int = 5
 
-    # Redis / Celery (optional, phase 2+)
+    # Redis / Celery
     redis_url: str = "redis://localhost:6379/0"
     celery_broker_url: str = "redis://localhost:6379/1"
 
     # Processing
+    # "sync"  - run the pipeline inside the request (default; no worker needed)
+    # "queue" - enqueue a Celery task; progress streams over the WebSocket
+    processing_mode: str = "sync"
     max_workers: int = 4
     denoise_enable_ml: bool = False
     depth_detection_method: str = "gradient"

@@ -1,10 +1,12 @@
 import { useCallback, useState } from 'react';
 
-const API_URL = import.meta.env.VITE_API_URL ?? '/api';
+import { apiClient } from '@/services/api';
+import type { DepthStatistics } from '@/types';
 
 /** Requests depth-map generation and exposes the resulting layer URLs. */
 export function useDepthShift(sessionId: string) {
   const [layerUrls, setLayerUrls] = useState<string[]>([]);
+  const [statistics, setStatistics] = useState<DepthStatistics | null>(null);
   const [intensity, setIntensity] = useState(50);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -14,16 +16,9 @@ export function useDepthShift(sessionId: string) {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch(`${API_URL}/depth-shift/${sessionId}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ intensity, num_layers: numLayers }),
-        });
-        if (!response.ok) {
-          throw new Error(`Depth shift failed: ${response.status}`);
-        }
-        const data = (await response.json()) as { depth_layers: Array<{ image_url: string }> };
-        setLayerUrls(data.depth_layers.map((layer) => `${API_URL}${layer.image_url}`));
+        const result = await apiClient.generateDepthShift(sessionId, numLayers, intensity);
+        setLayerUrls(result.depthLayers.map((layer) => layer.imageUrl));
+        setStatistics(result.statistics);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Depth shift failed');
       } finally {
@@ -33,5 +28,5 @@ export function useDepthShift(sessionId: string) {
     [sessionId, intensity],
   );
 
-  return { layerUrls, intensity, setIntensity, generate, isLoading, error };
+  return { layerUrls, statistics, intensity, setIntensity, generate, isLoading, error };
 }

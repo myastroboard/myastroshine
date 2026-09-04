@@ -4,12 +4,13 @@ import { ActionButtons } from '@/components/ActionButtons';
 import { DepthShiftViewer } from '@/components/DepthShiftViewer';
 import { ImagePreview } from '@/components/ImagePreview';
 import { PresetButtons } from '@/components/PresetButtons';
+import { SavePresetDialog } from '@/components/SavePresetDialog';
 import { SliderPanel } from '@/components/SliderPanel';
 import { useDepthShift } from '@/hooks/useDepthShift';
 import { useImageProcessing } from '@/hooks/useImageProcessing';
 import { usePresets } from '@/hooks/usePresets';
 import { apiClient } from '@/services/api';
-import type { UploadResponse } from '@/types';
+import type { EditorSession } from '@/types';
 
 export interface AstroDexContext {
   imageId: string;
@@ -18,16 +19,17 @@ export interface AstroDexContext {
 }
 
 export interface EditorViewProps {
-  session: UploadResponse;
+  session: EditorSession;
   astrodexContext: AstroDexContext | null;
 }
 
 /** Main editing surface: preview + parameter panel + actions. */
 export function EditorView({ session, astrodexContext }: EditorViewProps) {
   const { parameters, status, updateParameter, resetParameters } = useImageProcessing(session.sessionId);
-  const { presets, applyPreset, activePreset } = usePresets(session.sessionId);
+  const { presets, applyPreset, activePreset, savePreset } = usePresets(session.sessionId);
   const depthShift = useDepthShift(session.sessionId);
   const [showDepthViewer, setShowDepthViewer] = useState(false);
+  const [showSavePreset, setShowSavePreset] = useState(false);
 
   const originalUrl = apiClient.previewUrl(session.sessionId);
   const processedUrl = apiClient.previewUrl(session.sessionId, true);
@@ -49,14 +51,14 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
     void apiClient.sendToAstroDex(
       session.sessionId,
       astrodexContext.imageId,
-      parameters,
       astrodexContext.callbackUrl,
+      astrodexContext.token,
     );
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-      <div className="flex flex-col gap-4">
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="flex flex-col gap-5">
         <ImagePreview
           originalUrl={originalUrl}
           processedUrl={processedUrl}
@@ -81,12 +83,22 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
           canSendToAstroDex={Boolean(astrodexContext)}
           onDownload={() => void handleDownload()}
           onSendToAstroDex={handleSendToAstroDex}
-          onSavePreset={() => undefined}
+          onSavePreset={() => setShowSavePreset(true)}
         />
       </div>
 
-      <aside className="flex flex-col gap-4">
-        <PresetButtons presets={presets} activePreset={activePreset} onPresetApply={applyPreset} />
+      {showSavePreset && (
+        <SavePresetDialog
+          onSave={(name, description) => savePreset({ name, description, parameters })}
+          onClose={() => setShowSavePreset(false)}
+        />
+      )}
+
+      <aside className="flex flex-col gap-5">
+        <section className="flex flex-col gap-2.5">
+          <h2 className="eyebrow">Presets</h2>
+          <PresetButtons presets={presets} activePreset={activePreset} onPresetApply={applyPreset} />
+        </section>
         <SliderPanel
           parameters={parameters}
           onParameterChange={updateParameter}

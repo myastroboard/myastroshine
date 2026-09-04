@@ -94,6 +94,15 @@ export interface ProcessResponse {
   wsStatusUrl: string;
 }
 
+/**
+ * Minimal handle the editor needs. A fresh upload provides the full
+ * {@link UploadResponse}; a stacked composite only carries its session id.
+ */
+export interface EditorSession {
+  sessionId: string;
+  histogram?: HistogramData;
+}
+
 export type JobStatus = 'queued' | 'processing' | 'completed' | 'failed';
 
 export interface ProcessingStatus {
@@ -122,7 +131,49 @@ export interface WebhookResponse {
   message: string;
 }
 
-// --- Stacking (v1.1+) ---------------------------------------------------------
+// --- Webhook tokens ------------------------------------------------------
+
+export interface WebhookToken {
+  id: string;
+  name: string;
+  tokenPrefix: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  expiresAt: string | null;
+  revoked: boolean;
+}
+
+export interface CreatedToken extends WebhookToken {
+  /** Shown only once, at creation. */
+  token: string;
+  signingSecret: string;
+}
+
+// --- Depth shift -----------------------------------------------------------
+
+export interface DepthLayerInfo {
+  layerId: number;
+  depthRange: [number, number];
+  imageUrl: string;
+}
+
+export interface DepthStatistics {
+  minDepth: number;
+  maxDepth: number;
+  meanDepth: number;
+  medianDepth: number;
+  brightAreasPercent: number;
+}
+
+export interface DepthShiftResult {
+  sessionId: string;
+  numLayers: number;
+  depthMapUrl: string;
+  depthLayers: DepthLayerInfo[];
+  statistics: DepthStatistics;
+}
+
+// --- Stacking (v1.1) ---------------------------------------------------------
 
 export type CombinationMethod = 'median' | 'mean' | 'sigma_clip';
 export type RegistrationMethod = 'sift' | 'orb';
@@ -134,13 +185,36 @@ export interface StackSettings {
   backgroundNormalization: boolean;
 }
 
-export interface StackResult {
-  stackSessionId: string;
+export interface StackSession {
+  stackId: string;
   status: string;
   frameCount: number;
-  combinationMethod: CombinationMethod;
+  receivedFrames: number;
+}
+
+export interface UploadFrameResult {
+  frameIndex: number;
+  receivedFrames: number;
+  frameCount: number;
+  status: string;
+}
+
+export interface StackStatistics {
+  framesStacked: number;
+  framesRejected: number;
+  combinationMethod: string;
   cosmicRaysRemoved: number;
   registrationSuccessRate: number;
-  stackedImageUrl: string;
-  estimatedSnrImprovement: number;
+  snrImprovement: number;
+}
+
+export interface StackResult {
+  stackId: string;
+  status: string;
+  jobId?: string | null;
+  wsStatusUrl?: string | null;
+  sessionId: string | null;
+  stackedImageUrl: string | null;
+  statistics: StackStatistics | null;
+  error: string | null;
 }

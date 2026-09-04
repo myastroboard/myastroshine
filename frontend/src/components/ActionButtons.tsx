@@ -16,10 +16,10 @@ export function ActionButtons({
   onSavePreset,
 }: ActionButtonsProps) {
   return (
-    <div className="flex flex-wrap gap-3">
+    <div className="flex flex-wrap items-center gap-2">
       <button
         type="button"
-        className="rounded-md bg-primary px-4 py-2 text-sm font-medium disabled:opacity-50"
+        className="btn btn-primary"
         disabled={isProcessing}
         onClick={onDownload}
       >
@@ -28,7 +28,7 @@ export function ActionButtons({
       {canSendToAstroDex && (
         <button
           type="button"
-          className="rounded-md bg-secondary px-4 py-2 text-sm font-medium disabled:opacity-50"
+          className="btn btn-outline"
           disabled={isProcessing}
           onClick={onSendToAstroDex}
         >
@@ -37,7 +37,7 @@ export function ActionButtons({
       )}
       <button
         type="button"
-        className="rounded-md border border-white/20 px-4 py-2 text-sm disabled:opacity-50"
+        className="btn btn-outline"
         disabled={isProcessing}
         onClick={onSavePreset}
       >

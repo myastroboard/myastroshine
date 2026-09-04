@@ -23,6 +23,9 @@ def _isolated_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[N
     monkeypatch.setenv(
         "ASTRODEX_CALLBACK_URLS", "http://astrodex.test/api/webhooks/enhanced-images"
     )
+    monkeypatch.setenv("ASTRODEX_WEBHOOK_SECRET", "test-shared-secret")
+    monkeypatch.setenv("ASTRODEX_MAX_RETRIES", "3")
+    monkeypatch.setenv("ASTRODEX_RETRY_DELAY_SECONDS", "0")
 
     from app.config import get_settings
 
@@ -72,6 +75,7 @@ def client(db_engine) -> Iterator[object]:
     from fastapi.testclient import TestClient
     from sqlalchemy.orm import sessionmaker
 
+    import app.db.database as database_module
     import app.main as main_module
     from app.db.database import get_db
 
@@ -84,6 +88,10 @@ def client(db_engine) -> Iterator[object]:
         finally:
             session.close()
 
+    # Background jobs / Celery tasks open their own session via
+    # database.SessionLocal(); point that at the test engine too.
+    original_session_local = database_module.SessionLocal
+    database_module.SessionLocal = factory
     main_module.app.dependency_overrides[get_db] = _override_get_db
     test_client = TestClient(main_module.app)
     try:
@@ -91,6 +99,7 @@ def client(db_engine) -> Iterator[object]:
     finally:
         test_client.close()
         main_module.app.dependency_overrides.clear()
+        database_module.SessionLocal = original_session_local
 
 
 @pytest.fixture
@@ -113,3 +122,33 @@ def sample_jpeg(sample_image: np.ndarray) -> bytes:
     ok, buffer = cv2.imencode(".jpg", sample_image)
     assert ok
     return buffer.tobytes()
+
+
+@pytest.fixture
+def star_field() -> np.ndarray:
+    """A dark frame with ~80 stars of varied size/brightness plus faint
+    background texture - enough distinctive structure for ORB and SIFT."""
+    import cv2
+
+    rng = np.random.default_rng(7)
+    image = rng.integers(8, 18, (120, 160, 3), dtype=np.uint8)
+    for _ in range(80):
+        y, x = int(rng.integers(8, 112)), int(rng.integers(8, 152))
+        radius = int(rng.integers(1, 4))
+        brightness = int(rng.integers(120, 255))
+        cv2.circle(image, (x, y), radius, (brightness, brightness, brightness), -1)
+    return cv2.GaussianBlur(image, (3, 3), 0)
+
+
+@pytest.fixture
+def webhook_token(db_session) -> tuple[object, str]:
+    """A live webhook token; returns ``(record, raw_token)``."""
+    from app.services.token import TokenService
+
+    return TokenService(db_session).create_token("test-integration")
+
+
+@pytest.fixture
+def auth_header(webhook_token) -> dict[str, str]:
+    """An ``Authorization: Bearer`` header for the test token."""
+    return {"Authorization": f"Bearer {webhook_token[1]}"}

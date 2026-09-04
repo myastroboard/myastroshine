@@ -14,6 +14,7 @@ from app.routes import (
     presets,
     processing,
     stack,
+    tokens,
     upload,
     websockets,
 )
@@ -26,6 +27,7 @@ __all__ = [
     "presets",
     "processing",
     "stack",
+    "tokens",
     "upload",
     "websockets",
 ]

@@ -7,12 +7,16 @@ transform when its parameter sits at the default value.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import cv2
 import numpy as np
 
 from app.logging_config import get_logger
 from app.models import ProcessingParameters
 from app.utils.math_utils import kelvin_to_rgb_gain, tint_to_rgb_gain, to_uint8
+
+StepCallback = Callable[[str, int], None]
 
 logger = get_logger(__name__)
 
@@ -122,19 +126,38 @@ class ImageProcessingService:
         strength = (sharpness - 1.0) * 0.5
         return cv2.addWeighted(image, 1.0 - strength, sharp, strength, 0)
 
-    def apply_parameters(self, image: np.ndarray, params: ProcessingParameters) -> np.ndarray:
+    def apply_parameters(
+        self,
+        image: np.ndarray,
+        params: ProcessingParameters,
+        on_step: StepCallback | None = None,
+    ) -> np.ndarray:
         """Run the full pipeline in the recommended order.
 
         Returns the input unchanged when every parameter is at its default.
+        ``on_step(step_name, percent)`` is called as each stage begins.
         """
+        stages: list[tuple[str, Callable[[np.ndarray], np.ndarray]]] = [
+            (
+                "color_correction",
+                lambda r: self.apply_white_balance(r, params.temperature, params.tint),
+            ),
+            ("contrast", lambda r: self.apply_contrast(r, params.contrast)),
+            ("brightness", lambda r: self.apply_brightness(r, params.brightness)),
+            (
+                "highlights_shadows",
+                lambda r: self.apply_highlights_shadows(r, params.highlights, params.shadows),
+            ),
+            ("saturation", lambda r: self.apply_saturation(r, params.saturation)),
+            ("vibrance", lambda r: self.apply_vibrance(r, params.vibrance)),
+            ("clarity", lambda r: self.apply_clarity(r, params.clarity)),
+            ("denoise", lambda r: self.apply_denoise(r, params.denoise)),
+            ("sharpness", lambda r: self.apply_sharpness(r, params.sharpness)),
+        ]
+
         result = image
-        result = self.apply_white_balance(result, params.temperature, params.tint)
-        result = self.apply_contrast(result, params.contrast)
-        result = self.apply_brightness(result, params.brightness)
-        result = self.apply_highlights_shadows(result, params.highlights, params.shadows)
-        result = self.apply_saturation(result, params.saturation)
-        result = self.apply_vibrance(result, params.vibrance)
-        result = self.apply_clarity(result, params.clarity)
-        result = self.apply_denoise(result, params.denoise)
-        result = self.apply_sharpness(result, params.sharpness)
+        for index, (name, stage) in enumerate(stages):
+            if on_step is not None:
+                on_step(name, round(10 + index * 80 / len(stages)))
+            result = stage(result)
         return result

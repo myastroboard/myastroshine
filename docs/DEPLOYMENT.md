@@ -2,16 +2,23 @@
 
 ## Services
 
-`docker-compose.yml` defines three services on the `myastroshine` network:
+`docker-compose.yml` defines four services on the `myastroshine` network:
 
 | Service | Image / build | Port | Volumes |
 |---------|---------------|------|---------|
-| `api` | `./backend` (FastAPI + OpenCV) | 8002 | `myastroshine_images:/data/images`, `myastroshine_db:/data/db` |
+| `api` | `./backend` (FastAPI + OpenCV) | 8002 | `myastroshine_images`, `myastroshine_db` |
+| `worker` | `./backend` (Celery worker) | - | `myastroshine_images`, `myastroshine_db` |
 | `web` | `./frontend` (Vite build served by nginx) | 3000 | - |
 | `redis` | `redis:7-alpine` | 6379 | `myastroshine_redis:/data` |
 
-Redis is only used from phase 2+ (Celery job queue). It is safe to leave running
-before then.
+The compose file sets `PROCESSING_MODE=queue`, so `/api/process` and
+`/api/stack/{id}/process` enqueue a Celery task the `worker` runs, and progress
+streams over `/ws/processing-status/{job_id}` (or `/ws/stack-status/{id}`). Set
+`PROCESSING_MODE=sync` to run everything inside the request instead - then the
+`worker` and `redis` services are optional.
+
+> SQLite is shared between `api` and `worker` over a volume. This is fine for a
+> single worker and short writes; move to Postgres before scaling the worker out.
 
 ## Environment variables
 

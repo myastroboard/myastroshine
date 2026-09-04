@@ -38,42 +38,53 @@ export function ImageUpload({ onUpload, isLoading = false }: ImageUploadProps) {
   }
 
   return (
-    <div
-      className={`mx-auto flex max-w-xl flex-col items-center gap-4 rounded-lg border-2 border-dashed p-12 text-center transition-colors ${
-        dragActive ? 'border-primary bg-primary/10' : 'border-white/20'
-      }`}
-      onDragOver={(event) => {
-        event.preventDefault();
-        setDragActive(true);
-      }}
-      onDragLeave={() => setDragActive(false)}
-      onDrop={handleDrop}
-    >
-      <p className="text-sm text-gray-300">
-        Drag an astronomical image here, or
-      </p>
-      <button
-        type="button"
-        className="rounded-md bg-primary px-4 py-2 text-sm font-medium disabled:opacity-50"
-        disabled={isLoading}
-        onClick={() => inputRef.current?.click()}
-      >
-        {isLoading ? 'Uploading...' : 'Choose a file'}
-      </button>
-      <input
-        ref={inputRef}
-        type="file"
-        accept={ACCEPTED.join(',')}
-        className="hidden"
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          if (file) {
-            validateAndUpload(file);
-          }
+    <div className="mx-auto w-full max-w-xl">
+      <div
+        className={`dropzone ${dragActive ? 'dropzone-active' : ''}`}
+        onDragOver={(event) => {
+          event.preventDefault();
+          setDragActive(true);
         }}
-      />
-      <p className="text-xs text-gray-500">JPEG, PNG or TIFF, up to 100 MB</p>
-      {validationError && <p className="text-xs text-red-300">{validationError}</p>}
+        onDragLeave={() => setDragActive(false)}
+        onDrop={handleDrop}
+      >
+        <div className="grid h-12 w-12 place-items-center rounded-full border border-line bg-raised">
+          <svg viewBox="0 0 24 24" className="h-5 w-5 stroke-muted" fill="none" aria-hidden>
+            <path
+              d="M12 16V4m0 0-4 4m4-4 4 4M5 20h14"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </div>
+        <div className="flex flex-col gap-1">
+          <p className="text-sm text-ink">Drop an astronomical image here</p>
+          <p className="text-xs text-faint">or choose a file to begin</p>
+        </div>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={isLoading}
+          onClick={() => inputRef.current?.click()}
+        >
+          {isLoading ? 'Uploading...' : 'Choose a file'}
+        </button>
+        <input
+          ref={inputRef}
+          type="file"
+          accept={ACCEPTED.join(',')}
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) {
+              validateAndUpload(file);
+            }
+          }}
+        />
+        <p className="text-[11px] text-ghost">JPEG, PNG or TIFF, up to 100 MB</p>
+        {validationError && <p className="text-xs text-danger">{validationError}</p>}
+      </div>
     </div>
   );
 }

@@ -9,7 +9,7 @@ def _upload(client, sample_jpeg: bytes) -> str:
 
 
 def test_process_returns_completed_job(client, sample_jpeg: bytes) -> None:
-    """A sync process call reports a completed job and a preview URL."""
+    """A sync process call reports a completed job with its WS + preview URLs."""
     session_id = _upload(client, sample_jpeg)
 
     response = client.post(
@@ -22,6 +22,7 @@ def test_process_returns_completed_job(client, sample_jpeg: bytes) -> None:
     assert body["session_id"] == session_id
     assert body["status"] == "completed"
     assert body["preview_url"] == f"/api/preview/{session_id}"
+    assert body["ws_status_url"] == f"/ws/processing-status/{body['job_id']}"
 
 
 def test_process_changes_the_preview(client, sample_jpeg: bytes) -> None:

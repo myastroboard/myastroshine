@@ -8,25 +8,34 @@ export interface StackSettingsProps {
 /** Stacking configuration panel: alignment, combination, rejection (v1.1+). */
 export function StackSettings({ settings, onChange }: StackSettingsProps) {
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-white/10 p-4 text-sm">
-      <label className="flex justify-between gap-2">
-        Alignment
+    <div className="panel flex flex-col gap-4">
+      <label className="flex flex-col gap-1.5">
+        <span className="label">Alignment</span>
         <select
+          className="field"
           value={settings.registrationMethod}
           onChange={(event) =>
-            onChange({ ...settings, registrationMethod: event.target.value as StackSettingsValue['registrationMethod'] })
+            onChange({
+              ...settings,
+              registrationMethod: event.target.value as StackSettingsValue['registrationMethod'],
+            })
           }
         >
           <option value="orb">ORB (fast)</option>
           <option value="sift">SIFT (accurate)</option>
         </select>
       </label>
-      <label className="flex justify-between gap-2">
-        Combination
+
+      <label className="flex flex-col gap-1.5">
+        <span className="label">Combination</span>
         <select
+          className="field"
           value={settings.combinationMethod}
           onChange={(event) =>
-            onChange({ ...settings, combinationMethod: event.target.value as StackSettingsValue['combinationMethod'] })
+            onChange({
+              ...settings,
+              combinationMethod: event.target.value as StackSettingsValue['combinationMethod'],
+            })
           }
         >
           <option value="median">Median</option>
@@ -34,20 +43,26 @@ export function StackSettings({ settings, onChange }: StackSettingsProps) {
           <option value="sigma_clip">Sigma-clip</option>
         </select>
       </label>
-      <label className="flex items-center justify-between gap-2">
+
+      <label className="flex items-center justify-between gap-2 text-sm text-muted">
         Cosmic ray rejection
         <input
           type="checkbox"
+          className="size-4 accent-accent"
           checked={settings.cosmicRayRejection}
           onChange={(event) => onChange({ ...settings, cosmicRayRejection: event.target.checked })}
         />
       </label>
-      <label className="flex items-center justify-between gap-2">
+
+      <label className="flex items-center justify-between gap-2 text-sm text-muted">
         Background normalization
         <input
           type="checkbox"
+          className="size-4 accent-accent"
           checked={settings.backgroundNormalization}
-          onChange={(event) => onChange({ ...settings, backgroundNormalization: event.target.checked })}
+          onChange={(event) =>
+            onChange({ ...settings, backgroundNormalization: event.target.checked })
+          }
         />
       </label>
     </div>

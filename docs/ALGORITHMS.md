@@ -30,42 +30,49 @@ full-resolution result is computed on demand or via the job queue.
 
 ## Depth map (v1, gradient-based)
 
-`estimate_depth(image)`:
+`estimate_depth(image)` returns a single-channel `uint8` map, `0 = far`,
+`255 = near`:
 
 1. Grayscale, then Sobel gradients (`ksize=5`) in x and y.
-2. Gradient magnitude `sqrt(gx^2 + gy^2)`, normalized to 0-1.
-3. Invert (`255 - mag`): high-gradient detail reads as "near".
-4. Morphological close (5x5 ellipse) + 21x21 Gaussian blur for smoothness.
+2. Gradient magnitude `sqrt(gx^2 + gy^2)`, min-max normalized to 0-1, scaled to
+   0-255. High-detail regions (stars, structure) are near; smooth sky is far -
+   the map is **not** inverted.
+3. Morphological close (5x5 ellipse) + 21x21 Gaussian blur for smoothness.
 
 `generate_parallax_layers(image, depth_map, num_layers=7)` slices the 0-255 depth
-range into `num_layers` bands, builds a dilated `inRange` mask per band, and
-emits BGRA layers (alpha = mask) ordered far to near. Layers are cached under
-`{storage}/{session_id}/layers/layer_{n}.png`.
+range into `num_layers` equal bands, builds a dilated `inRange` mask per band,
+and emits BGRA layers (alpha = mask) ordered far (index 0) to near. The map and
+layers are cached under `{storage}/{session_id}/depth/`.
+
+`depth_statistics(depth_map)` reports min/max/mean/median and the percent of
+pixels above 200 (`bright_areas_percent`).
 
 An ML backend (MiDaS / `Intel/dpt-hybrid-midas`) is planned for v0.2 behind
 `DEPTH_DETECTION_METHOD=ml`.
 
-## Stacking (v1.1+)
+## Stacking (v1.1)
 
-Pipeline: load / validate -> registration -> background normalization ->
-cosmic-ray rejection -> combination -> single-image enhancement.
+`StackingService.process` runs: registration -> background normalisation
+(optional) -> cosmic-ray masking (optional) -> combination. The composite is
+saved as a normal session so the single-image routes work on it.
 
-- **Registration** (`RegistrationService`) - SIFT (accurate) or ORB (fast)
-  keypoints, Lowe's ratio test at 0.7, RANSAC homography (reproj threshold 5.0),
-  `warpPerspective` to the reference frame. Default detector: ORB.
-- **Background normalization** (`NormalizationService`) - measure the median of
-  a 50 px edge border per frame, shift each frame to the common median.
-- **Cosmic-ray rejection** (`CosmicRayService`) - fast Laplacian outlier mask, or
-  statistical rejection: mark pixels deviating > `threshold` sigma (default 3.0)
-  from the per-pixel median.
-- **Combination** (`CombinationService`):
-  - `median` - robust, ~0.9 sqrt(N) SNR gain. Default.
-  - `mean` - optimal sqrt(N) gain, only safe after cosmic-ray rejection.
-  - `sigma_clip` - iterative mean with per-pixel sigma clipping, ~0.95 sqrt(N),
-    best for 20+ frames.
+- **Registration** (`RegistrationService`) - ORB (default, fast) or SIFT
+  keypoints -> knnMatch + Lowe ratio 0.75 -> RANSAC homography (reproj 5.0) ->
+  `warpPerspective` to `frames[0]`. Needs >= 4 good matches; frames that fail are
+  returned unchanged and counted in `frames_rejected`.
+- **Background normalisation** (`NormalizationService`) - median of a 32 px edge
+  border per frame; shift all frames to the common median.
+- **Cosmic-ray masking** (`CosmicRayService.build_mask`) - per-pixel median plus
+  a **MAD-based** robust sigma (`1.4826 * MAD`, so one ray does not inflate its
+  own estimate); a sample is flagged when it exceeds both `threshold` sigma
+  (`STACKING_COSMIC_RAY_THRESHOLD`, default 3.0) **and** 12 absolute levels.
+- **Combination** (`CombinationService.combine`, honours the reject mask via
+  `nan`-aware ops):
+  - `median` - robust, default.
+  - `mean` - best SNR, only safe with cosmic-ray masking on.
+  - `sigma_clip` - 2 iterations of mean +/- 2.5 sigma clipping.
 
-Theoretical SNR improvement is `sqrt(N)` for N frames
-(`estimate_snr_improvement`).
+`estimate_snr_improvement(N) = sqrt(N)`.
 
 ## Performance notes
 

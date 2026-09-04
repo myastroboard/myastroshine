@@ -2,8 +2,11 @@ import { useMemo, useState } from 'react';
 
 import { EditorView } from '@/components/EditorView';
 import { ImageUpload } from '@/components/ImageUpload';
+import { TokenManager } from '@/components/TokenManager';
+import { StackMode, type EditorMode } from '@/components/stacking/StackMode';
+import { StackView } from '@/components/stacking/StackView';
 import { apiClient } from '@/services/api';
-import type { UploadResponse } from '@/types';
+import type { EditorSession } from '@/types';
 
 /**
  * Root orchestrator.
@@ -12,9 +15,11 @@ import type { UploadResponse } from '@/types';
  * `token` query params; otherwise the app runs in standalone mode.
  */
 export default function App() {
-  const [session, setSession] = useState<UploadResponse | null>(null);
+  const [mode, setMode] = useState<EditorMode>('single');
+  const [session, setSession] = useState<EditorSession | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
 
   const astrodexContext = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
@@ -41,21 +46,71 @@ export default function App() {
     }
   }
 
+  function handleEnhanceComposite(sessionId: string): void {
+    setSession({ sessionId });
+    setMode('single');
+  }
+
   return (
     <div className="min-h-screen">
-      <header className="flex items-center justify-between border-b border-white/10 px-6 py-4">
-        <h1 className="text-lg font-semibold">{import.meta.env.VITE_APP_NAME ?? 'MyAstroShine'}</h1>
-        <span className="text-xs text-gray-400">v{import.meta.env.VITE_APP_VERSION ?? '0.1.0'}</span>
+      <header className="sticky top-0 z-40 border-b border-hairline bg-canvas/80 backdrop-blur-md">
+        <div className="mx-auto flex h-14 max-w-[1200px] items-center justify-between px-4 sm:px-6">
+          <div className="flex items-center gap-2.5">
+            <BrandMark />
+            <span className="text-sm font-semibold tracking-tight text-ink">
+              {import.meta.env.VITE_APP_NAME ?? 'MyAstroShine'}
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              aria-pressed={showSettings}
+              onClick={() => setShowSettings((open) => !open)}
+            >
+              Settings
+            </button>
+            <span className="text-xs tabular-nums text-ghost">
+              v{import.meta.env.VITE_APP_VERSION ?? '0.1.0'}
+            </span>
+          </div>
+        </div>
       </header>
 
-      <main className="p-6">
-        {error && <p className="mb-4 rounded bg-red-500/20 px-4 py-2 text-sm text-red-200">{error}</p>}
-        {session ? (
+      <main className="mx-auto flex max-w-[1200px] flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
+        {error && (
+          <p className="rounded-md border border-danger/30 bg-danger-wash px-4 py-2.5 text-sm text-danger">
+            {error}
+          </p>
+        )}
+        {showSettings && <TokenManager />}
+
+        <StackMode mode={mode} onModeChange={setMode} />
+
+        {mode === 'stack' ? (
+          <StackView onEnhanceComposite={handleEnhanceComposite} />
+        ) : session ? (
           <EditorView session={session} astrodexContext={astrodexContext} />
         ) : (
           <ImageUpload onUpload={handleUpload} isLoading={isUploading} />
         )}
       </main>
     </div>
+  );
+}
+
+/** Compact aperture mark used in the header. */
+function BrandMark() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" role="img" aria-label="MyAstroShine" fill="none">
+      <circle cx="12" cy="12" r="9" className="stroke-line-strong" strokeWidth="1.5" />
+      <circle cx="12" cy="12" r="3.25" className="fill-accent" />
+      <path
+        d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"
+        className="stroke-accent"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }
