@@ -19,3 +19,8 @@ LOG_BACKUP_COUNT = 5  # myastroshine.log.1 .. .log.5
 
 # Accepted log levels, low to high. First entry is the safe default.
 LOG_LEVELS = ("debug", "info", "warning", "error", "critical")
+
+# How often the Celery-beat schedule runs task_cleanup_sessions (app/tasks/celery_app.py).
+# Independent of session_expiry_hours (app_settings.json): that decides which sessions are
+# due for cleanup, this decides how often we look. Not user-tunable - nobody needs to.
+SESSION_CLEANUP_INTERVAL_SECONDS = 60 * 60  # hourly

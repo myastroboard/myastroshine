@@ -121,6 +121,13 @@ tagged yet.
   in Settings -> Advanced; `JobRecord.client_ip` (new Alembic revision
   `623faa14df02_add_job_client_ip`).
 
+#### Session-cleanup scheduler
+
+- `worker` runs Celery beat embedded (`-B`, both compose files): hourly,
+  `task_cleanup_sessions` deletes sessions past `session_expiry_hours` and
+  their files, regardless of `PROCESSING_MODE`. Schedule state persisted at
+  `DATA_DIR/celerybeat-schedule`.
+
 ### Changed
 
 #### Configuration moved out of the environment (PASSATION alignment, part 1)
@@ -210,6 +217,5 @@ tagged yet.
 ### Known gaps
 
 - No load/performance benchmark suite.
-- `task_cleanup_sessions` exists but is not scheduled (no Celery beat entry).
 - The slider panel has no per-parameter tooltips.
 - Nothing is tagged yet; no published Docker images or GitHub release.

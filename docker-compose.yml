@@ -43,7 +43,9 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: myastroshine-worker
-    command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=2
+    # -B: embedded beat scheduler (expired-session cleanup). Do not scale this
+    # service past one replica without moving beat to its own service first.
+    command: celery -A app.tasks.celery_app worker -B --loglevel=info --concurrency=2
     environment: *backend-env
     volumes:
       - myastroshine_data:/data

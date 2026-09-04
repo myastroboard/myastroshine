@@ -16,19 +16,27 @@ session secret is generated on first start.
 | Service | Image / build | Port | Volumes |
 |---------|---------------|------|---------|
 | `api` | `./backend` (FastAPI + OpenCV) | 8002 | `myastroshine_data:/data` |
-| `worker` | `./backend` (Celery worker) | - | `myastroshine_data:/data` |
+| `worker` | `./backend` (Celery worker + embedded beat) | - | `myastroshine_data:/data` |
 | `web` | `./frontend` (Vite build served by nginx) | 3000 | - |
 | `redis` | `redis:7-alpine` | 6379 | `myastroshine_redis:/data` |
 
 This stack sets `PROCESSING_MODE=queue`, so `/api/process` and
 `/api/stack/{id}/process` enqueue a Celery task the `worker` runs, and progress
 streams over `/ws/processing-status/{job_id}` (or `/ws/stack-status/{id}`). Set
-`PROCESSING_MODE=sync` to run everything inside the request instead - then the
-`worker` and `redis` services are optional.
+`PROCESSING_MODE=sync` to run everything inside the request instead - `worker`
+and `redis` are then optional for processing, but dropping `worker` also drops
+the beat-scheduled session cleanup below; keep it running if you want that.
 
 > SQLite is shared between `api` and `worker` over the volume. This is fine for a
 > single worker and short writes; set `DATABASE_URL` to a Postgres URL before
 > scaling the worker out.
+
+`worker` also runs Celery beat in-process (`-B`), which hourly runs
+`task_cleanup_sessions` - deletes sessions past `session_expiry_hours` (and
+their files) regardless of `PROCESSING_MODE`. Its schedule state lives at
+`DATA_DIR/celerybeat-schedule`. Beat only ever runs once as long as `worker`
+stays at one replica; scaling it out would run the schedule multiple times, so
+move beat to its own service first if you ever do that.
 
 ## The data volume
 

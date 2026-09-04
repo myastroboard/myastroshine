@@ -3,7 +3,7 @@
 #   docker compose -f docker-compose.dev.yml up
 #
 # - api: uvicorn --reload, source bind-mounted
-# - worker: celery worker, restarted on code change by watchmedo (source bind-mounted)
+# - worker: celery worker + embedded beat, restarted on code change by watchmedo (source bind-mounted)
 # - web: Vite dev server with HMR, source bind-mounted
 # - data and the SQLite db live in ./data on the host
 
@@ -39,10 +39,11 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: myastroshine-worker-dev
+    # -B: embedded beat scheduler (expired-session cleanup) - see docker-compose.yml.
     command: >
       sh -c "pip install --quiet watchdog &&
       watchmedo auto-restart --directory=/app/app --pattern='*.py' --recursive --
-      celery -A app.tasks.celery_app worker --loglevel=info --concurrency=1"
+      celery -A app.tasks.celery_app worker -B --loglevel=info --concurrency=1"
     environment: *backend-env
     volumes:
       - ./backend:/app
