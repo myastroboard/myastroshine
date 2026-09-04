@@ -8,7 +8,7 @@ on:
   release:
     types: [published]
   workflow_run:
-    workflows: ["Build and Publish Docker Images"]
+    workflows: ["Build and Publish Docker Image"]
     types: [completed]
   workflow_dispatch:
     inputs:
