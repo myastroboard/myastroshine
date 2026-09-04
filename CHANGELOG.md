@@ -6,6 +6,10 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.1.0] - 2026-09-04
+
 First implementation pass covering the full v1.0 + v1.1 roadmap. Nothing has been
 tagged yet.
 
@@ -305,3 +309,4 @@ tagged yet.
   (`useDepthShift`). Found while adding parameter tooltips; not fixed since it
   needs a product decision (most likely: wire it as that viewer's starting
   value), not a copy change.
+
