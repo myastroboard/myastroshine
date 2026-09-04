@@ -93,7 +93,7 @@ CI runs this weekly; it is also part of `pytest` (skipped when offline).
 
 ## Technology stack
 
-- **Backend**: FastAPI, Python 3.13, OpenCV, scikit-image, Pillow
+- **Backend**: FastAPI, Python 3.14, OpenCV, scikit-image, Pillow
 - **Frontend**: React 19, TypeScript, Vite, Tailwind CSS v4
 - **Jobs**: Celery + Redis (optional; `PROCESSING_MODE=queue`)
 - **Storage**: local filesystem + SQLite for metadata

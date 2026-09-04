@@ -10,7 +10,7 @@
     "initial_plan"
   ],
   "extraPaths": ["backend"],
-  "pythonVersion": "3.13",
+  "pythonVersion": "3.14",
   "typeCheckingMode": "standard",
   "reportMissingModuleSource": "none"
 }

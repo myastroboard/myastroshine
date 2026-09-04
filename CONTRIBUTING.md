@@ -5,7 +5,7 @@ Thanks for helping build MyAstroShine. This guide covers the practical workflow;
 
 ## Development environment
 
-- Python 3.13, Node.js 24+, Docker Desktop 4.0+
+- Python 3.14, Node.js 24+, Docker Desktop 4.0+
 - See `README.md` for backend and frontend setup.
 
 ## Docker
