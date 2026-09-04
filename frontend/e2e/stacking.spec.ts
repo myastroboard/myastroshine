@@ -23,5 +23,5 @@ test('stack three frames and enhance the composite', async ({ page }) => {
 
   // Handoff: back to the single-image editor on the composite session.
   await expect(page.getByRole('button', { name: 'Download' })).toBeVisible();
-  await expect(page.getByLabel('Contrast')).toBeVisible();
+  await expect(page.getByRole('slider', { name: 'Contrast' })).toBeVisible();
 });

@@ -13,7 +13,7 @@ test('upload, adjust a slider, and download the result', async ({ page }) => {
   const processed = page.waitForResponse(
     (r) => r.url().includes('/api/process/') && r.request().method() === 'POST' && r.ok(),
   );
-  await page.getByLabel('Contrast').fill('2');
+  await page.getByRole('slider', { name: 'Contrast' }).fill('2');
   await processed;
 
   const [file] = await Promise.all([
@@ -33,7 +33,7 @@ test('adjusting a slider refreshes the processed preview', async ({ page }) => {
 
   await Promise.all([
     page.waitForResponse((r) => r.url().includes('/api/process/') && r.ok()),
-    page.getByLabel('Contrast').fill('2.4'),
+    page.getByRole('slider', { name: 'Contrast' }).fill('2.4'),
   ]);
   await expect(processed).not.toHaveAttribute('src', before ?? '');
   expect(await processed.getAttribute('src')).toContain('full=true');
@@ -65,7 +65,7 @@ test('opens the depth shift viewer', async ({ page }) => {
   await page.locator('input[type=file]').setInputFiles(SAMPLE);
   await expect(page.getByRole('button', { name: 'Download' })).toBeVisible();
 
-  await page.getByRole('button', { name: /depth shift/i }).click();
+  await page.getByRole('button', { name: 'Open Depth Shift viewer' }).click();
 
   const dialog = page.getByRole('dialog', { name: 'Depth shift viewer' });
   await expect(dialog).toBeVisible({ timeout: 20_000 });
@@ -153,7 +153,7 @@ test('applying a preset moves the sliders and star reduction works', async ({ pa
   await page.locator('input[type=file]').setInputFiles(SAMPLE);
   await expect(page.getByRole('button', { name: 'Download' })).toBeVisible();
 
-  const contrast = page.getByLabel('Contrast');
+  const contrast = page.getByRole('slider', { name: 'Contrast' });
   await expect(contrast).toHaveValue('1');
 
   const nebula = page.getByRole('button', { name: 'Nebula', exact: true });
@@ -164,7 +164,7 @@ test('applying a preset moves the sliders and star reduction works', async ({ pa
   await expect(contrast).not.toHaveValue('1'); // preset pushed its value into the slider
   await expect(nebula).toHaveAttribute('aria-pressed', 'true');
 
-  const stars = page.getByLabel('Star reduction');
+  const stars = page.getByRole('slider', { name: 'Star reduction' });
   await Promise.all([
     page.waitForResponse((r) => r.url().includes('/api/process/') && r.ok()),
     stars.fill('60'),

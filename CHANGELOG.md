@@ -80,6 +80,8 @@ tagged yet.
 - Single-image editor: drag-and-drop upload, before/after split preview with zoom
   controls, histogram, grouped parameter sliders (500 ms debounce), preset
   buttons, "save as preset" dialog, download.
+- Parameter tooltips: each slider gets a small "i" badge (hover or keyboard
+  focus, screen-reader linked via `aria-describedby`) explaining what it does.
 - Crop / rotate tool (`CropTool`): full-screen mode with a draggable crop
   rectangle (corner + edge handles), straighten dial (+/-45 deg), 90 deg rotate,
   horizontal / vertical flip, and aspect presets (Free / Original / 1:1 / 16:9 /
@@ -232,8 +234,21 @@ tagged yet.
   composite) load instead of 502-ing. `VITE_API_URL`/`VITE_WS_URL` dropped from
   `docker-compose.dev.yml`; `ws.ts` builds an absolute ws:// URL from the page
   origin when unset.
+- `mypy`: `packages = ["app"]` already kept the CI command (`mypy app`) from
+  ever touching `tests/`, but an IDE's mypy integration analyzes whatever file
+  is open regardless of that scoping, so every untyped pytest fixture/test
+  function surfaced as a strict-mode error there. Added a `tests.*` override
+  (relaxed the same way ruff already special-cases `tests/*`) - fixed ~130
+  false positives; the handful of real ones left (a couple of loosely-typed
+  numpy assignments, a duck-typed fake `Request` in the rate-limit tests) were
+  fixed properly instead of suppressed.
 
 ### Known gaps
 
-- The slider panel has no per-parameter tooltips.
 - Nothing is tagged yet; no published Docker images or GitHub release.
+- `depthShiftIntensity` (a `ProcessingParameters` field with its own slider) is
+  dead: nothing in the enhancement pipeline or `depth_shift.py` reads it. The
+  actual Depth Shift viewer has its own separate intensity state
+  (`useDepthShift`). Found while adding parameter tooltips; not fixed since it
+  needs a product decision (most likely: wire it as that viewer's starting
+  value), not a copy change.

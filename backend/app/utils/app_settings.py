@@ -117,7 +117,7 @@ def _load_from_disk() -> AppSettings:
         return AppSettings()
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except OSError, json.JSONDecodeError:
         logger.exception("could not read app settings; falling back to defaults", path=str(path))
         return AppSettings()
     return AppSettings.model_validate(data)

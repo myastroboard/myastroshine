@@ -88,7 +88,7 @@ function ParameterHint({
         type="button"
         aria-describedby={tooltipId}
         aria-label={`About ${label}`}
-        className="grid h-3.5 w-3.5 place-items-center rounded-full text-[9px] leading-none text-faint outline-none transition-colors hover:text-ink focus-visible:text-ink"
+        className="grid h-4 w-4 shrink-0 place-items-center rounded-full border border-line-strong text-[10px] font-semibold leading-none text-muted outline-none transition-colors hover:border-accent/60 hover:text-ink focus-visible:border-accent/60 focus-visible:text-ink"
       >
         i
       </button>

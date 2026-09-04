@@ -2,8 +2,12 @@
   "recommendations": [
     "ms-python.python",
     "ms-python.vscode-pylance",
+    "ms-python.mypy-type-checker",
     "charliermarsh.ruff",
     "dbaeumer.vscode-eslint",
     "bradlc.vscode-tailwindcss"
+  ],
+  "unwantedRecommendations": [
+    "matangover.mypy"
   ]
 }
