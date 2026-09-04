@@ -72,6 +72,9 @@ tagged yet.
 #### Frontend
 
 - React 19 + TypeScript + Vite single-page app, Tailwind CSS v4 (CSS-first).
+- "Darkroom / neutre pro" design system (`docs/DESIGN.md`): semantic token layer
+  and shared component classes (`.panel`, `.btn`, `.field`, `.slider`,
+  `.segmented`, `.chip`, `.dropzone`) in `src/styles/index.css`. Dark-only.
 - Single-image editor: drag-and-drop upload, before/after split preview with zoom
   controls, histogram, grouped parameter sliders (500 ms debounce), preset
   buttons, "save as preset" dialog, download.

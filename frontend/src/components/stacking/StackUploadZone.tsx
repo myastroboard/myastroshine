@@ -21,33 +21,48 @@ const STATUS_TONE: Record<StackFrame['status'], string> = {
 
 /** Multi-frame drag-and-drop upload list (v1.1+). */
 export function StackUploadZone({ frames, onAddFiles }: StackUploadZoneProps) {
+  const hasFrames = frames.length > 0;
+  const fileInput = (
+    <input
+      type="file"
+      multiple
+      accept=".jpg,.jpeg,.png,.tiff"
+      className="hidden"
+      onChange={(event) => onAddFiles(Array.from(event.target.files ?? []))}
+    />
+  );
+
   return (
     <div className="flex flex-col gap-4">
-      <label className="dropzone cursor-pointer">
-        <div className="grid h-10 w-10 place-items-center rounded-full border border-line bg-raised">
-          <svg viewBox="0 0 24 24" className="h-4 w-4 stroke-muted" fill="none" aria-hidden>
-            <path
-              d="M12 16V4m0 0-4 4m4-4 4 4M5 20h14"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+      {hasFrames ? (
+        <label className="chip cursor-pointer self-start">
+          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 stroke-current" fill="none" aria-hidden>
+            <path d="M12 5v14M5 12h14" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <span className="text-sm text-ink">Add frames</span>
-          <span className="text-xs text-faint">Select multiple files at once</span>
-        </div>
-        <input
-          type="file"
-          multiple
-          accept=".jpg,.jpeg,.png,.tiff"
-          className="hidden"
-          onChange={(event) => onAddFiles(Array.from(event.target.files ?? []))}
-        />
-      </label>
+          Add frames
+          {fileInput}
+        </label>
+      ) : (
+        <label className="dropzone cursor-pointer">
+          <div className="grid h-10 w-10 place-items-center rounded-full border border-line bg-raised">
+            <svg viewBox="0 0 24 24" className="h-4 w-4 stroke-muted" fill="none" aria-hidden>
+              <path
+                d="M12 16V4m0 0-4 4m4-4 4 4M5 20h14"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-sm text-ink">Add frames</span>
+            <span className="text-xs text-faint">Select multiple files at once</span>
+          </div>
+          {fileInput}
+        </label>
+      )}
 
-      {frames.length > 0 && (
+      {hasFrames && (
         <ul className="flex flex-col divide-y divide-hairline rounded-lg border border-hairline bg-surface px-3 text-xs">
           {frames.map((frame) => (
             <li key={frame.index} className="flex items-center justify-between gap-3 py-2">

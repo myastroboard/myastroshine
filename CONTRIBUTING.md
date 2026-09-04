@@ -106,6 +106,9 @@ own `e2e` CI job.
   add snake_case to component/hook/type code.
 - Tailwind v4 is configured CSS-first in `src/styles/index.css` (`@theme`), loaded
   by the `@tailwindcss/vite` plugin - there is no `tailwind.config.js`.
+- Follow `docs/DESIGN.md` - the "darkroom / neutre pro" design system. Compose the
+  shared component classes (`.panel`, `.btn`, `.field`, `.slider`, ...) and semantic
+  tokens; never a raw hex colour or a new font in a component.
 
 ## Pull requests
 
