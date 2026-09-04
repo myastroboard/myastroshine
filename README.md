@@ -109,9 +109,8 @@ pull request.
 ## Roadmap to 1.0.0
 
 The feature work is done; the remaining items before a first tag are tracked in
-[CHANGELOG.md](CHANGELOG.md#known-gaps): versioned Alembic migrations, API rate
-limiting, a load/performance suite, scheduled session cleanup, and published
-Docker images.
+[CHANGELOG.md](CHANGELOG.md#known-gaps): a load/performance suite, scheduled
+session cleanup, and published Docker images.
 
 ## About
 

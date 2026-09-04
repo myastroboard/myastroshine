@@ -46,6 +46,11 @@ class AppSettings(BaseModel):
     # API
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
 
+    # Rate limiting (per IP, across upload/process/stack - API spec "Rate Limiting")
+    rate_limit_enabled: bool = True
+    rate_limit_per_minute: int = Field(default=10, ge=1, le=1000)
+    max_concurrent_jobs_per_ip: int = Field(default=5, ge=1, le=100)
+
     # Uploads and sessions
     max_image_size_mb: int = Field(default=100, ge=1, le=1024)
     session_expiry_hours: int = Field(default=24, ge=1, le=8760)

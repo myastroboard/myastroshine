@@ -41,10 +41,13 @@ class EnhancementService:
     def _emit(self, job_id: str) -> None:
         progress.publish(job_id, JobService.to_event(self.jobs.get(job_id)))
 
-    def dispatch(self, session_id: str, params: ProcessingParameters) -> ProcessResponse:
+    def dispatch(
+        self, session_id: str, params: ProcessingParameters, client_ip: str | None = None
+    ) -> ProcessResponse:
         """Create a job and either run it inline or hand it to the queue."""
         self.sessions.get_session(session_id)  # 404/410 before any work
-        job = self.jobs.create(session_id)
+        self.jobs.assert_under_concurrency_limit(client_ip)
+        job = self.jobs.create(session_id, client_ip=client_ip)
 
         if get_settings().processing_mode == "queue":
             # Lazy import: app.tasks.processing imports this module.

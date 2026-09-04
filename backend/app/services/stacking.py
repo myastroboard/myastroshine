@@ -191,10 +191,13 @@ class StackingService:
         )
         return composite, stats
 
-    def dispatch(self, stack_id: str, jobs: JobService) -> tuple[StackRecord, str]:
+    def dispatch(
+        self, stack_id: str, jobs: JobService, client_ip: str | None = None
+    ) -> tuple[StackRecord, str]:
         """Create a job and run the stack inline or on the queue."""
         self._get(stack_id)  # 404 before any work
-        job = jobs.create(None)
+        jobs.assert_under_concurrency_limit(client_ip)
+        job = jobs.create(None, client_ip=client_ip)
 
         if get_settings().processing_mode == "queue":
             from app.tasks.processing import task_process_stack  # noqa: PLC0415

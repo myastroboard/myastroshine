@@ -27,6 +27,7 @@ from app.services.session import SessionService
 from app.services.stacking import StackingService
 from app.services.storage import StorageService
 from app.services.token import TokenService
+from app.utils.rate_limit import enforce_request_rate_limit
 
 DbSession = Annotated[Session, Depends(get_db)]
 
@@ -108,6 +109,8 @@ def require_admin() -> None:
 
 
 RequireAdmin = Annotated[None, Depends(require_admin)]
+
+RequireRateLimit = Annotated[None, Depends(enforce_request_rate_limit)]
 
 
 def get_astrodex_service() -> AstroDexService:

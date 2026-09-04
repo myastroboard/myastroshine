@@ -82,6 +82,7 @@ after changing it).
 | Webhooks | `astrodex_callback_urls` (allowlist) | empty |
 | Webhooks | `astrodex_max_retries` / `astrodex_retry_delay_seconds` | 3 / 5s |
 | Advanced | `cors_origins` | `http://localhost:3000` |
+| Advanced | `rate_limit_enabled` / `rate_limit_per_minute` / `max_concurrent_jobs_per_ip` | `true` / 10 / 5 |
 | Advanced | `log_level` / `console_log_level` | `info` / `warning` |
 
 ## Frontend environment
@@ -129,16 +130,31 @@ polling (`VITE_USE_POLLING=1`) so edits are picked up on Windows and macOS.
 
 Alembic is configured in `backend/alembic.ini` / `backend/migrations/`. The URL
 comes from application settings at runtime (`DATABASE_URL`, or the derived SQLite
-path under `DATA_DIR`).
+path under `DATA_DIR`). The initial revision
+(`606a1e113989_create_core_tables.py`) covers all six tables.
+
+Apply migrations before starting a production instance:
 
 ```bash
 cd backend
-alembic revision --autogenerate -m "create core tables"
 alembic upgrade head
 ```
 
+When the models change, author a new revision and check its diff before
+committing it:
+
+```bash
+cd backend
+alembic revision --autogenerate -m "describe the change"
+alembic upgrade head   # apply it locally and eyeball the generated SQL
+```
+
 For local development and tests, `init_db()` calls `Base.metadata.create_all`
-as a convenience; production should rely on `alembic upgrade head`.
+as a convenience (it only creates tables that don't exist yet, so it is
+harmless to run alongside Alembic); production should rely on
+`alembic upgrade head`. `api` and `worker` share the same SQLite file under
+`DATA_DIR`, so migrations are applied manually and once, not from either
+container's entrypoint.
 
 ## Logs
 

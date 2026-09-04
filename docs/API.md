@@ -21,7 +21,23 @@ All error responses share this shape:
 Common codes: `INVALID_PARAMETER` (400), `UNAUTHORIZED` (401), `FORBIDDEN` (403),
 `NOT_FOUND` / `SESSION_NOT_FOUND` (404), `UNSUPPORTED_FORMAT` (415),
 `DUPLICATE_RESOURCE` (400), `PAYLOAD_TOO_LARGE` (413), `SESSION_EXPIRED` (410),
-`PROCESSING_FAILED` (500), `ASTRODEX_UNREACHABLE` (503).
+`PROCESSING_FAILED` (500), `ASTRODEX_UNREACHABLE` (503), `RATE_LIMITED` (429).
+
+## Rate Limiting
+
+Per IP, on `/upload`, `/process/{id}`, `/presets/{id}/apply/{session_id}`, and
+`/stack/*`:
+
+- **Requests per minute** (`rate_limit_per_minute`, default 10): a fixed
+  60-second window, shared across all of the routes above (not per-route).
+- **Concurrent processing jobs** (`max_concurrent_jobs_per_ip`, default 5):
+  checked against non-terminal rows in the `jobs` table, so it holds under
+  both `PROCESSING_MODE=sync` and `queue`.
+
+Both settings, plus a `rate_limit_enabled` switch, are editable from
+**Settings -> Advanced** (`app_settings.json`, see docs/DEPLOYMENT.md) - no
+restart needed. Over either limit returns `429` with `error_code:
+"RATE_LIMITED"`.
 
 ## Status
 

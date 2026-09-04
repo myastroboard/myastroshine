@@ -9,7 +9,7 @@ from __future__ import annotations
 from fastapi import APIRouter, File, UploadFile
 from fastapi.responses import FileResponse
 
-from app.dependencies import SessionServiceDep, StorageDep
+from app.dependencies import RequireRateLimit, SessionServiceDep, StorageDep
 from app.exceptions import SessionNotFoundError, UnsupportedImageError
 from app.logging_config import get_logger
 from app.models import Dimensions, HistogramData, UploadResponse
@@ -29,6 +29,7 @@ router = APIRouter(tags=["upload"])
 async def upload_image(
     sessions: SessionServiceDep,
     storage: StorageDep,
+    _rate_limit: RequireRateLimit,
     file: UploadFile = File(...),
 ) -> UploadResponse:
     """Accept an image file and open a processing session."""

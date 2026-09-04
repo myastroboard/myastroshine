@@ -8,9 +8,9 @@ POST   /api/presets/{preset_id}/apply/{session_id}    - apply a preset to a sess
 
 from __future__ import annotations
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Request, status
 
-from app.dependencies import EnhancementServiceDep, PresetServiceDep
+from app.dependencies import EnhancementServiceDep, PresetServiceDep, RequireRateLimit
 from app.exceptions import SessionNotFoundError
 from app.logging_config import get_logger
 from app.models import (
@@ -20,6 +20,7 @@ from app.models import (
     SavePresetRequest,
     SavePresetResponse,
 )
+from app.utils.rate_limit import get_client_ip
 from app.utils.validators import is_valid_session_id
 
 logger = get_logger(__name__)
@@ -62,9 +63,12 @@ async def apply_preset(
     session_id: str,
     presets: PresetServiceDep,
     enhancement: EnhancementServiceDep,
+    http_request: Request,
+    _rate_limit: RequireRateLimit,
 ) -> ProcessResponse:
     """Apply a preset's parameters to a session (shortcut for /process)."""
     if not is_valid_session_id(session_id):
         raise SessionNotFoundError(f"Session {session_id} not found")
     preset = presets.get_preset(preset_id)
-    return enhancement.dispatch(session_id, ProcessingParameters(**preset.parameters))
+    client_ip = get_client_ip(http_request)
+    return enhancement.dispatch(session_id, ProcessingParameters(**preset.parameters), client_ip)

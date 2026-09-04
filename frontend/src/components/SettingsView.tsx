@@ -274,6 +274,33 @@ function AdvancedSection({ draft, patch }: SectionProps) {
         onChange={(corsOrigins) => patch({ corsOrigins })}
       />
 
+      <GroupLabel>Rate limiting</GroupLabel>
+      <ToggleRow
+        id="rate-limit-enabled"
+        label="Rate limiting"
+        hint="Caps how often one IP can upload, process, or stack images."
+        checked={draft.rateLimitEnabled}
+        onChange={(rateLimitEnabled) => patch({ rateLimitEnabled })}
+      />
+      <NumberRow
+        id="rate-limit-per-minute"
+        label="Requests per minute"
+        hint="Per IP, shared across upload/process/stack endpoints."
+        value={draft.rateLimitPerMinute}
+        min={1}
+        max={1000}
+        onChange={(rateLimitPerMinute) => patch({ rateLimitPerMinute })}
+      />
+      <NumberRow
+        id="max-concurrent-jobs"
+        label="Concurrent jobs"
+        hint="Maximum enhance/stack jobs running at once, per IP."
+        value={draft.maxConcurrentJobsPerIp}
+        min={1}
+        max={100}
+        onChange={(maxConcurrentJobsPerIp) => patch({ maxConcurrentJobsPerIp })}
+      />
+
       <GroupLabel>Logging</GroupLabel>
       <SelectRow
         id="log-file-level"

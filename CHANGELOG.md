@@ -106,6 +106,20 @@ tagged yet.
 - GitHub Actions: backend (ruff, mypy, pytest), frontend (lint, typecheck, test,
   build), and e2e (Playwright) jobs, plus the dependency-freshness cron.
 - API listens on port 8002.
+- Initial Alembic revision (`606a1e113989_create_core_tables`) covering all six
+  tables; `alembic upgrade head` / `downgrade base` and `alembic check` verified
+  clean against the ORM models.
+
+#### API rate limiting
+
+- Per-IP request-rate limit (default 10/min, in-memory fixed window) on
+  `/upload`, `/process/{id}`, `/presets/{id}/apply/{session_id}`, and
+  `/stack/*`; over the limit returns `429 RATE_LIMITED`.
+- Per-IP concurrent-job limit (default 5), checked against the shared `jobs`
+  table so it holds under both `sync` and `queue` processing modes.
+- `rate_limit_enabled` / `rate_limit_per_minute` / `max_concurrent_jobs_per_ip`
+  in Settings -> Advanced; `JobRecord.client_ip` (new Alembic revision
+  `623faa14df02_add_job_client_ip`).
 
 ### Changed
 
@@ -195,8 +209,6 @@ tagged yet.
 
 ### Known gaps
 
-- API rate limiting is planned for a later release (per the API spec, v1.5+).
-- Alembic has no versioned revisions; production migrations still to be authored.
 - No load/performance benchmark suite.
 - `task_cleanup_sessions` exists but is not scheduled (no Celery beat entry).
 - The slider panel has no per-parameter tooltips.

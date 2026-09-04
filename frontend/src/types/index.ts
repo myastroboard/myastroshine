@@ -200,6 +200,9 @@ export interface CreatedToken extends WebhookToken {
 
 export interface AppSettings {
   corsOrigins: string[];
+  rateLimitEnabled: boolean;
+  rateLimitPerMinute: number;
+  maxConcurrentJobsPerIp: number;
   maxImageSizeMb: number;
   sessionExpiryHours: number;
   previewMaxSize: number;

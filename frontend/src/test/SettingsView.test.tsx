@@ -23,6 +23,9 @@ const mocked = vi.mocked(apiClient);
 
 const SETTINGS: AppSettings = {
   corsOrigins: ['http://localhost:3000'],
+  rateLimitEnabled: true,
+  rateLimitPerMinute: 10,
+  maxConcurrentJobsPerIp: 5,
   maxImageSizeMb: 100,
   sessionExpiryHours: 24,
   previewMaxSize: 512,
@@ -100,6 +103,23 @@ describe('SettingsView', () => {
     expect(toggle).toHaveAttribute('aria-checked', 'false');
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('edits rate limiting settings under the Advanced section', async () => {
+    renderView();
+    await screen.findByLabelText('Maximum upload size');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Advanced' }));
+
+    const perMinute = await screen.findByLabelText('Requests per minute');
+    expect(perMinute).toHaveValue(10);
+    fireEvent.change(perMinute, { target: { value: '20' } });
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => expect(mocked.saveAppSettings).toHaveBeenCalledTimes(1));
+    expect(mocked.saveAppSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ rateLimitPerMinute: 20 }),
+    );
   });
 
   it('tails the log file under the Logs section', async () => {

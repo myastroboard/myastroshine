@@ -12,10 +12,10 @@ Processing runs inline (``PROCESSING_MODE=sync``) or on the Celery queue
 
 from __future__ import annotations
 
-from fastapi import APIRouter, File, Form, UploadFile, status
+from fastapi import APIRouter, File, Form, Request, UploadFile, status
 
 from app.db.models import StackRecord
-from app.dependencies import JobServiceDep, StackingServiceDep
+from app.dependencies import JobServiceDep, RequireRateLimit, StackingServiceDep
 from app.logging_config import get_logger
 from app.models import (
     InitiateStackRequest,
@@ -25,6 +25,7 @@ from app.models import (
     UploadFrameResponse,
 )
 from app.utils import image_utils
+from app.utils.rate_limit import get_client_ip
 from app.utils.validators import validate_upload_size
 
 logger = get_logger(__name__)
@@ -48,7 +49,7 @@ def _result(record: StackRecord, job_id: str | None = None) -> StackResultRespon
 
 @router.post("/initiate", status_code=status.HTTP_202_ACCEPTED, response_model=StackSessionResponse)
 async def initiate_stack(
-    request: InitiateStackRequest, stacking: StackingServiceDep
+    request: InitiateStackRequest, stacking: StackingServiceDep, _rate_limit: RequireRateLimit
 ) -> StackSessionResponse:
     """Open a stacking session and wait for frames."""
     record = stacking.initiate(request)
@@ -68,6 +69,7 @@ async def initiate_stack(
 async def upload_frame(
     stack_id: str,
     stacking: StackingServiceDep,
+    _rate_limit: RequireRateLimit,
     frame_index: int = Form(...),
     file: UploadFile = File(...),
 ) -> UploadFrameResponse:
@@ -87,10 +89,14 @@ async def upload_frame(
 
 @router.post("/{stack_id}/process", response_model=StackResultResponse)
 async def process_stack(
-    stack_id: str, stacking: StackingServiceDep, jobs: JobServiceDep
+    stack_id: str,
+    stacking: StackingServiceDep,
+    jobs: JobServiceDep,
+    http_request: Request,
+    _rate_limit: RequireRateLimit,
 ) -> StackResultResponse:
     """Register, normalise, reject cosmic rays, and combine the frames."""
-    record, job_id = stacking.dispatch(stack_id, jobs)
+    record, job_id = stacking.dispatch(stack_id, jobs, get_client_ip(http_request))
     return _result(record, job_id)
 
 

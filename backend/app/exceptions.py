@@ -74,3 +74,8 @@ class UpstreamUnavailableError(AppError):
 class ImageProcessingError(AppError):
     status_code = 500
     error_code = "PROCESSING_FAILED"
+
+
+class RateLimitedError(AppError):
+    status_code = 429
+    error_code = "RATE_LIMITED"
