@@ -137,3 +137,6 @@ tagged yet.
 - API rate limiting is planned for a later release (per the API spec, v1.5+).
 - Alembic has no versioned revisions; production migrations still to be authored.
 - No load/performance benchmark suite.
+- `task_cleanup_sessions` exists but is not scheduled (no Celery beat entry).
+- The slider panel has no per-parameter tooltips.
+- Nothing is tagged yet; no published Docker images or GitHub release.
