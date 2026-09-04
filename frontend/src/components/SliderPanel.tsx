@@ -44,12 +44,16 @@ export function SliderPanel({
         <fieldset key={group} className="flex flex-col gap-3">
           <legend className="mb-1 text-xs font-medium text-faint">{GROUP_LABELS[group]}</legend>
           {PARAMETER_BOUNDS.filter((bound) => bound.group === group).map((bound) => (
-            <label key={bound.key} className="flex flex-col gap-1.5 text-sm">
+            <div key={bound.key} className="flex flex-col gap-1.5 text-sm">
               <span className="flex items-baseline justify-between">
-                <span className="text-muted">{bound.label}</span>
+                <span className="inline-flex items-center gap-1 text-muted">
+                  <label htmlFor={`param-${bound.key}`}>{bound.label}</label>
+                  <ParameterHint paramKey={bound.key} label={bound.label} hint={bound.hint} />
+                </span>
                 <span className="text-xs tabular-nums text-faint">{parameters[bound.key]}</span>
               </span>
               <input
+                id={`param-${bound.key}`}
                 type="range"
                 className="slider"
                 min={bound.min}
@@ -57,13 +61,44 @@ export function SliderPanel({
                 step={bound.step}
                 value={parameters[bound.key]}
                 disabled={isProcessing}
-                aria-label={bound.label}
                 onChange={(event) => onParameterChange(bound.key, Number(event.target.value))}
               />
-            </label>
+            </div>
           ))}
         </fieldset>
       ))}
     </div>
+  );
+}
+
+/** Small "i" affordance; reveals `hint` in a popover on hover or keyboard focus. */
+function ParameterHint({
+  paramKey,
+  label,
+  hint,
+}: {
+  paramKey: SliderParameterKey;
+  label: string;
+  hint: string;
+}) {
+  const tooltipId = `param-hint-${paramKey}`;
+  return (
+    <span className="group/hint relative inline-flex">
+      <button
+        type="button"
+        aria-describedby={tooltipId}
+        aria-label={`About ${label}`}
+        className="grid h-3.5 w-3.5 place-items-center rounded-full text-[9px] leading-none text-faint outline-none transition-colors hover:text-ink focus-visible:text-ink"
+      >
+        i
+      </button>
+      <span
+        id={tooltipId}
+        role="tooltip"
+        className="pointer-events-none absolute bottom-full left-0 z-20 mb-1.5 w-52 rounded-md border border-line bg-overlay px-2.5 py-1.5 text-xs font-normal text-muted opacity-0 shadow-pop transition-opacity duration-100 group-hover/hint:opacity-100 group-focus-within/hint:opacity-100"
+      >
+        {hint}
+      </span>
+    </span>
   );
 }

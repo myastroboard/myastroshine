@@ -97,7 +97,7 @@ def test_star_reduction_dims_stars_more_than_the_object(
     """Star points lose brightness while a diffuse disc is left alone."""
     image = np.zeros((200, 200, 3), dtype=np.uint8)
     cv2.circle(image, (100, 100), 45, (120, 120, 130), -1)
-    image = cv2.GaussianBlur(image, (0, 0), sigmaX=12)
+    image = cv2.GaussianBlur(image, (0, 0), sigmaX=12).astype(np.uint8)
     object_before = int(image[100, 100].astype(int).sum())
 
     stars = [(20, 20), (180, 20), (20, 180), (180, 180), (100, 25)]

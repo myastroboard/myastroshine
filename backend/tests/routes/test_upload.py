@@ -14,7 +14,9 @@ def _upload(client, sample_jpeg: bytes):
 
 
 def _decode(content: bytes) -> np.ndarray:
-    return cv2.imdecode(np.frombuffer(content, np.uint8), cv2.IMREAD_COLOR)
+    image = cv2.imdecode(np.frombuffer(content, np.uint8), cv2.IMREAD_COLOR)
+    assert image is not None
+    return image
 
 
 def test_upload_opens_a_session(client, sample_jpeg: bytes) -> None:

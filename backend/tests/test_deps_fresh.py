@@ -22,6 +22,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
@@ -29,7 +30,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts" / "check_deps_fresh.py"
 
 
-def _load_checker():
+def _load_checker() -> ModuleType:
     spec = importlib.util.spec_from_file_location("check_deps_fresh", SCRIPT)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)

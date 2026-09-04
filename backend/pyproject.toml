@@ -36,6 +36,17 @@ disallow_untyped_decorators = false
 module = ["cv2.*", "skimage.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+# `packages = ["app"]` above already keeps `mypy app` (CI, CONTRIBUTING.md) from
+# ever touching tests/, but an IDE's mypy integration analyzes whatever file is
+# open regardless - this mirrors that same intent (see ruff's tests/*
+# per-file-ignores above) so it doesn't flag every untyped pytest fixture/test
+# function.
+module = "tests.*"
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+warn_return_any = false
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"

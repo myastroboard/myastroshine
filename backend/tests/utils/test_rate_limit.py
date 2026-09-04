@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
+from fastapi import Request
 
 from app.exceptions import RateLimitedError
 from app.utils import app_settings
@@ -24,6 +27,12 @@ class _FakeRequest:
         self.client = _FakeClient(host) if host is not None else None
 
 
+def _fake_request(host: str | None) -> Request:
+    """A minimal stand-in for Starlette's ``Request`` - the code under test only
+    reads ``.client.host``, so a full ASGI scope isn't needed."""
+    return cast(Request, _FakeRequest(host))
+
+
 class _NotTestEnv:
     """Stands in for ``get_settings()`` with ``is_test=False`` (real enforcement)."""
 
@@ -31,11 +40,11 @@ class _NotTestEnv:
 
 
 def test_get_client_ip_reads_the_connecting_socket() -> None:
-    assert get_client_ip(_FakeRequest("203.0.113.5")) == "203.0.113.5"
+    assert get_client_ip(_fake_request("203.0.113.5")) == "203.0.113.5"
 
 
 def test_get_client_ip_handles_missing_client() -> None:
-    assert get_client_ip(_FakeRequest(None)) is None
+    assert get_client_ip(_fake_request(None)) is None
 
 
 def test_limiter_allows_up_to_the_limit() -> None:
@@ -77,7 +86,7 @@ def test_enforce_dependency_is_a_noop_under_app_env_test() -> None:
     """The default test env bypasses enforcement so the suite doesn't need to
     special-case every route that hits a rate-limited endpoint."""
     app_settings.save_app_settings({"rate_limit_per_minute": 1})
-    request = _FakeRequest("1.2.3.4")
+    request = _fake_request("1.2.3.4")
     for _ in range(5):
         enforce_request_rate_limit(request)  # must not raise
 
@@ -85,7 +94,7 @@ def test_enforce_dependency_is_a_noop_under_app_env_test() -> None:
 def test_enforce_dependency_respects_the_disabled_flag(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("app.utils.rate_limit.get_settings", _NotTestEnv)
     app_settings.save_app_settings({"rate_limit_enabled": False, "rate_limit_per_minute": 1})
-    request = _FakeRequest("1.2.3.4")
+    request = _fake_request("1.2.3.4")
     for _ in range(5):
         enforce_request_rate_limit(request)  # must not raise
 
@@ -93,7 +102,7 @@ def test_enforce_dependency_respects_the_disabled_flag(monkeypatch: pytest.Monke
 def test_enforce_dependency_raises_once_over_budget(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("app.utils.rate_limit.get_settings", _NotTestEnv)
     app_settings.save_app_settings({"rate_limit_enabled": True, "rate_limit_per_minute": 2})
-    request = _FakeRequest("9.9.9.9")
+    request = _fake_request("9.9.9.9")
     _request_limiter._counts.pop("9.9.9.9", None)  # the limiter is a module-wide singleton
 
     try:
