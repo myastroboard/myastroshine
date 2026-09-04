@@ -1,0 +1,87 @@
+# MyAstroShine - full stack orchestration.
+#
+#   docker compose up -d
+#
+# No .env editing required. The only variables here are structural (run mode,
+# persistence root, container topology). Everything else - CORS, AstroDex
+# allowlist, upload limits, stacking defaults, log levels - is auto-generated or
+# edited from Settings in the UI and persisted under the data volume
+# (app_settings.json, secret_key.txt). See docs/DEPLOYMENT.md.
+
+x-backend-env: &backend-env
+  PYTHONUNBUFFERED: "1"
+  APP_ENV: production
+  DATA_DIR: /data
+  # This stack runs the worker + redis, so processing goes through the queue.
+  PROCESSING_MODE: queue
+  REDIS_URL: redis://redis:6379/0
+  CELERY_BROKER_URL: redis://redis:6379/1
+
+services:
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: myastroshine-api
+    environment: *backend-env
+    ports:
+      - "8002:8002"
+    volumes:
+      - myastroshine_data:/data
+    depends_on:
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: myastroshine-worker
+    command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=2
+    environment: *backend-env
+    volumes:
+      - myastroshine_data:/data
+    depends_on:
+      - redis
+      - api
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: myastroshine-web
+    environment:
+      - VITE_API_URL=http://localhost:8002/api
+      - VITE_WS_URL=ws://localhost:8002/ws
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: myastroshine-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - myastroshine_redis:/data
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+
+volumes:
+  myastroshine_data:
+    driver: local
+  myastroshine_redis:
+    driver: local
+
+networks:
+  default:
+    name: myastroshine

@@ -1,0 +1,86 @@
+# MyAstroShine - development stack with hot reload.
+#
+#   docker compose -f docker-compose.dev.yml up
+#
+# - api: uvicorn --reload, source bind-mounted
+# - worker: celery worker, restarted on code change by watchmedo (source bind-mounted)
+# - web: Vite dev server with HMR, source bind-mounted
+# - data and the SQLite db live in ./data on the host
+
+x-backend-env: &backend-env
+  PYTHONUNBUFFERED: "1"
+  APP_ENV: development
+  DEBUG: "true"
+  LOG_LEVEL: debug
+  DATA_DIR: /data
+  REDIS_URL: redis://redis:6379/0
+  CELERY_BROKER_URL: redis://redis:6379/1
+  PROCESSING_MODE: ${PROCESSING_MODE:-sync}
+
+services:
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: myastroshine-api-dev
+    command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8002
+    environment: *backend-env
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./backend:/app
+      - ./data:/data
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: myastroshine-worker-dev
+    command: >
+      sh -c "pip install --quiet watchdog &&
+      watchmedo auto-restart --directory=/app/app --pattern='*.py' --recursive --
+      celery -A app.tasks.celery_app worker --loglevel=info --concurrency=1"
+    environment: *backend-env
+    volumes:
+      - ./backend:/app
+      - ./data:/data
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  web:
+    image: node:24-alpine
+    container_name: myastroshine-web-dev
+    working_dir: /app
+    command: sh -c "npm install --no-fund --no-audit && npm run dev -- --host 0.0.0.0"
+    environment:
+      # No VITE_API_URL/VITE_WS_URL: the app talks to :3000 and Vite proxies
+      # /api and /ws to the api service (so backend-relative image URLs work too).
+      - VITE_PROXY_TARGET=http://api:8002
+      - VITE_USE_POLLING=1
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - myastroshine_web_node_modules:/app/node_modules
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: myastroshine-redis-dev
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    command: redis-server --save "" --appendonly no
+
+volumes:
+  myastroshine_web_node_modules:
+
+networks:
+  default:
+    name: myastroshine-dev

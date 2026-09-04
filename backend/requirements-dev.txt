@@ -1,0 +1,10 @@
+# MyAstroShine backend - development and test dependencies
+-r requirements.txt
+
+pytest==9.1.1
+pytest-asyncio==1.4.0
+pytest-cov==7.1.0
+ruff==0.16.6
+mypy==2.3.1
+packaging==26.3
+celery-types==0.26.0

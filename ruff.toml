@@ -1,0 +1,14 @@
+# Shared Ruff baseline for the whole repository.
+# backend/pyproject.toml extends this with backend-specific settings.
+
+line-length = 100
+target-version = "py313"
+
+[lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "PL", "S", "RUF"]
+# PLR0913/PLR0917: FastAPI routes and service constructors legitimately take
+# many (keyword) arguments via dependency injection.
+ignore = ["PLR0913", "PLR0917"]
+
+[lint.per-file-ignores]
+"scripts/*" = ["S310"]  # urllib against a fixed allowlist of registry hosts
