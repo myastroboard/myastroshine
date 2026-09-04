@@ -28,7 +28,7 @@ export function ActionButtons({
       {canSendToAstroDex && (
         <button
           type="button"
-          className="btn btn-outline"
+          className="btn btn-amber"
           disabled={isProcessing}
           onClick={onSendToAstroDex}
         >

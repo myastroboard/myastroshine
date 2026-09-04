@@ -1,7 +1,7 @@
 """StorageService - filesystem layout and IO for session working files.
 
 Layout (per docs/ARCHITECTURE):
-    {storage_path}/{session_id}/
+    {DATA_DIR}/images/{session_id}/
         original.jpg      full-resolution upload
         processed.jpg     full-resolution latest result
         preview.jpg       downscaled processed image (fast display)
@@ -19,6 +19,7 @@ import numpy as np
 from app.config import get_settings
 from app.logging_config import get_logger
 from app.utils import image_utils
+from app.utils.app_settings import get_app_settings
 
 logger = get_logger(__name__)
 
@@ -31,7 +32,7 @@ class StorageService:
     """
 
     def __init__(self, root: Path | None = None) -> None:
-        self.root = Path(root) if root is not None else get_settings().storage_path
+        self.root = Path(root) if root is not None else get_settings().images_dir
 
     # -- paths ---------------------------------------------------------------
 
@@ -73,10 +74,9 @@ class StorageService:
 
     def save_result(self, session_id: str, image: np.ndarray) -> None:
         """Store a processed image plus its downscaled preview."""
-        settings = get_settings()
         self.session_dir(session_id, create=True)
         image_utils.save_image(image, self.processed_path(session_id), quality=92)
-        preview = image_utils.make_preview(image, settings.preview_max_size)
+        preview = image_utils.make_preview(image, get_app_settings().preview_max_size)
         image_utils.save_image(preview, self.preview_path(session_id), quality=85)
 
     def load_original(self, session_id: str) -> np.ndarray:

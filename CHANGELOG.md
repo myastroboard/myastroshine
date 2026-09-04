@@ -107,6 +107,67 @@ tagged yet.
   build), and e2e (Playwright) jobs, plus the dependency-freshness cron.
 - API listens on port 8002.
 
+### Changed
+
+#### Configuration moved out of the environment (PASSATION alignment, part 1)
+
+- `docker compose up` now needs no `.env` editing. The compose files carry only
+  structural variables (`APP_ENV`, `DATA_DIR`, `PROCESSING_MODE`, the Redis URLs);
+  `docker-compose.yml` dropped from 11 backend variables to 6 and holds no
+  secrets.
+- Single persistence root `DATA_DIR` (`/data` in the image). The database,
+  session images, stacking frames, cache, log file, `secret_key.txt` and
+  `app_settings.json` all derive from it; the two data volumes were merged into
+  one (`myastroshine_data`).
+- The session / HMAC-fallback secret is generated once into
+  `DATA_DIR/secret_key.txt` (`secrets.token_hex(32)`) and never regenerated.
+  `ASTRODEX_WEBHOOK_SECRET` is gone.
+- New `app_settings.json` holds every runtime-tunable value (CORS origins,
+  AstroDex callback allowlist and retry policy, upload limit, session lifetime,
+  preview size, ML denoise, depth method, stacking defaults, log levels). It is
+  edited from a rebuilt **Settings** screen (General / Webhooks / Advanced tabs)
+  via `GET`/`POST /api/admin/app-settings`, gated by `ADMIN_ENABLED`.
+- `app/config.py` now exposes only the deployment shape; product settings come
+  from `app/utils/app_settings.py` (`get_app_settings()` / `save_app_settings()`
+  / `reload_app_settings()`). `DATABASE_URL` stays as an optional override for
+  Postgres.
+- `docs/DEPLOYMENT.md` rewritten around this split (structural env table +
+  "where to set it in the UI" table).
+
+#### Settings is its own page
+
+- Settings moved out of the editor into a standalone route (`#/settings`) with a
+  section rail (General / Webhooks / Advanced), labelled rows with descriptions,
+  toggle switches, and a sticky save bar. `useAppSettings` holds a draft and
+  posts the whole object back.
+
+#### Visual charter aligned with MyAstroBoard (PASSATION alignment, part 5)
+
+- `docs/DESIGN.md` rewritten: the sky/teal primary accent (`#38bdf8`), the amber
+  ecosystem accent (`#f59e0b`, used for AstroDex actions), deep navy-teal
+  surfaces, a fixed background gradient with two ambient halos, and glass panels
+  - the charter now shared with MyAstroBoard. The image still stays the loudest
+  thing on screen.
+- Token layer in `frontend/src/styles/index.css` reworked accordingly; new
+  `amber*` tokens, `--gradient-accent`, `--shadow-glass` / `--shadow-premium`,
+  and a `.btn-amber` modifier. `.btn-primary` is now the teal gradient. No
+  component markup changed - everything is token-driven.
+
+#### Logging: rotating file sink + admin controls (PASSATION alignment, part 4)
+
+- `get_logger()` now renders through the stdlib, so alongside the console there
+  is a rotating file at `DATA_DIR/myastroshine.log` (10 MB x 5) - and
+  `worker.log` for the Celery worker. Line format carries the timestamp in the
+  `TZ` zone with the UTC offset, the module, level, and `[func:line]`.
+- Independent console and file levels (`console_log_level` default `warning`,
+  `log_level` default `info`), changeable at runtime - `apply_runtime_log_levels`
+  runs at startup and after any settings write; noisy libraries (`httpx`, `PIL`,
+  ...) pinned to `warning`.
+- New endpoints: `GET /api/admin/logs` (tail, newest first, `level` filter),
+  `GET`/`POST /api/admin/logs/level`, `POST /api/admin/logs/clear`,
+  `GET /api/admin/logs/export` (ZIP of the logs + rotations + worker log).
+- Settings gains a **Logs** section: live tail, level filter, clear, export ZIP.
+
 ### Fixed
 
 - Editor preview now refreshes after every adjustment: `useImageProcessing`

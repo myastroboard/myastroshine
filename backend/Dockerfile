@@ -17,7 +17,10 @@ COPY app/ app/
 COPY alembic.ini .
 COPY migrations/ migrations/
 
-RUN mkdir -p /data/images /data/db
+# Single persistence root; the app creates the subtree (db/, images/, stacks/,
+# cache/) and secret_key.txt / app_settings.json at startup.
+ENV DATA_DIR=/data
+RUN mkdir -p /data
 
 EXPOSE 8002
 

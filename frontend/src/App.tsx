@@ -1,12 +1,33 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { EditorView } from '@/components/EditorView';
 import { ImageUpload } from '@/components/ImageUpload';
-import { TokenManager } from '@/components/TokenManager';
+import { SettingsView } from '@/components/SettingsView';
 import { StackMode, type EditorMode } from '@/components/stacking/StackMode';
 import { StackView } from '@/components/stacking/StackView';
 import { apiClient } from '@/services/api';
 import type { EditorSession } from '@/types';
+
+type Route = 'editor' | 'settings';
+
+function readRoute(): Route {
+  return window.location.hash.replace(/^#\/?/, '') === 'settings' ? 'settings' : 'editor';
+}
+
+function navigate(route: Route): void {
+  window.location.hash = route === 'settings' ? '#/settings' : '#/';
+}
+
+/** Minimal hash routing - no dependency, keeps the browser back button working. */
+function useRoute(): Route {
+  const [route, setRoute] = useState<Route>(readRoute);
+  useEffect(() => {
+    const onChange = () => setRoute(readRoute());
+    window.addEventListener('hashchange', onChange);
+    return () => window.removeEventListener('hashchange', onChange);
+  }, []);
+  return route;
+}
 
 /**
  * Root orchestrator.
@@ -15,11 +36,11 @@ import type { EditorSession } from '@/types';
  * `token` query params; otherwise the app runs in standalone mode.
  */
 export default function App() {
+  const route = useRoute();
   const [mode, setMode] = useState<EditorMode>('single');
   const [session, setSession] = useState<EditorSession | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
 
   const astrodexContext = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
@@ -55,18 +76,22 @@ export default function App() {
     <div className="min-h-screen">
       <header className="sticky top-0 z-40 border-b border-hairline bg-canvas/80 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-[1200px] items-center justify-between px-4 sm:px-6">
-          <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            className="flex items-center gap-2.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            onClick={() => navigate('editor')}
+          >
             <BrandMark />
             <span className="text-sm font-semibold tracking-tight text-ink">
               {import.meta.env.VITE_APP_NAME ?? 'MyAstroShine'}
             </span>
-          </div>
+          </button>
           <div className="flex items-center gap-3">
             <button
               type="button"
-              className="btn btn-ghost btn-sm"
-              aria-pressed={showSettings}
-              onClick={() => setShowSettings((open) => !open)}
+              className={route === 'settings' ? 'btn btn-outline btn-sm' : 'btn btn-ghost btn-sm'}
+              aria-current={route === 'settings' ? 'page' : undefined}
+              onClick={() => navigate(route === 'settings' ? 'editor' : 'settings')}
             >
               Settings
             </button>
@@ -77,24 +102,27 @@ export default function App() {
         </div>
       </header>
 
-      <main className="mx-auto flex max-w-[1200px] flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
-        {error && (
-          <p className="rounded-md border border-danger/30 bg-danger-wash px-4 py-2.5 text-sm text-danger">
-            {error}
-          </p>
-        )}
-        {showSettings && <TokenManager />}
+      {route === 'settings' ? (
+        <SettingsView onClose={() => navigate('editor')} />
+      ) : (
+        <main className="mx-auto flex max-w-[1200px] flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
+          {error && (
+            <p className="rounded-md border border-danger/30 bg-danger-wash px-4 py-2.5 text-sm text-danger">
+              {error}
+            </p>
+          )}
 
-        <StackMode mode={mode} onModeChange={setMode} />
+          <StackMode mode={mode} onModeChange={setMode} />
 
-        {mode === 'stack' ? (
-          <StackView onEnhanceComposite={handleEnhanceComposite} />
-        ) : session ? (
-          <EditorView session={session} astrodexContext={astrodexContext} />
-        ) : (
-          <ImageUpload onUpload={handleUpload} isLoading={isUploading} />
-        )}
-      </main>
+          {mode === 'stack' ? (
+            <StackView onEnhanceComposite={handleEnhanceComposite} />
+          ) : session ? (
+            <EditorView session={session} astrodexContext={astrodexContext} />
+          ) : (
+            <ImageUpload onUpload={handleUpload} isLoading={isUploading} />
+          )}
+        </main>
+      )}
     </div>
   );
 }

@@ -31,11 +31,11 @@ The full design lives in `docs/` and in the planning documents.
 
 ## Quick start (Docker)
 
-```bash
-cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
-# edit the .env files as needed
+No `.env` editing required - the compose file carries only the structural
+variables, and everything tunable is set from **Settings** in the UI (stored
+under the data volume). See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
+```bash
 docker compose build
 docker compose up -d
 

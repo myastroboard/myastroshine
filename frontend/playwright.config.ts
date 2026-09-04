@@ -1,8 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * End-to-end tests. Boots the real backend (sync processing, throwaway SQLite +
- * storage under .e2e-tmp) and the Vite dev server, then drives Chromium.
+ * End-to-end tests. Boots the real backend (sync processing, throwaway data
+ * tree under .e2e-tmp) and the Vite dev server, then drives Chromium.
  *
  * Run: `npm run test:e2e` (needs `npx playwright install chromium` once and the
  * backend dependencies importable, i.e. `pip install -r ../backend/requirements.txt`).
@@ -35,10 +35,7 @@ export default defineConfig({
       env: {
         APP_ENV: 'development',
         PROCESSING_MODE: 'sync',
-        DATABASE_URL: 'sqlite:///./.e2e-tmp/e2e.db',
-        STORAGE_PATH: './.e2e-tmp/images',
-        STACKING_TEMP_DIR: './.e2e-tmp/stacks',
-        ASTRODEX_WEBHOOK_SECRET: 'e2e-secret',
+        DATA_DIR: './.e2e-tmp',
       },
     },
     {

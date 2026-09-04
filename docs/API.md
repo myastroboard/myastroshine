@@ -35,6 +35,12 @@ Celery job queue (`PROCESSING_MODE=queue`), and the progress WebSockets.
 | Method | Path | Purpose | Sprint |
 |--------|------|---------|--------|
 | GET | `/health` | System health | 1 |
+| GET | `/admin/app-settings` | Current runtime settings (`app_settings.json`) | 1 |
+| POST | `/admin/app-settings` | Replace runtime settings (gated by `ADMIN_ENABLED`) | 1 |
+| GET | `/admin/logs` | Tail the log file, newest first (`limit`, `offset`, `level`) | 1 |
+| GET / POST | `/admin/logs/level` | Read / change the file and console log levels | 1 |
+| POST | `/admin/logs/clear` | Empty `myastroshine.log` | 1 |
+| GET | `/admin/logs/export` | ZIP of the logs (main + rotations + worker) | 1 |
 | POST | `/upload` | Upload an image, open a session | 1 |
 | GET | `/preview/{session_id}` | Session image: `?full=true` full-res result, `?original=true` untouched upload, default downscaled result | 1 |
 | POST | `/process/{session_id}` | Apply enhancement parameters | 1 / 3 |

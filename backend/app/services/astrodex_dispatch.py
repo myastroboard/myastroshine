@@ -11,7 +11,6 @@ import numpy as np
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.config import get_settings
 from app.db import database
 from app.db.models import AstroDexLink, SessionRecord, WebhookToken
 from app.exceptions import ForbiddenError
@@ -20,13 +19,14 @@ from app.services.astrodex_integration import AstroDexService
 from app.services.session import SessionService
 from app.services.storage import StorageService
 from app.utils import image_utils
+from app.utils.app_settings import get_app_settings, load_or_generate_secret_key
 from app.utils.validators import is_allowed_callback_url
 
 logger = get_logger(__name__)
 
 
 def _check_callback_url(url: str) -> None:
-    allowlist = get_settings().callback_url_allowlist
+    allowlist = get_app_settings().astrodex_callback_urls
     if allowlist and not is_allowed_callback_url(url):
         raise ForbiddenError(f"Callback URL {url} is not on the allowlist")
 
@@ -106,7 +106,7 @@ async def run_delivery(db: Session, link_id: int, astrodex: AstroDexService) -> 
         return
 
     token = db.get(WebhookToken, link.callback_token) if link.callback_token else None
-    secret = token.signing_secret if token else get_settings().astrodex_webhook_secret
+    secret = token.signing_secret if token else load_or_generate_secret_key()
     session = db.get(SessionRecord, link.session_id)
 
     try:

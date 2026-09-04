@@ -15,9 +15,9 @@ from datetime import UTC, datetime
 
 import httpx
 
-from app.config import Settings, get_settings
 from app.logging_config import get_logger
 from app.types import JsonDict
+from app.utils.app_settings import get_app_settings
 
 logger = get_logger(__name__)
 
@@ -46,12 +46,7 @@ def verify_signature(raw_payload: str, signature_header: str, secret: str) -> bo
 class AstroDexService:
     """Builds and delivers the ``image_enhanced`` webhook."""
 
-    def __init__(
-        self,
-        settings: Settings | None = None,
-        transport: httpx.AsyncBaseTransport | None = None,
-    ) -> None:
-        self.settings = settings or get_settings()
+    def __init__(self, transport: httpx.AsyncBaseTransport | None = None) -> None:
         self._transport = transport
 
     def build_payload(
@@ -99,8 +94,9 @@ class AstroDexService:
             "X-Webhook-Signature": signature,
             "X-Webhook-Signature-Algorithm": "HMAC-SHA256",
         }
-        base_delay = self.settings.astrodex_retry_delay_seconds
-        max_attempts = self.settings.astrodex_max_retries
+        app_settings = get_app_settings()
+        base_delay = app_settings.astrodex_retry_delay_seconds
+        max_attempts = app_settings.astrodex_max_retries
 
         async with httpx.AsyncClient(transport=self._transport, timeout=10.0) as client:
             for attempt in range(1, max_attempts + 1):

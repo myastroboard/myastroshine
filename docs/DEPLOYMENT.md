@@ -1,45 +1,90 @@
 # Deployment and configuration
 
+## Philosophy
+
+`docker compose up` works with **no `.env` editing**. The compose file carries
+only *structural* variables - the run mode, the persistence root, the container
+topology. Everything a user might tune (CORS origins, the AstroDex callback
+allowlist, upload limits, session lifetime, stacking defaults, log levels) is
+edited from **Settings** in the UI and persisted under the data volume. The
+session secret is generated on first start.
+
 ## Services
 
 `docker-compose.yml` defines four services on the `myastroshine` network:
 
 | Service | Image / build | Port | Volumes |
 |---------|---------------|------|---------|
-| `api` | `./backend` (FastAPI + OpenCV) | 8002 | `myastroshine_images`, `myastroshine_db` |
-| `worker` | `./backend` (Celery worker) | - | `myastroshine_images`, `myastroshine_db` |
+| `api` | `./backend` (FastAPI + OpenCV) | 8002 | `myastroshine_data:/data` |
+| `worker` | `./backend` (Celery worker) | - | `myastroshine_data:/data` |
 | `web` | `./frontend` (Vite build served by nginx) | 3000 | - |
 | `redis` | `redis:7-alpine` | 6379 | `myastroshine_redis:/data` |
 
-The compose file sets `PROCESSING_MODE=queue`, so `/api/process` and
+This stack sets `PROCESSING_MODE=queue`, so `/api/process` and
 `/api/stack/{id}/process` enqueue a Celery task the `worker` runs, and progress
 streams over `/ws/processing-status/{job_id}` (or `/ws/stack-status/{id}`). Set
 `PROCESSING_MODE=sync` to run everything inside the request instead - then the
 `worker` and `redis` services are optional.
 
-> SQLite is shared between `api` and `worker` over a volume. This is fine for a
-> single worker and short writes; move to Postgres before scaling the worker out.
+> SQLite is shared between `api` and `worker` over the volume. This is fine for a
+> single worker and short writes; set `DATABASE_URL` to a Postgres URL before
+> scaling the worker out.
 
-## Environment variables
+## The data volume
 
-Backend (`backend/.env`, see `backend/.env.example`):
+Everything the app persists hangs off one root, `DATA_DIR` (`/data` in the
+container):
+
+```
+/data/
+  db/myastroshine.db      SQLite database
+  images/<session>/       per-session working files
+  stacks/<stack>/         stacking frames (v1.1+)
+  cache/                  server-side caches
+  secret_key.txt          auto-generated once; HMAC fallback + session signing
+  app_settings.json       runtime settings edited in the UI
+  myastroshine.log        rotating application log
+```
+
+Back up this volume. Session images are transient and pruned after the
+configured session lifetime.
+
+## Structural environment variables
+
+Set only to change the deployment shape (see `backend/.env.example`):
 
 | Variable | Default | Notes |
 |----------|---------|-------|
-| `APP_ENV` | `development` | `development` enables console log rendering |
+| `APP_ENV` | `development` | `development` renders logs for humans; `production` emits JSON |
 | `DEBUG` | `true` | |
-| `LOG_LEVEL` | `info` | `debug` / `info` / `warning` / `error` |
-| `DATABASE_URL` | `sqlite:///./data/db/myastroshine.db` | SQLAlchemy URL |
-| `STORAGE_PATH` | `./data/images` | session working files |
-| `MAX_IMAGE_SIZE_MB` | `100` | upload limit |
-| `SESSION_EXPIRY_HOURS` | `24` | cleanup window |
-| `API_CORS_ORIGINS` | `http://localhost:3000,...` | comma-separated |
-| `ASTRODEX_WEBHOOK_SECRET` | `change-me` | HMAC shared secret |
-| `ASTRODEX_CALLBACK_URLS` | - | comma-separated allowlist |
-| `ASTRODEX_MAX_RETRIES` | `3` | webhook retries |
-| `REDIS_URL` / `CELERY_BROKER_URL` | `redis://localhost:6379/0` / `/1` | phase 2+ |
-| `DEPTH_DETECTION_METHOD` | `gradient` | `gradient` or `ml` |
-| `STACKING_*` | see `.env.example` | v1.1+ |
+| `DATA_DIR` | `./data` (local), `/data` (image) | the single persistence root |
+| `PROCESSING_MODE` | `sync` | `sync` or `queue` (compose sets `queue`) |
+| `REDIS_URL` / `CELERY_BROKER_URL` | `redis://localhost:6379/0` `/1` | only used with `queue`; compose points them at the `redis` service |
+| `DATABASE_URL` | *(derived)* | set to a Postgres URL to override the SQLite default |
+| `ADMIN_ENABLED` | `true` | set `false` to make `/api/admin/*` reject writes |
+
+## Runtime settings (edited in the UI)
+
+**Settings** in the app writes `DATA_DIR/app_settings.json` via
+`POST /api/admin/app-settings` and the change takes effect immediately (except
+`cors_origins`, which the CORS middleware reads once at startup - restart `api`
+after changing it).
+
+| Tab | Setting | Default |
+|-----|---------|---------|
+| General | `max_image_size_mb` | 100 |
+| General | `session_expiry_hours` | 24 |
+| General | `preview_max_size` | 512 |
+| General | `denoise_enable_ml` | false |
+| General | `depth_detection_method` | `gradient` |
+| General | `stacking_enabled` / `stacking_max_frames` / `stacking_detector` / `stacking_combination_default` / `stacking_cosmic_ray_threshold` | see `app/utils/app_settings.py` |
+| Webhooks | AstroDex bearer tokens (create / revoke) | - |
+| Webhooks | `astrodex_callback_urls` (allowlist) | empty |
+| Webhooks | `astrodex_max_retries` / `astrodex_retry_delay_seconds` | 3 / 5s |
+| Advanced | `cors_origins` | `http://localhost:3000` |
+| Advanced | `log_level` / `console_log_level` | `info` / `warning` |
+
+## Frontend environment
 
 Frontend (`frontend/.env`, see `frontend/.env.example`):
 
@@ -60,9 +105,6 @@ Setting an absolute `VITE_API_URL` makes `fetch` bypass that proxy while
 ## Startup (production-like)
 
 ```bash
-cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
-
 docker compose build
 docker compose up -d
 
@@ -86,7 +128,8 @@ polling (`VITE_USE_POLLING=1`) so edits are picked up on Windows and macOS.
 ## Database migrations
 
 Alembic is configured in `backend/alembic.ini` / `backend/migrations/`. The URL
-comes from application settings at runtime.
+comes from application settings at runtime (`DATABASE_URL`, or the derived SQLite
+path under `DATA_DIR`).
 
 ```bash
 cd backend
@@ -97,11 +140,23 @@ alembic upgrade head
 For local development and tests, `init_db()` calls `Base.metadata.create_all`
 as a convenience; production should rely on `alembic upgrade head`.
 
-## Persistence and backup
+## Logs
 
-Volumes: `myastroshine_images`, `myastroshine_db`, `myastroshine_redis`. Back up
-the DB volume regularly; session images are transient and pruned after
-`SESSION_EXPIRY_HOURS`.
+- The API writes `DATA_DIR/myastroshine.log`, the worker `DATA_DIR/worker.log` -
+  both rotating (10 MB x 5). The console (`docker compose logs api`) carries the
+  same events at `console_log_level`.
+- Timestamps are in the `TZ` zone with the UTC offset always shown.
+- **Settings -> Logs** tails the file, changes filter level, clears it, and
+  exports a ZIP of the log plus its rotations and the worker log - attach that
+  ZIP to bug reports. `log_level` / `console_log_level` are on the Advanced tab
+  and apply without a restart.
+- CLI equivalents: `GET/POST /api/admin/logs*` (see `docs/API.md`).
+
+## Backup
+
+Back up the `myastroshine_data` volume regularly - it holds the database, the
+settings file, and the session secret. `myastroshine_redis` is a transient
+broker and does not need backing up.
 
 ## Reverse proxy
 

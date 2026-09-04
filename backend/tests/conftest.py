@@ -7,31 +7,44 @@ suite never touches real data. Routes get their DB session through a
 
 from __future__ import annotations
 
+import os
 from collections.abc import Iterator
 from pathlib import Path
 
 import numpy as np
 import pytest
 
+# Before any `app.*` import: keep import-time logging setup in test mode (no file
+# handler writing into ./data). The per-test fixture re-points DATA_DIR.
+os.environ.setdefault("APP_ENV", "test")
+
 
 @pytest.fixture(autouse=True)
 def _isolated_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    """Point settings at a throwaway DB + storage path, rebuilt per test."""
+    """Point every settings-derived path at a throwaway ``DATA_DIR``, per test."""
     monkeypatch.setenv("APP_ENV", "test")
-    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'test.db'}")
-    monkeypatch.setenv("STORAGE_PATH", str(tmp_path / "images"))
-    monkeypatch.setenv(
-        "ASTRODEX_CALLBACK_URLS", "http://astrodex.test/api/webhooks/enhanced-images"
-    )
-    monkeypatch.setenv("ASTRODEX_WEBHOOK_SECRET", "test-shared-secret")
-    monkeypatch.setenv("ASTRODEX_MAX_RETRIES", "3")
-    monkeypatch.setenv("ASTRODEX_RETRY_DELAY_SECONDS", "0")
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
 
+    from app import logging_config
     from app.config import get_settings
+    from app.utils import app_settings
 
     get_settings.cache_clear()
+    app_settings._cache.settings = None
+    app_settings._cache.secret_key = None
+    logging_config.configure_logging(force=True)
+    # The AstroDex tests expect this callback host allow-listed and no retry backoff.
+    app_settings.save_app_settings(
+        {
+            "astrodex_callback_urls": ["http://astrodex.test/api/webhooks/enhanced-images"],
+            "astrodex_retry_delay_seconds": 0,
+        }
+    )
     yield
     get_settings.cache_clear()
+    app_settings._cache.settings = None
+    app_settings._cache.secret_key = None
+    logging_config.configure_logging(force=True)
 
 
 @pytest.fixture

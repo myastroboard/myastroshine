@@ -9,6 +9,7 @@ from app.models.depth_shift import (
     FocusPoint,
 )
 from app.models.image import Dimensions, HistogramData, UploadResponse
+from app.models.logs import LogLevels, LogLevelUpdate, LogTailResponse
 from app.models.preset import (
     PresetListResponse,
     PresetOut,
@@ -22,6 +23,7 @@ from app.models.processing import (
     ProcessResponse,
 )
 from app.models.session import SessionInfo
+from app.models.settings import AppSettingsResponse, AppSettingsUpdate
 from app.models.stack import (
     InitiateStackRequest,
     StackResultResponse,
@@ -37,6 +39,8 @@ from app.models.token import (
 )
 
 __all__ = [
+    "AppSettingsResponse",
+    "AppSettingsUpdate",
     "CreateTokenRequest",
     "CreatedTokenResponse",
     "DepthLayerInfo",
@@ -49,6 +53,9 @@ __all__ = [
     "GeometryParameters",
     "HistogramData",
     "InitiateStackRequest",
+    "LogLevelUpdate",
+    "LogLevels",
+    "LogTailResponse",
     "PresetListResponse",
     "PresetOut",
     "ProcessRequest",

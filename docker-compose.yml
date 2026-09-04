@@ -1,18 +1,21 @@
 # MyAstroShine - full stack orchestration.
+#
+#   docker compose up -d
+#
+# No .env editing required. The only variables here are structural (run mode,
+# persistence root, container topology). Everything else - CORS, AstroDex
+# allowlist, upload limits, stacking defaults, log levels - is auto-generated or
+# edited from Settings in the UI and persisted under the data volume
+# (app_settings.json, secret_key.txt). See docs/DEPLOYMENT.md.
 
 x-backend-env: &backend-env
   PYTHONUNBUFFERED: "1"
   APP_ENV: production
-  LOG_LEVEL: info
-  DATABASE_URL: sqlite:////data/db/myastroshine.db
-  STORAGE_PATH: /data/images
-  API_CORS_ORIGINS: http://localhost:3000,http://myastroshine.local
-  ASTRODEX_WEBHOOK_SECRET: ${ASTRODEX_WEBHOOK_SECRET:-change-me}
-  ASTRODEX_CALLBACK_URLS: ${ASTRODEX_CALLBACK_URLS:-}
+  DATA_DIR: /data
+  # This stack runs the worker + redis, so processing goes through the queue.
+  PROCESSING_MODE: queue
   REDIS_URL: redis://redis:6379/0
   CELERY_BROKER_URL: redis://redis:6379/1
-  # queue mode: /process and /stack/*/process run on the worker, progress on the WS
-  PROCESSING_MODE: queue
 
 services:
   api:
@@ -24,8 +27,7 @@ services:
     ports:
       - "8002:8002"
     volumes:
-      - myastroshine_images:/data/images
-      - myastroshine_db:/data/db
+      - myastroshine_data:/data
     depends_on:
       - redis
     restart: unless-stopped
@@ -44,8 +46,7 @@ services:
     command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=2
     environment: *backend-env
     volumes:
-      - myastroshine_images:/data/images
-      - myastroshine_db:/data/db
+      - myastroshine_data:/data
     depends_on:
       - redis
       - api
@@ -76,9 +77,7 @@ services:
     command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
 
 volumes:
-  myastroshine_images:
-    driver: local
-  myastroshine_db:
+  myastroshine_data:
     driver: local
   myastroshine_redis:
     driver: local

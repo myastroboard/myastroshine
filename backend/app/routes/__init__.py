@@ -7,6 +7,7 @@ resolves for every tool (and so ``app.main`` has a single import site).
 """
 
 from app.routes import (
+    admin,
     astrodex,
     depth_shift,
     download,
@@ -20,6 +21,7 @@ from app.routes import (
 )
 
 __all__ = [
+    "admin",
     "astrodex",
     "depth_shift",
     "download",

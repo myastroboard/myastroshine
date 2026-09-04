@@ -12,10 +12,7 @@ x-backend-env: &backend-env
   APP_ENV: development
   DEBUG: "true"
   LOG_LEVEL: debug
-  DATABASE_URL: sqlite:////data/db/myastroshine.db
-  STORAGE_PATH: /data/images
-  API_CORS_ORIGINS: http://localhost:3000
-  ASTRODEX_WEBHOOK_SECRET: ${ASTRODEX_WEBHOOK_SECRET:-dev-secret}
+  DATA_DIR: /data
   REDIS_URL: redis://redis:6379/0
   CELERY_BROKER_URL: redis://redis:6379/1
   PROCESSING_MODE: ${PROCESSING_MODE:-sync}

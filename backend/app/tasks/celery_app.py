@@ -9,11 +9,23 @@ In tests (``APP_ENV=test``) tasks run eagerly (inline), so no broker is needed.
 
 from __future__ import annotations
 
+from typing import Any
+
 from celery import Celery
+from celery.signals import setup_logging
 
 from app.config import get_settings
+from app.logging_config import apply_runtime_log_levels, configure_logging
 
 _settings = get_settings()
+
+
+@setup_logging.connect
+def _configure_worker_logging(**_kwargs: Any) -> None:
+    """Use the app's logging (rotating worker.log + console), not Celery's."""
+    configure_logging(role="worker", force=True)
+    apply_runtime_log_levels()
+
 
 celery_app = Celery(
     "myastroshine",

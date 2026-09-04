@@ -18,8 +18,8 @@ _CALLBACK = "http://astrodex.test/api/webhooks/enhanced-images"
 
 @pytest.fixture
 def dispatch(db_session) -> AstroDexDispatch:
-    # No explicit root: uses STORAGE_PATH from the test env, which is what the
-    # background job's own StorageService() will read too.
+    # No explicit root: uses images_dir under the test DATA_DIR, which is what
+    # the background job's own StorageService() will read too.
     storage = StorageService()
     return AstroDexDispatch(db_session, SessionService(db_session, storage), storage)
 

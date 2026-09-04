@@ -8,12 +8,12 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.config import get_settings
 from app.db.models import SessionRecord
 from app.exceptions import SessionExpiredError, SessionNotFoundError
 from app.logging_config import get_logger
 from app.services.storage import StorageService
 from app.types import JsonDict
+from app.utils.app_settings import get_app_settings
 
 logger = get_logger(__name__)
 
@@ -35,7 +35,7 @@ class SessionService:
             image_path=image_path,
             original_filename=original_filename,
             created_at=now,
-            expires_at=now + timedelta(hours=get_settings().session_expiry_hours),
+            expires_at=now + timedelta(hours=get_app_settings().session_expiry_hours),
         )
         self.db.add(record)
         self.db.commit()

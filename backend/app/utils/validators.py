@@ -9,8 +9,8 @@ from __future__ import annotations
 import re
 import uuid
 
-from app.config import get_settings
 from app.exceptions import PayloadTooLargeError, UnsupportedImageError
+from app.utils.app_settings import get_app_settings
 from app.utils.image_utils import SUPPORTED_FORMATS
 
 _SESSION_ID_RE = re.compile(r"^[0-9a-fA-F-]{36}$")
@@ -29,7 +29,7 @@ def is_valid_session_id(session_id: str) -> bool:
 
 def validate_upload_size(size_bytes: int) -> None:
     """Raise :class:`PayloadTooLargeError` if the upload exceeds the configured limit."""
-    max_mb = get_settings().max_image_size_mb
+    max_mb = get_app_settings().max_image_size_mb
     if size_bytes > max_mb * 1024 * 1024:
         raise PayloadTooLargeError(f"File size exceeds {max_mb}MB limit")
 
@@ -47,5 +47,5 @@ def validate_image_extension(filename: str) -> str:
 
 def is_allowed_callback_url(url: str) -> bool:
     """True if ``url`` is on the AstroDex callback allowlist."""
-    allowlist = get_settings().callback_url_allowlist
+    allowlist = get_app_settings().astrodex_callback_urls
     return any(url.startswith(allowed) for allowed in allowlist)

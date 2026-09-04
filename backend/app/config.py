@@ -1,7 +1,13 @@
-"""Application settings loaded from environment variables / .env.
+"""Structural configuration - the deployment shape only.
 
-Access settings through :func:`get_settings` so the object is built once and
-reused (and easily overridden in tests).
+These values describe *where* the app runs: the persistence root, the container
+topology, the run mode. Everything a user might want to tune at runtime lives in
+``app_settings.json`` and is reached through
+:func:`app.utils.app_settings.get_app_settings` - never read ``os.environ`` for a
+product setting.
+
+``docker compose up`` must work with none of these set: the defaults target the
+compose service names and a ``/data`` volume.
 """
 
 from __future__ import annotations
@@ -10,6 +16,8 @@ from functools import lru_cache
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from app.constants import LOG_FILE_NAME, WORKER_LOG_FILE_NAME
 
 
 class Settings(BaseSettings):
@@ -21,61 +29,75 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Application
-    app_env: str = "development"
+    # Deployment shape
+    app_env: str = "development"  # development | production | test
     debug: bool = True
-    log_level: str = "info"
+    log_level: str = "info"  # bootstrap level; the runtime level lives in app_settings
 
-    # Database
-    database_url: str = "sqlite:///./data/db/myastroshine.db"
+    # The single persistence root. Everything the app writes is derived from it.
+    data_dir: Path = Path("./data")
 
-    # Storage
-    storage_path: Path = Path("./data/images")
-    max_image_size_mb: int = 100
-    session_expiry_hours: int = 24
+    # Optional database override. Empty -> a SQLite file under ``data_dir``.
+    # Set this (to a Postgres URL) before scaling the worker out.
+    database_url: str = ""
 
-    # API
-    api_title: str = "MyAstroShine"
-    api_version: str = "0.1.0"
-    api_port: int = 8002  # host uses 8000 for other projects
-    api_cors_origins: str = "http://localhost:3000,http://myastroshine.local"
-
-    # AstroDex integration
-    astrodex_webhook_secret: str = "change-me"  # noqa: S105 - placeholder, must be set via env
-    astrodex_callback_urls: str = ""
-    astrodex_max_retries: int = 3
-    astrodex_retry_delay_seconds: int = 5
-
-    # Redis / Celery
+    # Container topology. Defaults match the docker-compose service names.
     redis_url: str = "redis://localhost:6379/0"
     celery_broker_url: str = "redis://localhost:6379/1"
 
-    # Processing
     # "sync"  - run the pipeline inside the request (default; no worker needed)
     # "queue" - enqueue a Celery task; progress streams over the WebSocket
+    # Tied to whether the compose worker/redis services run, so it stays here.
     processing_mode: str = "sync"
-    max_workers: int = 4
-    denoise_enable_ml: bool = False
-    depth_detection_method: str = "gradient"
-    preview_max_size: int = 512
 
-    # Stacking (v1.1+)
-    stacking_enabled: bool = True
-    stacking_max_frames: int = 100
-    stacking_detector: str = "orb"
-    stacking_combination_default: str = "median"
-    stacking_cosmic_ray_threshold: float = 3.0
-    stacking_temp_dir: Path = Path("./data/stacks")
+    # Gates writes to /api/admin/*. Single-user local deployments leave it on.
+    admin_enabled: bool = True
 
     @property
-    def cors_origins(self) -> list[str]:
-        """CORS origins as a list."""
-        return [origin.strip() for origin in self.api_cors_origins.split(",") if origin.strip()]
+    def is_test(self) -> bool:
+        return self.app_env == "test"
 
     @property
-    def callback_url_allowlist(self) -> list[str]:
-        """Trusted AstroDex callback URLs."""
-        return [url.strip() for url in self.astrodex_callback_urls.split(",") if url.strip()]
+    def db_dir(self) -> Path:
+        return self.data_dir / "db"
+
+    @property
+    def resolved_database_url(self) -> str:
+        """The database URL, deriving a SQLite path under ``data_dir`` if unset."""
+        return self.database_url or f"sqlite:///{self.db_dir / 'myastroshine.db'}"
+
+    @property
+    def images_dir(self) -> Path:
+        return self.data_dir / "images"
+
+    @property
+    def stacks_dir(self) -> Path:
+        return self.data_dir / "stacks"
+
+    @property
+    def cache_dir(self) -> Path:
+        return self.data_dir / "cache"
+
+    @property
+    def log_file(self) -> Path:
+        return self.data_dir / LOG_FILE_NAME
+
+    @property
+    def worker_log_file(self) -> Path:
+        return self.data_dir / WORKER_LOG_FILE_NAME
+
+    @property
+    def secret_key_file(self) -> Path:
+        return self.data_dir / "secret_key.txt"
+
+    @property
+    def app_settings_file(self) -> Path:
+        return self.data_dir / "app_settings.json"
+
+    def ensure_data_dirs(self) -> None:
+        """Create the persistence tree. Called once at startup."""
+        for path in (self.db_dir, self.images_dir, self.stacks_dir, self.cache_dir):
+            path.mkdir(parents=True, exist_ok=True)
 
 
 @lru_cache

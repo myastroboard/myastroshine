@@ -1,45 +1,54 @@
 @import 'tailwindcss';
 
 /*
- * MyAstroShine design system - "darkroom / neutre pro".
- * See docs/DESIGN.md for the rationale and the rules that keep it consistent.
+ * MyAstroShine design system.
+ *
+ * Shares its charter with MyAstroBoard: a sky/teal primary accent, an amber
+ * ecosystem accent, deep navy-teal surfaces, a fixed background gradient with
+ * two ambient halos, and glass panels. The image is still the loudest thing on
+ * screen - chrome stays quiet, colour is used sparingly. See docs/DESIGN.md.
  *
  * Dark-only for now (<html class="dark">). Tokens are semantic so a light
- * palette can be added later as a `:root:not(.dark)` block without touching
- * component code.
+ * palette and the "red night" mode can be added later as overrides without
+ * touching component code.
  */
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  /* Surfaces - warm-neutral near-black, four elevation steps. */
-  --color-canvas: #0c0c0d;
-  --color-surface: #131315;
-  --color-raised: #1a1a1d;
-  --color-overlay: #212125;
+  /* Surfaces - deep navy-teal, four elevation steps. */
+  --color-canvas: #060b12;
+  --color-surface: #0b1521;
+  --color-raised: #122232;
+  --color-overlay: #17293b;
 
-  /* Hairlines - separation comes from lines, not shadows. */
-  --color-hairline: #202023;
-  --color-line: #2b2b2f;
-  --color-line-strong: #3b3b41;
+  /* Hairlines - cool and low-contrast; separation from line, then shadow. */
+  --color-hairline: #1b2a37;
+  --color-line: #253846;
+  --color-line-strong: #35505f;
 
-  /* Text - warm off-white, never pure #fff. */
-  --color-ink: #ededee;
-  --color-muted: #a4a4a9;
-  --color-faint: #6d6d73;
-  --color-ghost: #4a4a4f;
+  /* Text - cool off-white, never pure #fff. */
+  --color-ink: #e7edf3;
+  --color-muted: #9aabb9;
+  --color-faint: #647889;
+  --color-ghost: #43535f;
 
-  /* Accent - one restrained desaturated blue, used sparingly. */
-  --color-accent: #5b8fb9;
-  --color-accent-strong: #74a4c9;
-  --color-accent-deep: #4a7aa1;
-  --color-accent-wash: #16222c;
-  --color-on-accent: #0b0f12;
+  /* Primary accent - sky/teal (MyAstroBoard dark accent). */
+  --color-accent: #38bdf8;
+  --color-accent-strong: #7dd3fc;
+  --color-accent-deep: #0ea5e9;
+  --color-accent-wash: #0c2634;
+  --color-on-accent: #04141d;
 
-  /* Status - same muted register as the accent. */
-  --color-danger: #d98b8b;
-  --color-danger-wash: #2a1c1c;
-  --color-success: #83ac8b;
-  --color-warning: #c9a978;
+  /* Amber - the AstroDex / ecosystem accent. */
+  --color-amber: #f59e0b;
+  --color-amber-strong: #fbbf24;
+  --color-amber-wash: #2a2008;
+
+  /* Status - saturated to read on the dark ground. */
+  --color-danger: #f87171;
+  --color-danger-wash: #2a1618;
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
 
   /* Radius. */
   --radius-sm: 0.375rem;
@@ -47,22 +56,34 @@
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
 
-  /* Elevation - restrained; only for things that truly float. */
+  /* Elevation. */
   --shadow-panel: 0 1px 2px rgb(0 0 0 / 0.4);
   --shadow-pop: 0 8px 28px -8px rgb(0 0 0 / 0.55), 0 2px 6px -2px rgb(0 0 0 / 0.4);
+  --shadow-glass:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.03), 0 10px 28px -14px rgb(0 0 0 / 0.6);
+  --shadow-premium:
+    0 24px 60px -20px rgb(0 0 0 / 0.7), 0 8px 20px -12px rgb(0 0 0 / 0.5);
 
   /* Motion. */
   --ease-premium: cubic-bezier(0.22, 1, 0.36, 1);
 
-  /* Type. Picks up Inter if it is ever installed/added; system otherwise. */
-  --font-sans: 'Inter var', 'Inter', system-ui, -apple-system, 'Segoe UI Variable Text',
-    'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas,
-    monospace;
+  /* Type. System stack led by Avenir Next / Segoe UI Variable, matching
+     MyAstroBoard; Inter is picked up if it is ever installed. */
+  --font-sans:
+    'Inter var', 'Inter', 'Avenir Next', 'Segoe UI Variable Text', 'Segoe UI Variable',
+    'Bahnschrift', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
 }
 
 :root {
   color-scheme: dark;
+
+  /* Non-utility gradients and halos (raw CSS below). */
+  --bg-gradient: linear-gradient(160deg, #060b12 0%, #0a1420 46%, #0c2231 100%);
+  --gradient-accent: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 54%, #22d3ee 100%);
+  --halo-accent: color-mix(in oklab, var(--color-accent) 13%, transparent);
+  --halo-amber: color-mix(in oklab, var(--color-amber) 9%, transparent);
 }
 
 html {
@@ -72,7 +93,7 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
-  background-color: var(--color-canvas);
+  background: var(--bg-gradient) fixed;
   color: var(--color-ink);
   font-family: var(--font-sans);
   font-size: 14px;
@@ -81,6 +102,32 @@ body {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   font-feature-settings: 'cv05', 'cv11', 'ss01';
+}
+
+/* Two ambient halos, fixed behind everything (amber top-right, teal bottom-left). */
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 9999px;
+}
+
+body::before {
+  width: min(52vw, 680px);
+  height: min(52vw, 680px);
+  top: -18vw;
+  right: -12vw;
+  background: radial-gradient(circle at center, var(--halo-amber) 0%, transparent 68%);
+}
+
+body::after {
+  width: min(48vw, 620px);
+  height: min(48vw, 620px);
+  bottom: -22vw;
+  left: -16vw;
+  background: radial-gradient(circle at center, var(--halo-accent) 0%, transparent 68%);
 }
 
 ::selection {
@@ -100,7 +147,10 @@ body {
   /* --- Surfaces ------------------------------------------------------- */
 
   .panel {
-    @apply rounded-xl border border-hairline bg-surface p-4 sm:p-5;
+    @apply rounded-xl border border-line p-4 sm:p-5;
+    background: color-mix(in oklab, var(--color-surface) 82%, transparent);
+    backdrop-filter: blur(10px);
+    box-shadow: var(--shadow-glass);
   }
 
   .panel-inset {
@@ -116,7 +166,7 @@ body {
 
   .btn {
     @apply inline-flex select-none items-center justify-center gap-2 rounded-md px-3.5 py-2
-      text-sm font-medium transition-colors duration-150
+      text-sm font-medium transition-[filter,background-color,color,border-color] duration-150
       outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2
       focus-visible:ring-offset-canvas
       disabled:pointer-events-none disabled:opacity-40;
@@ -127,7 +177,30 @@ body {
   }
 
   .btn-primary {
-    @apply bg-accent text-on-accent hover:bg-accent-strong active:bg-accent-deep;
+    @apply text-on-accent;
+    background-image: linear-gradient(
+      180deg,
+      var(--color-accent-strong) 0%,
+      var(--color-accent) 55%,
+      var(--color-accent-deep) 100%
+    );
+  }
+
+  .btn-primary:hover {
+    filter: brightness(1.07);
+  }
+
+  .btn-primary:active {
+    filter: brightness(0.95);
+  }
+
+  .btn-amber {
+    @apply text-on-accent;
+    background-image: linear-gradient(180deg, var(--color-amber-strong) 0%, var(--color-amber) 100%);
+  }
+
+  .btn-amber:hover {
+    filter: brightness(1.07);
   }
 
   .btn-outline {

@@ -31,12 +31,9 @@ docker compose -f docker-compose.dev.yml up          # add --build after editing
 ### Release build (production image check)
 
 Run this before tagging a release to confirm the shipped images build clean and
-boot:
+boot (no `.env` needed - the compose file carries the structural variables):
 
 ```bash
-cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
-
 docker compose build --no-cache --pull              # baked images, no bind mount
 docker compose up -d
 
@@ -80,8 +77,19 @@ pytest                 # test suite (target: 85%+ coverage)
 when offline or when `SKIP_DEPS_FRESH=1` is set.
 
 - Tests mirror the source tree: `app/services/foo.py` -> `tests/services/test_foo.py`.
-- Use `get_logger(__name__)` from `app.logging_config`; never `print()`.
 - Validate all external input through `app/utils/validators.py`.
+
+### Logging
+
+- Always `logger = get_logger(__name__)` from `app.logging_config`; never
+  `print()`, never `import logging` or configure a handler yourself.
+- Pick the level deliberately (`debug` / `info` / `warning` / `error`) and pass
+  context as keywords: `logger.info("stack combined", stack_id=sid, frames=n)`.
+- Two sinks: the console (`docker logs`, level `console_log_level`) and a
+  rotating file `DATA_DIR/myastroshine.log` (10 MB x 5, level `log_level`). Both
+  levels are runtime settings; the Celery worker writes `worker.log`.
+- Users read and export logs from **Settings -> Logs**; the export ZIP is what
+  to attach to a bug report.
 
 ## Frontend checks
 
@@ -106,9 +114,10 @@ own `e2e` CI job.
   add snake_case to component/hook/type code.
 - Tailwind v4 is configured CSS-first in `src/styles/index.css` (`@theme`), loaded
   by the `@tailwindcss/vite` plugin - there is no `tailwind.config.js`.
-- Follow `docs/DESIGN.md` - the "darkroom / neutre pro" design system. Compose the
-  shared component classes (`.panel`, `.btn`, `.field`, `.slider`, ...) and semantic
-  tokens; never a raw hex colour or a new font in a component.
+- Follow `docs/DESIGN.md` - the design charter shared with MyAstroBoard (teal +
+  amber accents, navy-teal glass surfaces). Compose the shared component classes
+  (`.panel`, `.btn`, `.field`, `.slider`, ...) and semantic tokens; never a raw
+  hex colour or a new font in a component.
 
 ## Pull requests
 

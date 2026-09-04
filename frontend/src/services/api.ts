@@ -5,8 +5,12 @@
 // this boundary (see caseConvert.ts) so the rest of the app stays camelCase.
 
 import type {
+  AppSettings,
   CreatedToken,
   DepthShiftResult,
+  LogLevel,
+  LogLevels,
+  LogTail,
   Preset,
   ProcessResponse,
   ProcessingParameters,
@@ -149,6 +153,40 @@ export const apiClient = {
       bearer: token,
       json: { sessionId, astrodexImageId, astrodexCallbackUrl: callbackUrl },
     });
+  },
+
+  // --- Runtime settings (Settings screen) ---
+  getAppSettings(): Promise<AppSettings> {
+    return request<AppSettings>('/admin/app-settings');
+  },
+
+  saveAppSettings(settings: AppSettings): Promise<AppSettings> {
+    return request<AppSettings>('/admin/app-settings', { method: 'POST', json: settings });
+  },
+
+  // --- Logs (Settings -> Logs) ---
+  getLogs(limit = 300, level?: LogLevel): Promise<LogTail> {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (level) {
+      params.set('level', level);
+    }
+    return request<LogTail>(`/admin/logs?${params.toString()}`);
+  },
+
+  getLogLevels(): Promise<LogLevels> {
+    return request<LogLevels>('/admin/logs/level');
+  },
+
+  clearLogs(): Promise<void> {
+    return request<void>('/admin/logs/clear', { method: 'POST' });
+  },
+
+  async exportLogs(): Promise<Blob> {
+    const response = await fetch(`${API_URL}/admin/logs/export`);
+    if (!response.ok) {
+      throw await readError(response);
+    }
+    return response.blob();
   },
 
   // --- Webhook tokens (created from Settings) ---

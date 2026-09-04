@@ -11,9 +11,10 @@ from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.db.database import get_db
 from app.db.models import WebhookToken
-from app.exceptions import UnauthorizedError
+from app.exceptions import ForbiddenError, UnauthorizedError
 from app.services.astrodex_dispatch import AstroDexDispatch
 from app.services.astrodex_integration import AstroDexService
 from app.services.depth_map import DepthMapService
@@ -98,6 +99,15 @@ def require_token(
 
 
 RequireToken = Annotated[WebhookToken, Depends(require_token)]
+
+
+def require_admin() -> None:
+    """Guard for ``/api/admin/*`` writes. Off means the endpoint 403s."""
+    if not get_settings().admin_enabled:
+        raise ForbiddenError("Admin API is disabled (ADMIN_ENABLED=false)")
+
+
+RequireAdmin = Annotated[None, Depends(require_admin)]
 
 
 def get_astrodex_service() -> AstroDexService:

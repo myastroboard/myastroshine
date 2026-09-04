@@ -29,6 +29,7 @@ from app.services.normalization import NormalizationService
 from app.services.registration import RegistrationService
 from app.services.session import SessionService
 from app.services.storage import StorageService
+from app.utils.app_settings import get_app_settings
 
 logger = get_logger(__name__)
 
@@ -50,9 +51,9 @@ class StackingService:
         return record
 
     def initiate(self, config: InitiateStackRequest) -> StackRecord:
-        settings = get_settings()
-        if config.frame_count > settings.stacking_max_frames:
-            raise InvalidParameterError(f"Too many frames (max {settings.stacking_max_frames})")
+        app_settings = get_app_settings()
+        if config.frame_count > app_settings.stacking_max_frames:
+            raise InvalidParameterError(f"Too many frames (max {app_settings.stacking_max_frames})")
         record = StackRecord(
             stack_id=str(uuid.uuid4()),
             frame_count=config.frame_count,
@@ -60,7 +61,7 @@ class StackingService:
             combination_method=config.combination_method,
             cosmic_ray_rejection=config.cosmic_ray_rejection,
             background_normalization=config.background_normalization,
-            expires_at=datetime.now(UTC) + timedelta(hours=settings.session_expiry_hours),
+            expires_at=datetime.now(UTC) + timedelta(hours=app_settings.session_expiry_hours),
         )
         self.db.add(record)
         self.db.commit()
@@ -172,7 +173,7 @@ class StackingService:
         if record.cosmic_ray_rejection:
             self._emit(job_id, stack_id, "cosmic_ray_rejection", 65)
             reject_mask = CosmicRayService().build_mask(
-                aligned, get_settings().stacking_cosmic_ray_threshold
+                aligned, get_app_settings().stacking_cosmic_ray_threshold
             )
             rays_removed = int(reject_mask.sum())
 

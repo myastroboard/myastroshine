@@ -194,6 +194,42 @@ export interface CreatedToken extends WebhookToken {
   signingSecret: string;
 }
 
+// --- Runtime settings (Settings screen) ----------------------------------
+// Mirror of backend/app/utils/app_settings.py::AppSettings. The GET returns the
+// whole object; the POST takes the whole object back.
+
+export interface AppSettings {
+  corsOrigins: string[];
+  maxImageSizeMb: number;
+  sessionExpiryHours: number;
+  previewMaxSize: number;
+  astrodexCallbackUrls: string[];
+  astrodexMaxRetries: number;
+  astrodexRetryDelaySeconds: number;
+  denoiseEnableMl: boolean;
+  depthDetectionMethod: 'gradient' | 'ml';
+  stackingEnabled: boolean;
+  stackingMaxFrames: number;
+  stackingDetector: 'orb' | 'sift';
+  stackingCombinationDefault: CombinationMethod;
+  stackingCosmicRayThreshold: number;
+  logLevel: LogLevel;
+  consoleLogLevel: LogLevel;
+}
+
+export type LogLevel = 'debug' | 'info' | 'warning' | 'error' | 'critical';
+
+export interface LogLevels {
+  file: LogLevel;
+  console: LogLevel;
+}
+
+export interface LogTail {
+  lines: string[];
+  returned: number;
+  filteredLevel: LogLevel | null;
+}
+
 // --- Depth shift -----------------------------------------------------------
 
 export interface DepthLayerInfo {

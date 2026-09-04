@@ -12,6 +12,7 @@ def test_openapi_schema_is_served(client) -> None:
     paths = client.get("/openapi.json").json()["paths"]
 
     for expected in (
+        "/api/admin/app-settings",
         "/api/upload",
         "/api/process/{session_id}",
         "/api/download/{session_id}",
