@@ -90,7 +90,7 @@ after changing it).
 | Webhooks | `astrodex_callback_urls` (allowlist) | empty |
 | Webhooks | `astrodex_max_retries` / `astrodex_retry_delay_seconds` | 3 / 5s |
 | Advanced | `cors_origins` | `http://localhost:3000` |
-| Advanced | `rate_limit_enabled` / `rate_limit_per_minute` / `max_concurrent_jobs_per_ip` | `true` / 10 / 5 |
+| Advanced | `rate_limit_enabled` / `rate_limit_per_minute` / `max_concurrent_jobs_per_ip` | `true` / 120 / 5 |
 | Advanced | `log_level` / `console_log_level` | `info` / `warning` |
 
 ## Frontend environment

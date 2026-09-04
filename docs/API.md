@@ -28,8 +28,11 @@ Common codes: `INVALID_PARAMETER` (400), `UNAUTHORIZED` (401), `FORBIDDEN` (403)
 Per IP, on `/upload`, `/process/{id}`, `/presets/{id}/apply/{session_id}`, and
 `/stack/*`:
 
-- **Requests per minute** (`rate_limit_per_minute`, default 10): a fixed
-  60-second window, shared across all of the routes above (not per-route).
+- **Requests per minute** (`rate_limit_per_minute`, default **120**, not the
+  API spec's original 10 - the editor re-processes on every slider change,
+  500ms debounced, so a normal editing session alone can approach 120/min):
+  a fixed 60-second window, shared across all of the routes above (not
+  per-route).
 - **Concurrent processing jobs** (`max_concurrent_jobs_per_ip`, default 5):
   checked against non-terminal rows in the `jobs` table, so it holds under
   both `PROCESSING_MODE=sync` and `queue`.

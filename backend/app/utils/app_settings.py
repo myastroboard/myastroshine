@@ -46,9 +46,11 @@ class AppSettings(BaseModel):
     # API
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
 
-    # Rate limiting (per IP, across upload/process/stack - API spec "Rate Limiting")
+    # Rate limiting (per IP, across upload/process/stack - API spec "Rate Limiting").
+    # 120/min, not the spec's original 10: the editor re-processes on every slider
+    # change (500ms debounce - see docs/API.md "Rate Limiting" for the numbers).
     rate_limit_enabled: bool = True
-    rate_limit_per_minute: int = Field(default=10, ge=1, le=1000)
+    rate_limit_per_minute: int = Field(default=120, ge=1, le=1000)
     max_concurrent_jobs_per_ip: int = Field(default=5, ge=1, le=100)
 
     # Uploads and sessions

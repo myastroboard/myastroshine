@@ -112,9 +112,12 @@ tagged yet.
 
 #### API rate limiting
 
-- Per-IP request-rate limit (default 10/min, in-memory fixed window) on
+- Per-IP request-rate limit (default 120/min, in-memory fixed window) on
   `/upload`, `/process/{id}`, `/presets/{id}/apply/{session_id}`, and
-  `/stack/*`; over the limit returns `429 RATE_LIMITED`.
+  `/stack/*`; over the limit returns `429 RATE_LIMITED`. (Shipped at the API
+  spec's original 10/min first; raised the same day after it broke e2e and
+  would have broken real interactive editing - the editor re-processes on
+  every debounced slider change.)
 - Per-IP concurrent-job limit (default 5), checked against the shared `jobs`
   table so it holds under both `sync` and `queue` processing modes.
 - `rate_limit_enabled` / `rate_limit_per_minute` / `max_concurrent_jobs_per_ip`
