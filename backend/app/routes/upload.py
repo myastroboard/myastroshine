@@ -7,12 +7,12 @@ GET  /api/preview/{id}      - current preview JPEG (?full=true for full res)
 from __future__ import annotations
 
 from fastapi import APIRouter, File, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 
-from app.dependencies import RequireRateLimit, SessionServiceDep, StorageDep
+from app.dependencies import ProcessingServiceDep, RequireRateLimit, SessionServiceDep, StorageDep
 from app.exceptions import SessionNotFoundError, UnsupportedImageError
 from app.logging_config import get_logger
-from app.models import Dimensions, HistogramData, UploadResponse
+from app.models import Dimensions, GeometryParameters, HistogramData, UploadResponse
 from app.utils import image_utils
 from app.utils.validators import (
     is_valid_session_id,
@@ -72,18 +72,32 @@ async def get_preview(
     session_id: str,
     sessions: SessionServiceDep,
     storage: StorageDep,
+    processing: ProcessingServiceDep,
     full: bool = False,
     original: bool = False,
-) -> FileResponse:
+    geometry: bool = False,
+) -> Response:
     """Return an image for a session.
 
     ``original=true`` serves the untouched upload (for before/after views);
     otherwise the current result - ``full=true`` for full resolution, the
-    downscaled preview by default.
+    downscaled preview by default. ``original=true&geometry=true`` applies the
+    session's current crop/rotate/flip/straighten to the original (but none of
+    the colour/tone enhancement) - the "before" side of the comparison once a
+    crop has changed the result's frame, so the two images still align.
     """
     if not is_valid_session_id(session_id):
         raise SessionNotFoundError(f"Session {session_id} not found")
-    sessions.get_session(session_id)
+    record = sessions.get_session(session_id)
+
+    if original and geometry:
+        geom_data = (record.parameters or {}).get("geometry")
+        geom = GeometryParameters.model_validate(geom_data) if geom_data else GeometryParameters()
+        result = processing.apply_geometry(storage.load_original(session_id), geom)
+        body = image_utils.encode_image(result)
+        return Response(
+            content=body, media_type="image/jpeg", headers={"Cache-Control": "no-cache"}
+        )
 
     if original:
         path = storage.original_path(session_id)

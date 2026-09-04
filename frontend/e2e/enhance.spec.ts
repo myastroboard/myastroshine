@@ -142,8 +142,9 @@ test('crop and rotate applies a new framing', async ({ page }) => {
     done.click(),
   ]);
   await expect(done).toBeHidden();
-  // a non-default geometry drops the before/after split and flags the button
-  await expect(page.locator('img[alt="Original"]')).toHaveCount(0);
+  // the before/after split still works after a crop: "before" is now the
+  // original with the same geometry applied, so the two frames stay aligned
+  await expect(page.locator('img[alt="Original"]')).toHaveCount(1);
   await expect(page.getByRole('button', { name: 'Crop & rotate' })).toHaveClass(/btn-primary/);
 });
 

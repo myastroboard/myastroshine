@@ -58,7 +58,7 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
   const aspectRatio = displayedAspect(session.dimensions, parameters.geometry);
   const version = previewVersion + presetVersion;
   const originalUrl = geometryChanged
-    ? apiClient.previewUrl(session.sessionId, { full: true, v: version })
+    ? apiClient.previewUrl(session.sessionId, { original: true, geometry: true, v: version })
     : apiClient.previewUrl(session.sessionId, { original: true });
   const processedUrl = apiClient.previewUrl(session.sessionId, { full: true, v: version });
 
@@ -117,7 +117,6 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
           processedUrl={processedUrl}
           histogram={session.histogram}
           aspectRatio={aspectRatio}
-          comparable={!geometryChanged}
           isLoading={status === 'processing'}
           onDepthShiftClick={() => {
             if (depthShift.layerUrls.length === 0) {

@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+import cv2
+import numpy as np
+
 
 def _upload(client, sample_jpeg: bytes):
     return client.post(
         "/api/upload",
         files={"file": ("m31.jpg", sample_jpeg, "image/jpeg")},
     )
+
+
+def _decode(content: bytes) -> np.ndarray:
+    return cv2.imdecode(np.frombuffer(content, np.uint8), cv2.IMREAD_COLOR)
 
 
 def test_upload_opens_a_session(client, sample_jpeg: bytes) -> None:
@@ -63,3 +70,60 @@ def test_preview_unknown_session_is_404(client) -> None:
 
     assert response.status_code == 404
     assert response.json()["error_code"] == "SESSION_NOT_FOUND"
+
+
+def test_preview_original_with_geometry_matches_the_cropped_result(
+    client, sample_jpeg: bytes
+) -> None:
+    """After a crop, original+geometry stays frame-aligned with the result (the
+    before/after comparison depends on this - see docs/API.md)."""
+    session_id = _upload(client, sample_jpeg).json()["session_id"]
+    process = client.post(
+        f"/api/process/{session_id}",
+        json={
+            "parameters": {
+                "geometry": {"crop_x": 0.25, "crop_y": 0.25, "crop_w": 0.5, "crop_h": 0.5}
+            }
+        },
+    )
+    assert process.status_code == 200
+
+    original_geo = client.get(
+        f"/api/preview/{session_id}", params={"original": "true", "geometry": "true"}
+    )
+    full = client.get(f"/api/preview/{session_id}", params={"full": "true"})
+    assert original_geo.status_code == 200
+    assert original_geo.headers["content-type"] == "image/jpeg"
+    assert _decode(original_geo.content).shape == _decode(full.content).shape
+
+
+def test_preview_original_without_geometry_stays_the_untouched_upload(
+    client, sample_jpeg: bytes
+) -> None:
+    """Plain ``original=true`` (no ``geometry``) always serves the raw upload,
+    crop or not - the CropTool depends on this to offer the full frame."""
+    session_id = _upload(client, sample_jpeg).json()["session_id"]
+    client.post(
+        f"/api/process/{session_id}",
+        json={
+            "parameters": {
+                "geometry": {"crop_x": 0.25, "crop_y": 0.25, "crop_w": 0.5, "crop_h": 0.5}
+            }
+        },
+    )
+
+    original = client.get(f"/api/preview/{session_id}", params={"original": "true"})
+    assert _decode(original.content).shape[:2] == (64, 96)
+
+
+def test_preview_original_with_geometry_falls_back_before_any_processing(
+    client, sample_jpeg: bytes
+) -> None:
+    """No parameters saved yet - degrades to the plain untouched original."""
+    session_id = _upload(client, sample_jpeg).json()["session_id"]
+
+    response = client.get(
+        f"/api/preview/{session_id}", params={"original": "true", "geometry": "true"}
+    )
+    assert response.status_code == 200
+    assert _decode(response.content).shape[:2] == (64, 96)

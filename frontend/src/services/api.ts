@@ -109,17 +109,23 @@ export const apiClient = {
   /**
    * URL for a session image.
    * - `original`: the untouched upload (before/after "before" side)
+   * - `geometry`: with `original`, apply the session's current crop/rotate/
+   *   flip/straighten (but no colour/tone enhancement) - keeps the "before"
+   *   side aligned with the result's frame once geometry has changed it
    * - `full`: full-resolution current result (default: downscaled preview)
    * - `v`: cache-busting token; bump it when the result changes so the
    *   browser re-fetches an otherwise-identical URL.
    */
   previewUrl(
     sessionId: string,
-    opts: { full?: boolean; original?: boolean; v?: number | string } = {},
+    opts: { full?: boolean; original?: boolean; geometry?: boolean; v?: number | string } = {},
   ): string {
     const params = new URLSearchParams();
     if (opts.original) {
       params.set('original', 'true');
+      if (opts.geometry) {
+        params.set('geometry', 'true');
+      }
     } else if (opts.full) {
       params.set('full', 'true');
     }
