@@ -115,6 +115,38 @@ test('save the current parameters as a preset', async ({ page }) => {
   await expect(chip).toHaveCount(0);
 });
 
+test('crop and rotate applies a new framing', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('input[type=file]').setInputFiles(SAMPLE);
+  await expect(page.getByRole('button', { name: 'Download' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Crop & rotate' }).click();
+  const done = page.getByRole('button', { name: 'Done' });
+  await expect(done).toBeVisible();
+
+  await page.getByLabel('Straighten').fill('12');
+
+  // drag the crop frame's SE corner inward and check it actually resizes
+  const frame = page.locator('.cursor-move');
+  const box = (await frame.boundingBox())!;
+  await page.mouse.move(box.x + box.width - 12, box.y + box.height - 12);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.55, box.y + box.height * 0.55, { steps: 12 });
+  await page.mouse.up();
+  const resized = (await frame.boundingBox())!;
+  expect(resized.width).toBeLessThan(box.width - 20);
+  expect(resized.height).toBeLessThan(box.height - 20);
+
+  await Promise.all([
+    page.waitForResponse((r) => r.url().includes('/api/process/') && r.ok()),
+    done.click(),
+  ]);
+  await expect(done).toBeHidden();
+  // a non-default geometry drops the before/after split and flags the button
+  await expect(page.locator('img[alt="Original"]')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Crop & rotate' })).toHaveClass(/btn-primary/);
+});
+
 test('applying a preset moves the sliders and star reduction works', async ({ page }) => {
   await page.goto('/');
   await page.locator('input[type=file]').setInputFiles(SAMPLE);

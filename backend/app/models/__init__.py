@@ -15,7 +15,12 @@ from app.models.preset import (
     SavePresetRequest,
     SavePresetResponse,
 )
-from app.models.processing import ProcessingParameters, ProcessRequest, ProcessResponse
+from app.models.processing import (
+    GeometryParameters,
+    ProcessingParameters,
+    ProcessRequest,
+    ProcessResponse,
+)
 from app.models.session import SessionInfo
 from app.models.stack import (
     InitiateStackRequest,
@@ -41,6 +46,7 @@ __all__ = [
     "DepthStatistics",
     "Dimensions",
     "FocusPoint",
+    "GeometryParameters",
     "HistogramData",
     "InitiateStackRequest",
     "PresetListResponse",

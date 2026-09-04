@@ -77,6 +77,21 @@ Celery job queue (`PROCESSING_MODE=queue`), and the progress WebSockets.
 | tint | -50 | 50 | 0 | int |
 | depth_shift_intensity | -100 | 100 | 0 | int |
 
+`geometry` is a nested object applied **before** enhancement (rotate -> flip ->
+straighten -> crop; crop coordinates are fractions of the rotated/flipped image):
+
+| Field | Min | Max | Default | Type |
+|-------|-----|-----|---------|------|
+| straighten | -45 | 45 | 0 | float (degrees) |
+| rotate_quarters | 0 | 3 | 0 | int (90 deg clockwise turns) |
+| flip_horizontal | - | - | false | bool |
+| flip_vertical | - | - | false | bool |
+| crop_x / crop_y | 0.0 | 1.0 | 0.0 | float |
+| crop_w / crop_h | >0 | 1.0 | 1.0 | float |
+
+`crop_x + crop_w` and `crop_y + crop_h` must not exceed 1. A crop or a quarter
+turn changes the result's dimensions.
+
 The canonical model is `app/models/processing.py`; keep this table in sync with it.
 
 ## WebSocket messages
@@ -99,7 +114,7 @@ relays live events from Redis until a terminal status arrives, then closes.
 ```
 
 `status`: `queued`, `processing`, `completed`, `failed` (or `unknown` if the
-`job_id` is not found). Image steps: `color_correction`, `contrast`,
+`job_id` is not found). Image steps: `geometry`, `color_correction`, `contrast`,
 `brightness`, `highlights_shadows`, `saturation`, `vibrance`, `clarity`,
 `denoise`, `star_reduction`, `sharpness`, `rendering`, `done`. Stack steps:
 `registration`, `background_normalization`, `cosmic_ray_rejection`,

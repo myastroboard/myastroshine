@@ -10,7 +10,7 @@ import cv2
 import numpy as np
 import pytest
 
-from app.models import ProcessingParameters
+from app.models import GeometryParameters, ProcessingParameters
 from app.services.image_processing import ImageProcessingService
 
 
@@ -115,6 +115,50 @@ def test_star_reduction_dims_stars_more_than_the_object(
     assert object_after >= object_before * 0.9
 
 
+def test_geometry_default_is_identity(
+    service: ImageProcessingService, sample_image: np.ndarray
+) -> None:
+    """All-default geometry returns the image unchanged."""
+    assert np.array_equal(service.apply_geometry(sample_image, GeometryParameters()), sample_image)
+
+
+def test_geometry_quarter_turn_swaps_dimensions(
+    service: ImageProcessingService, sample_image: np.ndarray
+) -> None:
+    """A single 90-degree turn transposes height and width."""
+    out = service.apply_geometry(sample_image, GeometryParameters(rotate_quarters=1))
+    height, width = sample_image.shape[:2]
+    assert out.shape[:2] == (width, height)
+
+
+def test_geometry_crop_reduces_size_to_the_rectangle(
+    service: ImageProcessingService, sample_image: np.ndarray
+) -> None:
+    """The crop rectangle is honoured in fractions of the image."""
+    height, width = sample_image.shape[:2]
+    out = service.apply_geometry(
+        sample_image, GeometryParameters(crop_x=0.25, crop_y=0.25, crop_w=0.5, crop_h=0.5)
+    )
+    assert out.shape[:2] == (round(0.5 * height), round(0.5 * width))
+
+
+def test_geometry_flip_horizontal_mirrors_columns(
+    service: ImageProcessingService, sample_image: np.ndarray
+) -> None:
+    """flip_horizontal reverses the column order."""
+    out = service.apply_geometry(sample_image, GeometryParameters(flip_horizontal=True))
+    assert np.array_equal(out, sample_image[:, ::-1])
+
+
+def test_geometry_straighten_keeps_frame_full(
+    service: ImageProcessingService, sample_image: np.ndarray
+) -> None:
+    """Straighten rotates but scales up so no border pixels appear (same shape)."""
+    out = service.apply_geometry(sample_image, GeometryParameters(straighten=8.0))
+    assert out.shape == sample_image.shape
+    assert out.dtype == np.uint8
+
+
 def test_white_balance_neutral_is_identity(
     service: ImageProcessingService, sample_image: np.ndarray
 ) -> None:
@@ -135,6 +179,7 @@ def test_full_pipeline_stays_in_range(
 ) -> None:
     """A heavy parameter set still yields a valid BGR uint8 image."""
     params = ProcessingParameters(
+        geometry=GeometryParameters(straighten=4.0, crop_x=0.1, crop_w=0.8),
         contrast=1.8,
         brightness=0.2,
         saturation=1.5,
@@ -149,7 +194,9 @@ def test_full_pipeline_stays_in_range(
         tint=10,
     )
     out = service.apply_parameters(sample_image, params)
-    assert out.shape == sample_image.shape
+    height, width = sample_image.shape[:2]
+    assert out.shape[0] == height
+    assert abs(out.shape[1] - round(0.8 * width)) <= 1  # geometry crop applied first
     assert out.dtype == np.uint8
     assert out.min() >= 0
     assert out.max() <= 255

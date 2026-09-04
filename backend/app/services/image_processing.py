@@ -7,13 +7,14 @@ transform when its parameter sits at the default value.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable
 
 import cv2
 import numpy as np
 
 from app.logging_config import get_logger
-from app.models import ProcessingParameters
+from app.models import GeometryParameters, ProcessingParameters
 from app.utils.math_utils import kelvin_to_rgb_gain, tint_to_rgb_gain, to_uint8
 
 StepCallback = Callable[[str, int], None]
@@ -32,6 +33,50 @@ def _unchanged(value: float, default: float) -> bool:
 
 class ImageProcessingService:
     """Applies enhancement parameters to an image."""
+
+    def apply_geometry(self, image: np.ndarray, geom: GeometryParameters) -> np.ndarray:
+        """Rotate / flip / straighten / crop the image before enhancement.
+
+        Quarter turns are clockwise; ``straighten`` (deg) rotates about the
+        centre and scales up so the frame stays full; the crop rectangle is in
+        fractions of the rotated/flipped image.
+        """
+        if geom == GeometryParameters():
+            return image
+
+        result = image
+        for _ in range(geom.rotate_quarters % 4):
+            result = cv2.rotate(result, cv2.ROTATE_90_CLOCKWISE)
+        if geom.flip_horizontal:
+            result = cv2.flip(result, 1)
+        if geom.flip_vertical:
+            result = cv2.flip(result, 0)
+
+        if abs(geom.straighten) > _EPS:
+            height, width = result.shape[:2]
+            rad = math.radians(abs(geom.straighten))
+            cover = max(
+                (width * math.cos(rad) + height * math.sin(rad)) / width,
+                (width * math.sin(rad) + height * math.cos(rad)) / height,
+            )
+            matrix = cv2.getRotationMatrix2D((width / 2, height / 2), geom.straighten, cover)
+            result = cv2.warpAffine(
+                result,
+                matrix,
+                (width, height),
+                flags=cv2.INTER_LINEAR,
+                borderMode=cv2.BORDER_REFLECT,
+            )
+
+        if (geom.crop_x, geom.crop_y, geom.crop_w, geom.crop_h) != (0.0, 0.0, 1.0, 1.0):
+            height, width = result.shape[:2]
+            x0 = max(0, round(geom.crop_x * width))
+            y0 = max(0, round(geom.crop_y * height))
+            x1 = min(width, max(round((geom.crop_x + geom.crop_w) * width), x0 + 1))
+            y1 = min(height, max(round((geom.crop_y + geom.crop_h) * height), y0 + 1))
+            result = result[y0:y1, x0:x1].copy()
+
+        return result
 
     def apply_white_balance(self, image: np.ndarray, temperature: int, tint: int) -> np.ndarray:
         """Adjust colour temperature (2000-8000K, 6500 neutral) and tint (-50..50)."""
@@ -174,6 +219,7 @@ class ImageProcessingService:
         ``on_step(step_name, percent)`` is called as each stage begins.
         """
         stages: list[tuple[str, Callable[[np.ndarray], np.ndarray]]] = [
+            ("geometry", lambda r: self.apply_geometry(r, params.geometry)),
             (
                 "color_correction",
                 lambda r: self.apply_white_balance(r, params.temperature, params.tint),

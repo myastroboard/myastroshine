@@ -1,8 +1,13 @@
-import { PARAMETER_BOUNDS, type ParameterBound, type ProcessingParameters } from '@/types';
+import {
+  PARAMETER_BOUNDS,
+  type ParameterBound,
+  type ProcessingParameters,
+  type SliderParameterKey,
+} from '@/types';
 
 export interface SliderPanelProps {
   parameters: ProcessingParameters;
-  onParameterChange: (key: keyof ProcessingParameters, value: number) => void;
+  onParameterChange: (key: SliderParameterKey, value: number) => void;
   onReset: () => void;
   isProcessing?: boolean;
 }

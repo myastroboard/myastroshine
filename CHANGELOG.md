@@ -15,10 +15,11 @@ tagged yet.
 
 - Image upload with format/size validation, 512 px preview generation, per-channel
   histogram, and session tracking (`POST /api/upload`, `GET /api/preview/{id}`).
-- `ImageProcessingService` pipeline: white balance (temperature/tint), contrast,
-  brightness, highlights/shadows recovery, saturation, vibrance, clarity, denoise
+- `ImageProcessingService` pipeline: geometry (rotate / flip / straighten /
+  crop), white balance (temperature/tint), contrast, brightness,
+  highlights/shadows recovery, saturation, vibrance, clarity, denoise
   (bilateral), star reduction (top-hat star mask + morphological erosion),
-  sharpness. Thirteen parameters, validated against documented bounds.
+  sharpness. Validated against documented bounds.
 - `POST /api/process/{id}` applies parameters and returns a job handle.
 - `GET /api/health` system health check.
 - Alembic migration scaffolding; `init_db()` creates tables for local/dev use.
@@ -79,6 +80,10 @@ tagged yet.
 - Single-image editor: drag-and-drop upload, before/after split preview with zoom
   controls, histogram, grouped parameter sliders (500 ms debounce), preset
   buttons, "save as preset" dialog, download.
+- Crop / rotate tool (`CropTool`): full-screen mode with a draggable crop
+  rectangle (corner + edge handles), straighten dial (+/-45 deg), 90 deg rotate,
+  horizontal / vertical flip, and aspect presets (Free / Original / 1:1 / 16:9 /
+  3:2 / 4:5 / 5:4). Commits a `geometry` object applied first in the pipeline.
 - Preset chips: apply, plus a two-step delete on user presets (built-ins have no
   delete affordance; the backend also rejects it with 403).
 - Interactive Depth Shift viewer (pointer-driven parallax, intensity slider).

@@ -8,6 +8,10 @@ services. All functions operate on BGR `uint8` numpy arrays unless noted.
 
 Applied in this order to minimize artifacts (`apply_parameters`):
 
+0. **Geometry** (`geometry`) - quarter turns (clockwise), then flips, then
+   straighten (`cv2.getRotationMatrix2D` + `warpAffine`, scaled up by
+   `max((w·cos+h·sin)/w, (w·sin+h·cos)/h)` so the frame stays full), then the
+   crop rectangle. Runs first; it changes the working dimensions.
 1. **White balance** (`temperature`, `tint`) - per-channel gain in linear RGB;
    6500K is neutral. Warm shifts reduce blue, cool shifts boost blue.
 2. **Contrast** (`contrast`, 0.5-3.0) - linear scaling around the image mean,

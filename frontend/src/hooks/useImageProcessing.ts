@@ -2,7 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { apiClient } from '@/services/api';
 import { processingStatusClient } from '@/services/ws';
-import { DEFAULT_PARAMETERS, type JobStatus, type ProcessingParameters } from '@/types';
+import {
+  DEFAULT_PARAMETERS,
+  type GeometryParameters,
+  type JobStatus,
+  type ProcessingParameters,
+  type SliderParameterKey,
+} from '@/types';
 
 const DEBOUNCE_MS = 500;
 
@@ -53,11 +59,24 @@ export function useImageProcessing(sessionId: string) {
   );
 
   const updateParameter = useCallback(
-    (key: keyof ProcessingParameters, value: number) => {
+    (key: SliderParameterKey, value: number) => {
       setParameters((prev) => {
         const next = { ...prev, [key]: value };
         clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(() => void applyParameters(next), DEBOUNCE_MS);
+        return next;
+      });
+    },
+    [applyParameters],
+  );
+
+  /** Commit a new framing (crop tool "Done") - processed immediately. */
+  const applyGeometry = useCallback(
+    (geometry: GeometryParameters) => {
+      setParameters((prev) => {
+        const next = { ...prev, geometry };
+        clearTimeout(debounceRef.current);
+        void applyParameters(next);
         return next;
       });
     },
@@ -87,6 +106,7 @@ export function useImageProcessing(sessionId: string) {
     previewVersion,
     error,
     updateParameter,
+    applyGeometry,
     applyParameters,
     resetParameters,
     syncParameters,

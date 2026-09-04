@@ -12,7 +12,44 @@ export interface HistogramData {
   b: number[];
 }
 
+/** Framing applied before enhancement. Edited in the crop tool, not by sliders. */
+export interface GeometryParameters {
+  straighten: number; // degrees, -45..45
+  rotateQuarters: number; // 0..3, clockwise 90deg turns
+  flipHorizontal: boolean;
+  flipVertical: boolean;
+  cropX: number; // 0..1 fractions of the rotated/flipped image
+  cropY: number;
+  cropW: number;
+  cropH: number;
+}
+
+export const DEFAULT_GEOMETRY: GeometryParameters = {
+  straighten: 0,
+  rotateQuarters: 0,
+  flipHorizontal: false,
+  flipVertical: false,
+  cropX: 0,
+  cropY: 0,
+  cropW: 1,
+  cropH: 1,
+};
+
+export function isDefaultGeometry(geometry: GeometryParameters): boolean {
+  return (
+    geometry.straighten === 0 &&
+    geometry.rotateQuarters === 0 &&
+    !geometry.flipHorizontal &&
+    !geometry.flipVertical &&
+    geometry.cropX === 0 &&
+    geometry.cropY === 0 &&
+    geometry.cropW === 1 &&
+    geometry.cropH === 1
+  );
+}
+
 export interface ProcessingParameters {
+  geometry: GeometryParameters;
   contrast: number;
   brightness: number;
   saturation: number;
@@ -29,6 +66,7 @@ export interface ProcessingParameters {
 }
 
 export const DEFAULT_PARAMETERS: ProcessingParameters = {
+  geometry: DEFAULT_GEOMETRY,
   contrast: 1.0,
   brightness: 0.0,
   saturation: 1.0,
@@ -44,8 +82,11 @@ export const DEFAULT_PARAMETERS: ProcessingParameters = {
   depthShiftIntensity: 0,
 };
 
+/** Numeric parameters driven by the slider panel (everything but `geometry`). */
+export type SliderParameterKey = Exclude<keyof ProcessingParameters, 'geometry'>;
+
 export interface ParameterBound {
-  key: keyof ProcessingParameters;
+  key: SliderParameterKey;
   label: string;
   min: number;
   max: number;
