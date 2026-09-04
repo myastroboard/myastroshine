@@ -35,6 +35,7 @@ frontend/playwright-report/
 frontend/blob-report/
 frontend/playwright/.cache/
 .e2e-tmp/
+backend/.e2e-tmp/
 
 # ---------------------------------------------------------------------------
 # Environment / secrets
