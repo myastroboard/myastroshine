@@ -34,7 +34,56 @@
     "auto_astro_button": "Auto Astro",
     "auto_astro_analyzing": "Analyzing...",
     "auto_astro_failed": "Auto Astro failed: {error}",
-    "save_as_preset": "Save as preset"
+    "save_as_preset": "Save as preset",
+    "reset_all": "Reset all adjustments",
+    "next_step": "Next: {step}",
+    "rail": {
+      "aria_label": "Editing workflow",
+      "modified": "changed from default",
+      "start": "Start",
+      "frame": "Framing",
+      "sky": "Background",
+      "light": "Light",
+      "curves": "Curves",
+      "colour": "Colour",
+      "detail": "Detail",
+      "stars": "Stars",
+      "depth": "Depth",
+      "export": "Export"
+    },
+    "steps": {
+      "start": {
+        "help": "Begin here: a one-click starting point with Auto Astro, or apply a saved preset. Then work down the steps."
+      },
+      "frame": {
+        "help": "Set the frame first - crop, level the horizon, rotate or flip. Everything after this works on the framed image.",
+        "unavailable": "Framing needs the original image dimensions, which aren't available for a stacked composite."
+      },
+      "sky": {
+        "help": "Clean up the raw signal before any creative grading: white balance, lens vignetting, light-pollution gradients, and haze."
+      },
+      "light": {
+        "help": "Overall exposure and tonal balance - how bright, contrasty, and full of shadow and highlight detail the image reads."
+      },
+      "curves": {
+        "help": "Fine-tune tone and colour with a master curve, then per-channel red/green/blue curves for grading."
+      },
+      "colour": {
+        "help": "How vivid the colours are. Vibrance protects already-saturated areas; saturation scales everything."
+      },
+      "detail": {
+        "help": "Local texture: micro-contrast, noise reduction, and sharpening. Do this after tone and colour are settled."
+      },
+      "stars": {
+        "help": "Detect individual stars and shrink them so faint nebulosity stands out. Use the mask to check detection first."
+      },
+      "depth": {
+        "help": "Pick the focal point, then open the Depth Shift viewer for an interactive parallax preview."
+      },
+      "export": {
+        "help": "Get the result out: download it, hand it to AstroDex, or save the current settings as a reusable preset."
+      }
+    }
   },
   "export_panel": {
     "heading": "Export",
@@ -96,10 +145,9 @@
     }
   },
   "crop_tool": {
-    "title": "Crop & rotate",
     "free": "Free",
     "original": "Original",
-    "done": "Done",
+    "apply": "Apply framing",
     "straighten_label": "Straighten",
     "rotate_90": "Rotate 90°",
     "flip_h": "Flip H",
@@ -107,37 +155,9 @@
     "crop_source_alt": "Crop source"
   },
   "slider_panel": {
-    "adjustments_heading": "Adjustments",
-    "reset_all": "Reset all",
     "show_star_mask": "Show star mask",
     "sources_count": "{count} sources",
     "about_param_aria": "About {label}",
-    "sections": {
-      "light": {
-        "label": "Light",
-        "help": "Overall exposure and tonal balance - how bright, contrasty, and full of shadow and highlight detail the image reads."
-      },
-      "corrections": {
-        "label": "Corrections",
-        "help": "Fix the raw signal before creative grading: lens vignetting, background light-pollution gradients, and atmospheric haze."
-      },
-      "colour": {
-        "label": "Colour",
-        "help": "Hue, saturation, and white balance - how vivid and how warm or cool the image looks."
-      },
-      "detail": {
-        "label": "Detail",
-        "help": "Local texture: micro-contrast, noise reduction, and sharpening."
-      },
-      "star": {
-        "label": "Stars",
-        "help": "How individual stars are detected and shrunk, so faint nebulosity stands out."
-      },
-      "depth": {
-        "label": "Depth",
-        "help": "Strength of the parallax effect in the Depth Shift viewer."
-      }
-    },
     "params": {
       "contrast": {
         "label": "Contrast",
@@ -218,10 +238,6 @@
       "tint": {
         "label": "Tint",
         "hint": "White balance: shifts the colour cast between green and magenta."
-      },
-      "depthShiftIntensity": {
-        "label": "Depth Shift",
-        "hint": "Strength of the parallax effect in the Depth Shift viewer."
       }
     }
   },

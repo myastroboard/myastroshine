@@ -21,7 +21,7 @@ export function Footer() {
 
   return (
     <footer className="border-t border-hairline bg-canvas/95 px-4 py-3 text-xs text-faint backdrop-blur-md sm:px-6">
-      <div className="mx-auto flex max-w-[1200px] flex-col gap-1.5">
+      <div className="mx-auto flex max-w-[1360px] flex-col gap-1.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span>
             {appName} &middot; v{version}
