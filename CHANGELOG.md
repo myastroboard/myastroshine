@@ -59,6 +59,82 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   points make a smooth curve - not a faceted polyline - and can never
   overshoot past a control point's value into crushed shadows or blown
   highlights.
+- Five missing core astro ops, a new **Corrections** section, and split
+  tone controls:
+  - **Vignette correction** - brightens the corners to counteract lens
+    vignetting (a generic radial model, not a per-lens calibrated profile).
+  - **Gradient reduction** - flattens smooth background gradients (light
+    pollution, sky glow) via a large-blur background estimate, subtracted
+    back out.
+  - **Dehaze** - dark-channel-prior haze removal, restoring contrast/colour
+    lost to a veiling glow or light-pollution haze.
+  - **Colour noise reduction** - denoises only the Cr/Cb colour channels,
+    leaving luma (and its own separate `denoise` control) untouched -
+    colour speckle tolerates far more smoothing than brightness detail does.
+  - **Whites / Blacks** - push the white/black clipping points, narrower
+    and more aggressive than the existing Highlights/Shadows (only the true
+    near-white/near-black tail moves, not the broader upper/lower-mid
+    range) - the usual distinction in most photo editors.
+  - New **Corrections** section (Vignette correction, Gradient reduction,
+    Dehaze) alongside Light/Colour/Detail/Stars/Depth.
+- **FITS + 16-bit + camera RAW upload support** - previously 8-bit JPEG/PNG/
+  TIFF only (and a 16-bit TIFF/PNG was silently truncated to 8-bit). FITS
+  (`.fits`/`.fit`/`.fts`) and camera RAW (`.cr2`/`.cr3`/`.nef`/`.arw`/`.dng`/
+  `.orf`/`.rw2`/`.pef`/`.raf`) now decode via `astropy`/`rawpy` respectively.
+  FITS and a genuine 16-bit TIFF/PNG both get a new auto-stretch (the same
+  "screen transfer function" PixInsight/Siril use) instead of a naive bit-
+  shift; RAW is demosaiced with the camera's as-shot white balance. See
+  `docs/ALGORITHMS.md` "Upload ingest: FITS / RAW / 16-bit".
+- **Colour curves** - the Tone Curve panel now has 4 tabs (RGB / Red / Green /
+  Blue), each an independent curve on the same `curve_points_to_lut`
+  monotone-spline LUT the master RGB curve already used, applied via
+  `cv2.split` / `cv2.LUT` per channel / `cv2.merge` instead of identically to
+  all three. For a colour cast a single white-balance gain can't reach at one
+  specific tonal range (e.g. a green background-sky cast only in the
+  midtones), or deliberate colour grading. New `red_curve_points` /
+  `green_curve_points` / `blue_curve_points` parameters (same empty-by-default,
+  first-at-0/last-at-255 validation as `curve_points`), applied right after
+  the master curve. See `docs/ALGORITHMS.md` "Colour curves".
+
+### Changed
+
+- `brightness` renamed to `exposure` throughout the API, Auto Astro, and the
+  editor UI - no behaviour change, just a name matching the rest of the
+  "Exposure/Highlights/Shadows/Whites/Blacks" tone-control family this
+  release completes. A saved preset or automation using the old
+  `brightness` key needs updating to `exposure`.
+- Full-resolution enhance's performance budget raised from 5s to 8s
+  (`tests/benchmarks/test_processing_speed.py`) to account for the 5 new
+  pipeline stages above - measured 5.75s on a 24MP frame with every slider
+  active at once (an unrealistic worst case; the interactive preview budget,
+  what a slider drag actually feels like, is unchanged and unaffected).
+
+### Removed
+
+- The `denoise_enable_ml` / `depth_detection_method` Settings fields (and
+  their "Processing" section) - both were placeholders for ML backends
+  evaluated this release and not adopted (see `docs/ALGORITHMS.md` "Depth
+  map" and "ML denoising"): no viable pretrained denoising model exists to
+  point a self-hoster at, and MiDaS/DPT-Hybrid depth estimation produces a
+  near-featureless result on real astrophotos regardless of model size.
+  Neither field ever did anything - `depth_detection_method` had no reader in
+  `DepthMapService`/`DepthShiftService` even before this evaluation. An old
+  `app_settings.json` with these keys still loads fine; they're just ignored.
+
+### Fixed
+
+- `GET /api/presets` 500ing whenever a built-in preset stored before a
+  `ProcessingParameters` field rename (e.g. this release's `brightness` ->
+  `exposure`) no longer matched the current model (`extra_forbidden` on the
+  stale field). `PresetService.ensure_defaults()` now refreshes existing
+  built-in presets to match the current spec on every call, not just inserts
+  missing ones - built-ins are fully code-defined and never user-edited, so
+  any drift is always wrong data, never a customization worth preserving.
+  `is_favorite` (the one user-set field on a built-in) is left untouched.
+- The `worker` container always reporting Docker-unhealthy - it inherited the
+  image's HTTP healthcheck (`curl :8002/api/health`) from the shared
+  Dockerfile stage, but a Celery worker never serves HTTP. Both compose files
+  now give `worker` its own healthcheck (`celery inspect ping`).
 
 ## [0.1.0] - 2026-09-04
 

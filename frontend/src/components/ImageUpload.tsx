@@ -2,7 +2,25 @@ import { useRef, useState, type DragEvent } from 'react';
 
 import { useTranslation } from '@/hooks/useTranslation';
 
-const ACCEPTED = ['.jpg', '.jpeg', '.png', '.tiff'];
+const ACCEPTED = [
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.tiff',
+  '.tif',
+  '.fits',
+  '.fit',
+  '.fts',
+  '.cr2',
+  '.cr3',
+  '.nef',
+  '.arw',
+  '.dng',
+  '.orf',
+  '.rw2',
+  '.pef',
+  '.raf',
+];
 const MAX_SIZE_BYTES = 100 * 1024 * 1024;
 
 export interface ImageUploadProps {

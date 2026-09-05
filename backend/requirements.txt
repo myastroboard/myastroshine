@@ -17,6 +17,10 @@ scikit-image==0.26.0
 Pillow==12.3.0
 numpy==2.5.2
 
+# FITS + camera RAW input (backend/app/utils/image_utils.py: decode_image)
+astropy==8.0.1
+rawpy==0.27.1
+
 # Database
 SQLAlchemy==2.0.52
 alembic==1.19.1

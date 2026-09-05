@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import io
 from pathlib import Path
 
+import cv2
 import numpy as np
 import pytest
+import rawpy
 
 from app.exceptions import UnsupportedImageError
 from app.utils import image_utils
@@ -23,6 +26,167 @@ def test_decode_rejects_garbage() -> None:
     """Non-image bytes raise UnsupportedImageError."""
     with pytest.raises(UnsupportedImageError):
         image_utils.decode_image(b"not an image")
+
+
+def test_decode_grayscale_png_becomes_3_channel_bgr(sample_image: np.ndarray) -> None:
+    """A single-channel source (cv2.IMREAD_UNCHANGED) still comes back as 3-channel BGR."""
+    gray = cv2.cvtColor(sample_image, cv2.COLOR_BGR2GRAY)
+    ok, buffer = cv2.imencode(".png", gray)
+    assert ok
+    image = image_utils.decode_image(buffer.tobytes(), "gray.png")
+    assert image.shape == (*gray.shape, 3)
+    assert image.dtype == np.uint8
+
+
+def test_decode_rgba_png_drops_alpha(sample_image: np.ndarray) -> None:
+    """A 4-channel source is flattened to plain BGR, matching the old IMREAD_COLOR behaviour."""
+    rgba = cv2.cvtColor(sample_image, cv2.COLOR_BGR2BGRA)
+    ok, buffer = cv2.imencode(".png", rgba)
+    assert ok
+    image = image_utils.decode_image(buffer.tobytes(), "rgba.png")
+    assert image.shape == sample_image.shape
+    assert image.dtype == np.uint8
+
+
+def test_decode_16bit_png_is_auto_stretched() -> None:
+    """A 16-bit source (e.g. a stacked TIFF/PNG) is auto-stretched, not truncated."""
+    rng = np.random.default_rng(3)
+    data = np.clip(rng.normal(3000, 200, size=(30, 40, 3)), 0, 65535).astype(np.uint16)
+    ok, buffer = cv2.imencode(".png", data)
+    assert ok
+    image = image_utils.decode_image(buffer.tobytes(), "stack.png")
+    assert image.dtype == np.uint8
+    assert image.shape == (30, 40, 3)
+    # background should land near the stretch's ~0.25 target, not stay crushed near 0
+    assert 30 < int(np.median(image)) < 100
+
+
+def _fits_bytes(data: np.ndarray) -> bytes:
+    from astropy.io import fits
+
+    buffer = io.BytesIO()
+    fits.PrimaryHDU(data=data).writeto(buffer)
+    return buffer.getvalue()
+
+
+def test_decode_fits_mono_auto_stretches() -> None:
+    """A 2D FITS plane (the common single-sensor case) becomes gray-replicated BGR."""
+    rng = np.random.default_rng(1)
+    data = rng.normal(500, 20, size=(40, 60)).astype(np.float32)
+    data[10, 10] = 40000  # a bright "star" pixel
+
+    image = image_utils.decode_image(_fits_bytes(data), "frame.fits")
+
+    assert image.shape == (40, 60, 3)
+    assert image.dtype == np.uint8
+    assert np.array_equal(image[:, :, 0], image[:, :, 1])
+    assert np.array_equal(image[:, :, 1], image[:, :, 2])
+    assert 40 < int(np.median(image)) < 90
+
+
+def test_decode_fits_rgb_planes_map_to_correct_bgr_channels() -> None:
+    """A (3, H, W) FITS cube is read as R/G/B planes and reordered to BGR."""
+    background = np.full((12, 12), 500.0, dtype=np.float32)
+    red, green, blue = background.copy(), background.copy(), background.copy()
+    red[2, 2] = 50000
+    green[6, 6] = 50000
+    blue[9, 9] = 50000
+    cube = np.stack([red, green, blue])
+
+    image = image_utils.decode_image(_fits_bytes(cube), "frame.fits")
+
+    assert image.shape == (12, 12, 3)
+    assert image[2, 2, 2] > 200  # red plane's bright spot -> BGR channel 2 (R)
+    assert image[2, 2, 0] < 100
+    assert image[2, 2, 1] < 100
+    assert image[6, 6, 1] > 200  # green plane's bright spot -> BGR channel 1 (G)
+    assert image[9, 9, 0] > 200  # blue plane's bright spot -> BGR channel 0 (B)
+
+
+def test_decode_fits_rejects_garbage() -> None:
+    """Non-FITS bytes with a .fits extension raise UnsupportedImageError, not a crash."""
+    with pytest.raises(UnsupportedImageError):
+        image_utils.decode_image(b"not a fits file", "broken.fits")
+
+
+def test_decode_fits_rejects_a_header_declared_oversized_shape() -> None:
+    """A FITS header can claim a huge NAXIS1/NAXIS2 with no real data behind it
+    (a 2880-byte header alone can declare 50000x50000) - decode_image must reject
+    this from the header alone, before ever allocating an array that size."""
+    from astropy.io import fits
+
+    header = fits.Header(
+        [
+            ("SIMPLE", True),
+            ("BITPIX", -32),
+            ("NAXIS", 2),
+            ("NAXIS1", 50000),
+            ("NAXIS2", 50000),
+            ("EXTEND", True),
+        ]
+    )
+    crafted = header.tostring(padding=True).encode("ascii")
+
+    with pytest.raises(UnsupportedImageError, match="exceeding"):
+        image_utils.decode_image(crafted, "huge.fits")
+
+
+def test_decode_fits_rejects_an_oversized_declared_shape_of_any_ndim() -> None:
+    """The header-only size guard must catch every declared shape, not just the
+    2D/3-plane-cube ones this module actually accepts - a shape this module would
+    otherwise reject as "unsupported" must still be caught before allocating."""
+    from astropy.io import fits
+
+    header = fits.Header(
+        [
+            ("SIMPLE", True),
+            ("BITPIX", -32),
+            ("NAXIS", 4),
+            ("NAXIS1", 5000),
+            ("NAXIS2", 5000),
+            ("NAXIS3", 5),
+            ("NAXIS4", 5),
+            ("EXTEND", True),
+        ]
+    )
+    crafted = header.tostring(padding=True).encode("ascii")
+
+    with pytest.raises(UnsupportedImageError, match="exceeding"):
+        image_utils.decode_image(crafted, "huge_cube.fits")
+
+
+def test_decode_fits_rejects_unsupported_shape() -> None:
+    """A FITS data cube that isn't 2D or a 3-plane RGB cube is rejected clearly."""
+    data = np.zeros((2, 4, 5), dtype=np.float32)
+    with pytest.raises(UnsupportedImageError, match="shape"):
+        image_utils.decode_image(_fits_bytes(data), "cube.fits")
+
+
+def test_decode_raw_dispatches_by_extension(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A recognised RAW extension routes through rawpy, then normalizes to BGR uint8."""
+
+    class _FakeRaw:
+        def __enter__(self) -> _FakeRaw:
+            return self
+
+        def __exit__(self, *exc_info: object) -> None:
+            return None
+
+        def postprocess(self, **kwargs: object) -> np.ndarray:
+            return np.full((4, 6, 3), 128, dtype=np.uint8)
+
+    monkeypatch.setattr(rawpy, "imread", lambda _file: _FakeRaw())
+
+    image = image_utils.decode_image(b"fake raw bytes", "photo.CR2")
+
+    assert image.shape == (4, 6, 3)
+    assert image.dtype == np.uint8
+
+
+def test_decode_raw_rejects_garbage() -> None:
+    """Non-RAW bytes with a RAW extension raise UnsupportedImageError, not a libraw crash."""
+    with pytest.raises(UnsupportedImageError):
+        image_utils.decode_image(b"not a raw file", "photo.nef")
 
 
 def test_decode_rejects_images_over_the_pixel_cap(

@@ -25,7 +25,7 @@
     "choose_file_hint": "or choose a file to begin",
     "choose_file_button": "Choose a file",
     "uploading_button": "Uploading...",
-    "accepted_formats": "JPEG, PNG or TIFF, up to 100 MB"
+    "accepted_formats": "JPEG, PNG, TIFF, FITS or camera RAW, up to 100 MB"
   },
   "editor": {
     "depth_shift_failed": "Depth shift failed: {error}",
@@ -86,7 +86,14 @@
   },
   "tone_curve": {
     "title": "Tone curve",
-    "help": "Drag a point to reshape the curve, double-click empty space to add one, double-click a point to remove it."
+    "help": "Drag a point to reshape the curve, double-click empty space to add one, double-click a point to remove it.",
+    "channel_tabs_aria_label": "Curve channel",
+    "channels": {
+      "rgb": "RGB",
+      "red": "Red",
+      "green": "Green",
+      "blue": "Blue"
+    }
   },
   "crop_tool": {
     "title": "Crop & rotate",
@@ -229,14 +236,13 @@
     "save_changes": "Save changes",
     "sections_aria_label": "Settings sections",
     "sections": {
-      "general": { "label": "General", "blurb": "Uploads, processing, and stacking defaults." },
+      "general": { "label": "General", "blurb": "Uploads and stacking defaults." },
       "webhooks": { "label": "Webhooks", "blurb": "AstroDex tokens and callback delivery." },
       "advanced": { "label": "Advanced", "blurb": "Networking and log levels." },
       "logs": { "label": "Logs", "blurb": "Tail, clear, and export the application log." }
     },
     "groups": {
       "uploads_and_sessions": "Uploads and sessions",
-      "processing": "Processing",
       "stacking_defaults": "Stacking defaults",
       "callback_delivery": "Callback delivery",
       "network": "Network",
@@ -247,8 +253,6 @@
       "max_upload": { "label": "Maximum upload size", "hint": "Uploads larger than this are rejected. Megabytes." },
       "session_ttl": { "label": "Session lifetime", "hint": "How long a session and its working files are kept. Hours." },
       "preview_size": { "label": "Preview size", "hint": "Longest edge of the fast-display preview image. Pixels." },
-      "depth_method": { "label": "Depth detection", "hint": "Method used to estimate the depth map for the parallax effect." },
-      "denoise_ml": { "label": "ML denoising", "hint": "Higher quality, noticeably slower, and needs the model present." },
       "stacking_enabled": { "label": "Stacking enabled", "hint": "Show the multi-frame stacking mode." },
       "stacking_max": { "label": "Maximum frames", "hint": "Upper bound on frames accepted for one stack." },
       "stacking_aligner": { "label": "Aligner", "hint": "Feature detector used to register frames." },

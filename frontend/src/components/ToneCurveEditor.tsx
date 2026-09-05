@@ -2,27 +2,45 @@ import { useRef, useState, type PointerEvent } from 'react';
 
 import { useTranslation } from '@/hooks/useTranslation';
 import { curveToSvgPath } from '@/services/toneCurve';
-import { DEFAULT_CURVE_POINTS, type CurvePoint } from '@/types';
+import { CURVE_CHANNELS, DEFAULT_CURVE_POINTS, type CurveChannel, type CurvePoint } from '@/types';
 
 export interface ToneCurveEditorProps {
-  /** Empty means "no curve" (identity) - the graph then shows the default 2-point line. */
-  points: CurvePoint[];
-  onChange: (points: CurvePoint[]) => void;
+  /** One curve per channel; empty means "no curve" (identity) for that channel. */
+  curves: Record<CurveChannel, CurvePoint[]>;
+  onChange: (channel: CurveChannel, points: CurvePoint[]) => void;
 }
 
 const LEVEL_MAX = 255;
 const MIN_GAP = 4; // minimum x-distance between adjacent points
 
+const CHANNEL_STROKE: Record<CurveChannel, string> = {
+  rgb: 'stroke-accent',
+  red: 'stroke-channel-red',
+  green: 'stroke-channel-green',
+  blue: 'stroke-channel-blue',
+};
+
 function clamp(value: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, value));
 }
 
-/** Interactive tone curve: drag points to reshape, double-click to add or remove one. */
-export function ToneCurveEditor({ points, onChange }: ToneCurveEditorProps) {
+/**
+ * Interactive tone curve, one graph shared by 4 channel tabs: RGB (the master
+ * curve, applied identically to all channels) and independent Red/Green/Blue
+ * curves for colour grading. Drag points to reshape, double-click to add or
+ * remove one - each tab remembers its own curve.
+ */
+export function ToneCurveEditor({ curves, onChange }: ToneCurveEditorProps) {
   const { t } = useTranslation();
   const svgRef = useRef<SVGSVGElement>(null);
+  const [channel, setChannel] = useState<CurveChannel>('rgb');
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const points = curves[channel];
   const curve = points.length >= 2 ? points : DEFAULT_CURVE_POINTS;
+
+  function emit(next: CurvePoint[]): void {
+    onChange(channel, next);
+  }
 
   function toDataPoint(event: PointerEvent): CurvePoint {
     const rect = svgRef.current?.getBoundingClientRect();
@@ -57,7 +75,7 @@ export function ToneCurveEditor({ points, onChange }: ToneCurveEditorProps) {
         ? { x: isFirst ? 0 : isLast ? LEVEL_MAX : clamp(x, minX, maxX), y }
         : point,
     );
-    onChange(next);
+    emit(next);
   }
 
   function handlePointerUp(): void {
@@ -69,7 +87,7 @@ export function ToneCurveEditor({ points, onChange }: ToneCurveEditorProps) {
     if (curve.some((point) => Math.abs(point.x - x) < MIN_GAP)) {
       return; // too close to an existing point/edge - would make a degenerate segment
     }
-    onChange([...curve, { x, y }].sort((a, b) => a.x - b.x));
+    emit([...curve, { x, y }].sort((a, b) => a.x - b.x));
   }
 
   function handleRemovePoint(index: number) {
@@ -78,7 +96,7 @@ export function ToneCurveEditor({ points, onChange }: ToneCurveEditorProps) {
       if (index === 0 || index === curve.length - 1) {
         return; // endpoints are permanent - the curve must span the full 0-255 range
       }
-      onChange(curve.filter((_, i) => i !== index));
+      emit(curve.filter((_, i) => i !== index));
     };
   }
 
@@ -86,9 +104,23 @@ export function ToneCurveEditor({ points, onChange }: ToneCurveEditorProps) {
     <div className="panel flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <h2 className="eyebrow">{t('tone_curve.title')}</h2>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={() => onChange([])}>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={() => emit([])}>
           {t('common.reset')}
         </button>
+      </div>
+      <div className="flex gap-1" role="tablist" aria-label={t('tone_curve.channel_tabs_aria_label')}>
+        {CURVE_CHANNELS.map((entry) => (
+          <button
+            key={entry}
+            type="button"
+            role="tab"
+            aria-selected={channel === entry}
+            className={`chip ${channel === entry ? 'chip-active' : ''}`}
+            onClick={() => setChannel(entry)}
+          >
+            {t(`tone_curve.channels.${entry}`)}
+          </button>
+        ))}
       </div>
       <p className="text-xs text-faint">{t('tone_curve.help')}</p>
       <svg
@@ -115,14 +147,19 @@ export function ToneCurveEditor({ points, onChange }: ToneCurveEditorProps) {
             strokeWidth={1}
             strokeDasharray="4 4"
           />
-          <path d={curveToSvgPath(curve)} fill="none" className="stroke-accent" strokeWidth={2} />
+          <path
+            d={curveToSvgPath(curve)}
+            fill="none"
+            className={CHANNEL_STROKE[channel]}
+            strokeWidth={2}
+          />
           {curve.map((point, index) => (
             <circle
               key={index}
               cx={point.x}
               cy={point.y}
               r={5}
-              className="cursor-pointer fill-canvas stroke-accent"
+              className={`cursor-pointer fill-canvas ${CHANNEL_STROKE[channel]}`}
               strokeWidth={2}
               onPointerDown={handlePointDown(index)}
               onDoubleClick={handleRemovePoint(index)}

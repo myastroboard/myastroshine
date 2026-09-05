@@ -45,7 +45,12 @@ _WIRE = {
     "tint": 5,
     "depth_shift_intensity": 40,
     "curve_points": [{"x": 0, "y": 0}, {"x": 128, "y": 160}, {"x": 255, "y": 255}],
+    "red_curve_points": [{"x": 0, "y": 0}, {"x": 128, "y": 170}, {"x": 255, "y": 255}],
+    "green_curve_points": [{"x": 0, "y": 0}, {"x": 128, "y": 150}, {"x": 255, "y": 255}],
+    "blue_curve_points": [{"x": 0, "y": 0}, {"x": 128, "y": 100}, {"x": 255, "y": 255}],
 }
+
+_CURVE_FIELDS = ["curve_points", "red_curve_points", "green_curve_points", "blue_curve_points"]
 
 
 def test_all_wire_fields_round_trip() -> None:
@@ -53,38 +58,51 @@ def test_all_wire_fields_round_trip() -> None:
     assert params.depth_shift_intensity == 40
     assert params.geometry.rotate_quarters == 1
     assert params.curve_points[1].y == 160
+    assert params.red_curve_points[1].y == 170
+    assert params.green_curve_points[1].y == 150
+    assert params.blue_curve_points[1].y == 100
     assert params.model_dump() == _WIRE
 
 
 def test_curve_points_defaults_to_empty() -> None:
-    """Omitting curve_points means "no curve" (identity), not a validation error."""
-    assert ProcessingParameters().curve_points == []
+    """Omitting any curve field means "no curve" (identity), not a validation error."""
+    params = ProcessingParameters()
+    assert params.curve_points == []
+    assert params.red_curve_points == []
+    assert params.green_curve_points == []
+    assert params.blue_curve_points == []
 
 
-def test_curve_points_rejects_a_single_point() -> None:
+@pytest.mark.parametrize("field", _CURVE_FIELDS)
+def test_curve_points_rejects_a_single_point(field: str) -> None:
     with pytest.raises(ValidationError):
-        ProcessingParameters(curve_points=[{"x": 0, "y": 0}])
+        ProcessingParameters(**{field: [{"x": 0, "y": 0}]})
 
 
-def test_curve_points_must_start_at_zero() -> None:
+@pytest.mark.parametrize("field", _CURVE_FIELDS)
+def test_curve_points_must_start_at_zero(field: str) -> None:
     with pytest.raises(ValidationError):
-        ProcessingParameters(curve_points=[{"x": 10, "y": 0}, {"x": 255, "y": 255}])
+        ProcessingParameters(**{field: [{"x": 10, "y": 0}, {"x": 255, "y": 255}]})
 
 
-def test_curve_points_must_end_at_255() -> None:
+@pytest.mark.parametrize("field", _CURVE_FIELDS)
+def test_curve_points_must_end_at_255(field: str) -> None:
     with pytest.raises(ValidationError):
-        ProcessingParameters(curve_points=[{"x": 0, "y": 0}, {"x": 250, "y": 255}])
+        ProcessingParameters(**{field: [{"x": 0, "y": 0}, {"x": 250, "y": 255}]})
 
 
-def test_curve_points_must_be_strictly_increasing() -> None:
+@pytest.mark.parametrize("field", _CURVE_FIELDS)
+def test_curve_points_must_be_strictly_increasing(field: str) -> None:
     with pytest.raises(ValidationError):
         ProcessingParameters(
-            curve_points=[
-                {"x": 0, "y": 0},
-                {"x": 128, "y": 100},
-                {"x": 128, "y": 200},
-                {"x": 255, "y": 255},
-            ]
+            **{
+                field: [
+                    {"x": 0, "y": 0},
+                    {"x": 128, "y": 100},
+                    {"x": 128, "y": 200},
+                    {"x": 255, "y": 255},
+                ]
+            }
         )
 
 

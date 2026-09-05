@@ -84,6 +84,9 @@ export interface ProcessingParameters {
   tint: number;
   depthShiftIntensity: number;
   curvePoints: CurvePoint[];
+  redCurvePoints: CurvePoint[];
+  greenCurvePoints: CurvePoint[];
+  blueCurvePoints: CurvePoint[];
 }
 
 export const DEFAULT_PARAMETERS: ProcessingParameters = {
@@ -110,10 +113,27 @@ export const DEFAULT_PARAMETERS: ProcessingParameters = {
   tint: 0,
   depthShiftIntensity: 0,
   curvePoints: [], // empty = no curve (identity); the editor shows DEFAULT_CURVE_POINTS instead
+  redCurvePoints: [],
+  greenCurvePoints: [],
+  blueCurvePoints: [],
 };
 
-/** Numeric parameters driven by the slider panel (everything but `geometry` / `curvePoints`). */
-export type SliderParameterKey = Exclude<keyof ProcessingParameters, 'geometry' | 'curvePoints'>;
+/** Curve fields, keyed by the channel the ToneCurveEditor tab selector edits. */
+export const CURVE_CHANNELS = ['rgb', 'red', 'green', 'blue'] as const;
+export type CurveChannel = (typeof CURVE_CHANNELS)[number];
+
+export const CURVE_CHANNEL_FIELD: Record<CurveChannel, keyof ProcessingParameters> = {
+  rgb: 'curvePoints',
+  red: 'redCurvePoints',
+  green: 'greenCurvePoints',
+  blue: 'blueCurvePoints',
+};
+
+/** Numeric parameters driven by the slider panel (everything but geometry / curve fields). */
+export type SliderParameterKey = Exclude<
+  keyof ProcessingParameters,
+  'geometry' | 'curvePoints' | 'redCurvePoints' | 'greenCurvePoints' | 'blueCurvePoints'
+>;
 
 export interface ParameterBound {
   key: SliderParameterKey;
@@ -255,8 +275,6 @@ export interface AppSettings {
   astrodexCallbackUrls: string[];
   astrodexMaxRetries: number;
   astrodexRetryDelaySeconds: number;
-  denoiseEnableMl: boolean;
-  depthDetectionMethod: 'gradient' | 'ml';
   stackingEnabled: boolean;
   stackingMaxFrames: number;
   stackingDetector: 'orb' | 'sift';

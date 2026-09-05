@@ -79,20 +79,33 @@ class ProcessingParameters(BaseModel):
     tint: int = Field(default=0, ge=-50, le=50)
     depth_shift_intensity: int = Field(default=0, ge=-100, le=100)
     curve_points: list[CurvePoint] = Field(default_factory=list)
+    red_curve_points: list[CurvePoint] = Field(default_factory=list)
+    green_curve_points: list[CurvePoint] = Field(default_factory=list)
+    blue_curve_points: list[CurvePoint] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _curve_points_valid(self) -> ProcessingParameters:
-        """Empty means "identity, no curve"; otherwise a full 0-255 function."""
-        points = self.curve_points
-        if not points:
-            return self
-        if len(points) < _MIN_CURVE_POINTS:
-            raise ValueError("curve_points needs at least 2 points, or none for no curve")
-        if points[0].x != _LEVEL_MIN or points[-1].x != _LEVEL_MAX:
-            raise ValueError("curve_points must start at x=0 and end at x=255")
-        xs = [p.x for p in points]
-        if xs != sorted(xs) or len(set(xs)) != len(xs):
-            raise ValueError("curve_points must have strictly increasing x values")
+        """Empty means "identity, no curve"; otherwise a full 0-255 function.
+
+        Same rule for the master curve and each per-channel colour curve (see
+        ``docs/ALGORITHMS.md`` "Tone curve" / "Colour curves").
+        """
+        for field_name in (
+            "curve_points",
+            "red_curve_points",
+            "green_curve_points",
+            "blue_curve_points",
+        ):
+            points: list[CurvePoint] = getattr(self, field_name)
+            if not points:
+                continue
+            if len(points) < _MIN_CURVE_POINTS:
+                raise ValueError(f"{field_name} needs at least 2 points, or none for no curve")
+            if points[0].x != _LEVEL_MIN or points[-1].x != _LEVEL_MAX:
+                raise ValueError(f"{field_name} must start at x=0 and end at x=255")
+            xs = [p.x for p in points]
+            if xs != sorted(xs) or len(set(xs)) != len(xs):
+                raise ValueError(f"{field_name} must have strictly increasing x values")
         return self
 
 

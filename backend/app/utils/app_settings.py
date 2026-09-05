@@ -63,10 +63,6 @@ class AppSettings(BaseModel):
     astrodex_max_retries: int = Field(default=3, ge=1, le=10)
     astrodex_retry_delay_seconds: float = Field(default=5.0, ge=0, le=60)
 
-    # Processing
-    denoise_enable_ml: bool = False
-    depth_detection_method: str = "gradient"  # gradient | ml
-
     # Stacking (v1.1+)
     stacking_enabled: bool = True
     stacking_max_frames: int = Field(default=100, ge=2, le=1000)

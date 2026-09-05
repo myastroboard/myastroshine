@@ -26,7 +26,7 @@ from app.models import (
 )
 from app.utils import image_utils
 from app.utils.rate_limit import get_client_ip
-from app.utils.validators import validate_upload_size
+from app.utils.validators import validate_image_extension, validate_upload_size
 
 logger = get_logger(__name__)
 
@@ -76,7 +76,9 @@ async def upload_frame(
     """Upload a single frame into an open stacking session."""
     data = await file.read()
     validate_upload_size(len(data))
-    image = image_utils.decode_image(data)
+    if file.filename:
+        validate_image_extension(file.filename)
+    image = image_utils.decode_image(data, file.filename)
 
     record = stacking.add_frame(stack_id, frame_index, image)
     return UploadFrameResponse(

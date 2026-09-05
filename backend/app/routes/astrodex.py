@@ -48,7 +48,7 @@ async def receive_from_astrodex(
     if not data:
         raise UnsupportedImageError("Empty image upload")
     validate_upload_size(len(data))
-    decoded = image_utils.decode_image(data)
+    decoded = image_utils.decode_image(data, image.filename)
 
     link = dispatch.receive_image(
         token=token,

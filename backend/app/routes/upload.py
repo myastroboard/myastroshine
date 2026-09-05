@@ -40,7 +40,7 @@ async def upload_image(
     if file.filename:
         validate_image_extension(file.filename)
 
-    image = image_utils.decode_image(data)
+    image = image_utils.decode_image(data, file.filename)
     height, width = image.shape[:2]
 
     record = sessions.create_session(image_path="", original_filename=file.filename)

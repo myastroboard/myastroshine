@@ -284,6 +284,36 @@ class ImageProcessingService:
         lut = curve_points_to_lut([(point.x, point.y) for point in curve_points])
         return cast("np.ndarray", cv2.LUT(image, lut))
 
+    def apply_channel_curves(
+        self,
+        image: np.ndarray,
+        red_curve_points: list[CurvePoint],
+        green_curve_points: list[CurvePoint],
+        blue_curve_points: list[CurvePoint],
+    ) -> np.ndarray:
+        """Apply an independent tone curve to each of R/G/B (colour grading).
+
+        Unlike :meth:`apply_tone_curve` (one curve applied identically to
+        every channel), each channel gets its own curve here - for a colour
+        cast at one specific tonal range that a single white-balance gain
+        can't reach (e.g. a slightly green background sky only in the
+        midtones), or deliberate creative grading (blue into the shadows,
+        warm into the highlights). Runs after the master tone curve, so a
+        curve is a fine-tuning layer on top of it, same relationship as the
+        master curve has with the basic tone sliders. Any channel left empty
+        (identity) is skipped independently of the others.
+        """
+        if not (red_curve_points or green_curve_points or blue_curve_points):
+            return image
+        blue, green, red = cv2.split(image)
+        if blue_curve_points:
+            blue = cv2.LUT(blue, curve_points_to_lut([(p.x, p.y) for p in blue_curve_points]))
+        if green_curve_points:
+            green = cv2.LUT(green, curve_points_to_lut([(p.x, p.y) for p in green_curve_points]))
+        if red_curve_points:
+            red = cv2.LUT(red, curve_points_to_lut([(p.x, p.y) for p in red_curve_points]))
+        return cast("np.ndarray", cv2.merge([blue, green, red]))
+
     def apply_saturation(self, image: np.ndarray, saturation: float) -> np.ndarray:
         """Scale the HSV saturation channel (0.0..2.0)."""
         if _unchanged(saturation, 1.0):
@@ -448,6 +478,12 @@ class ImageProcessingService:
                 lambda r: self.apply_whites_blacks(r, params.whites, params.blacks),
             ),
             ("tone_curve", lambda r: self.apply_tone_curve(r, params.curve_points)),
+            (
+                "channel_curves",
+                lambda r: self.apply_channel_curves(
+                    r, params.red_curve_points, params.green_curve_points, params.blue_curve_points
+                ),
+            ),
             ("saturation", lambda r: self.apply_saturation(r, params.saturation)),
             ("vibrance", lambda r: self.apply_vibrance(r, params.vibrance)),
             ("clarity", lambda r: self.apply_clarity(r, params.clarity)),
