@@ -1,3 +1,4 @@
+import { useTranslation } from '@/hooks/useTranslation';
 import type { StackSettings as StackSettingsValue } from '@/types';
 
 export interface StackSettingsProps {
@@ -7,10 +8,11 @@ export interface StackSettingsProps {
 
 /** Stacking configuration panel: alignment, combination, rejection (v1.1+). */
 export function StackSettings({ settings, onChange }: StackSettingsProps) {
+  const { t } = useTranslation();
   return (
     <div className="panel flex flex-col gap-4">
       <label className="flex flex-col gap-1.5">
-        <span className="label">Alignment</span>
+        <span className="label">{t('stacking.settings.alignment_label')}</span>
         <select
           className="field"
           value={settings.registrationMethod}
@@ -21,13 +23,13 @@ export function StackSettings({ settings, onChange }: StackSettingsProps) {
             })
           }
         >
-          <option value="orb">ORB (fast)</option>
-          <option value="sift">SIFT (accurate)</option>
+          <option value="orb">{t('stacking.settings.orb_option')}</option>
+          <option value="sift">{t('stacking.settings.sift_option')}</option>
         </select>
       </label>
 
       <label className="flex flex-col gap-1.5">
-        <span className="label">Combination</span>
+        <span className="label">{t('stacking.combination_label')}</span>
         <select
           className="field"
           value={settings.combinationMethod}
@@ -38,14 +40,14 @@ export function StackSettings({ settings, onChange }: StackSettingsProps) {
             })
           }
         >
-          <option value="median">Median</option>
-          <option value="mean">Mean</option>
-          <option value="sigma_clip">Sigma-clip</option>
+          <option value="median">{t('stacking.settings.median_option')}</option>
+          <option value="mean">{t('stacking.settings.mean_option')}</option>
+          <option value="sigma_clip">{t('stacking.settings.sigma_clip_option')}</option>
         </select>
       </label>
 
       <label className="flex items-center justify-between gap-2 text-sm text-muted">
-        Cosmic ray rejection
+        {t('stacking.cosmic_ray_rejection_label')}
         <input
           type="checkbox"
           className="size-4 accent-accent"
@@ -55,7 +57,7 @@ export function StackSettings({ settings, onChange }: StackSettingsProps) {
       </label>
 
       <label className="flex items-center justify-between gap-2 text-sm text-muted">
-        Background normalization
+        {t('stacking.background_normalization_label')}
         <input
           type="checkbox"
           className="size-4 accent-accent"

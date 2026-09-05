@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState, type PointerEvent } from 'react';
 
+import { useTranslation } from '@/hooks/useTranslation';
 import { DEFAULT_GEOMETRY, type Dimensions, type GeometryParameters } from '@/types';
 
 export interface CropToolProps {
@@ -29,10 +30,11 @@ const CORNERS: HandleId[] = ['nw', 'ne', 'se', 'sw'];
 const EDGES: HandleId[] = ['n', 'e', 's', 'w'];
 const MIN_FRAC = 0.08;
 
-/** Displayed-aspect presets. `null` = free. */
-const RATIOS: { label: string; value: number | null }[] = [
-  { label: 'Free', value: null },
-  { label: 'Original', value: 0 }, // 0 => use the image's own ratio
+/** Displayed-aspect presets. `null` = free. Ratio labels are numeric, so only
+ * "Free" and "Original" carry a translation key. */
+const RATIOS: { label: string; translationKey?: string; value: number | null }[] = [
+  { label: 'Free', translationKey: 'crop_tool.free', value: null },
+  { label: 'Original', translationKey: 'crop_tool.original', value: 0 }, // 0 => use the image's own ratio
   { label: '1:1', value: 1 },
   { label: '16:9', value: 16 / 9 },
   { label: '3:2', value: 3 / 2 },
@@ -46,6 +48,7 @@ function clamp(value: number, lo: number, hi: number): number {
 
 /** iPhone-style crop / straighten / rotate / flip tool. */
 export function CropTool({ imageUrl, dimensions, geometry, onDone, onCancel }: CropToolProps) {
+  const { t } = useTranslation();
   const [geom, setGeom] = useState<GeometryParameters>(geometry);
   const [ratioFrac, setRatioFrac] = useState<number | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -133,11 +136,11 @@ export function CropTool({ imageUrl, dimensions, geometry, onDone, onCancel }: C
     <div className="fixed inset-0 z-50 flex flex-col bg-canvas/95 backdrop-blur-sm">
       <div className="flex items-center justify-between border-b border-hairline px-4 py-3 sm:px-6">
         <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel}>
-          Cancel
+          {t('common.cancel')}
         </button>
-        <span className="eyebrow">Crop &amp; rotate</span>
+        <span className="eyebrow">{t('crop_tool.title')}</span>
         <button type="button" className="btn btn-primary btn-sm" onClick={() => onDone(geom)}>
-          Done
+          {t('crop_tool.done')}
         </button>
       </div>
 
@@ -152,7 +155,7 @@ export function CropTool({ imageUrl, dimensions, geometry, onDone, onCancel }: C
         >
           <img
             src={imageUrl}
-            alt="Crop source"
+            alt={t('crop_tool.crop_source_alt')}
             draggable={false}
             className="pointer-events-none absolute left-1/2 top-1/2"
             style={{ width: imgBox.w, height: imgBox.h, objectFit: 'fill', transform }}
@@ -210,7 +213,9 @@ export function CropTool({ imageUrl, dimensions, geometry, onDone, onCancel }: C
 
       <div className="flex flex-col gap-4 border-t border-hairline px-4 py-4 sm:px-6">
         <label className="flex items-center gap-3 text-xs">
-          <span className="w-20 uppercase tracking-wide text-faint">Straighten</span>
+          <span className="w-20 uppercase tracking-wide text-faint">
+            {t('crop_tool.straighten_label')}
+          </span>
           <input
             type="range"
             className="slider flex-1"
@@ -218,7 +223,7 @@ export function CropTool({ imageUrl, dimensions, geometry, onDone, onCancel }: C
             max={45}
             step={0.1}
             value={geom.straighten}
-            aria-label="Straighten"
+            aria-label={t('crop_tool.straighten_label')}
             onChange={(e) => setGeom((g) => ({ ...g, straighten: Number(e.target.value) }))}
           />
           <span className="w-12 text-right tabular-nums">{geom.straighten.toFixed(1)}&deg;</span>
@@ -226,7 +231,7 @@ export function CropTool({ imageUrl, dimensions, geometry, onDone, onCancel }: C
 
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" className="btn btn-outline btn-sm" onClick={rotate90}>
-            Rotate 90&deg;
+            {t('crop_tool.rotate_90')}
           </button>
           <button
             type="button"
@@ -240,7 +245,7 @@ export function CropTool({ imageUrl, dimensions, geometry, onDone, onCancel }: C
               }))
             }
           >
-            Flip H
+            {t('crop_tool.flip_h')}
           </button>
           <button
             type="button"
@@ -254,7 +259,7 @@ export function CropTool({ imageUrl, dimensions, geometry, onDone, onCancel }: C
               }))
             }
           >
-            Flip V
+            {t('crop_tool.flip_v')}
           </button>
           <button
             type="button"
@@ -264,7 +269,7 @@ export function CropTool({ imageUrl, dimensions, geometry, onDone, onCancel }: C
               setRatioFrac(null);
             }}
           >
-            Reset
+            {t('common.reset')}
           </button>
         </div>
 
@@ -283,7 +288,7 @@ export function CropTool({ imageUrl, dimensions, geometry, onDone, onCancel }: C
                 aria-pressed={active}
                 onClick={() => fitRatio(r.value)}
               >
-                {r.label}
+                {r.translationKey ? t(r.translationKey) : r.label}
               </button>
             );
           })}

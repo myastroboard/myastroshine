@@ -1,5 +1,6 @@
 import { useStackProcessing } from '@/hooks/useStackProcessing';
 import { useStackSettings } from '@/hooks/useStackSettings';
+import { useTranslation } from '@/hooks/useTranslation';
 import { apiClient } from '@/services/api';
 
 import { StackProgress } from './StackProgress';
@@ -14,6 +15,7 @@ export interface StackViewProps {
 
 /** Multi-frame stacking workflow: upload -> configure -> process -> results. */
 export function StackView({ onEnhanceComposite }: StackViewProps) {
+  const { t } = useTranslation();
   const { settings, setSettings } = useStackSettings();
   const { frames, addFiles, run, result, phase, progress, error } = useStackProcessing(settings);
 
@@ -51,7 +53,7 @@ export function StackView({ onEnhanceComposite }: StackViewProps) {
 
       <aside className="flex flex-col gap-4">
         <section className="flex flex-col gap-2.5">
-          <h2 className="eyebrow">Stack settings</h2>
+          <h2 className="eyebrow">{t('stacking.view.settings_heading')}</h2>
           <StackSettings settings={settings} onChange={setSettings} />
         </section>
         <button
@@ -60,12 +62,11 @@ export function StackView({ onEnhanceComposite }: StackViewProps) {
           disabled={!canStart}
           onClick={() => void run()}
         >
-          {busy ? 'Stacking...' : `Stack ${frames.length || ''} frames`}
+          {busy
+            ? t('stacking.view.stacking_button')
+            : t('stacking.view.stack_n_frames', { count: frames.length || '' })}
         </button>
-        <p className="text-xs text-faint">
-          Upload at least 2 similar frames (JPEG, PNG or TIFF). More frames raise the signal-to-noise
-          ratio by roughly the square root of the frame count.
-        </p>
+        <p className="text-xs text-faint">{t('stacking.view.hint')}</p>
         {error && (
           <p className="rounded-md border border-danger/30 bg-danger-wash px-3 py-2 text-xs text-danger">
             {error}

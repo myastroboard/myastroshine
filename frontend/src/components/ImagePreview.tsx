@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState, type PointerEvent } from 'react';
 
 import { HistogramDisplay } from '@/components/HistogramDisplay';
+import { useTranslation } from '@/hooks/useTranslation';
 import type { FocusPoint, HistogramData, StarSourceInfo } from '@/types';
 
 export interface ImagePreviewProps {
@@ -42,6 +43,7 @@ export function ImagePreview({
   onFocalPointPick,
   onClearFocalPoint,
 }: ImagePreviewProps) {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const [splitPercent, setSplitPercent] = useState(50);
   const [dragging, setDragging] = useState(false);
@@ -114,14 +116,14 @@ export function ImagePreview({
         >
           <img
             src={processedUrl}
-            alt="Processed"
+            alt={t('image_preview.processed_alt')}
             draggable={false}
             className="pointer-events-none absolute inset-0 h-full w-full object-contain"
           />
           {/* Same box as the processed image; clip-path reveals only the left split. */}
           <img
             src={originalUrl}
-            alt="Original"
+            alt={t('image_preview.original_alt')}
             draggable={false}
             className="pointer-events-none absolute inset-0 h-full w-full object-contain"
             style={{ clipPath: `inset(0 ${100 - splitPercent}% 0 0)` }}
@@ -166,7 +168,7 @@ export function ImagePreview({
 
         {pickingFocalPoint && (
           <div className="pointer-events-none absolute inset-x-0 top-3 z-10 mx-auto w-fit rounded bg-black/70 px-3 py-1 text-xs font-medium text-white/90 backdrop-blur-sm">
-            Click the image to set the focal point
+            {t('image_preview.click_to_set_focal_point')}
           </div>
         )}
 
@@ -192,7 +194,7 @@ export function ImagePreview({
         </div>
 
         <div className="pointer-events-none absolute left-3 top-3 rounded bg-black/55 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/70 backdrop-blur-sm">
-          Before / After
+          {t('image_preview.before_after')}
         </div>
 
         <div
@@ -202,7 +204,7 @@ export function ImagePreview({
           <button
             type="button"
             className="grid h-6 w-6 place-items-center rounded transition-colors hover:bg-white/10 disabled:opacity-40"
-            aria-label="Zoom out"
+            aria-label={t('image_preview.zoom_out')}
             disabled={zoom <= MIN_ZOOM}
             onClick={() => changeZoom(-ZOOM_STEP)}
           >
@@ -213,7 +215,7 @@ export function ImagePreview({
           <button
             type="button"
             className="min-w-[3rem] rounded px-1 py-1 text-xs tabular-nums transition-colors hover:bg-white/10"
-            aria-label="Reset zoom"
+            aria-label={t('image_preview.reset_zoom')}
             onClick={() => setZoom(1)}
           >
             {Math.round(zoom * 100)}%
@@ -221,7 +223,7 @@ export function ImagePreview({
           <button
             type="button"
             className="grid h-6 w-6 place-items-center rounded transition-colors hover:bg-white/10 disabled:opacity-40"
-            aria-label="Zoom in"
+            aria-label={t('image_preview.zoom_in')}
             disabled={zoom >= MAX_ZOOM}
             onClick={() => changeZoom(ZOOM_STEP)}
           >
@@ -235,7 +237,7 @@ export function ImagePreview({
           <div className="pointer-events-none absolute inset-0 grid place-items-center bg-black/45 backdrop-blur-[1px]">
             <span className="flex items-center gap-2 text-xs font-medium text-white/85">
               <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/25 border-t-white/80" />
-              Processing
+              {t('image_preview.processing')}
             </span>
           </div>
         )}
@@ -255,7 +257,7 @@ export function ImagePreview({
               className="btn btn-ghost btn-sm"
               onClick={onDepthShiftClick}
             >
-              Open Depth Shift viewer
+              {t('image_preview.open_depth_shift')}
             </button>
           )}
           {onTogglePickFocalPoint && (
@@ -265,15 +267,15 @@ export function ImagePreview({
               onClick={onTogglePickFocalPoint}
             >
               {pickingFocalPoint
-                ? 'Cancel'
+                ? t('common.cancel')
                 : focalPoint
-                  ? 'Change focal point'
-                  : 'Set focal point'}
+                  ? t('image_preview.change_focal_point')
+                  : t('image_preview.set_focal_point')}
             </button>
           )}
           {focalPoint && !pickingFocalPoint && onClearFocalPoint && (
             <button type="button" className="btn btn-ghost btn-sm" onClick={onClearFocalPoint}>
-              Clear focal point
+              {t('image_preview.clear_focal_point')}
             </button>
           )}
         </div>

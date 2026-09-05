@@ -50,6 +50,15 @@ jobs:
       - run: npm run build
       - run: npm audit --audit-level=high
 
+  i18n:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - run: python scripts/validate_i18n.py
+
   e2e:
     runs-on: ubuntu-latest
     steps:

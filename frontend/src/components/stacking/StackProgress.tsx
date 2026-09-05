@@ -1,3 +1,5 @@
+import { useTranslation } from '@/hooks/useTranslation';
+
 export interface StackProgressProps {
   /** Overall completion, 0-100. */
   percent: number;
@@ -5,15 +7,16 @@ export interface StackProgressProps {
   currentStep: string;
 }
 
-const PIPELINE: { key: string; label: string }[] = [
-  { key: 'registration', label: 'Registration' },
-  { key: 'background_normalization', label: 'Background normalization' },
-  { key: 'cosmic_ray_rejection', label: 'Cosmic ray rejection' },
-  { key: 'combination', label: 'Combination' },
+const PIPELINE: { key: string; translationKey: string }[] = [
+  { key: 'registration', translationKey: 'stacking.registration_label' },
+  { key: 'background_normalization', translationKey: 'stacking.background_normalization_label' },
+  { key: 'cosmic_ray_rejection', translationKey: 'stacking.cosmic_ray_rejection_label' },
+  { key: 'combination', translationKey: 'stacking.combination_label' },
 ];
 
 /** Step-by-step stacking progress display (v1.1+). */
 export function StackProgress({ percent, currentStep }: StackProgressProps) {
+  const { t } = useTranslation();
   const activeIndex = PIPELINE.findIndex((step) => step.key === currentStep);
   const done = currentStep === 'done';
 
@@ -21,7 +24,7 @@ export function StackProgress({ percent, currentStep }: StackProgressProps) {
     <div className="panel flex flex-col gap-4">
       <div className="flex flex-col gap-2">
         <span className="flex items-baseline justify-between">
-          <span className="eyebrow">Stacking</span>
+          <span className="eyebrow">{t('stacking.progress.heading')}</span>
           <span className="text-xs tabular-nums text-faint">{percent}%</span>
         </span>
         <span className="h-1 overflow-hidden rounded-full bg-line">
@@ -48,7 +51,9 @@ export function StackProgress({ percent, currentStep }: StackProgressProps) {
                       : 'h-1.5 w-1.5 rounded-full bg-line-strong'
                 }
               />
-              <span className={state === 'pending' ? 'text-ghost' : 'text-muted'}>{step.label}</span>
+              <span className={state === 'pending' ? 'text-ghost' : 'text-muted'}>
+                {t(step.translationKey)}
+              </span>
             </li>
           );
         })}
