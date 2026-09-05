@@ -59,6 +59,8 @@ export interface ProcessingParameters {
   vibrance: number;
   denoise: number;
   starReduction: number;
+  starSensitivity: number;
+  starMaxSize: number;
   sharpness: number;
   temperature: number;
   tint: number;
@@ -76,6 +78,8 @@ export const DEFAULT_PARAMETERS: ProcessingParameters = {
   vibrance: 1.0,
   denoise: 0,
   starReduction: 0,
+  starSensitivity: 50,
+  starMaxSize: 30,
   sharpness: 1.0,
   temperature: 6500,
   tint: 0,
@@ -159,6 +163,24 @@ export const PARAMETER_BOUNDS: ParameterBound[] = [
     step: 1,
     group: 'star',
     hint: 'Shrinks and dims star points so faint nebulosity stands out more.',
+  },
+  {
+    key: 'starSensitivity',
+    label: 'Star sensitivity',
+    min: 0,
+    max: 100,
+    step: 1,
+    group: 'star',
+    hint: 'How faint a point can be and still count as a star. Higher finds more, fainter stars.',
+  },
+  {
+    key: 'starMaxSize',
+    label: 'Star max size',
+    min: 0,
+    max: 100,
+    step: 1,
+    group: 'star',
+    hint: "Caps how large a bright spot can be and still count as a star, so bright cores aren't shrunk.",
   },
   {
     key: 'sharpness',
@@ -361,6 +383,20 @@ export interface DepthShiftResult {
   depthMapUrl: string;
   depthLayers: DepthLayerInfo[];
   statistics: DepthStatistics;
+}
+
+// --- Star mask preview -------------------------------------------------------
+
+export interface StarSourceInfo {
+  x: number; // fraction (0-1) of the analysed image's width
+  y: number; // fraction (0-1) of the analysed image's height
+  radius: number; // fraction (0-1) of the analysed image's longest side
+}
+
+export interface StarMaskResult {
+  sessionId: string;
+  sourceCount: number;
+  stars: StarSourceInfo[];
 }
 
 // --- Stacking (v1.1) ---------------------------------------------------------

@@ -85,6 +85,9 @@ class StorageService:
     def load_processed(self, session_id: str) -> np.ndarray:
         return image_utils.load_image(self.processed_path(session_id))
 
+    def load_preview(self, session_id: str) -> np.ndarray:
+        return image_utils.load_image(self.preview_path(session_id))
+
     # -- depth artifacts -------------------------------------------------
 
     def save_depth(self, session_id: str, depth_map: np.ndarray, layers: list[np.ndarray]) -> None:

@@ -32,6 +32,8 @@ _WIRE = {
     "vibrance": 1.1,
     "denoise": 30,
     "star_reduction": 20,
+    "star_sensitivity": 65,
+    "star_max_size": 40,
     "sharpness": 1.2,
     "temperature": 5500,
     "tint": 5,

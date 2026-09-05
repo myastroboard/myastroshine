@@ -57,4 +57,30 @@ describe('SliderPanel', () => {
     expect(screen.getByLabelText('Contrast')).toBeDisabled();
     expect(screen.getByLabelText('Denoise')).toBeDisabled();
   });
+
+  it('omits the star mask toggle when no handler is given', () => {
+    render(
+      <SliderPanel parameters={DEFAULT_PARAMETERS} onParameterChange={vi.fn()} onReset={vi.fn()} />,
+    );
+
+    expect(screen.queryByText('Show star mask')).not.toBeInTheDocument();
+  });
+
+  it('reports the star mask toggle and shows the detected source count', () => {
+    const onStarMaskToggle = vi.fn();
+    render(
+      <SliderPanel
+        parameters={DEFAULT_PARAMETERS}
+        onParameterChange={vi.fn()}
+        onReset={vi.fn()}
+        starMaskEnabled
+        onStarMaskToggle={onStarMaskToggle}
+        starMaskSourceCount={42}
+      />,
+    );
+
+    expect(screen.getByText('42 sources')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: /show star mask/i }));
+    expect(onStarMaskToggle).toHaveBeenCalledWith(false);
+  });
 });

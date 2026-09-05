@@ -25,6 +25,8 @@ from app.services.job import JobService
 from app.services.preset import PresetService
 from app.services.session import SessionService
 from app.services.stacking import StackingService
+from app.services.star_detection import StarDetectionService
+from app.services.star_mask import StarMaskService
 from app.services.storage import StorageService
 from app.services.token import TokenService
 from app.utils.rate_limit import enforce_request_rate_limit
@@ -75,9 +77,14 @@ def get_depth_shift_service(sessions: SessionServiceDep, storage: StorageDep) ->
     return DepthShiftService(sessions, storage, DepthMapService())
 
 
+def get_star_mask_service(sessions: SessionServiceDep, storage: StorageDep) -> StarMaskService:
+    return StarMaskService(sessions, storage, StarDetectionService())
+
+
 EnhancementServiceDep = Annotated[EnhancementService, Depends(get_enhancement_service)]
 PresetServiceDep = Annotated[PresetService, Depends(get_preset_service)]
 DepthShiftServiceDep = Annotated[DepthShiftService, Depends(get_depth_shift_service)]
+StarMaskServiceDep = Annotated[StarMaskService, Depends(get_star_mask_service)]
 
 
 def get_token_service(db: DbSession) -> TokenService:

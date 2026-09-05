@@ -25,8 +25,8 @@ Common codes: `INVALID_PARAMETER` (400), `UNAUTHORIZED` (401), `FORBIDDEN` (403)
 
 ## Rate Limiting
 
-Per IP, on `/upload`, `/process/{id}`, `/presets/{id}/apply/{session_id}`, and
-`/stack/*`:
+Per IP, on `/upload`, `/process/{id}`, `/presets/{id}/apply/{session_id}`,
+`/star-mask/{id}`, and `/stack/*`:
 
 - **Requests per minute** (`rate_limit_per_minute`, default **120**, not the
   API spec's original 10 - the editor re-processes on every slider change,
@@ -69,6 +69,7 @@ Celery job queue (`PROCESSING_MODE=queue`), and the progress WebSockets.
 | GET | `/depth-shift/{session_id}/metadata` | Depth statistics + layer URLs | 4 |
 | GET | `/depth-shift/{session_id}/depth_map` | Depth map as a grayscale PNG | 4 |
 | GET | `/depth-shift/{session_id}/layer_{index}` | Single BGRA layer PNG | 4 |
+| POST | `/star-mask/{session_id}` | Detect stars in the preview image for a mask overlay | v0.2 |
 | GET | `/tokens` | List webhook tokens (metadata only) | 4 |
 | POST | `/tokens` | Create a webhook token (raw value shown once) | 4 |
 | DELETE | `/tokens/{token_id}` | Revoke a token | 4 |
@@ -97,6 +98,8 @@ Celery job queue (`PROCESSING_MODE=queue`), and the progress WebSockets.
 | vibrance | 0.0 | 2.0 | 1.0 | float |
 | denoise | 0 | 100 | 0 | int |
 | star_reduction | 0 | 100 | 0 | int |
+| star_sensitivity | 0 | 100 | 50 | int |
+| star_max_size | 0 | 100 | 30 | int |
 | sharpness | 0.0 | 2.0 | 1.0 | float |
 | temperature | 2000 | 8000 | 6500 | int (Kelvin) |
 | tint | -50 | 50 | 0 | int |
@@ -193,6 +196,30 @@ Layers are ordered far (index 0, shifts most in the parallax) to near. Each
 `/layer_{index}` is a BGRA PNG (transparent outside its depth band);
 `/depth_map` is a grayscale PNG. `GET /depth-shift/{id}/metadata` reports
 `depth_map_generated` and, once generated, the statistics and layer URLs.
+
+## Star mask
+
+`POST /star-mask/{session_id}` takes `{ sensitivity?, max_size? }` (both 0-100,
+defaults 50 / 30, same semantics as the `star_sensitivity` / `star_max_size`
+processing parameters) and returns:
+
+```json
+{
+  "session_id": "...",
+  "source_count": 42,
+  "stars": [
+    { "x": 0.42, "y": 0.13, "radius": 0.006 }
+  ]
+}
+```
+
+Detection runs against the session's cached **preview** image (not the
+full-resolution result), so the mask stays fast enough to recompute on every
+slider change while the frontend's mask overlay is on - it's a preview aid, not
+the exact set of stars the full-resolution `star_reduction` stage will shrink,
+though both share the same detector. `x` / `y` / `radius` are fractions (0-1)
+of the preview image's width / height / longest side, so the frontend can
+position an overlay without needing the image's pixel dimensions.
 
 ## Webhook tokens
 

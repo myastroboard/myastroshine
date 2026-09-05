@@ -115,6 +115,63 @@ def test_star_reduction_dims_stars_more_than_the_object(
     assert object_after >= object_before * 0.9
 
 
+def test_star_reduction_sensitivity_gates_faint_points(
+    service: ImageProcessingService,
+) -> None:
+    """A strict threshold shrinks only the obvious star; a loose one catches the faint one too."""
+    image = np.zeros((200, 200, 3), dtype=np.uint8)
+    cv2.circle(image, (100, 100), 3, (255, 255, 255), -1)  # obvious star
+    cv2.circle(image, (30, 30), 2, (70, 70, 70), -1)  # faint star
+    before = image.astype(int)
+
+    def _changed(out: np.ndarray, cy: int, cx: int) -> bool:
+        window = slice(cy - 4, cy + 5), slice(cx - 4, cx + 5)
+        return bool(np.abs(out.astype(int)[window] - before[window]).sum() > 0)
+
+    strict = service.apply_star_reduction(image, 80, sensitivity=0, max_size=30)
+    loose = service.apply_star_reduction(image, 80, sensitivity=95, max_size=30)
+
+    assert _changed(strict, 100, 100)  # the obvious star is always shrunk
+    assert not _changed(strict, 30, 30)  # too faint for a strict threshold
+    assert _changed(loose, 30, 30)  # a looser threshold catches it too
+
+
+def test_star_reduction_leaves_untouched_pixels_far_from_any_star(
+    service: ImageProcessingService,
+) -> None:
+    """Only the star's own footprint is blended; the rest of the frame is exact."""
+    image = np.zeros((200, 200, 3), dtype=np.uint8)
+    image[:, :] = (40, 40, 45)  # a flat, dim "sky" background
+    cv2.circle(image, (100, 100), 3, (255, 255, 255), -1)
+
+    out = service.apply_star_reduction(image, 80, sensitivity=70, max_size=30)
+
+    corner = out[5:15, 5:15]
+    assert np.array_equal(corner, image[5:15, 5:15])
+
+
+def test_star_reduction_fades_into_background_not_black(
+    service: ImageProcessingService,
+) -> None:
+    """Regression: a fully-shrunk star must fade to its local background, not black.
+
+    An earlier version blended toward a darkened, eroded copy; for a small
+    isolated star, erosion's local-minimum fill crushed straight to near-zero
+    regardless of the actual surrounding colour, showing up as a visible black
+    dot at full strength. The fix (`cv2.inpaint`) fills from the real
+    neighbouring pixels, so the result must land near the background colour.
+    """
+    image = np.zeros((200, 200, 3), dtype=np.uint8)
+    image[:, :] = (90, 90, 100)  # a lit, mid-tone "sky" - not near-black itself
+    cv2.circle(image, (100, 100), 3, (255, 255, 255), -1)
+
+    out = service.apply_star_reduction(image, 100, sensitivity=70, max_size=30)
+
+    center = out[100, 100].astype(int)
+    background = np.array([90, 90, 100])
+    assert np.abs(center - background).max() < 30, f"star center faded to {center}, not background"
+
+
 def test_geometry_default_is_identity(
     service: ImageProcessingService, sample_image: np.ndarray
 ) -> None:
