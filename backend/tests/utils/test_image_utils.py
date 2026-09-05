@@ -84,6 +84,20 @@ def test_decode_fits_mono_auto_stretches() -> None:
     assert 40 < int(np.median(image)) < 90
 
 
+def test_decode_fits_tolerates_nan_blank_pixels() -> None:
+    """NaN/blank pixels (registered-stack edges, dead pixels) don't blank the frame."""
+    rng = np.random.default_rng(7)
+    data = rng.normal(500, 20, size=(40, 60)).astype(np.float32)
+    data[10, 10] = 40000
+    data[0:3, 0:3] = np.nan  # a blank corner
+
+    image = image_utils.decode_image(_fits_bytes(data), "frame.fits")
+
+    assert image.dtype == np.uint8
+    assert int(image[:, :, 0].max()) > 0  # not an all-black plane
+    assert int(image[20:, 20:, 0].mean()) > 10  # real signal survived the stretch
+
+
 def test_decode_fits_rgb_planes_map_to_correct_bgr_channels() -> None:
     """A (3, H, W) FITS cube is read as R/G/B planes and reordered to BGR."""
     background = np.full((12, 12), 500.0, dtype=np.float32)

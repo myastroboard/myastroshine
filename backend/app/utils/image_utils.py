@@ -48,6 +48,7 @@ _MONO_NDIM = 2
 _RGB_CUBE_NDIM = 3
 _RGB_PLANE_COUNT = 3
 _BGRA_CHANNEL_COUNT = 4
+_GRAY_ALPHA_CHANNEL_COUNT = 2
 
 
 def _midtone_transfer(x: np.ndarray, m: float) -> np.ndarray:
@@ -74,7 +75,11 @@ def _auto_stretch_to_uint8(data: np.ndarray) -> np.ndarray:
     if high <= low:
         return np.zeros(data.shape, dtype=np.uint8)
 
-    normalized = np.clip((data.astype(np.float64) - low) / (high - low), 0, 1)
+    # nan_to_num after the clip: blank/masked pixels (FITS BLANK, the NaN edges
+    # of a registered stack, dead pixels) map to black rather than poisoning the
+    # median / MAD / background below - a single NaN there is NaN, which would
+    # otherwise cascade and blank the whole plane. (clip already bounds +/-inf.)
+    normalized = np.nan_to_num(np.clip((data.astype(np.float64) - low) / (high - low), 0, 1))
     median = float(np.median(normalized))
     sigma = float(np.median(np.abs(normalized - median))) * _MAD_TO_SIGMA
     black_point = max(0.0, median - _STRETCH_SHADOW_CLIP_SIGMA * sigma)
@@ -178,6 +183,11 @@ def _to_bgr_uint8(decoded: np.ndarray) -> np.ndarray:
         return cv2.cvtColor(decoded, cv2.COLOR_GRAY2BGR)
     if decoded.shape[2] == _BGRA_CHANNEL_COUNT:
         return cv2.cvtColor(decoded, cv2.COLOR_BGRA2BGR)
+    if decoded.shape[2] <= _GRAY_ALPHA_CHANNEL_COUNT:
+        # 1 channel (some decoders keep the trailing axis) or gray+alpha: use the
+        # luminance plane, drop any alpha. Without this a 2-channel decode would
+        # fall through and be returned as a non-BGR array.
+        return cv2.cvtColor(np.ascontiguousarray(decoded[..., 0]), cv2.COLOR_GRAY2BGR)
     return decoded
 
 
