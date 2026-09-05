@@ -174,14 +174,18 @@ class ImageProcessingService:
         detection) rather than a single image-wide mask, so only genuine
         compact bright points are touched - diffuse nebulosity is never
         dimmed, unlike the old global top-hat blend. Inside each star's own
-        soft-edged footprint, the image is blended toward a `cv2.inpaint`
-        reconstruction - a seamless fill sampled from the real surrounding
-        background/nebulosity - so star disks fade into their surroundings
-        rather than the darkened-erosion fill this replaced, which crushed
-        small isolated stars to a visible black dot (erosion takes the local
-        minimum; for a star on a dark sky that minimum is near-zero, and
-        darkening it further only made it worse). ``amount``: 0 = off .. 100 =
-        strong. ``sensitivity`` / ``max_size`` (0-100) tune what counts as a
+        soft-edged footprint, the image is blended toward an eroded, slightly
+        darkened copy of itself - erosion genuinely shrinks the bright disc
+        while keeping the star's own colour and texture, unlike a flat
+        `cv2.inpaint` fill (an earlier version), which produced oversized,
+        textureless pale blobs instead of a smaller star. The eroded fill is
+        floored at :meth:`StarDetectionService.local_background` (the image
+        with stars morphologically opened away) so it can never crush below
+        what the real surrounding sky/nebulosity looks like - erosion alone
+        can push a small isolated star toward its darkest neighbour, which
+        for a star on a dark sky is near-zero, and was a visible black dot at
+        full strength before this floor was added. ``amount``: 0 = off .. 100
+        = strong. ``sensitivity`` / ``max_size`` (0-100) tune what counts as a
         star; see :meth:`StarDetectionService.detect`.
         """
         if amount <= 0:
@@ -193,24 +197,26 @@ class ImageProcessingService:
             return image
 
         height, width = image.shape[:2]
-        star_mask = np.zeros((height, width), dtype=np.uint8)
+        star_mask = np.zeros((height, width), dtype=np.float32)
         for star in stars:
             cv2.circle(
                 star_mask,
                 (round(star.x), round(star.y)),
                 max(1, round(star.radius * _STAR_FALLOFF_MARGIN)),
-                255,
+                1.0,
                 thickness=-1,
             )
-        inpainted = cv2.inpaint(image, star_mask, 3, cv2.INPAINT_TELEA)
+        star_mask = cast("np.ndarray", cv2.GaussianBlur(star_mask, (0, 0), sigmaX=1.2))
+        weight = np.clip(star_mask * (0.4 + 0.6 * strength), 0.0, 1.0)[:, :, np.newaxis]
 
-        mask = cast(
-            "np.ndarray",
-            cv2.GaussianBlur(star_mask.astype(np.float32) / 255.0, (0, 0), sigmaX=1.2),
-        )
-        weight = np.clip(mask * (0.4 + 0.6 * strength), 0.0, 1.0)[:, :, np.newaxis]
+        small = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+        eroded = cv2.erode(image, small, iterations=1 + round(strength * 3)).astype(np.float32)
+        eroded *= 1.0 - 0.6 * strength
 
-        blended = image.astype(np.float32) * (1.0 - weight) + inpainted.astype(np.float32) * weight
+        local_background = self._star_detector.local_background(image, max_size).astype(np.float32)
+        reduced = np.maximum(eroded, local_background)
+
+        blended = image.astype(np.float32) * (1.0 - weight) + reduced * weight
         return to_uint8(blended)
 
     def apply_sharpness(self, image: np.ndarray, sharpness: float) -> np.ndarray:

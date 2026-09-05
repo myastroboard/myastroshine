@@ -1,5 +1,6 @@
 """Pydantic request/response models for the MyAstroShine API."""
 
+from app.models.auto_astro import AutoAstroResponse
 from app.models.depth_shift import (
     DepthLayerInfo,
     DepthMetadataResponse,
@@ -42,6 +43,7 @@ from app.models.token import (
 __all__ = [
     "AppSettingsResponse",
     "AppSettingsUpdate",
+    "AutoAstroResponse",
     "CreateTokenRequest",
     "CreatedTokenResponse",
     "DepthLayerInfo",

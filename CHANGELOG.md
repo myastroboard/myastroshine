@@ -10,14 +10,28 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Star reduction rebuilt on per-star detection (`StarDetectionService`, a
   thresholded top-hat + `cv2.connectedComponentsWithStats`, at native
-  resolution) instead of a single image-wide top-hat mask, so only genuine
-  stars are shrunk and diffuse nebulosity is never dimmed. Each star fades
-  into a `cv2.inpaint`-reconstructed local background rather than a darkened
-  copy, so full-strength reduction doesn't leave black dots. New
-  `star_sensitivity` / `star_max_size` parameters tune what counts as a star.
+  resolution, robust to ordinary sensor/JPEG noise) instead of a single
+  image-wide top-hat mask, so only genuine stars are shrunk and diffuse
+  nebulosity is never dimmed. Each star shrinks via erosion floored at its
+  own local background, so it can't crush to a black dot or bloat into a flat
+  pale disc at full strength. New `star_sensitivity` / `star_max_size`
+  parameters tune what counts as a star.
 - Star mask preview: `POST /api/star-mask/{session_id}` reports detected star
   positions for a live "N sources detected" overlay in the editor, toggled from
   the Stars panel.
+- Auto Astro: a one-click "Auto Astro" button (`POST /api/auto-astro/{session_id}`)
+  analyses the image's histogram and star density and applies a computed
+  starting parameter set - crushing the background for depth/separation from
+  the DSO, and a gentle, log-scaled star reduction that stays a sensible
+  starting point across both sparse frames and busy deep-stacked fields -
+  in place of manually dialing in every slider.
+- Editor UX: the adjustment sliders are now 5 named, collapsible sections
+  (Light/Colour/Detail/Stars/Depth) with a per-section reset and help text,
+  instead of 7 flat, always-open, technically-named groups. A dedicated
+  Export panel holds Download/Send to AstroDex next to the preview. A
+  focal-point picker on the preview (click to set) now actually drives where
+  the Depth Shift parallax centers - `focus_point` was accepted by the API
+  before this but never used.
 
 ## [0.1.0] - 2026-09-04
 

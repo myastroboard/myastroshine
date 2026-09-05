@@ -7,33 +7,59 @@ backend (MiDaS) is planned for v0.2. See docs/ALGORITHMS.md.
 
 from __future__ import annotations
 
+import math
 from typing import cast
 
 import cv2
 import numpy as np
 
 from app.logging_config import get_logger
-from app.models import DepthStatistics
+from app.models import DepthStatistics, FocusPoint
 from app.utils.math_utils import normalize_01, to_uint8
 
 logger = get_logger(__name__)
 
 _NEAR_THRESHOLD = 200  # depth values above this count as "near / detailed"
 _COLOR_NDIM = 3
+# Equal parts detail-based and position-based depth when a focus point is
+# given - a first-pass constant, like other heuristics this session, to
+# revisit if real testing shows the parallax centering too strong/weak.
+_FOCUS_BLEND_WEIGHT = 0.5
 
 
 class DepthMapService:
     """Estimates a rough depth map and slices it into parallax layers."""
 
-    def estimate_depth(self, image: np.ndarray) -> np.ndarray:
-        """Return a single-channel 0-255 depth map (0 = far, 255 = near)."""
+    def estimate_depth(
+        self, image: np.ndarray, focus_point: FocusPoint | None = None
+    ) -> np.ndarray:
+        """Return a single-channel 0-255 depth map (0 = far, 255 = near).
+
+        With no ``focus_point``, depth is purely gradient/edge-based (detail
+        reads as near) - unchanged from before this parameter existed. With
+        one, a radial field centered on it (near at the point, far at the
+        image's corners) is blended in, so the chosen point - not just
+        whatever happens to be detailed - reads as "near" in the parallax.
+        """
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if image.ndim == _COLOR_NDIM else image
 
         sobel_x = np.asarray(cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=5), dtype=np.float64)
         sobel_y = np.asarray(cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=5), dtype=np.float64)
         magnitude = np.sqrt(sobel_x**2 + sobel_y**2)
+        gradient_depth = normalize_01(magnitude)
 
-        depth = to_uint8(normalize_01(magnitude) * 255.0)
+        if focus_point is not None:
+            height, width = gray.shape[:2]
+            yy, xx = np.mgrid[0:height, 0:width]
+            focus_x, focus_y = focus_point.x * width, focus_point.y * height
+            max_dist = math.hypot(width, height) / 2
+            dist = np.sqrt((xx - focus_x) ** 2 + (yy - focus_y) ** 2)
+            radial = 1.0 - np.clip(dist / max_dist, 0.0, 1.0)
+            gradient_depth = (
+                1.0 - _FOCUS_BLEND_WEIGHT
+            ) * gradient_depth + _FOCUS_BLEND_WEIGHT * radial
+
+        depth = to_uint8(gradient_depth * 255.0)
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
         closed = cv2.morphologyEx(depth, cv2.MORPH_CLOSE, kernel)
         return cast("np.ndarray", cv2.GaussianBlur(closed, (21, 21), 0))

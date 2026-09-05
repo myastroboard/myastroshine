@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from app.models import FocusPoint
 from app.services.depth_map import DepthMapService
 
 
@@ -66,6 +67,26 @@ def test_depth_statistics(service: DepthMapService, edged_image: np.ndarray) -> 
     stats = service.depth_statistics(depth)
     assert 0 <= stats.min_depth <= stats.mean_depth <= stats.max_depth <= 255
     assert 0.0 <= stats.bright_areas_percent <= 100.0
+
+
+def test_no_focus_point_is_unchanged(service: DepthMapService, edged_image: np.ndarray) -> None:
+    """Omitting focus_point (the default) matches passing it explicitly as None."""
+    assert np.array_equal(
+        service.estimate_depth(edged_image),
+        service.estimate_depth(edged_image, None),
+    )
+
+
+def test_focus_point_pulls_depth_toward_the_chosen_corner(
+    service: DepthMapService, edged_image: np.ndarray
+) -> None:
+    """A focus point reads as near even in an otherwise flat, far region."""
+    near_corner = FocusPoint(x=0.05, y=0.05)  # top-left, far from the bright square
+    depth = service.estimate_depth(edged_image, near_corner)
+
+    top_left = depth[:10, :10].mean()
+    bottom_right = depth[-10:, -10:].mean()
+    assert top_left > bottom_right
 
 
 def test_layer_depth_range() -> None:

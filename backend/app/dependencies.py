@@ -17,6 +17,7 @@ from app.db.models import WebhookToken
 from app.exceptions import ForbiddenError, UnauthorizedError
 from app.services.astrodex_dispatch import AstroDexDispatch
 from app.services.astrodex_integration import AstroDexService
+from app.services.auto_astro import AutoAstroService
 from app.services.depth_map import DepthMapService
 from app.services.depth_shift import DepthShiftService
 from app.services.enhancement import EnhancementService
@@ -81,10 +82,15 @@ def get_star_mask_service(sessions: SessionServiceDep, storage: StorageDep) -> S
     return StarMaskService(sessions, storage, StarDetectionService())
 
 
+def get_auto_astro_service() -> AutoAstroService:
+    return AutoAstroService(StarDetectionService())
+
+
 EnhancementServiceDep = Annotated[EnhancementService, Depends(get_enhancement_service)]
 PresetServiceDep = Annotated[PresetService, Depends(get_preset_service)]
 DepthShiftServiceDep = Annotated[DepthShiftService, Depends(get_depth_shift_service)]
 StarMaskServiceDep = Annotated[StarMaskService, Depends(get_star_mask_service)]
+AutoAstroServiceDep = Annotated[AutoAstroService, Depends(get_auto_astro_service)]
 
 
 def get_token_service(db: DbSession) -> TokenService:

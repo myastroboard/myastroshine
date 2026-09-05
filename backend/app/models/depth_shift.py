@@ -16,7 +16,11 @@ class DepthShiftRequest(BaseModel):
     """Body of ``POST /api/depth-shift/{session_id}``."""
 
     intensity: int = Field(default=50, ge=0, le=100)
-    focus_point: FocusPoint = Field(default_factory=FocusPoint)
+    # None (the default) means "no focal point chosen" - purely gradient-based
+    # depth, unchanged from before this field did anything. (0.5, 0.5) is a
+    # real, deliberately-picked center and must stay distinguishable from
+    # "not set", so this can't default to a concrete FocusPoint.
+    focus_point: FocusPoint | None = None
     num_layers: int = Field(default=7, ge=2, le=12)
 
 

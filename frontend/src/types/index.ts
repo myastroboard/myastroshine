@@ -95,7 +95,7 @@ export interface ParameterBound {
   min: number;
   max: number;
   step: number;
-  group: 'basic' | 'tone' | 'noise' | 'star' | 'sharp' | 'color' | 'depth';
+  group: 'light' | 'colour' | 'detail' | 'star' | 'depth';
   /** Shown in a hover/focus tooltip next to the label. */
   hint: string;
 }
@@ -107,7 +107,7 @@ export const PARAMETER_BOUNDS: ParameterBound[] = [
     min: 0.5,
     max: 3.0,
     step: 0.01,
-    group: 'basic',
+    group: 'light',
     hint: "Stretches the tonal range around the image's midpoint, separating faint detail from bright.",
   },
   {
@@ -116,7 +116,7 @@ export const PARAMETER_BOUNDS: ParameterBound[] = [
     min: -1.0,
     max: 1.0,
     step: 0.01,
-    group: 'basic',
+    group: 'light',
     hint: 'Shifts overall luminance up or down.',
   },
   {
@@ -125,7 +125,7 @@ export const PARAMETER_BOUNDS: ParameterBound[] = [
     min: -1.0,
     max: 1.0,
     step: 0.01,
-    group: 'tone',
+    group: 'light',
     hint: 'Recovers or boosts bright detail - weighted toward the brightest pixels only.',
   },
   {
@@ -134,7 +134,7 @@ export const PARAMETER_BOUNDS: ParameterBound[] = [
     min: -1.0,
     max: 1.0,
     step: 0.01,
-    group: 'tone',
+    group: 'light',
     hint: 'Lifts or deepens dark detail - weighted toward the darkest pixels only.',
   },
   {
@@ -143,7 +143,7 @@ export const PARAMETER_BOUNDS: ParameterBound[] = [
     min: -1.0,
     max: 1.0,
     step: 0.01,
-    group: 'tone',
+    group: 'detail',
     hint: 'Local contrast via unsharp masking. Negative values soften instead.',
   },
   {
@@ -152,7 +152,7 @@ export const PARAMETER_BOUNDS: ParameterBound[] = [
     min: 0,
     max: 100,
     step: 1,
-    group: 'noise',
+    group: 'detail',
     hint: 'Edge-preserving smoothing. Higher trades fine detail for a cleaner background.',
   },
   {
@@ -188,7 +188,7 @@ export const PARAMETER_BOUNDS: ParameterBound[] = [
     min: 0.0,
     max: 2.0,
     step: 0.01,
-    group: 'sharp',
+    group: 'detail',
     hint: 'Blurs below 100%, sharpens above via edge enhancement.',
   },
   {
@@ -197,7 +197,7 @@ export const PARAMETER_BOUNDS: ParameterBound[] = [
     min: 0.0,
     max: 2.0,
     step: 0.01,
-    group: 'sharp',
+    group: 'colour',
     hint: 'Boosts saturation, weighted toward already-muted colours so vivid areas stay natural.',
   },
   {
@@ -206,7 +206,7 @@ export const PARAMETER_BOUNDS: ParameterBound[] = [
     min: 0.0,
     max: 2.0,
     step: 0.01,
-    group: 'color',
+    group: 'colour',
     hint: 'Scales colour intensity uniformly across the whole image.',
   },
   {
@@ -215,7 +215,7 @@ export const PARAMETER_BOUNDS: ParameterBound[] = [
     min: 2000,
     max: 8000,
     step: 50,
-    group: 'color',
+    group: 'colour',
     hint: 'White balance: cooler (blue) toward 2000K, warmer (amber) toward 8000K.',
   },
   {
@@ -224,7 +224,7 @@ export const PARAMETER_BOUNDS: ParameterBound[] = [
     min: -50,
     max: 50,
     step: 1,
-    group: 'color',
+    group: 'colour',
     hint: 'White balance: shifts the colour cast between green and magenta.',
   },
   {
@@ -264,6 +264,11 @@ export interface ProcessResponse {
   previewUrl: string;
   estimatedTimeSeconds: number;
   wsStatusUrl: string;
+}
+
+/** Same shape as {@link ProcessResponse} plus the computed parameters. */
+export interface AutoAstroResult extends ProcessResponse {
+  parameters: ProcessingParameters;
 }
 
 /**
@@ -362,6 +367,12 @@ export interface LogTail {
 }
 
 // --- Depth shift -----------------------------------------------------------
+
+/** Normalised (0-1) point in image space, e.g. where Depth Shift centers. */
+export interface FocusPoint {
+  x: number;
+  y: number;
+}
 
 export interface DepthLayerInfo {
   layerId: number;

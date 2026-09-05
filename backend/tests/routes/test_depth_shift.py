@@ -64,3 +64,13 @@ def test_num_layers_out_of_range_is_400(client, sample_jpeg: bytes) -> None:
     session_id = _upload(client, sample_jpeg)
     response = client.post(f"/api/depth-shift/{session_id}", json={"num_layers": 99})
     assert response.status_code == 400
+
+
+def test_generate_accepts_a_focus_point(client, sample_jpeg: bytes) -> None:
+    session_id = _upload(client, sample_jpeg)
+    response = client.post(
+        f"/api/depth-shift/{session_id}",
+        json={"num_layers": 4, "focus_point": {"x": 0.2, "y": 0.8}},
+    )
+    assert response.status_code == 200
+    assert response.json()["num_layers"] == 4

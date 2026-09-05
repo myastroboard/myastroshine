@@ -88,6 +88,22 @@ export function useImageProcessing(sessionId: string) {
     void applyParameters(DEFAULT_PARAMETERS);
   }, [applyParameters]);
 
+  /** Reset just the given parameters (e.g. one section's sliders) to default. */
+  const resetKeys = useCallback(
+    (keys: SliderParameterKey[]) => {
+      setParameters((prev) => {
+        const next = { ...prev };
+        for (const key of keys) {
+          next[key] = DEFAULT_PARAMETERS[key];
+        }
+        clearTimeout(debounceRef.current);
+        void applyParameters(next);
+        return next;
+      });
+    },
+    [applyParameters],
+  );
+
   /**
    * Sync the sliders to parameters that were already applied elsewhere
    * (e.g. a preset the backend ran) - state only, no processing call.
@@ -109,6 +125,7 @@ export function useImageProcessing(sessionId: string) {
     applyGeometry,
     applyParameters,
     resetParameters,
+    resetKeys,
     syncParameters,
   };
 }

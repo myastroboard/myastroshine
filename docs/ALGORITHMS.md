@@ -39,31 +39,100 @@ Applied in this order to minimize artifacts (`apply_parameters`):
    (higher sensitivity -> lower threshold -> fainter/smaller points register);
    `star_max_size` caps the equivalent radius counted as a star, so bright
    diffuse cores (galaxy nuclei, nebula knots) aren't shrunk as if they were
-   one. Runs at native resolution - an earlier version used
+   one. A small pre-blur (`sigma=0.8`), a minimum region area (2px), and an
+   absolute top-hat floor (12, in raw 0-255 units, on top of the relative
+   threshold above) keep ordinary sensor/JPEG noise from registering as
+   hundreds of fake stars - the relative threshold alone degenerates on a
+   frame with no real point source at all, since a fraction of a small,
+   noisy peak is itself a tiny absolute value. Runs at native resolution - an
+   earlier version used
    `skimage.feature.blob_dog` on a downscaled copy to stay inside the
    performance budget, but the downscale's anti-aliasing routinely erased
    small/faint stars before detection ever saw them (a busy real star field
    visibly under-caught); connected components is a single near-linear pass,
    cheap enough at full 24MP resolution that no downscale is needed. For each
-   detected star, a soft-edged circle (radius
-   `1.6x` the detected radius, Gaussian-feathered) is drawn into a mask *local
-   to that star*; the old implementation built one image-wide mask from the
-   raw top-hat, which is what let it drag down nearby nebulosity and leave
-   halos. The mask is scaled by `0.4 + 0.6 * amount`, and inside it the image
-   is blended toward a `cv2.inpaint` (Telea) reconstruction of each star's
-   footprint - seamlessly filled from the real surrounding background/
-   nebulosity - so star disks fade into their surroundings while the object,
-   and everything not individually detected as a star, is untouched. An
-   earlier version of this blended toward a darkened, eroded copy instead;
-   erosion takes the local minimum, which for a small star on a dark sky
-   crushes straight to near-zero and showed up as a visible black dot at full
-   strength - `cv2.inpaint` doesn't have that failure mode since its fill is
-   always sampled from real neighbouring pixels.
+   detected star, a soft-edged circle (radius `1.6x` the detected radius,
+   Gaussian-feathered) is drawn into a mask *local to that star*; the old
+   implementation built one image-wide mask from the raw top-hat, which is
+   what let it drag down nearby nebulosity and leave halos. The mask is
+   scaled by `0.4 + 0.6 * amount`, and inside it the image is blended toward
+   an eroded (1-4 iterations of a 3x3 ellipse), `1 - 0.6 * amount` darkened
+   copy of itself - erosion genuinely shrinks the bright disc while keeping
+   the star's own colour and local texture. That fill is floored, per pixel,
+   at `StarDetectionService.local_background` (a morphological opening -
+   erosion then dilation - with a kernel sized to the current `max_size`, so
+   it fully removes even the largest star this call can return): the eroded
+   value can never drop below what the real surrounding sky/nebulosity
+   actually looks like there, so a small isolated star can't be crushed to a
+   black dot the way plain erosion+darkening could. A version in between
+   tried blending toward a `cv2.inpaint` (Telea) reconstruction instead
+   (reasoning: it can never go below the real background either); in
+   practice that produced oversized, flat, textureless pale discs on a real
+   photo - worse than the black-dot bug it was meant to fix - because
+   inpainting fills from the mask boundary rather than shrinking the star's
+   own disc in place.
 10. **Sharpness** (0-2) - below 1.0 Gaussian blur, above 1.0 Laplacian-kernel
     sharpen blended by `(sharpness - 1) * 0.5`.
 
 Preview path downscales to 512 px (`preview_max_size`) for instant feedback; the
 full-resolution result is computed on demand or via the job queue.
+
+## Auto Astro (one-click adaptive enhancement)
+
+`AutoAstroService.suggest_parameters(image)` (`app/services/auto_astro.py`)
+analyses the session's original image and proposes a `ProcessingParameters`
+set - deliberately scoped to what histogram/black-point/star-density can
+drive with confidence; everything else stays at its default.
+
+**Tone stretch** (grayscale luminance percentiles, robust to a few hot/cold
+pixels) is deliberately not a single uniform curve: the goal is *separation*
+between the background and the DSO, not just filling the tonal range evenly.
+- `bp = percentile(gray, 0.5)`, `wp = percentile(gray, 99.5)`. If
+  `wp - bp < 10` (a flat/degenerate frame), tone changes are skipped entirely.
+- `contrast = clip(210 / (wp - bp), 0.5, 3.0)` - stretch the real signal range
+  toward filling most (not all - headroom) of 0-255.
+- `brightness` is chosen so the black point, after `apply_contrast`'s own
+  mean-centered formula (`y = (x-mean)*contrast + mean`), settles near a
+  near-black floor (~3) - a crushed background reads as depth, so this isn't
+  protected from crushing the way an early version did (floor ~8, which read
+  as flat/washed-out against a real photo).
+- `highlights = +0.2` (a modest boost to the DSO's own bright detail) unless a
+  meaningful fraction of pixels already clip near white (`>= 250`), in which
+  case it pulls back instead.
+- `shadows = -0.35` (deepens the background) unless the frame is already
+  mostly near-black (`<= 5`) beyond what a typical deep-sky background
+  accounts for, in which case further crushing would just eat real faint
+  signal. `apply_highlights_shadows` weights `shadows` toward the *darkest*
+  pixels only (`shadow_mask = (1 - gray)^2`), so this mostly darkens the empty
+  sky and barely touches the DSO itself - exactly the "highlight the object,
+  darken the background" separation real deep-sky processing aims for, rather
+  than one flat brightness shift.
+- All four values are rounded to 2 decimals before being returned - the raw
+  percentile-derived floats carry a dozen digits of spurious precision that
+  read as broken in the slider UI.
+
+**Star density** (reuses `StarDetectionService.detect` at its default
+`sensitivity=50, max_size=30`): `star_reduction = clip(round(5 *
+log1p(density)), 0, 50)`, where `density` is detected star count per
+megapixel. Log-scaled rather than linear: real star fields span orders of
+magnitude in density (tens/MP for a single short frame, 1000+/MP for a deep
+stack), and a linear mapping saturates at the cap for almost any real busy
+field, defeating "gentle starting point" - a first version (`density * 0.8`)
+hit its cap of 60 on a real ~1000/MP deep-stack photo just as readily as on a
+merely-busy one. Capped at 50 (not 100) regardless - Auto Astro is meant as a
+starting point, not a maxed-out edit.
+
+**A note on very bright stars**: any meaningful contrast stretch pushes
+already-bright pixels further toward clipping, including a photo's brightest
+stars - by the time `star_reduction` runs (after `contrast`/`highlights`/
+`shadows`, see the pipeline order above), a star that was already near-white
+in the original can be a wide, flat, saturated plateau with little gradient
+left for erosion to shrink into. This reads as a small round white disc even
+after reduction - expected for a frame's few brightest "anchor" stars (real
+astro-processing tools leave these visible after reduction too), not a defect
+in the shrink algorithm itself. Actually removing a star regardless of
+brightness is a different, more aggressive operation ("starless", v0.4 on the
+roadmap) than reduction.
 
 ## Depth map (v1, gradient-based)
 
@@ -86,6 +155,18 @@ pixels above 200 (`bright_areas_percent`).
 
 An ML backend (MiDaS / `Intel/dpt-hybrid-midas`) is planned for v0.2 behind
 `DEPTH_DETECTION_METHOD=ml`.
+
+### Focal point
+
+`estimate_depth(image, focus_point=None)` - with no `focus_point`, identical
+to the above. With one (normalised `x`/`y`, 0-1), a radial field centred on
+it is blended into the gradient-normalized depth *before* step 3
+(`gradient_depth = (1-w)*gradient_depth + w*radial`, `w=0.5`): for each pixel,
+`radial = 1 - clip(distance_from_focus_point / (image_diagonal/2), 0, 1)` - 1
+at the chosen point, 0 at the frame's far corners. This is what makes the
+picked point read as "near" in the parallax, not just whatever happens to be
+detailed. `w=0.5` is a first-pass constant, like other heuristics this
+session, to revisit if real testing shows the centering too strong/weak.
 
 ## Stacking (v1.1)
 
