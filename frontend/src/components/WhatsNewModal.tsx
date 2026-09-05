@@ -45,7 +45,7 @@ export function WhatsNewModal({ releaseName, releaseNotes, releaseUrl, onClose }
         </div>
 
         <div className="max-h-[60vh] overflow-y-auto overflow-x-hidden break-words text-sm text-muted [&_a]:text-accent [&_a]:underline [&_code]:whitespace-pre-wrap [&_code]:break-all [&_code]:rounded [&_code]:bg-raised [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs [&_h3]:mt-3 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:text-ink [&_h3]:first:mt-0 [&_h4]:mt-2 [&_h4]:text-sm [&_h4]:font-medium [&_h4]:text-ink [&_li]:ml-4 [&_li]:list-disc [&_p]:mt-2 [&_p]:first:mt-0 [&_ul]:mt-1">
-          <Markdown>{releaseNotes}</Markdown>
+          <Markdown options={{ disableParsingRawHTML: true }}>{releaseNotes}</Markdown>
         </div>
 
         {releaseUrl && (

@@ -127,6 +127,31 @@ async def test_check_for_updates_handles_a_connection_error() -> None:
 
 
 @pytest.mark.asyncio
+async def test_a_transient_failure_is_only_cached_briefly() -> None:
+    """A timeout doesn't suppress the check for the full success TTL - the next
+    call after the short error window retries and can then succeed."""
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise httpx.TimeoutException("timed out")
+        return _release_response("v999.0.0")
+
+    service = VersionCheckService(transport=httpx.MockTransport(handler))
+    first = await service.check_for_updates()
+    assert first["error"] == "Request timed out"
+
+    # jump past the short error TTL but well within the success TTL
+    service._cached_at -= 10 * 60
+    second = await service.check_for_updates()
+
+    assert calls["n"] == 2
+    assert second["error"] is None
+    assert second["update_available"] is True
+
+
+@pytest.mark.asyncio
 async def test_check_for_updates_handles_malformed_response() -> None:
     service = VersionCheckService(
         transport=httpx.MockTransport(lambda _r: httpx.Response(200, json={"unexpected": True}))

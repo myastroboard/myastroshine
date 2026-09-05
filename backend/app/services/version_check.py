@@ -21,6 +21,13 @@ from app.types import JsonDict
 
 logger = get_logger(__name__)
 
+# A failed lookup (timeout, transient network error, malformed body) is cached
+# only briefly - long enough to absorb a burst of requests, short enough that a
+# passing outage doesn't suppress the update notice for the full success TTL.
+# A GitHub 403 rate-limit is the exception: retrying soon would just be rate
+# limited again, so it keeps the full TTL.
+_ERROR_CACHE_TTL_SECONDS = 5 * 60
+
 
 def _is_newer(latest: str, current: str) -> bool:
     """True if ``latest`` parses as a strictly newer version than ``current``."""
@@ -47,13 +54,23 @@ class VersionCheckService:
         """
         now = time.monotonic()
         cache_age = now - self._cached_at
-        if self._cached_result is not None and cache_age < VERSION_CHECK_CACHE_TTL_SECONDS:
+        if self._cached_result is not None and cache_age < self._cache_ttl(self._cached_result):
             return self._cached_result
 
         result = await self._fetch_latest_release()
         self._cached_result = result
         self._cached_at = now
         return result
+
+    @staticmethod
+    def _cache_ttl(result: JsonDict) -> float:
+        """How long ``result`` stays cached: full TTL for a success (or a GitHub
+        rate-limit, where retrying soon is pointless), a short retry window for
+        any other transient failure."""
+        error = result.get("error")
+        if error is None or error == "Rate limit exceeded":
+            return VERSION_CHECK_CACHE_TTL_SECONDS
+        return _ERROR_CACHE_TTL_SECONDS
 
     async def _fetch_latest_release(self) -> JsonDict:
         try:

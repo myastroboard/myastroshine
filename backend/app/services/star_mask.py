@@ -1,8 +1,10 @@
 """StarMaskService - orchestrates the star-mask preview endpoint.
 
-Runs detection against the session's full-resolution *original* image, the
-same input the real `star_reduction` pipeline stage analyses, so the mask
-overlay's "N sources detected" always matches what will actually be shrunk.
+Runs detection against the session's full-resolution *original* image. This is
+a close guide to, but not an exact match for, what `star_reduction` shrinks:
+that pipeline stage runs after geometry (crop/rotate) and the tone stages, so
+with a crop active or a strong tone curve the overlay positions and the
+"N sources detected" count will drift from the final result.
 An earlier version ran this against the downscaled preview image to stay
 fast, back when detection used `skimage.feature.blob_dog`; now that detection
 is a cheap top-hat + `cv2.connectedComponentsWithStats` pass (~140ms even at
