@@ -15,9 +15,14 @@ import cv2
 import numpy as np
 
 from app.logging_config import get_logger
-from app.models import GeometryParameters, ProcessingParameters
+from app.models import CurvePoint, GeometryParameters, ProcessingParameters
 from app.services.star_detection import StarDetectionService
-from app.utils.math_utils import kelvin_to_rgb_gain, tint_to_rgb_gain, to_uint8
+from app.utils.math_utils import (
+    curve_points_to_lut,
+    kelvin_to_rgb_gain,
+    tint_to_rgb_gain,
+    to_uint8,
+)
 
 StepCallback = Callable[[str, int], None]
 
@@ -122,6 +127,18 @@ class ImageProcessingService:
         shadow_mask = np.square(1.0 - gray)[:, :, np.newaxis]
         img = img + highlight_mask * highlights * 0.3 + shadow_mask * shadows * 0.3
         return to_uint8(img * 255.0)
+
+    def apply_tone_curve(self, image: np.ndarray, curve_points: list[CurvePoint]) -> np.ndarray:
+        """Apply a user-drawn tone curve as a 256-entry LUT, identical on each channel.
+
+        ``curve_points`` are ``(x, y)`` 8-bit input/output pairs spanning
+        0-255; empty means no curve (identity). See
+        :func:`app.utils.math_utils.curve_points_to_lut` for the interpolation.
+        """
+        if not curve_points:
+            return image
+        lut = curve_points_to_lut([(point.x, point.y) for point in curve_points])
+        return cast("np.ndarray", cv2.LUT(image, lut))
 
     def apply_saturation(self, image: np.ndarray, saturation: float) -> np.ndarray:
         """Scale the HSV saturation channel (0.0..2.0)."""
@@ -254,6 +271,7 @@ class ImageProcessingService:
                 "highlights_shadows",
                 lambda r: self.apply_highlights_shadows(r, params.highlights, params.shadows),
             ),
+            ("tone_curve", lambda r: self.apply_tone_curve(r, params.curve_points)),
             ("saturation", lambda r: self.apply_saturation(r, params.saturation)),
             ("vibrance", lambda r: self.apply_vibrance(r, params.vibrance)),
             ("clarity", lambda r: self.apply_clarity(r, params.clarity)),

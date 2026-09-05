@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { EditorView } from '@/components/EditorView';
+import { Footer } from '@/components/Footer';
 import { ImageUpload } from '@/components/ImageUpload';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { SettingsView } from '@/components/SettingsView';
 import { StackMode, type EditorMode } from '@/components/stacking/StackMode';
 import { StackView } from '@/components/stacking/StackView';
-import { UpdateBanner } from '@/components/UpdateBanner';
 import { useTranslation } from '@/hooks/useTranslation';
 import { apiClient } from '@/services/api';
 import type { EditorSession } from '@/types';
@@ -77,7 +77,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-40 border-b border-hairline bg-canvas/80 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-[1200px] items-center justify-between px-4 sm:px-6">
           <button
@@ -100,36 +100,35 @@ export default function App() {
             >
               {t('app.nav_settings')}
             </button>
-            <span className="text-xs tabular-nums text-ghost">
-              v{import.meta.env.VITE_APP_VERSION ?? '0.0.0-dev'}
-            </span>
           </div>
         </div>
       </header>
 
-      {route === 'settings' ? (
-        <SettingsView onClose={() => navigate('editor')} />
-      ) : (
-        <main className="mx-auto flex max-w-[1200px] flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
-          {error && (
-            <p className="rounded-md border border-danger/30 bg-danger-wash px-4 py-2.5 text-sm text-danger">
-              {error}
-            </p>
-          )}
+      <div className="flex-1">
+        {route === 'settings' ? (
+          <SettingsView onClose={() => navigate('editor')} />
+        ) : (
+          <main className="mx-auto flex max-w-[1200px] flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
+            {error && (
+              <p className="rounded-md border border-danger/30 bg-danger-wash px-4 py-2.5 text-sm text-danger">
+                {error}
+              </p>
+            )}
 
-          <StackMode mode={mode} onModeChange={setMode} />
+            <StackMode mode={mode} onModeChange={setMode} />
 
-          {mode === 'stack' ? (
-            <StackView onEnhanceComposite={handleEnhanceComposite} />
-          ) : session ? (
-            <EditorView session={session} astrodexContext={astrodexContext} />
-          ) : (
-            <ImageUpload onUpload={handleUpload} isLoading={isUploading} />
-          )}
-        </main>
-      )}
+            {mode === 'stack' ? (
+              <StackView onEnhanceComposite={handleEnhanceComposite} />
+            ) : session ? (
+              <EditorView session={session} astrodexContext={astrodexContext} />
+            ) : (
+              <ImageUpload onUpload={handleUpload} isLoading={isUploading} />
+            )}
+          </main>
+        )}
+      </div>
 
-      <UpdateBanner />
+      <Footer />
     </div>
   );
 }

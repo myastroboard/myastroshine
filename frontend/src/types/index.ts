@@ -48,6 +48,18 @@ export function isDefaultGeometry(geometry: GeometryParameters): boolean {
   );
 }
 
+/** One control point of the tone curve: 8-bit input/output level, both 0-255. */
+export interface CurvePoint {
+  x: number;
+  y: number;
+}
+
+/** The default (and only always-present) curve: a straight identity line. */
+export const DEFAULT_CURVE_POINTS: CurvePoint[] = [
+  { x: 0, y: 0 },
+  { x: 255, y: 255 },
+];
+
 export interface ProcessingParameters {
   geometry: GeometryParameters;
   contrast: number;
@@ -65,6 +77,7 @@ export interface ProcessingParameters {
   temperature: number;
   tint: number;
   depthShiftIntensity: number;
+  curvePoints: CurvePoint[];
 }
 
 export const DEFAULT_PARAMETERS: ProcessingParameters = {
@@ -84,10 +97,11 @@ export const DEFAULT_PARAMETERS: ProcessingParameters = {
   temperature: 6500,
   tint: 0,
   depthShiftIntensity: 0,
+  curvePoints: [], // empty = no curve (identity); the editor shows DEFAULT_CURVE_POINTS instead
 };
 
-/** Numeric parameters driven by the slider panel (everything but `geometry`). */
-export type SliderParameterKey = Exclude<keyof ProcessingParameters, 'geometry'>;
+/** Numeric parameters driven by the slider panel (everything but `geometry` / `curvePoints`). */
+export type SliderParameterKey = Exclude<keyof ProcessingParameters, 'geometry' | 'curvePoints'>;
 
 export interface ParameterBound {
   key: SliderParameterKey;
