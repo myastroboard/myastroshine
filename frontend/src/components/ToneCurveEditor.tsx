@@ -8,6 +8,8 @@ export interface ToneCurveEditorProps {
   /** One curve per channel; empty means "no curve" (identity) for that channel. */
   curves: Record<CurveChannel, CurvePoint[]>;
   onChange: (channel: CurveChannel, points: CurvePoint[]) => void;
+  /** Drop the panel chrome + title row when the host already provides them. */
+  bare?: boolean;
 }
 
 const LEVEL_MAX = 255;
@@ -30,7 +32,7 @@ function clamp(value: number, lo: number, hi: number): number {
  * curves for colour grading. Drag points to reshape, double-click to add or
  * remove one - each tab remembers its own curve.
  */
-export function ToneCurveEditor({ curves, onChange }: ToneCurveEditorProps) {
+export function ToneCurveEditor({ curves, onChange, bare = false }: ToneCurveEditorProps) {
   const { t } = useTranslation();
   const svgRef = useRef<SVGSVGElement>(null);
   const [channel, setChannel] = useState<CurveChannel>('rgb');
@@ -101,13 +103,15 @@ export function ToneCurveEditor({ curves, onChange }: ToneCurveEditorProps) {
   }
 
   return (
-    <div className="panel flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <h2 className="eyebrow">{t('tone_curve.title')}</h2>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={() => emit([])}>
-          {t('common.reset')}
-        </button>
-      </div>
+    <div className={bare ? 'flex flex-col gap-3' : 'panel flex flex-col gap-3'}>
+      {!bare && (
+        <div className="flex items-center justify-between">
+          <h2 className="eyebrow">{t('tone_curve.title')}</h2>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => emit([])}>
+            {t('common.reset')}
+          </button>
+        </div>
+      )}
       <div className="flex gap-1" role="tablist" aria-label={t('tone_curve.channel_tabs_aria_label')}>
         {CURVE_CHANNELS.map((entry) => (
           <button

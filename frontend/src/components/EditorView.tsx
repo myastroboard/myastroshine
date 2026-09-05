@@ -1,13 +1,10 @@
 import { useEffect, useState } from 'react';
 
-import { CropTool } from '@/components/CropTool';
 import { DepthShiftViewer } from '@/components/DepthShiftViewer';
-import { ExportPanel } from '@/components/ExportPanel';
+import { EditorInspector } from '@/components/EditorInspector';
+import { EditorRail } from '@/components/EditorRail';
 import { ImagePreview } from '@/components/ImagePreview';
-import { PresetButtons } from '@/components/PresetButtons';
 import { SavePresetDialog } from '@/components/SavePresetDialog';
-import { SliderPanel } from '@/components/SliderPanel';
-import { ToneCurveEditor } from '@/components/ToneCurveEditor';
 import { useAutoAstro } from '@/hooks/useAutoAstro';
 import { useDepthShift } from '@/hooks/useDepthShift';
 import { useImageProcessing } from '@/hooks/useImageProcessing';
@@ -16,12 +13,15 @@ import { useStarMask } from '@/hooks/useStarMask';
 import { useTranslation } from '@/hooks/useTranslation';
 import { apiClient } from '@/services/api';
 import {
+  DEFAULT_GEOMETRY,
   DEFAULT_PARAMETERS,
+  geometryEquals,
   isDefaultGeometry,
   type CurveChannel,
   type CurvePoint,
   type Dimensions,
   type EditorSession,
+  type EditorStepId,
   type FocusPoint,
   type GeometryParameters,
   type SliderParameterKey,
@@ -49,7 +49,7 @@ function displayedAspect(dimensions: Dimensions | undefined, geometry: GeometryP
   return width / height;
 }
 
-/** Main editing surface: preview + parameter panel + actions. */
+/** Main editing surface: workflow rail + step inspector + persistent preview. */
 export function EditorView({ session, astrodexContext }: EditorViewProps) {
   const { t } = useTranslation();
   const {
@@ -60,6 +60,7 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
     updateChannelCurve,
     applyGeometry,
     resetParameters,
+    resetCurves,
     resetKeys,
     syncParameters,
   } = useImageProcessing(session.sessionId);
@@ -69,13 +70,23 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
   const starMask = useStarMask(session.sessionId);
   const autoAstro = useAutoAstro(session.sessionId);
   const { detect: detectStars } = starMask;
+
+  const [activeStep, setActiveStep] = useState<EditorStepId>('start');
   const [showDepthViewer, setShowDepthViewer] = useState(false);
   const [showSavePreset, setShowSavePreset] = useState(false);
-  const [showCrop, setShowCrop] = useState(false);
   const [presetVersion, setPresetVersion] = useState(0);
   const [starMaskEnabled, setStarMaskEnabled] = useState(false);
   const [focalPoint, setFocalPoint] = useState<FocusPoint | null>(null);
   const [pickingFocalPoint, setPickingFocalPoint] = useState(false);
+  const [framingGeom, setFramingGeom] = useState<GeometryParameters>(parameters.geometry);
+  const [framingRatioFrac, setFramingRatioFrac] = useState<number | null>(null);
+
+  // Keep the framing draft in step with geometry applied elsewhere (a preset,
+  // Auto Astro, or a global reset). Draft-only edits don't change the reference,
+  // so this doesn't clobber an in-progress crop.
+  useEffect(() => {
+    setFramingGeom(parameters.geometry);
+  }, [parameters.geometry]);
 
   function handleStarMaskToggle(enabled: boolean): void {
     setStarMaskEnabled(enabled);
@@ -98,6 +109,10 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
     return () => clearTimeout(timeout);
   }, [starMaskEnabled, parameters.starSensitivity, parameters.starMaxSize, detectStars]);
 
+  const framingAvailable = Boolean(session.dimensions);
+  const framingDirty = !geometryEquals(framingGeom, parameters.geometry);
+  const framingActive = activeStep === 'frame' && framingAvailable;
+
   const geometryChanged = !isDefaultGeometry(parameters.geometry);
   const aspectRatio = displayedAspect(session.dimensions, parameters.geometry);
   const version = previewVersion + presetVersion;
@@ -106,11 +121,43 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
     : apiClient.previewUrl(session.sessionId, { original: true });
   const processedUrl = apiClient.previewUrl(session.sessionId, { full: true, v: version });
 
+  function handleStepChange(next: EditorStepId): void {
+    // Leaving the Framing step with an uncommitted crop commits it.
+    if (activeStep === 'frame' && next !== 'frame' && framingDirty) {
+      applyGeometry(framingGeom);
+      setPresetVersion((v) => v + 1);
+    }
+    if (activeStep === 'depth' && next !== 'depth') {
+      setPickingFocalPoint(false);
+    }
+    setActiveStep(next);
+  }
+
+  function handleFramingApply(): void {
+    applyGeometry(framingGeom);
+    setPresetVersion((v) => v + 1);
+  }
+
+  function handleFramingReset(): void {
+    setFramingGeom(DEFAULT_GEOMETRY);
+    setFramingRatioFrac(null);
+    if (!isDefaultGeometry(parameters.geometry)) {
+      applyGeometry(DEFAULT_GEOMETRY);
+      setPresetVersion((v) => v + 1);
+    }
+  }
+
   async function handlePresetApply(presetId: string): Promise<void> {
     await applyPreset(presetId);
     const preset = presets.find((entry) => entry.presetId === presetId);
     if (preset) {
-      syncParameters({ ...DEFAULT_PARAMETERS, ...preset.parameters });
+      // A preset is a look, not a composition - keep the current framing
+      // (the backend's preset-apply route preserves geometry the same way).
+      syncParameters({
+        ...DEFAULT_PARAMETERS,
+        ...preset.parameters,
+        geometry: parameters.geometry,
+      });
     }
     setPresetVersion((v) => v + 1);
   }
@@ -119,7 +166,12 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
     clearActivePreset();
     const result = await autoAstro.apply();
     if (result) {
-      syncParameters({ ...DEFAULT_PARAMETERS, ...result.parameters });
+      // Auto Astro proposes tone/star settings only - carry the framing over.
+      syncParameters({
+        ...DEFAULT_PARAMETERS,
+        ...result.parameters,
+        geometry: parameters.geometry,
+      });
       setPresetVersion((v) => v + 1);
     }
   }
@@ -129,7 +181,7 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
     updateParameter(key, value);
   }
 
-  function handleReset(): void {
+  function handleResetAll(): void {
     clearActivePreset();
     resetParameters();
   }
@@ -137,6 +189,11 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
   function handleResetSection(keys: SliderParameterKey[]): void {
     clearActivePreset();
     resetKeys(keys);
+  }
+
+  function handleResetCurves(): void {
+    clearActivePreset();
+    resetCurves();
   }
 
   function handleCurveChange(channel: CurveChannel, points: CurvePoint[]): void {
@@ -157,10 +214,11 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
     void depthShift.generate(7);
   }
 
-  function handleCropDone(geometry: GeometryParameters): void {
-    setShowCrop(false);
-    applyGeometry(geometry);
-    setPresetVersion((v) => v + 1);
+  function handleOpenDepthViewer(): void {
+    if (depthShift.layerUrls.length === 0) {
+      void depthShift.generate(7, focalPoint ?? undefined);
+    }
+    setShowDepthViewer(true);
   }
 
   async function handleDownload(): Promise<void> {
@@ -185,28 +243,93 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
     );
   }
 
+  const isProcessing = status === 'processing';
+
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-      <div className="flex flex-col gap-5">
+    <div className="grid gap-5 lg:grid-cols-[10.5rem_19rem_minmax(0,1fr)] lg:items-start">
+      <EditorRail
+        activeStep={activeStep}
+        onStepChange={handleStepChange}
+        parameters={parameters}
+        focalPoint={focalPoint}
+      />
+
+      <EditorInspector
+        activeStep={activeStep}
+        onStepChange={handleStepChange}
+        parameters={parameters}
+        onParameterChange={handleParameterChange}
+        onResetSection={handleResetSection}
+        onCurveChange={handleCurveChange}
+        onResetCurves={handleResetCurves}
+        isProcessing={isProcessing}
+        start={{
+          onAutoAstro: () => void handleAutoAstro(),
+          autoAstroLoading: autoAstro.isLoading,
+          autoAstroError: autoAstro.error,
+          presets,
+          activePreset,
+          onPresetApply: (id) => void handlePresetApply(id),
+          onPresetDelete: (id) => void deletePreset(id).catch(() => undefined),
+          onResetAll: handleResetAll,
+        }}
+        framing={{
+          available: framingAvailable,
+          dimensions: session.dimensions ?? { width: 0, height: 0 },
+          geometry: framingGeom,
+          ratioFrac: framingRatioFrac,
+          dirty: framingDirty,
+          onGeometryChange: setFramingGeom,
+          onRatioFracChange: setFramingRatioFrac,
+          onApply: handleFramingApply,
+          onReset: handleFramingReset,
+        }}
+        stars={{
+          enabled: starMaskEnabled,
+          onToggle: handleStarMaskToggle,
+          sourceCount: starMask.sourceCount,
+          loading: starMask.isLoading,
+        }}
+        depth={{
+          focalPoint,
+          picking: pickingFocalPoint,
+          onTogglePick: () => setPickingFocalPoint((picking) => !picking),
+          onClear: handleClearFocalPoint,
+          onOpenViewer: handleOpenDepthViewer,
+          error: depthShift.error,
+        }}
+        exportActions={{
+          canSendToAstroDex: Boolean(astrodexContext),
+          onDownload: () => void handleDownload(),
+          onSendToAstroDex: handleSendToAstroDex,
+          onSaveAsPreset: () => setShowSavePreset(true),
+        }}
+      />
+
+      <div className="flex flex-col gap-4 lg:sticky lg:top-20 lg:self-start">
         <ImagePreview
           originalUrl={originalUrl}
           processedUrl={processedUrl}
           histogram={session.histogram}
           aspectRatio={aspectRatio}
-          isLoading={status === 'processing'}
-          starMaskOverlay={starMaskEnabled ? starMask.stars : null}
-          focalPoint={focalPoint}
-          pickingFocalPoint={pickingFocalPoint}
-          onTogglePickFocalPoint={() => setPickingFocalPoint((picking) => !picking)}
+          isLoading={isProcessing}
+          framing={
+            framingActive && session.dimensions
+              ? {
+                  imageUrl: apiClient.previewUrl(session.sessionId, { original: true }),
+                  dimensions: session.dimensions,
+                  geometry: framingGeom,
+                  ratioFrac: framingRatioFrac,
+                  onGeometryChange: setFramingGeom,
+                }
+              : null
+          }
+          starMaskOverlay={starMaskEnabled && !framingActive ? starMask.stars : null}
+          focalPoint={framingActive ? null : focalPoint}
+          pickingFocalPoint={activeStep === 'depth' && pickingFocalPoint}
           onFocalPointPick={handleFocalPointPick}
-          onClearFocalPoint={handleClearFocalPoint}
-          onDepthShiftClick={() => {
-            if (depthShift.layerUrls.length === 0) {
-              void depthShift.generate(7, focalPoint ?? undefined);
-            }
-            setShowDepthViewer(true);
-          }}
         />
+
         {showDepthViewer && (
           <div className="flex flex-col gap-2">
             {depthShift.error ? (
@@ -228,33 +351,7 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
             )}
           </div>
         )}
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className={`btn btn-sm ${geometryChanged ? 'btn-primary' : 'btn-outline'}`}
-            disabled={!session.dimensions || status === 'processing'}
-            onClick={() => setShowCrop(true)}
-          >
-            {t('crop_tool.title')}
-          </button>
-        </div>
-        <ExportPanel
-          isProcessing={status === 'processing'}
-          canSendToAstroDex={Boolean(astrodexContext)}
-          onDownload={() => void handleDownload()}
-          onSendToAstroDex={handleSendToAstroDex}
-        />
       </div>
-
-      {showCrop && session.dimensions && (
-        <CropTool
-          imageUrl={apiClient.previewUrl(session.sessionId, { original: true })}
-          dimensions={session.dimensions}
-          geometry={parameters.geometry}
-          onDone={handleCropDone}
-          onCancel={() => setShowCrop(false)}
-        />
-      )}
 
       {showSavePreset && (
         <SavePresetDialog
@@ -262,59 +359,6 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
           onClose={() => setShowSavePreset(false)}
         />
       )}
-
-      <aside className="flex flex-col gap-5">
-        <section className="flex flex-col gap-2.5">
-          <h2 className="eyebrow">{t('editor.presets_heading')}</h2>
-          <button
-            type="button"
-            className="btn btn-primary btn-sm w-full"
-            disabled={status === 'processing' || autoAstro.isLoading}
-            onClick={() => void handleAutoAstro()}
-          >
-            {autoAstro.isLoading ? t('editor.auto_astro_analyzing') : t('editor.auto_astro_button')}
-          </button>
-          {autoAstro.error && (
-            <p className="rounded-md border border-danger/30 bg-danger-wash px-3 py-2 text-xs text-danger">
-              {t('editor.auto_astro_failed', { error: autoAstro.error })}
-            </p>
-          )}
-          <PresetButtons
-            presets={presets}
-            activePreset={activePreset}
-            onPresetApply={(id) => void handlePresetApply(id)}
-            onPresetDelete={(id) => void deletePreset(id).catch(() => undefined)}
-          />
-          <button
-            type="button"
-            className="btn btn-outline btn-sm self-start"
-            disabled={status === 'processing'}
-            onClick={() => setShowSavePreset(true)}
-          >
-            {t('editor.save_as_preset')}
-          </button>
-        </section>
-        <ToneCurveEditor
-          curves={{
-            rgb: parameters.curvePoints,
-            red: parameters.redCurvePoints,
-            green: parameters.greenCurvePoints,
-            blue: parameters.blueCurvePoints,
-          }}
-          onChange={handleCurveChange}
-        />
-        <SliderPanel
-          parameters={parameters}
-          onParameterChange={handleParameterChange}
-          onReset={handleReset}
-          onResetSection={handleResetSection}
-          isProcessing={status === 'processing'}
-          starMaskEnabled={starMaskEnabled}
-          onStarMaskToggle={handleStarMaskToggle}
-          starMaskSourceCount={starMask.sourceCount}
-          starMaskLoading={starMask.isLoading}
-        />
-      </aside>
     </div>
   );
 }

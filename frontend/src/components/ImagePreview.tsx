@@ -1,8 +1,25 @@
 import { useCallback, useRef, useState, type PointerEvent } from 'react';
 
+import { FramingLayer } from '@/components/FramingLayer';
 import { HistogramDisplay } from '@/components/HistogramDisplay';
 import { useTranslation } from '@/hooks/useTranslation';
-import type { FocusPoint, HistogramData, StarSourceInfo } from '@/types';
+import { baseAspectRatio } from '@/services/framingGeometry';
+import type {
+  Dimensions,
+  FocusPoint,
+  GeometryParameters,
+  HistogramData,
+  StarSourceInfo,
+} from '@/types';
+
+/** When set, the preview shows the crop frame instead of the before/after view. */
+export interface FramingState {
+  imageUrl: string;
+  dimensions: Dimensions;
+  geometry: GeometryParameters;
+  ratioFrac: number | null;
+  onGeometryChange: (next: GeometryParameters) => void;
+}
 
 export interface ImagePreviewProps {
   originalUrl: string;
@@ -11,17 +28,15 @@ export interface ImagePreviewProps {
   /** Image aspect ratio (width / height); falls back to 16:9. */
   aspectRatio?: number;
   isLoading?: boolean;
-  onDepthShiftClick?: () => void;
+  /** Present only while the Framing step is active. */
+  framing?: FramingState | null;
   /** Detected star circles to draw over the preview, or null to hide the overlay. */
   starMaskOverlay?: StarSourceInfo[] | null;
   /** The currently-set Depth Shift focal point, or null/undefined if none. */
   focalPoint?: FocusPoint | null;
   /** While true, a click on the image sets the focal point instead of dragging the divider. */
   pickingFocalPoint?: boolean;
-  /** Toggles picking mode on/off - shown as a button when provided. */
-  onTogglePickFocalPoint?: () => void;
   onFocalPointPick?: (point: FocusPoint) => void;
-  onClearFocalPoint?: () => void;
 }
 
 const MIN_ZOOM = 1;
@@ -35,13 +50,11 @@ export function ImagePreview({
   histogram,
   aspectRatio,
   isLoading = false,
-  onDepthShiftClick,
+  framing,
   starMaskOverlay,
   focalPoint,
   pickingFocalPoint = false,
-  onTogglePickFocalPoint,
   onFocalPointPick,
-  onClearFocalPoint,
 }: ImagePreviewProps) {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -94,7 +107,12 @@ export function ImagePreview({
     });
   }
 
-  const ratio = aspectRatio && aspectRatio > 0 ? aspectRatio : 16 / 9;
+  const framingActive = Boolean(framing);
+  const ratio = framing
+    ? baseAspectRatio(framing.dimensions, framing.geometry.rotateQuarters)
+    : aspectRatio && aspectRatio > 0
+      ? aspectRatio
+      : 16 / 9;
   // Portrait frames would blow past the viewport at full column width; cap their
   // width so the frame stays inside 70vh and centres instead of letterboxing.
   const maxWidth = ratio < 1 ? `calc(70vh * ${ratio})` : '100%';
@@ -103,135 +121,158 @@ export function ImagePreview({
     <div className="flex flex-col gap-3">
       <div
         ref={containerRef}
-        className={`relative mx-auto max-h-[70vh] w-full touch-pan-y select-none overflow-hidden rounded-xl border border-hairline bg-black ${pickingFocalPoint ? 'cursor-crosshair' : 'cursor-ew-resize'}`}
+        className={`relative mx-auto max-h-[70vh] w-full touch-pan-y select-none overflow-hidden rounded-xl border border-hairline bg-black ${
+          framingActive ? '' : pickingFocalPoint ? 'cursor-crosshair' : 'cursor-ew-resize'
+        }`}
         style={{ aspectRatio: ratio, maxWidth }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
+        onPointerDown={framingActive ? undefined : handlePointerDown}
+        onPointerMove={framingActive ? undefined : handlePointerMove}
+        onPointerUp={framingActive ? undefined : endDrag}
+        onPointerCancel={framingActive ? undefined : endDrag}
       >
-        <div
-          className="absolute inset-0 origin-center transition-transform duration-100"
-          style={{ transform: `scale(${zoom})` }}
-        >
-          <img
-            src={processedUrl}
-            alt={t('image_preview.processed_alt')}
-            draggable={false}
-            className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+        {framing ? (
+          <FramingLayer
+            imageUrl={framing.imageUrl}
+            dimensions={framing.dimensions}
+            geometry={framing.geometry}
+            ratioFrac={framing.ratioFrac}
+            onGeometryChange={framing.onGeometryChange}
           />
-          {/* Same box as the processed image; clip-path reveals only the left split. */}
-          <img
-            src={originalUrl}
-            alt={t('image_preview.original_alt')}
-            draggable={false}
-            className="pointer-events-none absolute inset-0 h-full w-full object-contain"
-            style={{ clipPath: `inset(0 ${100 - splitPercent}% 0 0)` }}
-          />
-          {starMaskOverlay && starMaskOverlay.length > 0 && (
-            // viewBox width:height matches the container's own aspect ratio, so
-            // the (non-uniform in general) preserveAspectRatio="none" stretch is
-            // actually uniform here - circles stay round. See radius conversion
-            // below: a longest-side fraction needs `* max(ratio, 1)` to land in
-            // these viewBox units.
-            <svg
-              viewBox={`0 0 ${ratio} 1`}
-              preserveAspectRatio="none"
-              className="pointer-events-none absolute inset-0 h-full w-full stroke-accent"
-              fill="none"
-              aria-hidden
-            >
-              {starMaskOverlay.map((star, index) => (
-                <circle
-                  key={index}
-                  cx={star.x * ratio}
-                  cy={star.y}
-                  r={Math.max(star.radius * Math.max(ratio, 1), 0.006)}
-                  strokeWidth={0.006}
-                  opacity={0.85}
-                />
-              ))}
-            </svg>
-          )}
-          {focalPoint && (
+        ) : (
+          <>
             <div
-              className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
-              style={{ left: `${focalPoint.x * 100}%`, top: `${focalPoint.y * 100}%` }}
+              className="absolute inset-0 origin-center transition-transform duration-100"
+              style={{ transform: `scale(${zoom})` }}
             >
-              <svg viewBox="0 0 24 24" className="h-6 w-6 stroke-accent" fill="none" aria-hidden>
-                <circle cx="12" cy="12" r="7" strokeWidth="1.5" />
-                <path d="M12 2v4M12 18v4M2 12h4M18 12h4" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-            </div>
-          )}
-        </div>
-
-        {pickingFocalPoint && (
-          <div className="pointer-events-none absolute inset-x-0 top-3 z-10 mx-auto w-fit rounded bg-black/70 px-3 py-1 text-xs font-medium text-white/90 backdrop-blur-sm">
-            {t('image_preview.click_to_set_focal_point')}
-          </div>
-        )}
-
-        {/* Divider + grab handle */}
-        <div
-          className="pointer-events-none absolute inset-y-0 z-10 w-px -translate-x-1/2 bg-white/70 shadow-[0_0_0_1px_rgb(0_0_0/0.35)]"
-          style={{ left: `${splitPercent}%` }}
-        >
-          <span
-            className={`absolute left-1/2 top-1/2 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/25 bg-black/60 backdrop-blur-sm transition-transform ${
-              dragging ? 'scale-110' : ''
-            }`}
-          >
-            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 stroke-white/80" fill="none" aria-hidden>
-              <path
-                d="M6 4 3 8l3 4M10 4l3 4-3 4"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+              <img
+                src={processedUrl}
+                alt={t('image_preview.processed_alt')}
+                draggable={false}
+                className="pointer-events-none absolute inset-0 h-full w-full object-contain"
               />
-            </svg>
-          </span>
-        </div>
+              {/* Same box as the processed image; clip-path reveals only the left split. */}
+              <img
+                src={originalUrl}
+                alt={t('image_preview.original_alt')}
+                draggable={false}
+                className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+                style={{ clipPath: `inset(0 ${100 - splitPercent}% 0 0)` }}
+              />
+              {starMaskOverlay && starMaskOverlay.length > 0 && (
+                // viewBox width:height matches the container's own aspect ratio, so
+                // the (non-uniform in general) preserveAspectRatio="none" stretch is
+                // actually uniform here - circles stay round. See radius conversion
+                // below: a longest-side fraction needs `* max(ratio, 1)` to land in
+                // these viewBox units.
+                <svg
+                  viewBox={`0 0 ${ratio} 1`}
+                  preserveAspectRatio="none"
+                  className="pointer-events-none absolute inset-0 h-full w-full stroke-accent"
+                  fill="none"
+                  aria-hidden
+                >
+                  {starMaskOverlay.map((star, index) => (
+                    <circle
+                      key={index}
+                      cx={star.x * ratio}
+                      cy={star.y}
+                      r={Math.max(star.radius * Math.max(ratio, 1), 0.006)}
+                      strokeWidth={0.006}
+                      opacity={0.85}
+                    />
+                  ))}
+                </svg>
+              )}
+              {focalPoint && (
+                <div
+                  className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
+                  style={{ left: `${focalPoint.x * 100}%`, top: `${focalPoint.y * 100}%` }}
+                >
+                  <svg viewBox="0 0 24 24" className="h-6 w-6 stroke-accent" fill="none" aria-hidden>
+                    <circle cx="12" cy="12" r="7" strokeWidth="1.5" />
+                    <path
+                      d="M12 2v4M12 18v4M2 12h4M18 12h4"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </div>
+              )}
+            </div>
 
-        <div className="pointer-events-none absolute left-3 top-3 rounded bg-black/55 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/70 backdrop-blur-sm">
-          {t('image_preview.before_after')}
-        </div>
+            {pickingFocalPoint && (
+              <div className="pointer-events-none absolute inset-x-0 top-3 z-10 mx-auto w-fit rounded bg-black/70 px-3 py-1 text-xs font-medium text-white/90 backdrop-blur-sm">
+                {t('image_preview.click_to_set_focal_point')}
+              </div>
+            )}
 
-        <div
-          className="absolute right-3 top-3 flex cursor-default items-center gap-0.5 rounded-md border border-white/10 bg-black/55 p-0.5 text-white/80 backdrop-blur-sm"
-          onPointerDown={(event) => event.stopPropagation()}
-        >
-          <button
-            type="button"
-            className="grid h-6 w-6 place-items-center rounded transition-colors hover:bg-white/10 disabled:opacity-40"
-            aria-label={t('image_preview.zoom_out')}
-            disabled={zoom <= MIN_ZOOM}
-            onClick={() => changeZoom(-ZOOM_STEP)}
-          >
-            <svg viewBox="0 0 12 12" className="h-3 w-3 stroke-current" aria-hidden>
-              <path d="M2 6h8" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            className="min-w-[3rem] rounded px-1 py-1 text-xs tabular-nums transition-colors hover:bg-white/10"
-            aria-label={t('image_preview.reset_zoom')}
-            onClick={() => setZoom(1)}
-          >
-            {Math.round(zoom * 100)}%
-          </button>
-          <button
-            type="button"
-            className="grid h-6 w-6 place-items-center rounded transition-colors hover:bg-white/10 disabled:opacity-40"
-            aria-label={t('image_preview.zoom_in')}
-            disabled={zoom >= MAX_ZOOM}
-            onClick={() => changeZoom(ZOOM_STEP)}
-          >
-            <svg viewBox="0 0 12 12" className="h-3 w-3 stroke-current" aria-hidden>
-              <path d="M6 2v8M2 6h8" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </button>
-        </div>
+            {/* Divider + grab handle */}
+            <div
+              className="pointer-events-none absolute inset-y-0 z-10 w-px -translate-x-1/2 bg-white/70 shadow-[0_0_0_1px_rgb(0_0_0/0.35)]"
+              style={{ left: `${splitPercent}%` }}
+            >
+              <span
+                className={`absolute left-1/2 top-1/2 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/25 bg-black/60 backdrop-blur-sm transition-transform ${
+                  dragging ? 'scale-110' : ''
+                }`}
+              >
+                <svg
+                  viewBox="0 0 16 16"
+                  className="h-3.5 w-3.5 stroke-white/80"
+                  fill="none"
+                  aria-hidden
+                >
+                  <path
+                    d="M6 4 3 8l3 4M10 4l3 4-3 4"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </span>
+            </div>
+
+            <div className="pointer-events-none absolute left-3 top-3 rounded bg-black/55 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/70 backdrop-blur-sm">
+              {t('image_preview.before_after')}
+            </div>
+
+            <div
+              className="absolute right-3 top-3 flex cursor-default items-center gap-0.5 rounded-md border border-white/10 bg-black/55 p-0.5 text-white/80 backdrop-blur-sm"
+              onPointerDown={(event) => event.stopPropagation()}
+            >
+              <button
+                type="button"
+                className="grid h-6 w-6 place-items-center rounded transition-colors hover:bg-white/10 disabled:opacity-40"
+                aria-label={t('image_preview.zoom_out')}
+                disabled={zoom <= MIN_ZOOM}
+                onClick={() => changeZoom(-ZOOM_STEP)}
+              >
+                <svg viewBox="0 0 12 12" className="h-3 w-3 stroke-current" aria-hidden>
+                  <path d="M2 6h8" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="min-w-[3rem] rounded px-1 py-1 text-xs tabular-nums transition-colors hover:bg-white/10"
+                aria-label={t('image_preview.reset_zoom')}
+                onClick={() => setZoom(1)}
+              >
+                {Math.round(zoom * 100)}%
+              </button>
+              <button
+                type="button"
+                className="grid h-6 w-6 place-items-center rounded transition-colors hover:bg-white/10 disabled:opacity-40"
+                aria-label={t('image_preview.zoom_in')}
+                disabled={zoom >= MAX_ZOOM}
+                onClick={() => changeZoom(ZOOM_STEP)}
+              >
+                <svg viewBox="0 0 12 12" className="h-3 w-3 stroke-current" aria-hidden>
+                  <path d="M6 2v8M2 6h8" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+          </>
+        )}
 
         {isLoading && (
           <div className="pointer-events-none absolute inset-0 grid place-items-center bg-black/45 backdrop-blur-[1px]">
@@ -246,38 +287,6 @@ export function ImagePreview({
       {histogram && (
         <div className="rounded-lg border border-hairline bg-surface p-3">
           <HistogramDisplay data={histogram} />
-        </div>
-      )}
-
-      {(onDepthShiftClick || onTogglePickFocalPoint) && (
-        <div className="flex flex-wrap items-center gap-2">
-          {onDepthShiftClick && (
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={onDepthShiftClick}
-            >
-              {t('image_preview.open_depth_shift')}
-            </button>
-          )}
-          {onTogglePickFocalPoint && (
-            <button
-              type="button"
-              className={`btn btn-sm ${pickingFocalPoint ? 'btn-primary' : 'btn-ghost'}`}
-              onClick={onTogglePickFocalPoint}
-            >
-              {pickingFocalPoint
-                ? t('common.cancel')
-                : focalPoint
-                  ? t('image_preview.change_focal_point')
-                  : t('image_preview.set_focal_point')}
-            </button>
-          )}
-          {focalPoint && !pickingFocalPoint && onClearFocalPoint && (
-            <button type="button" className="btn btn-ghost btn-sm" onClick={onClearFocalPoint}>
-              {t('image_preview.clear_focal_point')}
-            </button>
-          )}
         </div>
       )}
     </div>

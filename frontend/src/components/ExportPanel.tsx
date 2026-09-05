@@ -5,19 +5,21 @@ export interface ExportPanelProps {
   canSendToAstroDex?: boolean;
   onDownload: () => void;
   onSendToAstroDex: () => void;
+  onSaveAsPreset: () => void;
 }
 
-/** Getting the enhanced image out of the editor: download, or hand it to AstroDex. */
+/** Getting the enhanced image out of the editor: download, hand it to AstroDex,
+ * or save the current parameters as a reusable preset. */
 export function ExportPanel({
   isProcessing = false,
   canSendToAstroDex = false,
   onDownload,
   onSendToAstroDex,
+  onSaveAsPreset,
 }: ExportPanelProps) {
   const { t } = useTranslation();
   return (
-    <div className="panel flex flex-col gap-2.5">
-      <h2 className="eyebrow">{t('export_panel.heading')}</h2>
+    <div className="flex flex-col gap-2.5">
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
@@ -38,6 +40,14 @@ export function ExportPanel({
           </button>
         )}
       </div>
+      <button
+        type="button"
+        className="btn btn-outline btn-sm self-start"
+        disabled={isProcessing}
+        onClick={onSaveAsPreset}
+      >
+        {t('editor.save_as_preset')}
+      </button>
     </div>
   );
 }

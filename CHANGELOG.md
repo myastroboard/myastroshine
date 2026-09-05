@@ -24,12 +24,22 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   starting parameter set - crushing the background for depth/separation from
   the DSO, and a gentle, log-scaled star reduction that stays a sensible
   starting point across both sparse frames and busy deep-stacked fields -
-  in place of manually dialing in every slider.
-- Editor UX: the adjustment sliders are now 5 named, collapsible sections
-  (Light/Colour/Detail/Stars/Depth) with a per-section reset and help text,
-  instead of 7 flat, always-open, technically-named groups. A dedicated
-  Export panel holds Download/Send to AstroDex next to the preview. A
-  focal-point picker on the preview (click to set) now actually drives where
+  in place of manually dialing in every slider. Auto Astro and preset apply
+  both keep the session's current framing (crop / rotate / straighten / flip)
+  rather than resetting it - a look is not a composition.
+- Editor UX: a workflow-driven three-pane editor. A numbered **rail** on the
+  left steps through the retouching order (1 Framing, 2 Background, 3 Light,
+  4 Curves, 5 Colour, 6 Detail, 7 Stars, 8 Depth), bracketed by a
+  one-click **Start** (Auto Astro + presets) and **Export** - the same order
+  the backend pipeline applies. Only the selected step's controls show, in an
+  **inspector** panel with its own help text, reset, and a "Next" link; the
+  **preview + histogram stay pinned** on the right instead of scrolling out of
+  view under a long list of tools. A step shows a dot on the rail once its
+  values leave the default. Crop / straighten / rotate / flip is now step 1,
+  edited directly on the preview (the separate full-screen crop editor is
+  gone). White balance (temperature / tint) moved from the creative colour
+  controls into step 2, next to the other background corrections, matching the
+  pipeline. A focal-point picker on the preview (click to set) drives where
   the Depth Shift parallax centers - `focus_point` was accepted by the API
   before this but never used.
 - i18n: FR + EN. Every frontend-owned UI string now goes through
@@ -75,8 +85,8 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     and more aggressive than the existing Highlights/Shadows (only the true
     near-white/near-black tail moves, not the broader upper/lower-mid
     range) - the usual distinction in most photo editors.
-  - New **Corrections** section (Vignette correction, Gradient reduction,
-    Dehaze) alongside Light/Colour/Detail/Stars/Depth.
+  - Vignette correction, Gradient reduction and Dehaze live in the editor's
+    step 2 (**Background**), applied before any creative grading.
 - **FITS + 16-bit + camera RAW upload support** - previously 8-bit JPEG/PNG/
   TIFF only (and a 16-bit TIFF/PNG was silently truncated to 8-bit). FITS
   (`.fits`/`.fit`/`.fts`) and camera RAW (`.cr2`/`.cr3`/`.nef`/`.arw`/`.dng`/

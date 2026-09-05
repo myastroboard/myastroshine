@@ -34,7 +34,56 @@
     "auto_astro_button": "Auto Astro",
     "auto_astro_analyzing": "Analyse en cours...",
     "auto_astro_failed": "Échec d'Auto Astro : {error}",
-    "save_as_preset": "Enregistrer comme préréglage"
+    "save_as_preset": "Enregistrer comme préréglage",
+    "reset_all": "Réinitialiser tous les réglages",
+    "next_step": "Suivant : {step}",
+    "rail": {
+      "aria_label": "Étapes de retouche",
+      "modified": "modifié par rapport au défaut",
+      "start": "Départ",
+      "frame": "Cadrage",
+      "sky": "Fond de ciel",
+      "light": "Lumière",
+      "curves": "Courbes",
+      "colour": "Couleur",
+      "detail": "Détail",
+      "stars": "Étoiles",
+      "depth": "Profondeur",
+      "export": "Export"
+    },
+    "steps": {
+      "start": {
+        "help": "Commencez ici : un point de départ en un clic avec Auto Astro, ou appliquez un préréglage enregistré. Puis descendez les étapes."
+      },
+      "frame": {
+        "help": "Cadrez d'abord - recadrage, redressement de l'horizon, rotation ou miroir. Tout ce qui suit travaille sur l'image cadrée.",
+        "unavailable": "Le cadrage a besoin des dimensions de l'image d'origine, indisponibles pour un composite empilé."
+      },
+      "sky": {
+        "help": "Corrigez le signal brut avant tout réglage créatif : balance des blancs, vignetage de l'objectif, dégradés de pollution lumineuse et brume."
+      },
+      "light": {
+        "help": "Exposition générale et équilibre tonal - la luminosité, le contraste et la richesse des détails dans les ombres et les hautes lumières."
+      },
+      "curves": {
+        "help": "Affinez tons et couleurs avec une courbe maîtresse, puis des courbes rouge/vert/bleu par canal pour l'étalonnage."
+      },
+      "colour": {
+        "help": "L'intensité des couleurs. La vibrance protège les zones déjà saturées ; la saturation agit sur tout."
+      },
+      "detail": {
+        "help": "Texture locale : micro-contraste, réduction du bruit et netteté. À faire une fois tons et couleurs réglés."
+      },
+      "stars": {
+        "help": "Détectez chaque étoile et réduisez-la pour faire ressortir les nébulosités faibles. Utilisez le masque pour vérifier la détection d'abord."
+      },
+      "depth": {
+        "help": "Choisissez le point focal, puis ouvrez la visionneuse Depth Shift pour un aperçu de parallaxe interactif."
+      },
+      "export": {
+        "help": "Sortez le résultat : téléchargez-le, envoyez-le vers AstroDex, ou enregistrez les réglages actuels comme préréglage réutilisable."
+      }
+    }
   },
   "export_panel": {
     "heading": "Export",
@@ -96,10 +145,9 @@
     }
   },
   "crop_tool": {
-    "title": "Recadrer et pivoter",
     "free": "Libre",
     "original": "Original",
-    "done": "Terminé",
+    "apply": "Appliquer le cadrage",
     "straighten_label": "Redresser",
     "rotate_90": "Pivoter à 90°",
     "flip_h": "Miroir H",
@@ -107,37 +155,9 @@
     "crop_source_alt": "Source du recadrage"
   },
   "slider_panel": {
-    "adjustments_heading": "Réglages",
-    "reset_all": "Tout réinitialiser",
     "show_star_mask": "Afficher le masque d'étoiles",
     "sources_count": "{count} sources",
     "about_param_aria": "À propos de {label}",
-    "sections": {
-      "light": {
-        "label": "Lumière",
-        "help": "Exposition générale et équilibre tonal - la luminosité, le contraste et la richesse des détails dans les ombres et les hautes lumières."
-      },
-      "corrections": {
-        "label": "Corrections",
-        "help": "Corriger le signal brut avant les réglages créatifs : vignetage de l'objectif, dégradés de pollution lumineuse du fond, et brume atmosphérique."
-      },
-      "colour": {
-        "label": "Couleur",
-        "help": "Teinte, saturation et balance des blancs - l'intensité des couleurs et la dominante chaude ou froide de l'image."
-      },
-      "detail": {
-        "label": "Détail",
-        "help": "Texture locale : micro-contraste, réduction du bruit et netteté."
-      },
-      "star": {
-        "label": "Étoiles",
-        "help": "Comment chaque étoile est détectée et réduite, afin de faire ressortir les nébulosités faibles."
-      },
-      "depth": {
-        "label": "Profondeur",
-        "help": "Intensité de l'effet de parallaxe dans la visionneuse Depth Shift."
-      }
-    },
     "params": {
       "contrast": {
         "label": "Contraste",
@@ -218,10 +238,6 @@
       "tint": {
         "label": "Teinte",
         "hint": "Balance des blancs : décale la dominante colorée entre vert et magenta."
-      },
-      "depthShiftIntensity": {
-        "label": "Depth Shift",
-        "hint": "Intensité de l'effet de parallaxe dans la visionneuse Depth Shift."
       }
     }
   },

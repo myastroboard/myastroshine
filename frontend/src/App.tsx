@@ -79,7 +79,7 @@ export default function App() {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-40 border-b border-hairline bg-canvas/80 backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-[1200px] items-center justify-between px-4 sm:px-6">
+        <div className="mx-auto flex h-14 max-w-[1360px] items-center justify-between px-4 sm:px-6">
           <button
             type="button"
             className="flex items-center gap-2.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-accent"
@@ -108,7 +108,7 @@ export default function App() {
         {route === 'settings' ? (
           <SettingsView onClose={() => navigate('editor')} />
         ) : (
-          <main className="mx-auto flex max-w-[1200px] flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
+          <main className="mx-auto flex max-w-[1360px] flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
             {error && (
               <p className="rounded-md border border-danger/30 bg-danger-wash px-4 py-2.5 text-sm text-danger">
                 {error}

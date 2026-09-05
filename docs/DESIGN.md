@@ -80,7 +80,13 @@ Compose these; do not re-implement them per component.
 - Section spacing: `gap-5`/`gap-6`; inside a panel `gap-4`; tight groups `gap-2`.
 - Panel padding: `p-4 sm:p-5` (that is what `.panel` does).
 - Numbers (percentages, counts, versions): add `tabular-nums`.
-- Two-column editor layout: `lg:grid-cols-[minmax(0,1fr)_340px]`.
+- Editor layout: three panes, `lg:grid-cols-[10.5rem_19rem_minmax(0,1fr)]` -
+  a numbered **workflow rail** (`EditorRail`), the active step's **inspector**
+  (`EditorInspector`), then the **preview**. The preview column is
+  `lg:sticky lg:top-20` so the image and histogram stay visible while the
+  inspector scrolls. Below `lg` the rail is a horizontal scroll strip and the
+  three panes stack. The workflow order lives in one place - `EDITOR_STEPS` in
+  `types/index.ts` - and mirrors the backend pipeline order.
 - Settings-style rows: label + one-line description on the left, control on the
   right, hairline divider between rows (see `SettingsView`).
 - Overlays on top of an image: `bg-black/55` + `backdrop-blur-sm` + `border-white/10`.

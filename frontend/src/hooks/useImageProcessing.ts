@@ -105,6 +105,22 @@ export function useImageProcessing(sessionId: string) {
     void applyParameters(DEFAULT_PARAMETERS);
   }, [applyParameters]);
 
+  /** Reset every tone curve (master + R/G/B) back to identity. */
+  const resetCurves = useCallback(() => {
+    setParameters((prev) => {
+      const next: ProcessingParameters = {
+        ...prev,
+        curvePoints: [],
+        redCurvePoints: [],
+        greenCurvePoints: [],
+        blueCurvePoints: [],
+      };
+      clearTimeout(debounceRef.current);
+      void applyParameters(next);
+      return next;
+    });
+  }, [applyParameters]);
+
   /** Reset just the given parameters (e.g. one section's sliders) to default. */
   const resetKeys = useCallback(
     (keys: SliderParameterKey[]) => {
@@ -143,6 +159,7 @@ export function useImageProcessing(sessionId: string) {
     applyGeometry,
     applyParameters,
     resetParameters,
+    resetCurves,
     resetKeys,
     syncParameters,
   };
