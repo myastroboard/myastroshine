@@ -103,7 +103,47 @@ describe('SliderPanel', () => {
     const lightSection = screen.getByText('Light').closest('details') as HTMLElement;
     fireEvent.click(within(lightSection).getByRole('button', { name: 'Reset' }));
 
-    expect(onResetSection).toHaveBeenCalledWith(['contrast', 'brightness', 'highlights', 'shadows']);
+    expect(onResetSection).toHaveBeenCalledWith([
+      'contrast',
+      'exposure',
+      'highlights',
+      'shadows',
+      'whites',
+      'blacks',
+    ]);
+  });
+
+  it('reports a change on the renamed Exposure slider', () => {
+    const onParameterChange = vi.fn();
+    render(
+      <SliderPanel
+        parameters={DEFAULT_PARAMETERS}
+        onParameterChange={onParameterChange}
+        onReset={vi.fn()}
+        onResetSection={vi.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText('Exposure'), { target: { value: '0.3' } });
+
+    expect(onParameterChange).toHaveBeenCalledWith('exposure', 0.3);
+  });
+
+  it('collapses the new Corrections section by default, with vignette/gradient/dehaze inside', () => {
+    render(
+      <SliderPanel
+        parameters={DEFAULT_PARAMETERS}
+        onParameterChange={vi.fn()}
+        onReset={vi.fn()}
+        onResetSection={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText('Vignette correction')).not.toBeVisible();
+    fireEvent.click(screen.getByText('Corrections'));
+    expect(screen.getByLabelText('Vignette correction')).toBeVisible();
+    expect(screen.getByLabelText('Gradient reduction')).toBeVisible();
+    expect(screen.getByLabelText('Dehaze')).toBeVisible();
   });
 
   it('omits the star mask toggle when no handler is given', () => {

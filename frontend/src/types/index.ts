@@ -63,13 +63,19 @@ export const DEFAULT_CURVE_POINTS: CurvePoint[] = [
 export interface ProcessingParameters {
   geometry: GeometryParameters;
   contrast: number;
-  brightness: number;
+  exposure: number;
   saturation: number;
   highlights: number;
   shadows: number;
+  whites: number;
+  blacks: number;
   clarity: number;
   vibrance: number;
   denoise: number;
+  chromaDenoise: number;
+  vignetteCorrection: number;
+  gradientReduction: number;
+  dehaze: number;
   starReduction: number;
   starSensitivity: number;
   starMaxSize: number;
@@ -83,13 +89,19 @@ export interface ProcessingParameters {
 export const DEFAULT_PARAMETERS: ProcessingParameters = {
   geometry: DEFAULT_GEOMETRY,
   contrast: 1.0,
-  brightness: 0.0,
+  exposure: 0.0,
   saturation: 1.0,
   highlights: 0.0,
   shadows: 0.0,
+  whites: 0.0,
+  blacks: 0.0,
   clarity: 0.0,
   vibrance: 1.0,
   denoise: 0,
+  chromaDenoise: 0,
+  vignetteCorrection: 0,
+  gradientReduction: 0,
+  dehaze: 0,
   starReduction: 0,
   starSensitivity: 50,
   starMaxSize: 30,
@@ -108,7 +120,7 @@ export interface ParameterBound {
   min: number;
   max: number;
   step: number;
-  group: 'light' | 'colour' | 'detail' | 'star' | 'depth';
+  group: 'light' | 'corrections' | 'colour' | 'detail' | 'star' | 'depth';
 }
 
 /**
@@ -117,11 +129,17 @@ export interface ParameterBound {
  */
 export const PARAMETER_BOUNDS: ParameterBound[] = [
   { key: 'contrast', min: 0.5, max: 3.0, step: 0.01, group: 'light' },
-  { key: 'brightness', min: -1.0, max: 1.0, step: 0.01, group: 'light' },
+  { key: 'exposure', min: -1.0, max: 1.0, step: 0.01, group: 'light' },
   { key: 'highlights', min: -1.0, max: 1.0, step: 0.01, group: 'light' },
   { key: 'shadows', min: -1.0, max: 1.0, step: 0.01, group: 'light' },
+  { key: 'whites', min: -1.0, max: 1.0, step: 0.01, group: 'light' },
+  { key: 'blacks', min: -1.0, max: 1.0, step: 0.01, group: 'light' },
+  { key: 'vignetteCorrection', min: 0, max: 100, step: 1, group: 'corrections' },
+  { key: 'gradientReduction', min: 0, max: 100, step: 1, group: 'corrections' },
+  { key: 'dehaze', min: 0, max: 100, step: 1, group: 'corrections' },
   { key: 'clarity', min: -1.0, max: 1.0, step: 0.01, group: 'detail' },
   { key: 'denoise', min: 0, max: 100, step: 1, group: 'detail' },
+  { key: 'chromaDenoise', min: 0, max: 100, step: 1, group: 'detail' },
   { key: 'starReduction', min: 0, max: 100, step: 1, group: 'star' },
   { key: 'starSensitivity', min: 0, max: 100, step: 1, group: 'star' },
   { key: 'starMaxSize', min: 0, max: 100, step: 1, group: 'star' },

@@ -53,20 +53,20 @@ class AutoAstroService:
         """Analyse ``image`` (BGR ``uint8``) and propose a parameter set."""
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if image.ndim == _COLOR_NDIM else image
 
-        contrast, brightness, highlights, shadows = self._suggest_tone(gray)
+        contrast, exposure, highlights, shadows = self._suggest_tone(gray)
         star_reduction = self._suggest_star_reduction(image, gray)
 
         # Round to what the sliders actually step by (2 decimals) - the raw
         # percentile-derived floats have a dozen digits of noise that look
         # broken in the UI and imply far more precision than the heuristic has.
         contrast = round(contrast, 2)
-        brightness = round(brightness, 2)
+        exposure = round(exposure, 2)
         highlights = round(highlights, 2)
         shadows = round(shadows, 2)
 
         return ProcessingParameters(
             contrast=contrast,
-            brightness=brightness,
+            exposure=exposure,
             highlights=highlights,
             shadows=shadows,
             star_reduction=star_reduction,
@@ -75,7 +75,7 @@ class AutoAstroService:
     def _suggest_tone(self, gray: np.ndarray) -> tuple[float, float, float, float]:
         """Stretch the real signal range, then push the DSO and background apart.
 
-        Contrast/brightness alone just fill the tonal range; the depth/pop a
+        Contrast/exposure alone just fill the tonal range; the depth/pop a
         DSO shot wants comes from treating the background and the object
         differently, not from a single uniform curve - see ``shadows`` and
         ``highlights`` below.
@@ -90,7 +90,7 @@ class AutoAstroService:
 
         mean = float(gray.mean())
         black_point_after = (black_point - mean) * contrast + mean
-        brightness = float(np.clip((_TARGET_BLACK_POINT - black_point_after) / 50.0, -1.0, 1.0))
+        exposure = float(np.clip((_TARGET_BLACK_POINT - black_point_after) / 50.0, -1.0, 1.0))
 
         # Pull back only if a meaningful fraction is already clipping to
         # white. Deliberately never boosts highlights upward: this pipeline
@@ -109,7 +109,7 @@ class AutoAstroService:
         crushed_fraction = float((gray <= _SHADOW_CRUSH_THRESHOLD).mean())
         shadows = _DEPTH_SHADOWS if crushed_fraction < _SHADOW_CRUSH_BASELINE * 2 else 0.0
 
-        return contrast, brightness, highlights, shadows
+        return contrast, exposure, highlights, shadows
 
     def _suggest_star_reduction(self, image: np.ndarray, gray: np.ndarray) -> int:
         stars = self.star_detector.detect(image, sensitivity=50, max_size=30)

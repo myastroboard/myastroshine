@@ -96,6 +96,6 @@ def test_flat_degenerate_frame_skips_tone_changes(service: AutoAstroService) -> 
     params = service.suggest_parameters(image)
 
     assert params.contrast == 1.0
-    assert params.brightness == 0.0
+    assert params.exposure == 0.0
     assert params.highlights == 0.0
     assert params.shadows == 0.0

@@ -110,6 +110,10 @@
         "label": "Light",
         "help": "Overall exposure and tonal balance - how bright, contrasty, and full of shadow and highlight detail the image reads."
       },
+      "corrections": {
+        "label": "Corrections",
+        "help": "Fix the raw signal before creative grading: lens vignetting, background light-pollution gradients, and atmospheric haze."
+      },
       "colour": {
         "label": "Colour",
         "help": "Hue, saturation, and white balance - how vivid and how warm or cool the image looks."
@@ -132,8 +136,8 @@
         "label": "Contrast",
         "hint": "Stretches the tonal range around the image's midpoint, separating faint detail from bright."
       },
-      "brightness": {
-        "label": "Brightness",
+      "exposure": {
+        "label": "Exposure",
         "hint": "Shifts overall luminance up or down."
       },
       "highlights": {
@@ -144,6 +148,26 @@
         "label": "Shadows",
         "hint": "Lifts or deepens dark detail - weighted toward the darkest pixels only."
       },
+      "whites": {
+        "label": "Whites",
+        "hint": "Pushes the white clipping point - narrower and more aggressive than Highlights, only the near-white tail."
+      },
+      "blacks": {
+        "label": "Blacks",
+        "hint": "Pushes the black clipping point - narrower and more aggressive than Shadows, only the near-black tail."
+      },
+      "vignetteCorrection": {
+        "label": "Vignette correction",
+        "hint": "Brightens the corners to counteract lens vignetting."
+      },
+      "gradientReduction": {
+        "label": "Gradient reduction",
+        "hint": "Flattens smooth background gradients - light pollution, sky glow."
+      },
+      "dehaze": {
+        "label": "Dehaze",
+        "hint": "Restores contrast and colour lost to a veiling haze or light-pollution glow."
+      },
       "clarity": {
         "label": "Clarity",
         "hint": "Local contrast via unsharp masking. Negative values soften instead."
@@ -151,6 +175,10 @@
       "denoise": {
         "label": "Denoise",
         "hint": "Edge-preserving smoothing. Higher trades fine detail for a cleaner background."
+      },
+      "chromaDenoise": {
+        "label": "Colour noise reduction",
+        "hint": "Smooths colour speckle only, leaving brightness detail untouched."
       },
       "starReduction": {
         "label": "Star reduction",

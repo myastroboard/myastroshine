@@ -32,7 +32,10 @@ pytestmark = pytest.mark.skipif(
     reason="opt-in: set RUN_BENCHMARKS=1 (see this file's module docstring)",
 )
 
-FULL_RES_BUDGET_SECONDS = 5.0
+FULL_RES_BUDGET_SECONDS = 8.0  # was 5.0 at v0.1.0; raised for v0.2's 5 new stages (below) - see
+# ALGORITHMS.md "Missing core astro ops". Full-res enhance is not the interactive path (that's
+# the preview budget below, unaffected): it runs on-demand or via the job queue with progress
+# reported over the WebSocket, not on every slider drag.
 PREVIEW_BUDGET_SECONDS = 0.5
 
 
@@ -41,13 +44,19 @@ def _typical_edit() -> ProcessingParameters:
     unlike the all-defaults case ``apply_parameters`` short-circuits."""
     return ProcessingParameters(
         contrast=1.4,
-        brightness=0.15,
+        exposure=0.15,
         saturation=1.3,
         highlights=-0.3,
         shadows=0.4,
+        whites=0.2,
+        blacks=-0.2,
         clarity=0.5,
         vibrance=1.2,
         denoise=50,
+        chroma_denoise=30,
+        vignette_correction=30,
+        gradient_reduction=30,
+        dehaze=30,
         star_reduction=40,
         sharpness=1.3,
         temperature=7200,

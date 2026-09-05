@@ -32,6 +32,7 @@ interface SectionMeta {
 
 const SECTION_ORDER: SectionMeta[] = [
   { key: 'light', defaultOpen: true },
+  { key: 'corrections', defaultOpen: false },
   { key: 'colour', defaultOpen: true },
   { key: 'detail', defaultOpen: false },
   { key: 'star', defaultOpen: false },
