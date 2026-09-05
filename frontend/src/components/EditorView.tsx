@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 
-import { ActionButtons } from '@/components/ActionButtons';
 import { CropTool } from '@/components/CropTool';
 import { DepthShiftViewer } from '@/components/DepthShiftViewer';
+import { ExportPanel } from '@/components/ExportPanel';
 import { ImagePreview } from '@/components/ImagePreview';
 import { PresetButtons } from '@/components/PresetButtons';
 import { SavePresetDialog } from '@/components/SavePresetDialog';
 import { SliderPanel } from '@/components/SliderPanel';
+import { useAutoAstro } from '@/hooks/useAutoAstro';
 import { useDepthShift } from '@/hooks/useDepthShift';
 import { useImageProcessing } from '@/hooks/useImageProcessing';
 import { usePresets } from '@/hooks/usePresets';
@@ -17,6 +18,7 @@ import {
   isDefaultGeometry,
   type Dimensions,
   type EditorSession,
+  type FocusPoint,
   type GeometryParameters,
   type SliderParameterKey,
 } from '@/types';
@@ -45,18 +47,29 @@ function displayedAspect(dimensions: Dimensions | undefined, geometry: GeometryP
 
 /** Main editing surface: preview + parameter panel + actions. */
 export function EditorView({ session, astrodexContext }: EditorViewProps) {
-  const { parameters, status, previewVersion, updateParameter, applyGeometry, resetParameters, syncParameters } =
-    useImageProcessing(session.sessionId);
+  const {
+    parameters,
+    status,
+    previewVersion,
+    updateParameter,
+    applyGeometry,
+    resetParameters,
+    resetKeys,
+    syncParameters,
+  } = useImageProcessing(session.sessionId);
   const { presets, applyPreset, activePreset, savePreset, deletePreset, clearActivePreset } =
     usePresets(session.sessionId);
   const depthShift = useDepthShift(session.sessionId);
   const starMask = useStarMask(session.sessionId);
+  const autoAstro = useAutoAstro(session.sessionId);
   const { detect: detectStars } = starMask;
   const [showDepthViewer, setShowDepthViewer] = useState(false);
   const [showSavePreset, setShowSavePreset] = useState(false);
   const [showCrop, setShowCrop] = useState(false);
   const [presetVersion, setPresetVersion] = useState(0);
   const [starMaskEnabled, setStarMaskEnabled] = useState(false);
+  const [focalPoint, setFocalPoint] = useState<FocusPoint | null>(null);
+  const [pickingFocalPoint, setPickingFocalPoint] = useState(false);
 
   function handleStarMaskToggle(enabled: boolean): void {
     setStarMaskEnabled(enabled);
@@ -96,6 +109,15 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
     setPresetVersion((v) => v + 1);
   }
 
+  async function handleAutoAstro(): Promise<void> {
+    clearActivePreset();
+    const result = await autoAstro.apply();
+    if (result) {
+      syncParameters({ ...DEFAULT_PARAMETERS, ...result.parameters });
+      setPresetVersion((v) => v + 1);
+    }
+  }
+
   function handleParameterChange(key: SliderParameterKey, value: number): void {
     clearActivePreset(); // manual edits diverge from any applied preset
     updateParameter(key, value);
@@ -104,6 +126,24 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
   function handleReset(): void {
     clearActivePreset();
     resetParameters();
+  }
+
+  function handleResetSection(keys: SliderParameterKey[]): void {
+    clearActivePreset();
+    resetKeys(keys);
+  }
+
+  function handleFocalPointPick(point: FocusPoint): void {
+    setFocalPoint(point);
+    setPickingFocalPoint(false);
+    // Regenerate eagerly so a change is reflected right away if the viewer is
+    // already open, and is ready instantly the next time it's opened.
+    void depthShift.generate(7, point);
+  }
+
+  function handleClearFocalPoint(): void {
+    setFocalPoint(null);
+    void depthShift.generate(7);
   }
 
   function handleCropDone(geometry: GeometryParameters): void {
@@ -144,9 +184,14 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
           aspectRatio={aspectRatio}
           isLoading={status === 'processing'}
           starMaskOverlay={starMaskEnabled ? starMask.stars : null}
+          focalPoint={focalPoint}
+          pickingFocalPoint={pickingFocalPoint}
+          onTogglePickFocalPoint={() => setPickingFocalPoint((picking) => !picking)}
+          onFocalPointPick={handleFocalPointPick}
+          onClearFocalPoint={handleClearFocalPoint}
           onDepthShiftClick={() => {
             if (depthShift.layerUrls.length === 0) {
-              void depthShift.generate();
+              void depthShift.generate(7, focalPoint ?? undefined);
             }
             setShowDepthViewer(true);
           }}
@@ -181,15 +226,13 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
           >
             Crop &amp; rotate
           </button>
-          <ActionButtons
-            sessionId={session.sessionId}
-            isProcessing={status === 'processing'}
-            canSendToAstroDex={Boolean(astrodexContext)}
-            onDownload={() => void handleDownload()}
-            onSendToAstroDex={handleSendToAstroDex}
-            onSavePreset={() => setShowSavePreset(true)}
-          />
         </div>
+        <ExportPanel
+          isProcessing={status === 'processing'}
+          canSendToAstroDex={Boolean(astrodexContext)}
+          onDownload={() => void handleDownload()}
+          onSendToAstroDex={handleSendToAstroDex}
+        />
       </div>
 
       {showCrop && session.dimensions && (
@@ -212,17 +255,39 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
       <aside className="flex flex-col gap-5">
         <section className="flex flex-col gap-2.5">
           <h2 className="eyebrow">Presets</h2>
+          <button
+            type="button"
+            className="btn btn-primary btn-sm w-full"
+            disabled={status === 'processing' || autoAstro.isLoading}
+            onClick={() => void handleAutoAstro()}
+          >
+            {autoAstro.isLoading ? 'Analyzing...' : 'Auto Astro'}
+          </button>
+          {autoAstro.error && (
+            <p className="rounded-md border border-danger/30 bg-danger-wash px-3 py-2 text-xs text-danger">
+              Auto Astro failed: {autoAstro.error}
+            </p>
+          )}
           <PresetButtons
             presets={presets}
             activePreset={activePreset}
             onPresetApply={(id) => void handlePresetApply(id)}
             onPresetDelete={(id) => void deletePreset(id).catch(() => undefined)}
           />
+          <button
+            type="button"
+            className="btn btn-outline btn-sm self-start"
+            disabled={status === 'processing'}
+            onClick={() => setShowSavePreset(true)}
+          >
+            Save as preset
+          </button>
         </section>
         <SliderPanel
           parameters={parameters}
           onParameterChange={handleParameterChange}
           onReset={handleReset}
+          onResetSection={handleResetSection}
           isProcessing={status === 'processing'}
           starMaskEnabled={starMaskEnabled}
           onStarMaskToggle={handleStarMaskToggle}

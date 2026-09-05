@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState, type PointerEvent } from 'react';
 
 import { HistogramDisplay } from '@/components/HistogramDisplay';
-import type { HistogramData, StarSourceInfo } from '@/types';
+import type { FocusPoint, HistogramData, StarSourceInfo } from '@/types';
 
 export interface ImagePreviewProps {
   originalUrl: string;
@@ -13,6 +13,14 @@ export interface ImagePreviewProps {
   onDepthShiftClick?: () => void;
   /** Detected star circles to draw over the preview, or null to hide the overlay. */
   starMaskOverlay?: StarSourceInfo[] | null;
+  /** The currently-set Depth Shift focal point, or null/undefined if none. */
+  focalPoint?: FocusPoint | null;
+  /** While true, a click on the image sets the focal point instead of dragging the divider. */
+  pickingFocalPoint?: boolean;
+  /** Toggles picking mode on/off - shown as a button when provided. */
+  onTogglePickFocalPoint?: () => void;
+  onFocalPointPick?: (point: FocusPoint) => void;
+  onClearFocalPoint?: () => void;
 }
 
 const MIN_ZOOM = 1;
@@ -28,6 +36,11 @@ export function ImagePreview({
   isLoading = false,
   onDepthShiftClick,
   starMaskOverlay,
+  focalPoint,
+  pickingFocalPoint = false,
+  onTogglePickFocalPoint,
+  onFocalPointPick,
+  onClearFocalPoint,
 }: ImagePreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [splitPercent, setSplitPercent] = useState(50);
@@ -45,6 +58,14 @@ export function ImagePreview({
   }, []);
 
   function handlePointerDown(event: PointerEvent<HTMLDivElement>): void {
+    if (pickingFocalPoint) {
+      const rect = event.currentTarget.getBoundingClientRect();
+      onFocalPointPick?.({
+        x: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)),
+        y: Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height)),
+      });
+      return;
+    }
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
     setDragging(true);
@@ -80,7 +101,7 @@ export function ImagePreview({
     <div className="flex flex-col gap-3">
       <div
         ref={containerRef}
-        className="relative mx-auto max-h-[70vh] w-full cursor-ew-resize touch-pan-y select-none overflow-hidden rounded-xl border border-hairline bg-black"
+        className={`relative mx-auto max-h-[70vh] w-full touch-pan-y select-none overflow-hidden rounded-xl border border-hairline bg-black ${pickingFocalPoint ? 'cursor-crosshair' : 'cursor-ew-resize'}`}
         style={{ aspectRatio: ratio, maxWidth }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -130,7 +151,24 @@ export function ImagePreview({
               ))}
             </svg>
           )}
+          {focalPoint && (
+            <div
+              className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
+              style={{ left: `${focalPoint.x * 100}%`, top: `${focalPoint.y * 100}%` }}
+            >
+              <svg viewBox="0 0 24 24" className="h-6 w-6 stroke-accent" fill="none" aria-hidden>
+                <circle cx="12" cy="12" r="7" strokeWidth="1.5" />
+                <path d="M12 2v4M12 18v4M2 12h4M18 12h4" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </div>
+          )}
         </div>
+
+        {pickingFocalPoint && (
+          <div className="pointer-events-none absolute inset-x-0 top-3 z-10 mx-auto w-fit rounded bg-black/70 px-3 py-1 text-xs font-medium text-white/90 backdrop-blur-sm">
+            Click the image to set the focal point
+          </div>
+        )}
 
         {/* Divider + grab handle */}
         <div
@@ -209,10 +247,36 @@ export function ImagePreview({
         </div>
       )}
 
-      {onDepthShiftClick && (
-        <button type="button" className="btn btn-ghost btn-sm self-start" onClick={onDepthShiftClick}>
-          Open Depth Shift viewer
-        </button>
+      {(onDepthShiftClick || onTogglePickFocalPoint) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {onDepthShiftClick && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={onDepthShiftClick}
+            >
+              Open Depth Shift viewer
+            </button>
+          )}
+          {onTogglePickFocalPoint && (
+            <button
+              type="button"
+              className={`btn btn-sm ${pickingFocalPoint ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={onTogglePickFocalPoint}
+            >
+              {pickingFocalPoint
+                ? 'Cancel'
+                : focalPoint
+                  ? 'Change focal point'
+                  : 'Set focal point'}
+            </button>
+          )}
+          {focalPoint && !pickingFocalPoint && onClearFocalPoint && (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={onClearFocalPoint}>
+              Clear focal point
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

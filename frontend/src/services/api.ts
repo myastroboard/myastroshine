@@ -6,8 +6,10 @@
 
 import type {
   AppSettings,
+  AutoAstroResult,
   CreatedToken,
   DepthShiftResult,
+  FocusPoint,
   LogLevel,
   LogLevels,
   LogTail,
@@ -228,14 +230,19 @@ export const apiClient = {
     return request<ProcessResponse>(`/presets/${presetId}/apply/${sessionId}`, { method: 'POST' });
   },
 
+  applyAutoAstro(sessionId: string): Promise<AutoAstroResult> {
+    return request<AutoAstroResult>(`/auto-astro/${sessionId}`, { method: 'POST' });
+  },
+
   generateDepthShift(
     sessionId: string,
     numLayers = 7,
     intensity = 50,
+    focusPoint?: FocusPoint,
   ): Promise<DepthShiftResult> {
     return request<DepthShiftResult>(`/depth-shift/${sessionId}`, {
       method: 'POST',
-      json: { numLayers, intensity },
+      json: { numLayers, intensity, ...(focusPoint ? { focusPoint } : {}) },
     });
   },
 

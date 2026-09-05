@@ -14,6 +14,7 @@ from app.models import (
     DepthLayerInfo,
     DepthMetadataResponse,
     DepthShiftResponse,
+    FocusPoint,
 )
 from app.services.depth_map import DepthMapService
 from app.services.session import SessionService
@@ -38,12 +39,14 @@ class DepthShiftService:
     def _base_url(self, session_id: str) -> str:
         return f"/api/depth-shift/{session_id}"
 
-    def generate(self, session_id: str, num_layers: int) -> DepthShiftResponse:
+    def generate(
+        self, session_id: str, num_layers: int, focus_point: FocusPoint | None = None
+    ) -> DepthShiftResponse:
         """Estimate depth, build parallax layers, and cache everything."""
         self.sessions.get_session(session_id)
         image = self.storage.load_processed(session_id)
 
-        depth_map = self.depth_maps.estimate_depth(image)
+        depth_map = self.depth_maps.estimate_depth(image, focus_point)
         layers = self.depth_maps.generate_parallax_layers(image, depth_map, num_layers)
         self.storage.save_depth(session_id, depth_map, layers)
 

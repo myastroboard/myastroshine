@@ -26,7 +26,7 @@ Common codes: `INVALID_PARAMETER` (400), `UNAUTHORIZED` (401), `FORBIDDEN` (403)
 ## Rate Limiting
 
 Per IP, on `/upload`, `/process/{id}`, `/presets/{id}/apply/{session_id}`,
-`/star-mask/{id}`, and `/stack/*`:
+`/star-mask/{id}`, `/auto-astro/{id}`, and `/stack/*`:
 
 - **Requests per minute** (`rate_limit_per_minute`, default **120**, not the
   API spec's original 10 - the editor re-processes on every slider change,
@@ -69,7 +69,8 @@ Celery job queue (`PROCESSING_MODE=queue`), and the progress WebSockets.
 | GET | `/depth-shift/{session_id}/metadata` | Depth statistics + layer URLs | 4 |
 | GET | `/depth-shift/{session_id}/depth_map` | Depth map as a grayscale PNG | 4 |
 | GET | `/depth-shift/{session_id}/layer_{index}` | Single BGRA layer PNG | 4 |
-| POST | `/star-mask/{session_id}` | Detect stars in the preview image for a mask overlay | v0.2 |
+| POST | `/star-mask/{session_id}` | Detect stars in the original image for a mask overlay | v0.2 |
+| POST | `/auto-astro/{session_id}` | Analyse the original image and apply a one-click parameter set | v0.2 |
 | GET | `/tokens` | List webhook tokens (metadata only) | 4 |
 | POST | `/tokens` | Create a webhook token (raw value shown once) | 4 |
 | DELETE | `/tokens/{token_id}` | Revoke a token | 4 |
@@ -197,6 +198,14 @@ Layers are ordered far (index 0, shifts most in the parallax) to near. Each
 `/depth_map` is a grayscale PNG. `GET /depth-shift/{id}/metadata` reports
 `depth_map_generated` and, once generated, the statistics and layer URLs.
 
+`focus_point` (`{ x, y }`, both 0-1, image-space fractions) is optional and
+**omitted by default** - not sent means "no focal point chosen", pure
+gradient-based depth (detail reads as near), exactly as before this field did
+anything. When sent, a radial field centred on that point is blended in, so
+the chosen point reads as "near" too - see `docs/ALGORITHMS.md` "Focal point".
+`(0.5, 0.5)` is a real, deliberately-picked center, not a default, so it's
+distinguished from "omitted" by the field's *presence*, not its value.
+
 ## Star mask
 
 `POST /star-mask/{session_id}` takes `{ sensitivity?, max_size? }` (both 0-100,
@@ -213,13 +222,39 @@ processing parameters) and returns:
 }
 ```
 
-Detection runs against the session's cached **preview** image (not the
-full-resolution result), so the mask stays fast enough to recompute on every
-slider change while the frontend's mask overlay is on - it's a preview aid, not
-the exact set of stars the full-resolution `star_reduction` stage will shrink,
-though both share the same detector. `x` / `y` / `radius` are fractions (0-1)
-of the preview image's width / height / longest side, so the frontend can
-position an overlay without needing the image's pixel dimensions.
+Detection runs against the session's full-resolution **original** image - the
+same input the `star_reduction` pipeline stage analyses - so the reported
+count matches what actually gets shrunk. (An earlier version ran this against
+the downscaled preview image to stay fast; detection is now cheap enough
+(~140ms even at 24MP) that there's no accuracy/speed trade-off left to make.)
+`x` / `y` / `radius` are fractions (0-1) of the image's width / height /
+longest side, so the frontend can position an overlay without needing the
+image's pixel dimensions.
+
+## Auto Astro
+
+`POST /auto-astro/{session_id}` takes no body. It analyses the session's
+original image (histogram black/white point, star density) and applies a
+computed parameter set - a dynamic alternative to a fixed preset. Returns the
+same shape as `POST /process/{session_id}` plus the computed `parameters`, so
+the frontend can sync its sliders in one round trip:
+
+```json
+{
+  "session_id": "...",
+  "job_id": "job-...",
+  "status": "completed",
+  "preview_url": "/api/preview/{id}",
+  "estimated_time_seconds": 0,
+  "ws_status_url": "/ws/processing-status/job-...",
+  "parameters": { "contrast": 1.8, "brightness": 0.1, "star_reduction": 35, "..." : "..." }
+}
+```
+
+Scope is deliberately limited to what histogram/black-point/star-density can
+drive with confidence: `contrast`, `brightness`, `highlights`, `shadows`, and
+`star_reduction`. Everything else stays at its `ProcessingParameters` default.
+See `docs/ALGORITHMS.md` "Auto Astro" for the heuristic.
 
 ## Webhook tokens
 

@@ -35,7 +35,7 @@ async def generate_depth_shift(
 ) -> DepthShiftResponse:
     """Generate the depth map and parallax layers for a session."""
     _require_session(session_id)
-    return depth_shift.generate(session_id, request.num_layers)
+    return depth_shift.generate(session_id, request.num_layers, request.focus_point)
 
 
 @router.get("/{session_id}/metadata", response_model=DepthMetadataResponse)

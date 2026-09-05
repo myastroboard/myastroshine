@@ -1,11 +1,16 @@
 """StarMaskService - orchestrates the star-mask preview endpoint.
 
-Runs detection against a session's cached *preview* image (not the full
-original), so the mask preview stays fast on every toggle/slider change,
-independent of the full-resolution enhancement pipeline's own cost. Mirrors
-:class:`DepthShiftService`'s session/storage/algorithm split, minus the disk
-caching - this is a cheap, stateless, parameter-dependent computation, not a
-discrete generated artifact.
+Runs detection against the session's full-resolution *original* image, the
+same input the real `star_reduction` pipeline stage analyses, so the mask
+overlay's "N sources detected" always matches what will actually be shrunk.
+An earlier version ran this against the downscaled preview image to stay
+fast, back when detection used `skimage.feature.blob_dog`; now that detection
+is a cheap top-hat + `cv2.connectedComponentsWithStats` pass (~140ms even at
+24MP, see docs/ALGORITHMS.md), there's no accuracy/speed trade-off left to
+make, and running on the downscaled copy was measurably under-detecting small
+stars anyway. Mirrors :class:`DepthShiftService`'s session/storage/algorithm
+split, minus the disk caching - this is a cheap, stateless, parameter-
+dependent computation, not a discrete generated artifact.
 """
 
 from __future__ import annotations
@@ -20,7 +25,7 @@ logger = get_logger(__name__)
 
 
 class StarMaskService:
-    """Detects stars in a session's preview image for the mask overlay."""
+    """Detects stars in a session's original image for the mask overlay."""
 
     def __init__(
         self,
@@ -35,7 +40,7 @@ class StarMaskService:
     def preview(self, session_id: str, sensitivity: int, max_size: int) -> StarMaskResponse:
         """Detect stars and report their positions as fractions of the image size."""
         self.sessions.get_session(session_id)
-        image = self.storage.load_preview(session_id)
+        image = self.storage.load_original(session_id)
         height, width = image.shape[:2]
         longest_side = max(width, height)
 

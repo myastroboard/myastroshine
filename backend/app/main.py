@@ -30,6 +30,7 @@ from app.logging_config import apply_runtime_log_levels, configure_logging, get_
 from app.routes import (
     admin,
     astrodex,
+    auto_astro,
     depth_shift,
     download,
     health,
@@ -131,6 +132,7 @@ def create_app() -> FastAPI:
         tokens.router,
         stack.router,
         star_mask.router,
+        auto_astro.router,
         admin.router,
     ):
         app.include_router(router, prefix="/api")
