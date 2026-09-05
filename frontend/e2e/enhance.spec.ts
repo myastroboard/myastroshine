@@ -164,6 +164,13 @@ test('applying a preset moves the sliders and star reduction works', async ({ pa
   await expect(contrast).not.toHaveValue('1'); // preset pushed its value into the slider
   await expect(nebula).toHaveAttribute('aria-pressed', 'true');
 
+  // The "Stars" section of the slider panel is collapsed by default.
+  await page
+    .locator('details', { has: page.locator('#param-starReduction') })
+    .locator('summary')
+    .getByText('Stars')
+    .click();
+
   const stars = page.getByRole('slider', { name: 'Star reduction' });
   await Promise.all([
     page.waitForResponse((r) => r.url().includes('/api/process/') && r.ok()),
