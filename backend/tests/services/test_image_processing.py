@@ -49,10 +49,125 @@ def test_contrast_increases_spread(
     assert out.std() > sample_image.std()
 
 
-def test_brightness_direction(service: ImageProcessingService, sample_image: np.ndarray) -> None:
-    """Positive brightness lifts the mean, negative drops it."""
-    assert _mean_luma(service.apply_brightness(sample_image, 0.5)) > _mean_luma(sample_image)
-    assert _mean_luma(service.apply_brightness(sample_image, -0.5)) < _mean_luma(sample_image)
+def test_exposure_direction(service: ImageProcessingService, sample_image: np.ndarray) -> None:
+    """Positive exposure lifts the mean, negative drops it."""
+    assert _mean_luma(service.apply_exposure(sample_image, 0.5)) > _mean_luma(sample_image)
+    assert _mean_luma(service.apply_exposure(sample_image, -0.5)) < _mean_luma(sample_image)
+
+
+def test_whites_blacks_identity_at_zero(
+    service: ImageProcessingService, sample_image: np.ndarray
+) -> None:
+    """whites=0, blacks=0 is a no-op."""
+    assert np.array_equal(service.apply_whites_blacks(sample_image, 0.0, 0.0), sample_image)
+
+
+def test_whites_direction(service: ImageProcessingService, sample_image: np.ndarray) -> None:
+    """Positive whites brightens the highlight tail; negative dims it."""
+    brightened = service.apply_whites_blacks(sample_image, 0.5, 0.0)
+    dimmed = service.apply_whites_blacks(sample_image, -0.5, 0.0)
+    assert _mean_luma(brightened) > _mean_luma(sample_image)
+    assert _mean_luma(dimmed) < _mean_luma(sample_image)
+
+
+def test_blacks_direction(service: ImageProcessingService, sample_image: np.ndarray) -> None:
+    """Positive blacks lifts the shadow tail; negative crushes it further."""
+    lifted = service.apply_whites_blacks(sample_image, 0.0, 0.5)
+    crushed = service.apply_whites_blacks(sample_image, 0.0, -0.5)
+    assert _mean_luma(lifted) > _mean_luma(sample_image)
+    assert _mean_luma(crushed) < _mean_luma(sample_image)
+
+
+def test_whites_blacks_affect_midtones_less_than_highlights_shadows(
+    service: ImageProcessingService,
+) -> None:
+    """The narrower gray**4 mask moves a midtone less than highlights/shadows' gray**2."""
+    midtone = np.full((64, 64, 3), 128, dtype=np.uint8)
+    whites_blacks_delta = abs(
+        _mean_luma(service.apply_whites_blacks(midtone, 1.0, 1.0)) - _mean_luma(midtone)
+    )
+    highlights_shadows_delta = abs(
+        _mean_luma(service.apply_highlights_shadows(midtone, 1.0, 1.0)) - _mean_luma(midtone)
+    )
+    assert whites_blacks_delta < highlights_shadows_delta
+
+
+def test_vignette_correction_off_is_identity(
+    service: ImageProcessingService, sample_image: np.ndarray
+) -> None:
+    assert np.array_equal(service.apply_vignette_correction(sample_image, 0), sample_image)
+
+
+def test_vignette_correction_brightens_corners_more_than_centre(
+    service: ImageProcessingService,
+) -> None:
+    flat = np.full((200, 200, 3), 100, dtype=np.uint8)
+    out = service.apply_vignette_correction(flat, 100)
+    corner = out[5, 5].astype(np.float32).mean()
+    centre = out[100, 100].astype(np.float32).mean()
+    assert corner > centre
+    assert centre == pytest.approx(100.0, abs=1.0)  # centre gain is ~1.0
+
+
+def test_gradient_reduction_off_is_identity(
+    service: ImageProcessingService, sample_image: np.ndarray
+) -> None:
+    assert np.array_equal(service.apply_gradient_reduction(sample_image, 0), sample_image)
+
+
+def test_gradient_reduction_flattens_a_synthetic_gradient(
+    service: ImageProcessingService,
+) -> None:
+    """A left-to-right brightness ramp is flattened by a strong correction."""
+    ramp = np.tile(np.linspace(50, 200, 256, dtype=np.uint8), (256, 1))
+    image = cv2.cvtColor(ramp, cv2.COLOR_GRAY2BGR)
+    out = service.apply_gradient_reduction(image, 100)
+    left_mean = out[:, :20].astype(np.float32).mean()
+    right_mean = out[:, -20:].astype(np.float32).mean()
+    original_spread = float(ramp[:, -20:].mean() - ramp[:, :20].mean())
+    corrected_spread = abs(right_mean - left_mean)
+    assert corrected_spread < original_spread
+
+
+def test_dehaze_off_is_identity(service: ImageProcessingService, sample_image: np.ndarray) -> None:
+    assert np.array_equal(service.apply_dehaze(sample_image, 0), sample_image)
+
+
+def test_dehaze_increases_contrast_on_a_hazy_image(service: ImageProcessingService) -> None:
+    """A washed-out (low-contrast, veiled) synthetic frame gains contrast back."""
+    rng = np.random.default_rng(7)
+    base = rng.integers(0, 120, (150, 150, 3), dtype=np.uint8)
+    veil = 90  # additive haze: lifts blacks and compresses the range toward white
+    hazy = np.clip(base.astype(np.int32) + veil, 0, 255).astype(np.uint8)
+    out = service.apply_dehaze(hazy, 80)
+    assert out.std() > hazy.std()
+    assert out.shape == hazy.shape
+    assert out.dtype == np.uint8
+
+
+def test_chroma_denoise_off_is_identity(
+    service: ImageProcessingService, sample_image: np.ndarray
+) -> None:
+    assert np.array_equal(service.apply_chroma_denoise(sample_image, 0), sample_image)
+
+
+def test_chroma_denoise_reduces_color_speckle_without_flattening_luma(
+    service: ImageProcessingService,
+) -> None:
+    rng = np.random.default_rng(3)
+    base = np.full((100, 100, 3), 120, dtype=np.uint8)
+    noisy = np.clip(
+        base.astype(np.int32) + rng.integers(-40, 40, base.shape), 0, 255
+    ).astype(np.uint8)
+    out = service.apply_chroma_denoise(noisy, 80)
+
+    def _chroma_std(image: np.ndarray) -> float:
+        _, cr, cb = cv2.split(cv2.cvtColor(image, cv2.COLOR_BGR2YCrCb))
+        return float(np.std(cr.astype(np.float32)) + np.std(cb.astype(np.float32)))
+
+    assert _chroma_std(out) < _chroma_std(noisy)
+    # Luma (overall brightness) is preserved - only colour noise is targeted.
+    assert _mean_luma(out) == pytest.approx(_mean_luma(noisy), abs=2.0)
 
 
 def test_saturation_zero_is_greyscale(
@@ -266,13 +381,19 @@ def test_full_pipeline_stays_in_range(
     params = ProcessingParameters(
         geometry=GeometryParameters(straighten=4.0, crop_x=0.1, crop_w=0.8),
         contrast=1.8,
-        brightness=0.2,
+        exposure=0.2,
         saturation=1.5,
         highlights=-0.3,
         shadows=0.4,
+        whites=0.2,
+        blacks=-0.2,
         clarity=0.6,
         vibrance=1.3,
         denoise=40,
+        chroma_denoise=30,
+        vignette_correction=30,
+        gradient_reduction=30,
+        dehaze=30,
         star_reduction=50,
         sharpness=1.5,
         temperature=4200,

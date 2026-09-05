@@ -14,7 +14,7 @@ def test_process_returns_completed_job(client, sample_jpeg: bytes) -> None:
 
     response = client.post(
         f"/api/process/{session_id}",
-        json={"parameters": {"contrast": 1.6, "brightness": 0.2}},
+        json={"parameters": {"contrast": 1.6, "exposure": 0.2}},
     )
 
     assert response.status_code == 200

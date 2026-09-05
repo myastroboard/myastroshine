@@ -15,12 +15,51 @@ Applied in this order to minimize artifacts (`apply_parameters`):
    crop rectangle. Runs first; it changes the working dimensions.
 1. **White balance** (`temperature`, `tint`) - per-channel gain in linear RGB;
    6500K is neutral. Warm shifts reduce blue, cool shifts boost blue.
-2. **Contrast** (`contrast`, 0.5-3.0) - linear scaling around the image mean,
+2. **Vignette correction** (`vignette_correction`, 0-100) - a generic radial
+   gain model (not a per-lens calibrated profile), `gain = 1 + amount *
+   dist^2 * 0.8` where `dist` is the normalized distance from centre (0 at
+   centre, 1 at the corners). Purely geometric - depends on position, not
+   image content - so the gain map is computed on a small downscaled grid
+   (128px) and resized up; full-resolution precision would be wasted work for
+   a smooth analytic function.
+3. **Gradient reduction** (`gradient_reduction`, 0-100) - flattens smooth
+   background gradients (light pollution, sky glow). A very large Gaussian
+   blur approximates the background; genuine DSO structure is
+   higher-frequency and survives mostly in the residual, so subtracting the
+   blur's own deviation from its mean flattens the background without eating
+   into real detail. Estimated on a small downscaled copy (256px) then
+   resized back up - a huge blur at full resolution is computationally
+   infeasible (an 8000px-wide frame would need a ~5000px-wide kernel to reach
+   the same effective sigma), and a smooth low-frequency estimate doesn't
+   lose anything by downscaling first.
+4. **Dehaze** (`dehaze`, 0-100) - dark-channel-prior haze removal, restoring
+   contrast/colour lost to a veiling glow (thin cloud, humidity,
+   light-pollution haze). Distinct from gradient reduction's smooth
+   *background level* correction: this estimates a per-pixel transmission map
+   (`1 - amount * dark_channel(normalized_image)`, dark channel = per-pixel
+   min-over-channels then a 15x15 min-filter/erosion) and divides it back
+   out, `recovered = (img - atmospheric_light) / transmission +
+   atmospheric_light`. Atmospheric light is the brightest 0.1% of dark-channel
+   pixels (floored at 0.2 so a very dark frame can't push it near zero).
+   Simplified from He et al.'s original - no guided-filter transmission
+   refinement, the patch-erosion step already gives a reasonable, if
+   blockier, map without a new dependency. The dark-channel/transmission
+   estimation (two large-kernel erosions - the expensive part) runs on a
+   downscaled copy (800px); only the final per-pixel recovery formula runs at
+   full resolution, using the transmission map resized back up.
+5. **Contrast** (`contrast`, 0.5-3.0) - linear scaling around the image mean,
    `y = (x - mean) * contrast + mean`, then a mild gamma for a smooth response.
-3. **Brightness** (`brightness`, -1..1) - pixel offset, `beta = brightness * 50`.
-4. **Highlights / shadows** (-1..1) - masked tone curves; `gray^2` emphasizes
+6. **Exposure** (`exposure`, -1..1) - pixel offset, `beta = exposure * 50`.
+7. **Highlights / shadows** (-1..1) - masked tone curves; `gray^2` emphasizes
    bright regions, `(1 - gray)^2` emphasizes dark regions, scaled by 0.3.
-5. **Tone curve** (`curve_points`, empty by default = identity) - a 256-entry
+8. **Whites / blacks** (`whites` / `blacks`, -1..1) - the same masked-tone-curve
+   shape as highlights/shadows, but narrower and more aggressive (`gray^4` /
+   `(1-gray)^4` weighting, scaled by 0.4) so only the true near-white/near-black
+   tail moves, not the broader upper/lower-mid range - the usual distinction
+   between "Highlights"/"Shadows" and "Whites"/"Blacks" in most photo editors.
+   `x**4` is computed as `square(square(x))`, not `power(x, 4)` - the repeated-
+   squaring path is measurably faster at 24MP.
+9. **Tone curve** (`curve_points`, empty by default = identity) - a 256-entry
    lookup table (`app/utils/math_utils.py:curve_points_to_lut`), applied via
    `cv2.LUT` identically on each BGR channel (a combined RGB curve, not
    separate per-channel curves). Points are `(input, output)` 8-bit level
@@ -32,18 +71,24 @@ Applied in this order to minimize artifacts (`apply_parameters`):
    guarantees the spline never overshoots past a control point's value in the
    segments next to it (an overshoot would locally crush shadows or blow out
    highlights the user never asked for). A user-drawn curve subsumes and can
-   replace manual contrast/brightness/highlights/shadows tweaking, but doesn't
+   replace manual contrast/exposure/highlights/shadows tweaking, but doesn't
    replace those sliders - both stages run, in this order, so a curve is a
    fine-tuning layer on top of the basic tone controls, matching how most
    photo editors separate "Basic" tone sliders from a "Curve" panel.
-6. **Saturation** (0-2) - scale the HSV S channel.
-7. **Vibrance** (0-2) - saturation boost weighted by `(1 - current_saturation)`
+10. **Saturation** (0-2) - scale the HSV S channel.
+11. **Vibrance** (0-2) - saturation boost weighted by `(1 - current_saturation)`
    so already-saturated pixels move less.
-8. **Clarity** (-1..1) - unsharp mask against a 21x21 Gaussian blur; positive
+12. **Clarity** (-1..1) - unsharp mask against a 21x21 Gaussian blur; positive
    sharpens, negative softens.
-9. **Denoise** (0-100) - bilateral filter; map to diameter 5-20 and
+13. **Denoise** (0-100) - bilateral filter; map to diameter 5-20 and
    sigma_color / sigma_space 75-150. Above 50, add a 3x3 morphological close.
-10. **Star reduction** (`star_reduction` 0-100, `star_sensitivity` /
+14. **Chroma denoise** (`chroma_denoise`, 0-100) - the same bilateral filter as
+   Denoise, applied only to the Cr/Cb channels (`COLOR_BGR2YCrCb`), leaving
+   luma untouched. Colour speckle is usually more objectionable than luma
+   noise in a stacked astro frame, and can be smoothed much harder than luma
+   without an apparent loss of detail, since detail lives almost entirely in
+   luma.
+15. **Star reduction** (`star_reduction` 0-100, `star_sensitivity` /
    `star_max_size` 0-100) - shrink *individually detected* stars, leaving
    everything else untouched. Detection (`StarDetectionService.detect`, shared
    with the `POST /api/star-mask/{id}` mask-preview endpoint) isolates compact
@@ -87,7 +132,7 @@ Applied in this order to minimize artifacts (`apply_parameters`):
    photo - worse than the black-dot bug it was meant to fix - because
    inpainting fills from the mask boundary rather than shrinking the star's
    own disc in place.
-11. **Sharpness** (0-2) - below 1.0 Gaussian blur, above 1.0 Laplacian-kernel
+16. **Sharpness** (0-2) - below 1.0 Gaussian blur, above 1.0 Laplacian-kernel
     sharpen blended by `(sharpness - 1) * 0.5`.
 
 Preview path downscales to 512 px (`preview_max_size`) for instant feedback; the
@@ -107,14 +152,20 @@ between the background and the DSO, not just filling the tonal range evenly.
   `wp - bp < 10` (a flat/degenerate frame), tone changes are skipped entirely.
 - `contrast = clip(210 / (wp - bp), 0.5, 3.0)` - stretch the real signal range
   toward filling most (not all - headroom) of 0-255.
-- `brightness` is chosen so the black point, after `apply_contrast`'s own
+- `exposure` is chosen so the black point, after `apply_contrast`'s own
   mean-centered formula (`y = (x-mean)*contrast + mean`), settles near a
   near-black floor (~3) - a crushed background reads as depth, so this isn't
   protected from crushing the way an early version did (floor ~8, which read
   as flat/washed-out against a real photo).
-- `highlights = +0.2` (a modest boost to the DSO's own bright detail) unless a
-  meaningful fraction of pixels already clip near white (`>= 250`), in which
-  case it pulls back instead.
+- `highlights` is **never positive** - only pulled back (`clip(-clipped_fraction
+  * 8.0, -1.0, 0.0)`) when a meaningful fraction of pixels already clip near
+  white (`>= 250`), otherwise 0. An earlier version also boosted highlights
+  (`+0.2`) to lift the DSO's own bright detail, but this pipeline runs
+  `star_reduction` *after* highlights/contrast (see `apply_parameters`), so
+  boosting brightness here blew stars out toward flat, saturated plateaus
+  before the shrink step ever saw them - erosion can't meaningfully shrink a
+  plateau with no gradient left to eat into. A DSO's own brightness comes from
+  the contrast stretch above, not from this.
 - `shadows = -0.35` (deepens the background) unless the frame is already
   mostly near-black (`<= 5`) beyond what a typical deep-sky background
   accounts for, in which case further crushing would just eat real faint
@@ -122,7 +173,7 @@ between the background and the DSO, not just filling the tonal range evenly.
   pixels only (`shadow_mask = (1 - gray)^2`), so this mostly darkens the empty
   sky and barely touches the DSO itself - exactly the "highlight the object,
   darken the background" separation real deep-sky processing aims for, rather
-  than one flat brightness shift.
+  than one flat exposure shift.
 - All four values are rounded to 2 decimals before being returned - the raw
   percentile-derived floats carry a dozen digits of spurious precision that
   read as broken in the slider UI.

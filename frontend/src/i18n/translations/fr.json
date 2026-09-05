@@ -110,6 +110,10 @@
         "label": "Lumière",
         "help": "Exposition générale et équilibre tonal - la luminosité, le contraste et la richesse des détails dans les ombres et les hautes lumières."
       },
+      "corrections": {
+        "label": "Corrections",
+        "help": "Corriger le signal brut avant les réglages créatifs : vignetage de l'objectif, dégradés de pollution lumineuse du fond, et brume atmosphérique."
+      },
       "colour": {
         "label": "Couleur",
         "help": "Teinte, saturation et balance des blancs - l'intensité des couleurs et la dominante chaude ou froide de l'image."
@@ -132,8 +136,8 @@
         "label": "Contraste",
         "hint": "Étire la plage tonale autour du point médian de l'image, séparant les détails faibles des détails lumineux."
       },
-      "brightness": {
-        "label": "Luminosité",
+      "exposure": {
+        "label": "Exposition",
         "hint": "Décale la luminosité globale vers le haut ou vers le bas."
       },
       "highlights": {
@@ -144,6 +148,26 @@
         "label": "Ombres",
         "hint": "Éclaircit ou assombrit les détails sombres - pondéré vers les pixels les plus sombres uniquement."
       },
+      "whites": {
+        "label": "Blancs",
+        "hint": "Déplace le point de coupure des blancs - plus étroit et plus marqué que Hautes lumières, seulement la frange proche du blanc pur."
+      },
+      "blacks": {
+        "label": "Noirs",
+        "hint": "Déplace le point de coupure des noirs - plus étroit et plus marqué que Ombres, seulement la frange proche du noir pur."
+      },
+      "vignetteCorrection": {
+        "label": "Correction du vignetage",
+        "hint": "Éclaircit les coins pour contrer le vignetage de l'objectif."
+      },
+      "gradientReduction": {
+        "label": "Réduction du gradient",
+        "hint": "Aplanit les dégradés de fond lisses - pollution lumineuse, lueur du ciel."
+      },
+      "dehaze": {
+        "label": "Anti-brume",
+        "hint": "Restaure le contraste et la couleur perdus à cause d'une brume ou d'une lueur de pollution lumineuse."
+      },
       "clarity": {
         "label": "Clarté",
         "hint": "Contraste local via un masque flou. Les valeurs négatives adoucissent l'image à la place."
@@ -151,6 +175,10 @@
       "denoise": {
         "label": "Débruitage",
         "hint": "Lissage préservant les contours. Plus la valeur est élevée, plus le fond est propre au détriment des détails fins."
+      },
+      "chromaDenoise": {
+        "label": "Réduction du bruit couleur",
+        "hint": "Lisse uniquement le bruit de couleur, sans toucher aux détails de luminosité."
       },
       "starReduction": {
         "label": "Réduction des étoiles",

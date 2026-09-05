@@ -24,13 +24,19 @@ _WIRE = {
         "crop_h": 0.9,
     },
     "contrast": 1.5,
-    "brightness": 0.1,
+    "exposure": 0.1,
     "saturation": 1.2,
     "highlights": 0.0,
     "shadows": 0.2,
+    "whites": 0.15,
+    "blacks": -0.15,
     "clarity": 0.8,
     "vibrance": 1.1,
     "denoise": 30,
+    "chroma_denoise": 25,
+    "vignette_correction": 20,
+    "gradient_reduction": 15,
+    "dehaze": 10,
     "star_reduction": 20,
     "star_sensitivity": 65,
     "star_max_size": 40,
@@ -90,6 +96,19 @@ def test_curve_point_level_out_of_range_is_rejected() -> None:
 def test_unknown_field_is_rejected() -> None:
     with pytest.raises(ValidationError):
         ProcessingParameters(depthShiftIntensity=40)  # type: ignore[call-arg]
+
+
+def test_whites_blacks_out_of_range_is_rejected() -> None:
+    with pytest.raises(ValidationError):
+        ProcessingParameters(whites=1.5)
+    with pytest.raises(ValidationError):
+        ProcessingParameters(blacks=-1.5)
+
+
+def test_new_percentage_fields_out_of_range_is_rejected() -> None:
+    for field in ("chroma_denoise", "vignette_correction", "gradient_reduction", "dehaze"):
+        with pytest.raises(ValidationError):
+            ProcessingParameters(**{field: 150})
 
 
 def test_unknown_geometry_field_is_rejected() -> None:
