@@ -22,6 +22,7 @@ import type {
   StarMaskResult,
   UploadFrameResult,
   UploadResponse,
+  VersionCheckResult,
   WebhookResponse,
   WebhookToken,
 } from '@/types';
@@ -285,6 +286,11 @@ export const apiClient = {
 
   getStack(stackId: string): Promise<StackResult> {
     return request<StackResult>(`/stack/${stackId}`);
+  },
+
+  // --- Update check ---
+  checkForUpdates(): Promise<VersionCheckResult> {
+    return request<VersionCheckResult>('/version/check-updates');
   },
 };
 

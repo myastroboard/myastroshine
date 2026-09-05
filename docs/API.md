@@ -85,6 +85,8 @@ Celery job queue (`PROCESSING_MODE=queue`), and the progress WebSockets.
 | POST | `/stack/{stack_id}/process` | Align + combine frames | 7 |
 | GET | `/stack/{stack_id}` | Stack result and statistics | 7 |
 | WS | `/ws/stack-status/{job_id}` | Real-time stacking progress | 6 |
+| GET | `/version` | The version this instance is running | v0.2 |
+| GET | `/version/check-updates` | Latest GitHub release, cached ~4h | v0.2 |
 
 ## Processing parameters
 
@@ -255,6 +257,37 @@ Scope is deliberately limited to what histogram/black-point/star-density can
 drive with confidence: `contrast`, `brightness`, `highlights`, `shadows`, and
 `star_reduction`. Everything else stays at its `ProcessingParameters` default.
 See `docs/ALGORITHMS.md` "Auto Astro" for the heuristic.
+
+## Update check
+
+`GET /version` reads the running version directly (no caching needed - it's a
+constant for the life of the process). `GET /version/check-updates` reports
+whether a newer GitHub release exists:
+
+```json
+{
+  "current_version": "0.1.0",
+  "latest_version": "0.2.0",
+  "update_available": true,
+  "release_url": "https://github.com/myastroboard/myastroshine/releases/tag/v0.2.0",
+  "release_name": "v0.2.0",
+  "release_notes": "### Added\n- ...",
+  "published_at": "2026-09-05T00:00:00Z",
+  "error": null
+}
+```
+
+Backed by `VersionCheckService` (`app/services/version_check.py`): queries
+`GET https://api.github.com/repos/myastroboard/myastroshine/releases/latest`
+and caches the result in memory for 4 hours, so polling this endpoint never
+translates into hammering GitHub's (unauthenticated, 60 req/hour) rate limit.
+Every failure path (timeout, 404, GitHub's own rate limit, a malformed
+response, ...) is caught and returned as a normal 200 with a non-null `error`
+and `update_available: false` - this endpoint never 5xxs on a GitHub outage.
+The frontend (`useVersionCheck.ts`) polls this every 4h and re-verifies
+`update_available` itself before showing the discreet update banner
+(`UpdateBanner.tsx`), so a stale or incorrect cache can never present as a
+downgrade.
 
 ## Webhook tokens
 
