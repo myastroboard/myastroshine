@@ -1,5 +1,7 @@
 import { useState } from 'react';
 
+import { useTranslation } from '@/hooks/useTranslation';
+
 export interface SavePresetDialogProps {
   onSave: (name: string, description: string) => Promise<void> | void;
   onClose: () => void;
@@ -7,6 +9,7 @@ export interface SavePresetDialogProps {
 
 /** Small modal that collects a name for a user preset. */
 export function SavePresetDialog({ onSave, onClose }: SavePresetDialogProps) {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [busy, setBusy] = useState(false);
@@ -14,7 +17,7 @@ export function SavePresetDialog({ onSave, onClose }: SavePresetDialogProps) {
 
   async function handleSubmit(): Promise<void> {
     if (!name.trim()) {
-      setError('A name is required');
+      setError(t('save_preset_dialog.name_required_error'));
       return;
     }
     setBusy(true);
@@ -33,22 +36,22 @@ export function SavePresetDialog({ onSave, onClose }: SavePresetDialogProps) {
       className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
-      aria-label="Save as preset"
+      aria-label={t('save_preset_dialog.title')}
     >
       <div className="flex w-full max-w-sm flex-col gap-4 rounded-xl border border-line bg-overlay p-5 shadow-pop">
-        <h2 className="text-sm font-semibold text-ink">Save as preset</h2>
+        <h2 className="text-sm font-semibold text-ink">{t('save_preset_dialog.title')}</h2>
         <label className="flex flex-col gap-1.5">
-          <span className="label">Name</span>
+          <span className="label">{t('common.name')}</span>
           <input
             className="field"
-            placeholder="My nebula look"
+            placeholder={t('save_preset_dialog.name_placeholder')}
             value={name}
             autoFocus
             onChange={(event) => setName(event.target.value)}
           />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="label">Description (optional)</span>
+          <span className="label">{t('save_preset_dialog.description_label')}</span>
           <input
             className="field"
             value={description}
@@ -58,7 +61,7 @@ export function SavePresetDialog({ onSave, onClose }: SavePresetDialogProps) {
         {error && <p className="text-xs text-danger">{error}</p>}
         <div className="mt-1 flex justify-end gap-2">
           <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}>
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             type="button"
@@ -66,7 +69,7 @@ export function SavePresetDialog({ onSave, onClose }: SavePresetDialogProps) {
             disabled={busy}
             onClick={() => void handleSubmit()}
           >
-            {busy ? 'Saving...' : 'Save'}
+            {busy ? t('common.saving') : t('save_preset_dialog.save')}
           </button>
         </div>
       </div>

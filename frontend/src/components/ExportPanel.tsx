@@ -1,3 +1,5 @@
+import { useTranslation } from '@/hooks/useTranslation';
+
 export interface ExportPanelProps {
   isProcessing?: boolean;
   canSendToAstroDex?: boolean;
@@ -12,9 +14,10 @@ export function ExportPanel({
   onDownload,
   onSendToAstroDex,
 }: ExportPanelProps) {
+  const { t } = useTranslation();
   return (
     <div className="panel flex flex-col gap-2.5">
-      <h2 className="eyebrow">Export</h2>
+      <h2 className="eyebrow">{t('export_panel.heading')}</h2>
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
@@ -22,7 +25,7 @@ export function ExportPanel({
           disabled={isProcessing}
           onClick={onDownload}
         >
-          Download
+          {t('export_panel.download')}
         </button>
         {canSendToAstroDex && (
           <button
@@ -31,7 +34,7 @@ export function ExportPanel({
             disabled={isProcessing}
             onClick={onSendToAstroDex}
           >
-            Send to AstroDex
+            {t('export_panel.send_to_astrodex')}
           </button>
         )}
       </div>

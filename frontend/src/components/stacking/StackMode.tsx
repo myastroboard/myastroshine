@@ -1,3 +1,5 @@
+import { useTranslation } from '@/hooks/useTranslation';
+
 export type EditorMode = 'single' | 'stack';
 
 export interface StackModeProps {
@@ -5,16 +7,17 @@ export interface StackModeProps {
   onModeChange: (mode: EditorMode) => void;
 }
 
-const MODES: { value: EditorMode; label: string }[] = [
-  { value: 'single', label: 'Single Image' },
-  { value: 'stack', label: 'Multi-Image Stack' },
+const MODE_KEYS: { value: EditorMode; key: string }[] = [
+  { value: 'single', key: 'stacking.mode.single' },
+  { value: 'stack', key: 'stacking.mode.stack' },
 ];
 
 /** Mode selector: single-image enhancement vs multi-frame stacking (v1.1+). */
 export function StackMode({ mode, onModeChange }: StackModeProps) {
+  const { t } = useTranslation();
   return (
     <div className="segmented self-start">
-      {MODES.map((entry) => {
+      {MODE_KEYS.map((entry) => {
         const active = mode === entry.value;
         return (
           <button
@@ -24,7 +27,7 @@ export function StackMode({ mode, onModeChange }: StackModeProps) {
             className={`segmented-item ${active ? 'segmented-item-active' : ''}`}
             onClick={() => onModeChange(entry.value)}
           >
-            {entry.label}
+            {t(entry.key)}
           </button>
         );
       })}

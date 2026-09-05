@@ -12,6 +12,7 @@ import { useDepthShift } from '@/hooks/useDepthShift';
 import { useImageProcessing } from '@/hooks/useImageProcessing';
 import { usePresets } from '@/hooks/usePresets';
 import { useStarMask } from '@/hooks/useStarMask';
+import { useTranslation } from '@/hooks/useTranslation';
 import { apiClient } from '@/services/api';
 import {
   DEFAULT_PARAMETERS,
@@ -47,6 +48,7 @@ function displayedAspect(dimensions: Dimensions | undefined, geometry: GeometryP
 
 /** Main editing surface: preview + parameter panel + actions. */
 export function EditorView({ session, astrodexContext }: EditorViewProps) {
+  const { t } = useTranslation();
   const {
     parameters,
     status,
@@ -200,11 +202,11 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
           <div className="flex flex-col gap-2">
             {depthShift.error ? (
               <p className="rounded-md border border-danger/30 bg-danger-wash px-3 py-2 text-xs text-danger">
-                Depth shift failed: {depthShift.error}
+                {t('editor.depth_shift_failed', { error: depthShift.error })}
               </p>
             ) : depthShift.layerUrls.length === 0 ? (
               <div className="grid h-40 place-items-center rounded-xl border border-hairline bg-surface text-xs text-faint">
-                Generating depth map...
+                {t('editor.generating_depth_map')}
               </div>
             ) : (
               <DepthShiftViewer
@@ -224,7 +226,7 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
             disabled={!session.dimensions || status === 'processing'}
             onClick={() => setShowCrop(true)}
           >
-            Crop &amp; rotate
+            {t('crop_tool.title')}
           </button>
         </div>
         <ExportPanel
@@ -254,18 +256,18 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
 
       <aside className="flex flex-col gap-5">
         <section className="flex flex-col gap-2.5">
-          <h2 className="eyebrow">Presets</h2>
+          <h2 className="eyebrow">{t('editor.presets_heading')}</h2>
           <button
             type="button"
             className="btn btn-primary btn-sm w-full"
             disabled={status === 'processing' || autoAstro.isLoading}
             onClick={() => void handleAutoAstro()}
           >
-            {autoAstro.isLoading ? 'Analyzing...' : 'Auto Astro'}
+            {autoAstro.isLoading ? t('editor.auto_astro_analyzing') : t('editor.auto_astro_button')}
           </button>
           {autoAstro.error && (
             <p className="rounded-md border border-danger/30 bg-danger-wash px-3 py-2 text-xs text-danger">
-              Auto Astro failed: {autoAstro.error}
+              {t('editor.auto_astro_failed', { error: autoAstro.error })}
             </p>
           )}
           <PresetButtons
@@ -280,7 +282,7 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
             disabled={status === 'processing'}
             onClick={() => setShowSavePreset(true)}
           >
-            Save as preset
+            {t('editor.save_as_preset')}
           </button>
         </section>
         <SliderPanel

@@ -3,16 +3,12 @@ import { useState, type ReactNode } from 'react';
 import { TokenManager } from '@/components/TokenManager';
 import { useAppSettings } from '@/hooks/useAppSettings';
 import { useLogs } from '@/hooks/useLogs';
+import { useTranslation } from '@/hooks/useTranslation';
 import type { AppSettings, LogLevel } from '@/types';
 
 type Section = 'general' | 'webhooks' | 'advanced' | 'logs';
 
-const SECTIONS: { id: Section; label: string; blurb: string }[] = [
-  { id: 'general', label: 'General', blurb: 'Uploads, processing, and stacking defaults.' },
-  { id: 'webhooks', label: 'Webhooks', blurb: 'AstroDex tokens and callback delivery.' },
-  { id: 'advanced', label: 'Advanced', blurb: 'Networking and log levels.' },
-  { id: 'logs', label: 'Logs', blurb: 'Tail, clear, and export the application log.' },
-];
+const SECTIONS: Section[] = ['general', 'webhooks', 'advanced', 'logs'];
 
 const LOG_LEVELS: LogLevel[] = ['debug', 'info', 'warning', 'error', 'critical'];
 
@@ -27,9 +23,9 @@ interface SectionProps {
  * environment variable.
  */
 export function SettingsView({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation();
   const { draft, patch, reset, save, dirty, isLoading, isSaving, error } = useAppSettings();
   const [section, setSection] = useState<Section>('general');
-  const current = SECTIONS.find((entry) => entry.id === section) ?? SECTIONS[0];
 
   return (
     <main className="mx-auto w-full max-w-4xl px-4 pb-24 pt-8 sm:px-6">
@@ -39,12 +35,10 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
           className="mb-2 -ml-1 flex w-fit items-center gap-1 rounded px-1 text-xs text-muted outline-none transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-accent"
           onClick={onClose}
         >
-          <span aria-hidden>&lsaquo;</span> Back to editor
+          <span aria-hidden>&lsaquo;</span> {t('settings.back_to_editor')}
         </button>
-        <h1 className="text-xl font-semibold tracking-tight text-ink">Settings</h1>
-        <p className="text-sm text-muted">
-          Runtime configuration. Stored in the data volume, applied without a redeploy.
-        </p>
+        <h1 className="text-xl font-semibold tracking-tight text-ink">{t('settings.heading')}</h1>
+        <p className="text-sm text-muted">{t('settings.subheading')}</p>
       </div>
 
       {error && (
@@ -56,33 +50,33 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
       <div className="mt-8 grid gap-x-10 gap-y-6 lg:grid-cols-[188px_minmax(0,1fr)]">
         <nav
           className="flex gap-1 overflow-x-auto lg:sticky lg:top-20 lg:h-fit lg:flex-col lg:overflow-visible"
-          aria-label="Settings sections"
+          aria-label={t('settings.sections_aria_label')}
         >
           {SECTIONS.map((entry) => (
             <button
-              key={entry.id}
+              key={entry}
               type="button"
-              aria-current={section === entry.id ? 'page' : undefined}
-              onClick={() => setSection(entry.id)}
+              aria-current={section === entry ? 'page' : undefined}
+              onClick={() => setSection(entry)}
               className={
                 'shrink-0 rounded-md px-3 py-2 text-left text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent ' +
-                (section === entry.id
+                (section === entry
                   ? 'bg-raised font-medium text-ink'
                   : 'text-muted hover:bg-white/[0.04] hover:text-ink')
               }
             >
-              {entry.label}
+              {t(`settings.sections.${entry}.label`)}
             </button>
           ))}
         </nav>
 
         <div className="min-w-0">
           <div className="mb-5 border-b border-line-strong pb-3">
-            <h2 className="text-sm font-semibold text-ink">{current.label}</h2>
-            <p className="mt-0.5 text-xs text-muted">{current.blurb}</p>
+            <h2 className="text-sm font-semibold text-ink">{t(`settings.sections.${section}.label`)}</h2>
+            <p className="mt-0.5 text-xs text-muted">{t(`settings.sections.${section}.blurb`)}</p>
           </div>
 
-          {isLoading && !draft && <p className="text-xs text-faint">Loading...</p>}
+          {isLoading && !draft && <p className="text-xs text-faint">{t('common.loading')}</p>}
 
           {section === 'logs' && <LogsSection />}
 
@@ -99,14 +93,14 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
       {dirty && (
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-canvas/90 backdrop-blur">
           <div className="mx-auto flex max-w-4xl items-center gap-3 px-4 py-3 sm:px-6">
-            <span className="mr-auto text-xs text-muted">Unsaved changes</span>
+            <span className="mr-auto text-xs text-muted">{t('settings.unsaved_changes')}</span>
             <button
               type="button"
               className="btn btn-ghost btn-sm"
               onClick={reset}
               disabled={isSaving}
             >
-              Reset
+              {t('common.reset')}
             </button>
             <button
               type="button"
@@ -114,7 +108,7 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
               onClick={() => void save()}
               disabled={isSaving}
             >
-              {isSaving ? 'Saving...' : 'Save changes'}
+              {isSaving ? t('common.saving') : t('settings.save_changes')}
             </button>
           </div>
         </div>
@@ -126,13 +120,14 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
 // --- sections ----------------------------------------------------------------
 
 function GeneralSection({ draft, patch }: SectionProps) {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-col">
-      <GroupLabel>Uploads and sessions</GroupLabel>
+      <GroupLabel>{t('settings.groups.uploads_and_sessions')}</GroupLabel>
       <NumberRow
         id="max-upload"
-        label="Maximum upload size"
-        hint="Uploads larger than this are rejected. Megabytes."
+        label={t('settings.general.max_upload.label')}
+        hint={t('settings.general.max_upload.hint')}
         value={draft.maxImageSizeMb}
         min={1}
         max={1024}
@@ -140,8 +135,8 @@ function GeneralSection({ draft, patch }: SectionProps) {
       />
       <NumberRow
         id="session-ttl"
-        label="Session lifetime"
-        hint="How long a session and its working files are kept. Hours."
+        label={t('settings.general.session_ttl.label')}
+        hint={t('settings.general.session_ttl.hint')}
         value={draft.sessionExpiryHours}
         min={1}
         max={8760}
@@ -149,8 +144,8 @@ function GeneralSection({ draft, patch }: SectionProps) {
       />
       <NumberRow
         id="preview-size"
-        label="Preview size"
-        hint="Longest edge of the fast-display preview image. Pixels."
+        label={t('settings.general.preview_size.label')}
+        hint={t('settings.general.preview_size.hint')}
         value={draft.previewMaxSize}
         min={64}
         max={4096}
@@ -158,35 +153,35 @@ function GeneralSection({ draft, patch }: SectionProps) {
         onChange={(previewMaxSize) => patch({ previewMaxSize })}
       />
 
-      <GroupLabel>Processing</GroupLabel>
+      <GroupLabel>{t('settings.groups.processing')}</GroupLabel>
       <SelectRow
         id="depth-method"
-        label="Depth detection"
-        hint="Method used to estimate the depth map for the parallax effect."
+        label={t('settings.general.depth_method.label')}
+        hint={t('settings.general.depth_method.hint')}
         value={draft.depthDetectionMethod}
         options={['gradient', 'ml']}
         onChange={(depthDetectionMethod) => patch({ depthDetectionMethod })}
       />
       <ToggleRow
         id="denoise-ml"
-        label="ML denoising"
-        hint="Higher quality, noticeably slower, and needs the model present."
+        label={t('settings.general.denoise_ml.label')}
+        hint={t('settings.general.denoise_ml.hint')}
         checked={draft.denoiseEnableMl}
         onChange={(denoiseEnableMl) => patch({ denoiseEnableMl })}
       />
 
-      <GroupLabel>Stacking defaults</GroupLabel>
+      <GroupLabel>{t('settings.groups.stacking_defaults')}</GroupLabel>
       <ToggleRow
         id="stacking-enabled"
-        label="Stacking enabled"
-        hint="Show the multi-frame stacking mode."
+        label={t('settings.general.stacking_enabled.label')}
+        hint={t('settings.general.stacking_enabled.hint')}
         checked={draft.stackingEnabled}
         onChange={(stackingEnabled) => patch({ stackingEnabled })}
       />
       <NumberRow
         id="stacking-max"
-        label="Maximum frames"
-        hint="Upper bound on frames accepted for one stack."
+        label={t('settings.general.stacking_max.label')}
+        hint={t('settings.general.stacking_max.hint')}
         value={draft.stackingMaxFrames}
         min={2}
         max={1000}
@@ -194,24 +189,24 @@ function GeneralSection({ draft, patch }: SectionProps) {
       />
       <SelectRow
         id="stacking-aligner"
-        label="Aligner"
-        hint="Feature detector used to register frames."
+        label={t('settings.general.stacking_aligner.label')}
+        hint={t('settings.general.stacking_aligner.hint')}
         value={draft.stackingDetector}
         options={['orb', 'sift']}
         onChange={(stackingDetector) => patch({ stackingDetector })}
       />
       <SelectRow
         id="stacking-combine"
-        label="Combination"
-        hint="Default method for combining aligned frames."
+        label={t('settings.general.stacking_combine.label')}
+        hint={t('settings.general.stacking_combine.hint')}
         value={draft.stackingCombinationDefault}
         options={['median', 'mean', 'sigma_clip']}
         onChange={(stackingCombinationDefault) => patch({ stackingCombinationDefault })}
       />
       <NumberRow
         id="stacking-sigma"
-        label="Cosmic-ray sigma"
-        hint="Rejection threshold in robust standard deviations."
+        label={t('settings.general.stacking_sigma.label')}
+        hint={t('settings.general.stacking_sigma.hint')}
         value={draft.stackingCosmicRayThreshold}
         min={0.5}
         max={10}
@@ -223,24 +218,25 @@ function GeneralSection({ draft, patch }: SectionProps) {
 }
 
 function WebhooksSection({ draft, patch }: SectionProps) {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-8">
       <TokenManager />
 
       <div className="flex flex-col">
-        <GroupLabel>Callback delivery</GroupLabel>
+        <GroupLabel>{t('settings.groups.callback_delivery')}</GroupLabel>
         <ListRow
           id="callback-allowlist"
-          label="Callback URL allowlist"
-          hint="One URL prefix per line. An empty list allows any host (development only)."
+          label={t('settings.webhooks.allowlist.label')}
+          hint={t('settings.webhooks.allowlist.hint')}
           value={draft.astrodexCallbackUrls}
           placeholder="http://myastroboard.local/api/webhooks/enhanced-images"
           onChange={(astrodexCallbackUrls) => patch({ astrodexCallbackUrls })}
         />
         <NumberRow
           id="astrodex-retries"
-          label="Maximum retries"
-          hint="Delivery attempts before a webhook is marked failed."
+          label={t('settings.webhooks.max_retries.label')}
+          hint={t('settings.webhooks.max_retries.hint')}
           value={draft.astrodexMaxRetries}
           min={1}
           max={10}
@@ -248,8 +244,8 @@ function WebhooksSection({ draft, patch }: SectionProps) {
         />
         <NumberRow
           id="astrodex-delay"
-          label="Retry delay"
-          hint="Base backoff between attempts. Seconds."
+          label={t('settings.webhooks.retry_delay.label')}
+          hint={t('settings.webhooks.retry_delay.hint')}
           value={draft.astrodexRetryDelaySeconds}
           min={0}
           max={60}
@@ -262,30 +258,31 @@ function WebhooksSection({ draft, patch }: SectionProps) {
 }
 
 function AdvancedSection({ draft, patch }: SectionProps) {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-col">
-      <GroupLabel>Network</GroupLabel>
+      <GroupLabel>{t('settings.groups.network')}</GroupLabel>
       <ListRow
         id="cors-origins"
-        label="CORS origins"
-        hint="One origin per line. Takes effect after the api service restarts."
+        label={t('settings.advanced.cors_origins.label')}
+        hint={t('settings.advanced.cors_origins.hint')}
         value={draft.corsOrigins}
         placeholder="http://localhost:3000"
         onChange={(corsOrigins) => patch({ corsOrigins })}
       />
 
-      <GroupLabel>Rate limiting</GroupLabel>
+      <GroupLabel>{t('settings.groups.rate_limiting')}</GroupLabel>
       <ToggleRow
         id="rate-limit-enabled"
-        label="Rate limiting"
-        hint="Caps how often one IP can upload, process, or stack images."
+        label={t('settings.advanced.rate_limit_enabled.label')}
+        hint={t('settings.advanced.rate_limit_enabled.hint')}
         checked={draft.rateLimitEnabled}
         onChange={(rateLimitEnabled) => patch({ rateLimitEnabled })}
       />
       <NumberRow
         id="rate-limit-per-minute"
-        label="Requests per minute"
-        hint="Per IP, shared across upload/process/stack endpoints."
+        label={t('settings.advanced.rate_limit_per_minute.label')}
+        hint={t('settings.advanced.rate_limit_per_minute.hint')}
         value={draft.rateLimitPerMinute}
         min={1}
         max={1000}
@@ -293,27 +290,27 @@ function AdvancedSection({ draft, patch }: SectionProps) {
       />
       <NumberRow
         id="max-concurrent-jobs"
-        label="Concurrent jobs"
-        hint="Maximum enhance/stack jobs running at once, per IP."
+        label={t('settings.advanced.max_concurrent_jobs.label')}
+        hint={t('settings.advanced.max_concurrent_jobs.hint')}
         value={draft.maxConcurrentJobsPerIp}
         min={1}
         max={100}
         onChange={(maxConcurrentJobsPerIp) => patch({ maxConcurrentJobsPerIp })}
       />
 
-      <GroupLabel>Logging</GroupLabel>
+      <GroupLabel>{t('settings.groups.logging')}</GroupLabel>
       <SelectRow
         id="log-file-level"
-        label="File log level"
-        hint="Level written to the rotating log file."
+        label={t('settings.advanced.log_file_level.label')}
+        hint={t('settings.advanced.log_file_level.hint')}
         value={draft.logLevel}
         options={LOG_LEVELS}
         onChange={(logLevel) => patch({ logLevel })}
       />
       <SelectRow
         id="log-console-level"
-        label="Console log level"
-        hint="Level echoed to the container logs."
+        label={t('settings.advanced.log_console_level.label')}
+        hint={t('settings.advanced.log_console_level.hint')}
         value={draft.consoleLogLevel}
         options={LOG_LEVELS}
         onChange={(consoleLogLevel) => patch({ consoleLogLevel })}
@@ -323,6 +320,7 @@ function AdvancedSection({ draft, patch }: SectionProps) {
 }
 
 function LogsSection() {
+  const { t } = useTranslation();
   const { lines, level, setLevel, levels, refresh, clear, exportZip, isLoading, busy, error } =
     useLogs();
   const [confirmClear, setConfirmClear] = useState(false);
@@ -342,13 +340,13 @@ function LogsSection() {
 
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-xs text-muted">
-          Level
+          {t('settings.logs.level_label')}
           <select
             className="field w-32 py-1.5"
             value={level}
             onChange={(event) => setLevel(event.target.value as LogLevel | '')}
           >
-            <option value="">all</option>
+            <option value="">{t('settings.logs.level_all_option')}</option>
             {LOG_LEVELS.map((option) => (
               <option key={option} value={option}>
                 {option}
@@ -357,10 +355,10 @@ function LogsSection() {
           </select>
         </label>
         <button type="button" className="btn btn-outline btn-sm" onClick={() => void refresh()}>
-          Refresh
+          {t('settings.logs.refresh')}
         </button>
         <button type="button" className="btn btn-outline btn-sm" onClick={() => void exportZip()}>
-          Export ZIP
+          {t('settings.logs.export_zip')}
         </button>
         <button
           type="button"
@@ -369,22 +367,21 @@ function LogsSection() {
           onBlur={() => setConfirmClear(false)}
           disabled={busy}
         >
-          {confirmClear ? 'Confirm clear' : 'Clear'}
+          {confirmClear ? t('settings.logs.confirm_clear') : t('settings.logs.clear')}
         </button>
       </div>
 
       {levels && (
         <p className="text-xs text-faint">
-          Levels - file: <span className="text-muted">{levels.file}</span>, console:{' '}
-          <span className="text-muted">{levels.console}</span>. Change them on the Advanced tab.
+          {t('settings.logs.levels_hint', { file: levels.file, console: levels.console })}
         </p>
       )}
 
       <pre className="max-h-[440px] overflow-auto rounded-md border border-line bg-canvas p-3 font-mono text-[11px] leading-relaxed whitespace-pre text-muted">
         {isLoading && lines.length === 0
-          ? 'Loading...'
+          ? t('common.loading')
           : lines.length === 0
-            ? 'No log lines.'
+            ? t('settings.logs.no_lines')
             : lines.join('\n')}
       </pre>
     </div>

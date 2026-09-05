@@ -1,3 +1,5 @@
+import { useTranslation } from '@/hooks/useTranslation';
+
 export interface StackFrame {
   index: number;
   name: string;
@@ -19,8 +21,16 @@ const STATUS_TONE: Record<StackFrame['status'], string> = {
   error: 'text-danger',
 };
 
+const STATUS_KEY: Record<StackFrame['status'], string> = {
+  queued: 'stacking.upload_zone.status.queued',
+  uploading: 'stacking.upload_zone.status.uploading',
+  done: 'stacking.upload_zone.status.done',
+  error: 'stacking.upload_zone.status.error',
+};
+
 /** Multi-frame drag-and-drop upload list (v1.1+). */
 export function StackUploadZone({ frames, onAddFiles }: StackUploadZoneProps) {
+  const { t } = useTranslation();
   const hasFrames = frames.length > 0;
   const fileInput = (
     <input
@@ -39,7 +49,7 @@ export function StackUploadZone({ frames, onAddFiles }: StackUploadZoneProps) {
           <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 stroke-current" fill="none" aria-hidden>
             <path d="M12 5v14M5 12h14" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
-          Add frames
+          {t('stacking.upload_zone.add_frames')}
           {fileInput}
         </label>
       ) : (
@@ -55,8 +65,8 @@ export function StackUploadZone({ frames, onAddFiles }: StackUploadZoneProps) {
             </svg>
           </div>
           <div className="flex flex-col gap-0.5">
-            <span className="text-sm text-ink">Add frames</span>
-            <span className="text-xs text-faint">Select multiple files at once</span>
+            <span className="text-sm text-ink">{t('stacking.upload_zone.add_frames')}</span>
+            <span className="text-xs text-faint">{t('stacking.upload_zone.select_multiple_hint')}</span>
           </div>
           {fileInput}
         </label>
@@ -67,10 +77,13 @@ export function StackUploadZone({ frames, onAddFiles }: StackUploadZoneProps) {
           {frames.map((frame) => (
             <li key={frame.index} className="flex items-center justify-between gap-3 py-2">
               <span className="truncate text-muted">
-                <span className="text-faint">Frame {frame.index + 1}:</span> {frame.name}
+                <span className="text-faint">
+                  {t('stacking.upload_zone.frame_label', { n: frame.index + 1 })}
+                </span>{' '}
+                {frame.name}
               </span>
               <span className={`shrink-0 tabular-nums ${STATUS_TONE[frame.status]}`}>
-                {frame.status}
+                {t(STATUS_KEY[frame.status])}
               </span>
             </li>
           ))}

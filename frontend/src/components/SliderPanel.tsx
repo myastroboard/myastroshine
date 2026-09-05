@@ -1,3 +1,4 @@
+import { useTranslation } from '@/hooks/useTranslation';
 import {
   PARAMETER_BOUNDS,
   type ParameterBound,
@@ -25,40 +26,17 @@ function decimalPlaces(step: number): number {
 }
 
 interface SectionMeta {
-  label: string;
-  help: string;
+  key: ParameterBound['group'];
   defaultOpen: boolean;
 }
 
-const SECTIONS: Record<ParameterBound['group'], SectionMeta> = {
-  light: {
-    label: 'Light',
-    help: 'Overall exposure and tonal balance - how bright, contrasty, and full of shadow and highlight detail the image reads.',
-    defaultOpen: true,
-  },
-  colour: {
-    label: 'Colour',
-    help: 'Hue, saturation, and white balance - how vivid and how warm or cool the image looks.',
-    defaultOpen: true,
-  },
-  detail: {
-    label: 'Detail',
-    help: 'Local texture: micro-contrast, noise reduction, and sharpening.',
-    defaultOpen: false,
-  },
-  star: {
-    label: 'Stars',
-    help: 'How individual stars are detected and shrunk, so faint nebulosity stands out.',
-    defaultOpen: false,
-  },
-  depth: {
-    label: 'Depth',
-    help: 'Strength of the parallax effect in the Depth Shift viewer.',
-    defaultOpen: false,
-  },
-};
-
-const SECTION_ORDER = Object.keys(SECTIONS) as ParameterBound['group'][];
+const SECTION_ORDER: SectionMeta[] = [
+  { key: 'light', defaultOpen: true },
+  { key: 'colour', defaultOpen: true },
+  { key: 'detail', defaultOpen: false },
+  { key: 'star', defaultOpen: false },
+  { key: 'depth', defaultOpen: false },
+];
 
 /** Parameter adjustment sliders, grouped into named, collapsible sections. */
 export function SliderPanel({
@@ -72,21 +50,22 @@ export function SliderPanel({
   starMaskSourceCount = null,
   starMaskLoading = false,
 }: SliderPanelProps) {
+  const { t } = useTranslation();
+
   return (
     <div className="panel flex flex-col gap-1">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="eyebrow">Adjustments</h2>
+        <h2 className="eyebrow">{t('slider_panel.adjustments_heading')}</h2>
         <button type="button" className="btn btn-ghost btn-sm -mr-2" onClick={onReset}>
-          Reset all
+          {t('slider_panel.reset_all')}
         </button>
       </div>
 
-      {SECTION_ORDER.map((group) => {
-        const bounds = PARAMETER_BOUNDS.filter((bound) => bound.group === group);
-        const section = SECTIONS[group];
+      {SECTION_ORDER.map((section) => {
+        const bounds = PARAMETER_BOUNDS.filter((bound) => bound.group === section.key);
         return (
           <details
-            key={group}
+            key={section.key}
             className="group/section border-t border-hairline py-3 first:border-t-0 first:pt-0"
             open={section.defaultOpen}
           >
@@ -105,7 +84,7 @@ export function SliderPanel({
                     strokeLinejoin="round"
                   />
                 </svg>
-                <span className="eyebrow">{section.label}</span>
+                <span className="eyebrow">{t(`slider_panel.sections.${section.key}.label`)}</span>
               </span>
               <button
                 type="button"
@@ -116,47 +95,53 @@ export function SliderPanel({
                   onResetSection(bounds.map((bound) => bound.key));
                 }}
               >
-                Reset
+                {t('common.reset')}
               </button>
             </summary>
 
-            <p className="mb-3 mt-1.5 text-xs text-faint">{section.help}</p>
+            <p className="mb-3 mt-1.5 text-xs text-faint">
+              {t(`slider_panel.sections.${section.key}.help`)}
+            </p>
 
             <div className="flex flex-col gap-3">
-              {bounds.map((bound) => (
-                <div key={bound.key} className="flex flex-col gap-1.5 text-sm">
-                  <span className="flex items-baseline justify-between">
-                    <span className="inline-flex items-center gap-1 text-muted">
-                      <label htmlFor={`param-${bound.key}`}>{bound.label}</label>
-                      <ParameterHint paramKey={bound.key} label={bound.label} hint={bound.hint} />
+              {bounds.map((bound) => {
+                const label = t(`slider_panel.params.${bound.key}.label`);
+                const hint = t(`slider_panel.params.${bound.key}.hint`);
+                return (
+                  <div key={bound.key} className="flex flex-col gap-1.5 text-sm">
+                    <span className="flex items-baseline justify-between">
+                      <span className="inline-flex items-center gap-1 text-muted">
+                        <label htmlFor={`param-${bound.key}`}>{label}</label>
+                        <ParameterHint paramKey={bound.key} label={label} hint={hint} />
+                      </span>
+                      <span className="text-xs tabular-nums text-faint">
+                        {parameters[bound.key].toFixed(decimalPlaces(bound.step))}
+                      </span>
                     </span>
-                    <span className="text-xs tabular-nums text-faint">
-                      {parameters[bound.key].toFixed(decimalPlaces(bound.step))}
-                    </span>
-                  </span>
-                  <input
-                    id={`param-${bound.key}`}
-                    type="range"
-                    className="slider"
-                    min={bound.min}
-                    max={bound.max}
-                    step={bound.step}
-                    value={parameters[bound.key]}
-                    disabled={isProcessing}
-                    onChange={(event) => onParameterChange(bound.key, Number(event.target.value))}
-                  />
-                </div>
-              ))}
-              {group === 'star' && onStarMaskToggle && (
+                    <input
+                      id={`param-${bound.key}`}
+                      type="range"
+                      className="slider"
+                      min={bound.min}
+                      max={bound.max}
+                      step={bound.step}
+                      value={parameters[bound.key]}
+                      disabled={isProcessing}
+                      onChange={(event) => onParameterChange(bound.key, Number(event.target.value))}
+                    />
+                  </div>
+                );
+              })}
+              {section.key === 'star' && onStarMaskToggle && (
                 <label className="flex items-center justify-between gap-2 text-sm text-muted">
                   <span className="inline-flex items-center gap-1.5">
-                    Show star mask
+                    {t('slider_panel.show_star_mask')}
                     {starMaskEnabled && (
                       <span className="text-xs tabular-nums text-faint">
                         {starMaskLoading
                           ? '...'
                           : starMaskSourceCount !== null
-                            ? `${starMaskSourceCount} sources`
+                            ? t('slider_panel.sources_count', { count: starMaskSourceCount })
                             : ''}
                       </span>
                     )}
@@ -187,13 +172,14 @@ function ParameterHint({
   label: string;
   hint: string;
 }) {
+  const { t } = useTranslation();
   const tooltipId = `param-hint-${paramKey}`;
   return (
     <span className="group/hint relative inline-flex">
       <button
         type="button"
         aria-describedby={tooltipId}
-        aria-label={`About ${label}`}
+        aria-label={t('slider_panel.about_param_aria', { label })}
         className="grid h-4 w-4 shrink-0 place-items-center rounded-full border border-line-strong text-[10px] font-semibold leading-none text-muted outline-none transition-colors hover:border-accent/60 hover:text-ink focus-visible:border-accent/60 focus-visible:text-ink"
       >
         i

@@ -91,151 +91,32 @@ export type SliderParameterKey = Exclude<keyof ProcessingParameters, 'geometry'>
 
 export interface ParameterBound {
   key: SliderParameterKey;
-  label: string;
   min: number;
   max: number;
   step: number;
   group: 'light' | 'colour' | 'detail' | 'star' | 'depth';
-  /** Shown in a hover/focus tooltip next to the label. */
-  hint: string;
 }
 
+/**
+ * Label and hint text live in the i18n translation files, keyed by `key`
+ * (`slider_panel.params.<key>.label` / `.hint`), not here - see SliderPanel.tsx.
+ */
 export const PARAMETER_BOUNDS: ParameterBound[] = [
-  {
-    key: 'contrast',
-    label: 'Contrast',
-    min: 0.5,
-    max: 3.0,
-    step: 0.01,
-    group: 'light',
-    hint: "Stretches the tonal range around the image's midpoint, separating faint detail from bright.",
-  },
-  {
-    key: 'brightness',
-    label: 'Brightness',
-    min: -1.0,
-    max: 1.0,
-    step: 0.01,
-    group: 'light',
-    hint: 'Shifts overall luminance up or down.',
-  },
-  {
-    key: 'highlights',
-    label: 'Highlights',
-    min: -1.0,
-    max: 1.0,
-    step: 0.01,
-    group: 'light',
-    hint: 'Recovers or boosts bright detail - weighted toward the brightest pixels only.',
-  },
-  {
-    key: 'shadows',
-    label: 'Shadows',
-    min: -1.0,
-    max: 1.0,
-    step: 0.01,
-    group: 'light',
-    hint: 'Lifts or deepens dark detail - weighted toward the darkest pixels only.',
-  },
-  {
-    key: 'clarity',
-    label: 'Clarity',
-    min: -1.0,
-    max: 1.0,
-    step: 0.01,
-    group: 'detail',
-    hint: 'Local contrast via unsharp masking. Negative values soften instead.',
-  },
-  {
-    key: 'denoise',
-    label: 'Denoise',
-    min: 0,
-    max: 100,
-    step: 1,
-    group: 'detail',
-    hint: 'Edge-preserving smoothing. Higher trades fine detail for a cleaner background.',
-  },
-  {
-    key: 'starReduction',
-    label: 'Star reduction',
-    min: 0,
-    max: 100,
-    step: 1,
-    group: 'star',
-    hint: 'Shrinks and dims star points so faint nebulosity stands out more.',
-  },
-  {
-    key: 'starSensitivity',
-    label: 'Star sensitivity',
-    min: 0,
-    max: 100,
-    step: 1,
-    group: 'star',
-    hint: 'How faint a point can be and still count as a star. Higher finds more, fainter stars.',
-  },
-  {
-    key: 'starMaxSize',
-    label: 'Star max size',
-    min: 0,
-    max: 100,
-    step: 1,
-    group: 'star',
-    hint: "Caps how large a bright spot can be and still count as a star, so bright cores aren't shrunk.",
-  },
-  {
-    key: 'sharpness',
-    label: 'Sharpness',
-    min: 0.0,
-    max: 2.0,
-    step: 0.01,
-    group: 'detail',
-    hint: 'Blurs below 100%, sharpens above via edge enhancement.',
-  },
-  {
-    key: 'vibrance',
-    label: 'Vibrance',
-    min: 0.0,
-    max: 2.0,
-    step: 0.01,
-    group: 'colour',
-    hint: 'Boosts saturation, weighted toward already-muted colours so vivid areas stay natural.',
-  },
-  {
-    key: 'saturation',
-    label: 'Saturation',
-    min: 0.0,
-    max: 2.0,
-    step: 0.01,
-    group: 'colour',
-    hint: 'Scales colour intensity uniformly across the whole image.',
-  },
-  {
-    key: 'temperature',
-    label: 'Temperature',
-    min: 2000,
-    max: 8000,
-    step: 50,
-    group: 'colour',
-    hint: 'White balance: cooler (blue) toward 2000K, warmer (amber) toward 8000K.',
-  },
-  {
-    key: 'tint',
-    label: 'Tint',
-    min: -50,
-    max: 50,
-    step: 1,
-    group: 'colour',
-    hint: 'White balance: shifts the colour cast between green and magenta.',
-  },
-  {
-    key: 'depthShiftIntensity',
-    label: 'Depth Shift',
-    min: -100,
-    max: 100,
-    step: 1,
-    group: 'depth',
-    hint: 'Strength of the parallax effect in the Depth Shift viewer.',
-  },
+  { key: 'contrast', min: 0.5, max: 3.0, step: 0.01, group: 'light' },
+  { key: 'brightness', min: -1.0, max: 1.0, step: 0.01, group: 'light' },
+  { key: 'highlights', min: -1.0, max: 1.0, step: 0.01, group: 'light' },
+  { key: 'shadows', min: -1.0, max: 1.0, step: 0.01, group: 'light' },
+  { key: 'clarity', min: -1.0, max: 1.0, step: 0.01, group: 'detail' },
+  { key: 'denoise', min: 0, max: 100, step: 1, group: 'detail' },
+  { key: 'starReduction', min: 0, max: 100, step: 1, group: 'star' },
+  { key: 'starSensitivity', min: 0, max: 100, step: 1, group: 'star' },
+  { key: 'starMaxSize', min: 0, max: 100, step: 1, group: 'star' },
+  { key: 'sharpness', min: 0.0, max: 2.0, step: 0.01, group: 'detail' },
+  { key: 'vibrance', min: 0.0, max: 2.0, step: 0.01, group: 'colour' },
+  { key: 'saturation', min: 0.0, max: 2.0, step: 0.01, group: 'colour' },
+  { key: 'temperature', min: 2000, max: 8000, step: 50, group: 'colour' },
+  { key: 'tint', min: -50, max: 50, step: 1, group: 'colour' },
+  { key: 'depthShiftIntensity', min: -100, max: 100, step: 1, group: 'depth' },
 ];
 
 export interface Image {

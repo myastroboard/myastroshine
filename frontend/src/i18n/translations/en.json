@@ -1,0 +1,295 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "reset": "Reset",
+    "loading": "Loading...",
+    "saving": "Saving...",
+    "name": "Name"
+  },
+  "language_switcher": {
+    "aria_label": "Language"
+  },
+  "app": {
+    "nav_settings": "Settings"
+  },
+  "image_upload": {
+    "format_not_supported": "Format {ext} not supported",
+    "file_too_large": "File size exceeds 100MB limit",
+    "drop_hint": "Drop an astronomical image here",
+    "choose_file_hint": "or choose a file to begin",
+    "choose_file_button": "Choose a file",
+    "uploading_button": "Uploading...",
+    "accepted_formats": "JPEG, PNG or TIFF, up to 100 MB"
+  },
+  "editor": {
+    "depth_shift_failed": "Depth shift failed: {error}",
+    "generating_depth_map": "Generating depth map...",
+    "presets_heading": "Presets",
+    "auto_astro_button": "Auto Astro",
+    "auto_astro_analyzing": "Analyzing...",
+    "auto_astro_failed": "Auto Astro failed: {error}",
+    "save_as_preset": "Save as preset"
+  },
+  "export_panel": {
+    "heading": "Export",
+    "download": "Download",
+    "send_to_astrodex": "Send to AstroDex"
+  },
+  "image_preview": {
+    "processed_alt": "Processed",
+    "original_alt": "Original",
+    "click_to_set_focal_point": "Click the image to set the focal point",
+    "zoom_out": "Zoom out",
+    "reset_zoom": "Reset zoom",
+    "zoom_in": "Zoom in",
+    "processing": "Processing",
+    "before_after": "Before / After",
+    "open_depth_shift": "Open Depth Shift viewer",
+    "change_focal_point": "Change focal point",
+    "set_focal_point": "Set focal point",
+    "clear_focal_point": "Clear focal point"
+  },
+  "preset_buttons": {
+    "confirm_delete_aria": "Confirm delete preset {name}",
+    "delete_aria": "Delete preset {name}",
+    "click_again_to_delete": "Click again to delete",
+    "delete_preset_title": "Delete preset"
+  },
+  "save_preset_dialog": {
+    "title": "Save as preset",
+    "name_placeholder": "My nebula look",
+    "description_label": "Description (optional)",
+    "name_required_error": "A name is required",
+    "save": "Save"
+  },
+  "token_manager": {
+    "heading": "AstroDex webhook tokens",
+    "copy_now_warning": "Copy these now, they are not shown again.",
+    "done": "Done",
+    "name_placeholder": "AstroDex prod",
+    "expires_label": "Expires (days, optional)",
+    "create_button": "Create token",
+    "revoke_button": "Revoke",
+    "expires_on": "expires {date}"
+  },
+  "depth_shift_viewer": {
+    "dialog_aria_label": "Depth shift viewer",
+    "layer_alt": "Depth layer {index}",
+    "intensity_label": "Intensity",
+    "intensity_aria_label": "Depth shift intensity",
+    "close": "Close"
+  },
+  "crop_tool": {
+    "title": "Crop & rotate",
+    "free": "Free",
+    "original": "Original",
+    "done": "Done",
+    "straighten_label": "Straighten",
+    "rotate_90": "Rotate 90°",
+    "flip_h": "Flip H",
+    "flip_v": "Flip V",
+    "crop_source_alt": "Crop source"
+  },
+  "slider_panel": {
+    "adjustments_heading": "Adjustments",
+    "reset_all": "Reset all",
+    "show_star_mask": "Show star mask",
+    "sources_count": "{count} sources",
+    "about_param_aria": "About {label}",
+    "sections": {
+      "light": {
+        "label": "Light",
+        "help": "Overall exposure and tonal balance - how bright, contrasty, and full of shadow and highlight detail the image reads."
+      },
+      "colour": {
+        "label": "Colour",
+        "help": "Hue, saturation, and white balance - how vivid and how warm or cool the image looks."
+      },
+      "detail": {
+        "label": "Detail",
+        "help": "Local texture: micro-contrast, noise reduction, and sharpening."
+      },
+      "star": {
+        "label": "Stars",
+        "help": "How individual stars are detected and shrunk, so faint nebulosity stands out."
+      },
+      "depth": {
+        "label": "Depth",
+        "help": "Strength of the parallax effect in the Depth Shift viewer."
+      }
+    },
+    "params": {
+      "contrast": {
+        "label": "Contrast",
+        "hint": "Stretches the tonal range around the image's midpoint, separating faint detail from bright."
+      },
+      "brightness": {
+        "label": "Brightness",
+        "hint": "Shifts overall luminance up or down."
+      },
+      "highlights": {
+        "label": "Highlights",
+        "hint": "Recovers or boosts bright detail - weighted toward the brightest pixels only."
+      },
+      "shadows": {
+        "label": "Shadows",
+        "hint": "Lifts or deepens dark detail - weighted toward the darkest pixels only."
+      },
+      "clarity": {
+        "label": "Clarity",
+        "hint": "Local contrast via unsharp masking. Negative values soften instead."
+      },
+      "denoise": {
+        "label": "Denoise",
+        "hint": "Edge-preserving smoothing. Higher trades fine detail for a cleaner background."
+      },
+      "starReduction": {
+        "label": "Star reduction",
+        "hint": "Shrinks and dims star points so faint nebulosity stands out more."
+      },
+      "starSensitivity": {
+        "label": "Star sensitivity",
+        "hint": "How faint a point can be and still count as a star. Higher finds more, fainter stars."
+      },
+      "starMaxSize": {
+        "label": "Star max size",
+        "hint": "Caps how large a bright spot can be and still count as a star, so bright cores aren't shrunk."
+      },
+      "sharpness": {
+        "label": "Sharpness",
+        "hint": "Blurs below 100%, sharpens above via edge enhancement."
+      },
+      "vibrance": {
+        "label": "Vibrance",
+        "hint": "Boosts saturation, weighted toward already-muted colours so vivid areas stay natural."
+      },
+      "saturation": {
+        "label": "Saturation",
+        "hint": "Scales colour intensity uniformly across the whole image."
+      },
+      "temperature": {
+        "label": "Temperature",
+        "hint": "White balance: cooler (blue) toward 2000K, warmer (amber) toward 8000K."
+      },
+      "tint": {
+        "label": "Tint",
+        "hint": "White balance: shifts the colour cast between green and magenta."
+      },
+      "depthShiftIntensity": {
+        "label": "Depth Shift",
+        "hint": "Strength of the parallax effect in the Depth Shift viewer."
+      }
+    }
+  },
+  "histogram": {
+    "aria_label": "RGB histogram"
+  },
+  "settings": {
+    "back_to_editor": "Back to editor",
+    "heading": "Settings",
+    "subheading": "Runtime configuration. Stored in the data volume, applied without a redeploy.",
+    "unsaved_changes": "Unsaved changes",
+    "save_changes": "Save changes",
+    "sections_aria_label": "Settings sections",
+    "sections": {
+      "general": { "label": "General", "blurb": "Uploads, processing, and stacking defaults." },
+      "webhooks": { "label": "Webhooks", "blurb": "AstroDex tokens and callback delivery." },
+      "advanced": { "label": "Advanced", "blurb": "Networking and log levels." },
+      "logs": { "label": "Logs", "blurb": "Tail, clear, and export the application log." }
+    },
+    "groups": {
+      "uploads_and_sessions": "Uploads and sessions",
+      "processing": "Processing",
+      "stacking_defaults": "Stacking defaults",
+      "callback_delivery": "Callback delivery",
+      "network": "Network",
+      "rate_limiting": "Rate limiting",
+      "logging": "Logging"
+    },
+    "general": {
+      "max_upload": { "label": "Maximum upload size", "hint": "Uploads larger than this are rejected. Megabytes." },
+      "session_ttl": { "label": "Session lifetime", "hint": "How long a session and its working files are kept. Hours." },
+      "preview_size": { "label": "Preview size", "hint": "Longest edge of the fast-display preview image. Pixels." },
+      "depth_method": { "label": "Depth detection", "hint": "Method used to estimate the depth map for the parallax effect." },
+      "denoise_ml": { "label": "ML denoising", "hint": "Higher quality, noticeably slower, and needs the model present." },
+      "stacking_enabled": { "label": "Stacking enabled", "hint": "Show the multi-frame stacking mode." },
+      "stacking_max": { "label": "Maximum frames", "hint": "Upper bound on frames accepted for one stack." },
+      "stacking_aligner": { "label": "Aligner", "hint": "Feature detector used to register frames." },
+      "stacking_combine": { "label": "Combination", "hint": "Default method for combining aligned frames." },
+      "stacking_sigma": { "label": "Cosmic-ray sigma", "hint": "Rejection threshold in robust standard deviations." }
+    },
+    "webhooks": {
+      "allowlist": { "label": "Callback URL allowlist", "hint": "One URL prefix per line. An empty list allows any host (development only)." },
+      "max_retries": { "label": "Maximum retries", "hint": "Delivery attempts before a webhook is marked failed." },
+      "retry_delay": { "label": "Retry delay", "hint": "Base backoff between attempts. Seconds." }
+    },
+    "advanced": {
+      "cors_origins": { "label": "CORS origins", "hint": "One origin per line. Takes effect after the api service restarts." },
+      "rate_limit_enabled": { "label": "Rate limiting", "hint": "Caps how often one IP can upload, process, or stack images." },
+      "rate_limit_per_minute": { "label": "Requests per minute", "hint": "Per IP, shared across upload/process/stack endpoints." },
+      "max_concurrent_jobs": { "label": "Concurrent jobs", "hint": "Maximum enhance/stack jobs running at once, per IP." },
+      "log_file_level": { "label": "File log level", "hint": "Level written to the rotating log file." },
+      "log_console_level": { "label": "Console log level", "hint": "Level echoed to the container logs." }
+    },
+    "logs": {
+      "level_label": "Level",
+      "level_all_option": "all",
+      "refresh": "Refresh",
+      "export_zip": "Export ZIP",
+      "confirm_clear": "Confirm clear",
+      "clear": "Clear",
+      "levels_hint": "Levels - file: {file}, console: {console}. Change them on the Advanced tab.",
+      "no_lines": "No log lines."
+    }
+  },
+  "stacking": {
+    "registration_label": "Registration",
+    "background_normalization_label": "Background normalization",
+    "cosmic_ray_rejection_label": "Cosmic ray rejection",
+    "combination_label": "Combination",
+    "mode": {
+      "single": "Single Image",
+      "stack": "Multi-Image Stack"
+    },
+    "progress": {
+      "heading": "Stacking"
+    },
+    "results": {
+      "failed": "Stacking failed: {error}",
+      "status_ellipsis": "Stack {status}...",
+      "composite_alt": "Stacked composite",
+      "frames_stacked": "Frames stacked",
+      "frames_rejected": "Frames rejected",
+      "cosmic_rays_removed": "Cosmic rays removed",
+      "registration_success": "Registration success",
+      "snr_improvement": "SNR improvement",
+      "enhance_composite": "Enhance composite",
+      "download_composite": "Download composite"
+    },
+    "settings": {
+      "alignment_label": "Alignment",
+      "orb_option": "ORB (fast)",
+      "sift_option": "SIFT (accurate)",
+      "median_option": "Median",
+      "mean_option": "Mean",
+      "sigma_clip_option": "Sigma-clip"
+    },
+    "upload_zone": {
+      "add_frames": "Add frames",
+      "select_multiple_hint": "Select multiple files at once",
+      "frame_label": "Frame {n}:",
+      "status": {
+        "queued": "queued",
+        "uploading": "uploading",
+        "done": "done",
+        "error": "error"
+      }
+    },
+    "view": {
+      "settings_heading": "Stack settings",
+      "stacking_button": "Stacking...",
+      "stack_n_frames": "Stack {count} frames",
+      "hint": "Upload at least 2 similar frames (JPEG, PNG or TIFF). More frames raise the signal-to-noise ratio by roughly the square root of the frame count."
+    }
+  }
+}

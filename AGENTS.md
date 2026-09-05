@@ -29,10 +29,17 @@ Keep the "Non-negotiables" section intact.
 
 ## 3. Language and text
 
-- All code, comments, docstrings, commit messages, PR text, and user-facing strings
-  in **English**.
-- **ASCII punctuation only** in source text. Straight apostrophe `'` (U+0027), never
-  the curly `U+2019`. Hyphen-minus `-` (U+002D), never en/em dashes.
+- All code, comments, docstrings, commit messages, PR text, and backend-owned
+  user-facing strings (API error messages, log lines) in **English**.
+- Frontend UI text is translated: FR + EN, `frontend/src/i18n/translations/*.json`
+  (`en.json` is the reference language). Add a UI string as a key there and read it
+  with `useTranslation()`'s `t()` (`@/hooks/useTranslation`), never hardcode text in
+  a component. Every language file must carry the same keys, leaf types, and
+  `{placeholder}` names as `en.json` - `python scripts/validate_i18n.py` checks this
+  and runs in CI.
+- **ASCII punctuation only** in source text (this still applies within each
+  language's translation values, French included). Straight apostrophe `'`
+  (U+0027), never the curly `U+2019`. Hyphen-minus `-` (U+002D), never en/em dashes.
 
 ## 4. Logging and output
 
@@ -109,9 +116,10 @@ Do not report a change as complete until the project check set passes:
 - [ ] `mypy app` (backend)
 - [ ] `npm run lint` and `npm run typecheck` (frontend)
 - [ ] `python scripts/check_deps_fresh.py` passes (no dependency left behind)
+- [ ] `python scripts/validate_i18n.py` passes if you touched frontend UI text
 - [ ] Contract tests updated if you added/removed/renamed a route or public API
 - [ ] Docs updated for any user-facing or behavioral change
-- [ ] All new text in English / ASCII punctuation
+- [ ] All new text in English / ASCII punctuation (frontend UI text: see section 3)
 - [ ] No `print()` / raw logging import; no `innerHTML`; no new static inline styles
 
 Report which commands you actually ran and their results.

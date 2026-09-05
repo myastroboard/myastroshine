@@ -1,3 +1,4 @@
+import { useTranslation } from '@/hooks/useTranslation';
 import type { HistogramData } from '@/types';
 
 export interface HistogramDisplayProps {
@@ -6,6 +7,7 @@ export interface HistogramDisplayProps {
 
 /** RGB histogram visualization (three overlaid channel curves). */
 export function HistogramDisplay({ data }: HistogramDisplayProps) {
+  const { t } = useTranslation();
   const channels: Array<[keyof HistogramData, string]> = [
     ['r', 'stroke-red-400'],
     ['g', 'stroke-green-400'],
@@ -14,7 +16,7 @@ export function HistogramDisplay({ data }: HistogramDisplayProps) {
   const max = Math.max(1, ...data.r, ...data.g, ...data.b);
 
   return (
-    <svg viewBox="0 0 256 64" className="h-16 w-full" role="img" aria-label="RGB histogram">
+    <svg viewBox="0 0 256 64" className="h-16 w-full" role="img" aria-label={t('histogram.aria_label')}>
       {channels.map(([channel, className]) => (
         <polyline
           key={channel}

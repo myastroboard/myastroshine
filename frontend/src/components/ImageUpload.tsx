@@ -1,5 +1,7 @@
 import { useRef, useState, type DragEvent } from 'react';
 
+import { useTranslation } from '@/hooks/useTranslation';
+
 const ACCEPTED = ['.jpg', '.jpeg', '.png', '.tiff'];
 const MAX_SIZE_BYTES = 100 * 1024 * 1024;
 
@@ -10,6 +12,7 @@ export interface ImageUploadProps {
 
 /** Drag-and-drop + file picker upload zone. */
 export function ImageUpload({ onUpload, isLoading = false }: ImageUploadProps) {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -17,11 +20,11 @@ export function ImageUpload({ onUpload, isLoading = false }: ImageUploadProps) {
   function validateAndUpload(file: File): void {
     const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
     if (!ACCEPTED.includes(ext)) {
-      setValidationError(`Format ${ext} not supported`);
+      setValidationError(t('image_upload.format_not_supported', { ext }));
       return;
     }
     if (file.size > MAX_SIZE_BYTES) {
-      setValidationError('File size exceeds 100MB limit');
+      setValidationError(t('image_upload.file_too_large'));
       return;
     }
     setValidationError(null);
@@ -59,8 +62,8 @@ export function ImageUpload({ onUpload, isLoading = false }: ImageUploadProps) {
           </svg>
         </div>
         <div className="flex flex-col gap-1">
-          <p className="text-sm text-ink">Drop an astronomical image here</p>
-          <p className="text-xs text-faint">or choose a file to begin</p>
+          <p className="text-sm text-ink">{t('image_upload.drop_hint')}</p>
+          <p className="text-xs text-faint">{t('image_upload.choose_file_hint')}</p>
         </div>
         <button
           type="button"
@@ -68,7 +71,7 @@ export function ImageUpload({ onUpload, isLoading = false }: ImageUploadProps) {
           disabled={isLoading}
           onClick={() => inputRef.current?.click()}
         >
-          {isLoading ? 'Uploading...' : 'Choose a file'}
+          {isLoading ? t('image_upload.uploading_button') : t('image_upload.choose_file_button')}
         </button>
         <input
           ref={inputRef}
@@ -82,7 +85,7 @@ export function ImageUpload({ onUpload, isLoading = false }: ImageUploadProps) {
             }
           }}
         />
-        <p className="text-[11px] text-ghost">JPEG, PNG or TIFF, up to 100 MB</p>
+        <p className="text-[11px] text-ghost">{t('image_upload.accepted_formats')}</p>
         {validationError && <p className="text-xs text-danger">{validationError}</p>}
       </div>
     </div>

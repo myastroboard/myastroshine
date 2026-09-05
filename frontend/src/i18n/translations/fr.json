@@ -1,0 +1,295 @@
+{
+  "common": {
+    "cancel": "Annuler",
+    "reset": "Réinitialiser",
+    "loading": "Chargement...",
+    "saving": "Enregistrement...",
+    "name": "Nom"
+  },
+  "language_switcher": {
+    "aria_label": "Langue"
+  },
+  "app": {
+    "nav_settings": "Paramètres"
+  },
+  "image_upload": {
+    "format_not_supported": "Format {ext} non pris en charge",
+    "file_too_large": "La taille du fichier dépasse la limite de 100 Mo",
+    "drop_hint": "Déposez une image astronomique ici",
+    "choose_file_hint": "ou choisissez un fichier pour commencer",
+    "choose_file_button": "Choisir un fichier",
+    "uploading_button": "Téléversement...",
+    "accepted_formats": "JPEG, PNG ou TIFF, jusqu'à 100 Mo"
+  },
+  "editor": {
+    "depth_shift_failed": "Échec du décalage de profondeur : {error}",
+    "generating_depth_map": "Génération de la carte de profondeur...",
+    "presets_heading": "Préréglages",
+    "auto_astro_button": "Auto Astro",
+    "auto_astro_analyzing": "Analyse en cours...",
+    "auto_astro_failed": "Échec d'Auto Astro : {error}",
+    "save_as_preset": "Enregistrer comme préréglage"
+  },
+  "export_panel": {
+    "heading": "Export",
+    "download": "Télécharger",
+    "send_to_astrodex": "Envoyer vers AstroDex"
+  },
+  "image_preview": {
+    "processed_alt": "Traitée",
+    "original_alt": "Originale",
+    "click_to_set_focal_point": "Cliquez sur l'image pour définir le point focal",
+    "zoom_out": "Zoom arrière",
+    "reset_zoom": "Réinitialiser le zoom",
+    "zoom_in": "Zoom avant",
+    "processing": "Traitement en cours",
+    "before_after": "Avant / Après",
+    "open_depth_shift": "Ouvrir la visionneuse Depth Shift",
+    "change_focal_point": "Changer le point focal",
+    "set_focal_point": "Définir le point focal",
+    "clear_focal_point": "Effacer le point focal"
+  },
+  "preset_buttons": {
+    "confirm_delete_aria": "Confirmer la suppression du préréglage {name}",
+    "delete_aria": "Supprimer le préréglage {name}",
+    "click_again_to_delete": "Cliquez à nouveau pour supprimer",
+    "delete_preset_title": "Supprimer le préréglage"
+  },
+  "save_preset_dialog": {
+    "title": "Enregistrer comme préréglage",
+    "name_placeholder": "Mon rendu de nébuleuse",
+    "description_label": "Description (optionnel)",
+    "name_required_error": "Un nom est requis",
+    "save": "Enregistrer"
+  },
+  "token_manager": {
+    "heading": "Jetons webhook AstroDex",
+    "copy_now_warning": "Copiez-les maintenant, ils ne seront plus affichés ensuite.",
+    "done": "Terminé",
+    "name_placeholder": "AstroDex prod",
+    "expires_label": "Expiration (jours, optionnel)",
+    "create_button": "Créer un jeton",
+    "revoke_button": "Révoquer",
+    "expires_on": "expire le {date}"
+  },
+  "depth_shift_viewer": {
+    "dialog_aria_label": "Visionneuse Depth Shift",
+    "layer_alt": "Couche de profondeur {index}",
+    "intensity_label": "Intensité",
+    "intensity_aria_label": "Intensité du décalage de profondeur",
+    "close": "Fermer"
+  },
+  "crop_tool": {
+    "title": "Recadrer et pivoter",
+    "free": "Libre",
+    "original": "Original",
+    "done": "Terminé",
+    "straighten_label": "Redresser",
+    "rotate_90": "Pivoter à 90°",
+    "flip_h": "Miroir H",
+    "flip_v": "Miroir V",
+    "crop_source_alt": "Source du recadrage"
+  },
+  "slider_panel": {
+    "adjustments_heading": "Réglages",
+    "reset_all": "Tout réinitialiser",
+    "show_star_mask": "Afficher le masque d'étoiles",
+    "sources_count": "{count} sources",
+    "about_param_aria": "À propos de {label}",
+    "sections": {
+      "light": {
+        "label": "Lumière",
+        "help": "Exposition générale et équilibre tonal - la luminosité, le contraste et la richesse des détails dans les ombres et les hautes lumières."
+      },
+      "colour": {
+        "label": "Couleur",
+        "help": "Teinte, saturation et balance des blancs - l'intensité des couleurs et la dominante chaude ou froide de l'image."
+      },
+      "detail": {
+        "label": "Détail",
+        "help": "Texture locale : micro-contraste, réduction du bruit et netteté."
+      },
+      "star": {
+        "label": "Étoiles",
+        "help": "Comment chaque étoile est détectée et réduite, afin de faire ressortir les nébulosités faibles."
+      },
+      "depth": {
+        "label": "Profondeur",
+        "help": "Intensité de l'effet de parallaxe dans la visionneuse Depth Shift."
+      }
+    },
+    "params": {
+      "contrast": {
+        "label": "Contraste",
+        "hint": "Étire la plage tonale autour du point médian de l'image, séparant les détails faibles des détails lumineux."
+      },
+      "brightness": {
+        "label": "Luminosité",
+        "hint": "Décale la luminosité globale vers le haut ou vers le bas."
+      },
+      "highlights": {
+        "label": "Hautes lumières",
+        "hint": "Récupère ou renforce les détails clairs - pondéré vers les pixels les plus lumineux uniquement."
+      },
+      "shadows": {
+        "label": "Ombres",
+        "hint": "Éclaircit ou assombrit les détails sombres - pondéré vers les pixels les plus sombres uniquement."
+      },
+      "clarity": {
+        "label": "Clarté",
+        "hint": "Contraste local via un masque flou. Les valeurs négatives adoucissent l'image à la place."
+      },
+      "denoise": {
+        "label": "Débruitage",
+        "hint": "Lissage préservant les contours. Plus la valeur est élevée, plus le fond est propre au détriment des détails fins."
+      },
+      "starReduction": {
+        "label": "Réduction des étoiles",
+        "hint": "Réduit et atténue les points d'étoiles pour faire ressortir davantage la nébulosité faible."
+      },
+      "starSensitivity": {
+        "label": "Sensibilité aux étoiles",
+        "hint": "À quel point un point peut être faible et compter comme une étoile. Plus la valeur est élevée, plus d'étoiles faibles sont détectées."
+      },
+      "starMaxSize": {
+        "label": "Taille maxi des étoiles",
+        "hint": "Limite la taille qu'un point lumineux peut avoir pour compter comme une étoile, afin que les coeurs brillants ne soient pas réduits."
+      },
+      "sharpness": {
+        "label": "Netteté",
+        "hint": "Floute en dessous de 100 %, accentue au-dessus via un renforcement des contours."
+      },
+      "vibrance": {
+        "label": "Vibrance",
+        "hint": "Renforce la saturation, en priorité sur les couleurs déjà ternes pour que les zones vives restent naturelles."
+      },
+      "saturation": {
+        "label": "Saturation",
+        "hint": "Ajuste l'intensité des couleurs de façon uniforme sur toute l'image."
+      },
+      "temperature": {
+        "label": "Température",
+        "hint": "Balance des blancs : plus froid (bleu) vers 2000K, plus chaud (ambre) vers 8000K."
+      },
+      "tint": {
+        "label": "Teinte",
+        "hint": "Balance des blancs : décale la dominante colorée entre vert et magenta."
+      },
+      "depthShiftIntensity": {
+        "label": "Depth Shift",
+        "hint": "Intensité de l'effet de parallaxe dans la visionneuse Depth Shift."
+      }
+    }
+  },
+  "histogram": {
+    "aria_label": "Histogramme RVB"
+  },
+  "settings": {
+    "back_to_editor": "Retour à l'éditeur",
+    "heading": "Paramètres",
+    "subheading": "Configuration à l'exécution. Stockée dans le volume de données, appliquée sans redéploiement.",
+    "unsaved_changes": "Modifications non enregistrées",
+    "save_changes": "Enregistrer les modifications",
+    "sections_aria_label": "Sections des paramètres",
+    "sections": {
+      "general": { "label": "Général", "blurb": "Téléversements, traitement et valeurs par défaut de l'empilement." },
+      "webhooks": { "label": "Webhooks", "blurb": "Jetons AstroDex et livraison des rappels." },
+      "advanced": { "label": "Avancé", "blurb": "Réseau et niveaux de journalisation." },
+      "logs": { "label": "Journaux", "blurb": "Consulter, vider et exporter le journal de l'application." }
+    },
+    "groups": {
+      "uploads_and_sessions": "Téléversements et sessions",
+      "processing": "Traitement",
+      "stacking_defaults": "Valeurs par défaut de l'empilement",
+      "callback_delivery": "Livraison des rappels",
+      "network": "Réseau",
+      "rate_limiting": "Limitation de débit",
+      "logging": "Journalisation"
+    },
+    "general": {
+      "max_upload": { "label": "Taille maximale de téléversement", "hint": "Les téléversements plus volumineux sont refusés. Mégaoctets." },
+      "session_ttl": { "label": "Durée de vie de la session", "hint": "Durée de conservation d'une session et de ses fichiers de travail. Heures." },
+      "preview_size": { "label": "Taille de l'aperçu", "hint": "Plus grand côté de l'image d'aperçu rapide. Pixels." },
+      "depth_method": { "label": "Détection de profondeur", "hint": "Méthode utilisée pour estimer la carte de profondeur pour l'effet de parallaxe." },
+      "denoise_ml": { "label": "Débruitage par IA", "hint": "Meilleure qualité, nettement plus lent, et nécessite la présence du modèle." },
+      "stacking_enabled": { "label": "Empilement activé", "hint": "Afficher le mode d'empilement multi-images." },
+      "stacking_max": { "label": "Nombre maximal d'images", "hint": "Limite supérieure d'images acceptées pour un empilement." },
+      "stacking_aligner": { "label": "Alignement", "hint": "Détecteur de caractéristiques utilisé pour recaler les images." },
+      "stacking_combine": { "label": "Combinaison", "hint": "Méthode par défaut pour combiner les images alignées." },
+      "stacking_sigma": { "label": "Sigma rayons cosmiques", "hint": "Seuil de rejet en écarts-types robustes." }
+    },
+    "webhooks": {
+      "allowlist": { "label": "Liste blanche des URL de rappel", "hint": "Un préfixe d'URL par ligne. Une liste vide autorise n'importe quel hôte (développement uniquement)." },
+      "max_retries": { "label": "Nombre maximal de tentatives", "hint": "Tentatives de livraison avant qu'un webhook soit marqué en échec." },
+      "retry_delay": { "label": "Délai entre les tentatives", "hint": "Délai de base entre les tentatives. Secondes." }
+    },
+    "advanced": {
+      "cors_origins": { "label": "Origines CORS", "hint": "Une origine par ligne. Prend effet après le redémarrage du service api." },
+      "rate_limit_enabled": { "label": "Limitation de débit", "hint": "Limite la fréquence à laquelle une IP peut téléverser, traiter ou empiler des images." },
+      "rate_limit_per_minute": { "label": "Requêtes par minute", "hint": "Par IP, partagé entre les points d'accès téléversement/traitement/empilement." },
+      "max_concurrent_jobs": { "label": "Tâches simultanées", "hint": "Nombre maximal de tâches d'amélioration/empilement en cours, par IP." },
+      "log_file_level": { "label": "Niveau du journal fichier", "hint": "Niveau écrit dans le fichier journal en rotation." },
+      "log_console_level": { "label": "Niveau du journal console", "hint": "Niveau affiché dans les journaux du conteneur." }
+    },
+    "logs": {
+      "level_label": "Niveau",
+      "level_all_option": "tous",
+      "refresh": "Actualiser",
+      "export_zip": "Exporter en ZIP",
+      "confirm_clear": "Confirmer la suppression",
+      "clear": "Vider",
+      "levels_hint": "Niveaux - fichier : {file}, console : {console}. Modifiez-les dans l'onglet Avancé.",
+      "no_lines": "Aucune ligne de journal."
+    }
+  },
+  "stacking": {
+    "registration_label": "Recalage",
+    "background_normalization_label": "Normalisation du fond de ciel",
+    "cosmic_ray_rejection_label": "Rejet des rayons cosmiques",
+    "combination_label": "Combinaison",
+    "mode": {
+      "single": "Image unique",
+      "stack": "Empilement multi-images"
+    },
+    "progress": {
+      "heading": "Empilement"
+    },
+    "results": {
+      "failed": "Échec de l'empilement : {error}",
+      "status_ellipsis": "Empilement {status}...",
+      "composite_alt": "Composite empilé",
+      "frames_stacked": "Images empilées",
+      "frames_rejected": "Images rejetées",
+      "cosmic_rays_removed": "Rayons cosmiques supprimés",
+      "registration_success": "Taux de réussite du recalage",
+      "snr_improvement": "Amélioration du RSB",
+      "enhance_composite": "Améliorer le composite",
+      "download_composite": "Télécharger le composite"
+    },
+    "settings": {
+      "alignment_label": "Alignement",
+      "orb_option": "ORB (rapide)",
+      "sift_option": "SIFT (précis)",
+      "median_option": "Médiane",
+      "mean_option": "Moyenne",
+      "sigma_clip_option": "Sigma-clip"
+    },
+    "upload_zone": {
+      "add_frames": "Ajouter des images",
+      "select_multiple_hint": "Sélectionnez plusieurs fichiers à la fois",
+      "frame_label": "Image {n} :",
+      "status": {
+        "queued": "en attente",
+        "uploading": "envoi en cours",
+        "done": "terminé",
+        "error": "erreur"
+      }
+    },
+    "view": {
+      "settings_heading": "Paramètres d'empilement",
+      "stacking_button": "Empilement en cours...",
+      "stack_n_frames": "Empiler {count} images",
+      "hint": "Téléversez au moins 2 images similaires (JPEG, PNG ou TIFF). Plus il y a d'images, plus le rapport signal/bruit augmente, environ selon la racine carrée du nombre d'images."
+    }
+  }
+}

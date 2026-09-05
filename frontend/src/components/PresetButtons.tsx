@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 
+import { useTranslation } from '@/hooks/useTranslation';
 import type { Preset } from '@/types';
 
 export interface PresetButtonsProps {
@@ -17,6 +18,7 @@ export function PresetButtons({
   onPresetApply,
   onPresetDelete,
 }: PresetButtonsProps) {
+  const { t } = useTranslation();
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -59,10 +61,10 @@ export function PresetButtons({
                 }`}
                 aria-label={
                   confirming
-                    ? `Confirm delete preset ${preset.name}`
-                    : `Delete preset ${preset.name}`
+                    ? t('preset_buttons.confirm_delete_aria', { name: preset.name })
+                    : t('preset_buttons.delete_aria', { name: preset.name })
                 }
-                title={confirming ? 'Click again to delete' : 'Delete preset'}
+                title={confirming ? t('preset_buttons.click_again_to_delete') : t('preset_buttons.delete_preset_title')}
                 onClick={() => {
                   if (confirming) {
                     onPresetDelete?.(preset.presetId);

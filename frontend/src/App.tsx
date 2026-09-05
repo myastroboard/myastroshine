@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { EditorView } from '@/components/EditorView';
 import { ImageUpload } from '@/components/ImageUpload';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { SettingsView } from '@/components/SettingsView';
 import { StackMode, type EditorMode } from '@/components/stacking/StackMode';
 import { StackView } from '@/components/stacking/StackView';
+import { useTranslation } from '@/hooks/useTranslation';
 import { apiClient } from '@/services/api';
 import type { EditorSession } from '@/types';
 
@@ -36,6 +38,7 @@ function useRoute(): Route {
  * `token` query params; otherwise the app runs in standalone mode.
  */
 export default function App() {
+  const { t } = useTranslation();
   const route = useRoute();
   const [mode, setMode] = useState<EditorMode>('single');
   const [session, setSession] = useState<EditorSession | null>(null);
@@ -87,13 +90,14 @@ export default function App() {
             </span>
           </button>
           <div className="flex items-center gap-3">
+            <LanguageSwitcher />
             <button
               type="button"
               className={route === 'settings' ? 'btn btn-outline btn-sm' : 'btn btn-ghost btn-sm'}
               aria-current={route === 'settings' ? 'page' : undefined}
               onClick={() => navigate(route === 'settings' ? 'editor' : 'settings')}
             >
-              Settings
+              {t('app.nav_settings')}
             </button>
             <span className="text-xs tabular-nums text-ghost">
               v{import.meta.env.VITE_APP_VERSION ?? '0.0.0-dev'}
