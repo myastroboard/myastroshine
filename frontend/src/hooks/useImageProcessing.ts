@@ -4,6 +4,7 @@ import { apiClient } from '@/services/api';
 import { processingStatusClient } from '@/services/ws';
 import {
   DEFAULT_PARAMETERS,
+  type CurvePoint,
   type GeometryParameters,
   type JobStatus,
   type ProcessingParameters,
@@ -70,6 +71,18 @@ export function useImageProcessing(sessionId: string) {
     [applyParameters],
   );
 
+  const updateCurvePoints = useCallback(
+    (curvePoints: CurvePoint[]) => {
+      setParameters((prev) => {
+        const next = { ...prev, curvePoints };
+        clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => void applyParameters(next), DEBOUNCE_MS);
+        return next;
+      });
+    },
+    [applyParameters],
+  );
+
   /** Commit a new framing (crop tool "Done") - processed immediately. */
   const applyGeometry = useCallback(
     (geometry: GeometryParameters) => {
@@ -122,6 +135,7 @@ export function useImageProcessing(sessionId: string) {
     previewVersion,
     error,
     updateParameter,
+    updateCurvePoints,
     applyGeometry,
     applyParameters,
     resetParameters,

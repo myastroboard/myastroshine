@@ -18,6 +18,7 @@ from app.models.preset import (
     SavePresetResponse,
 )
 from app.models.processing import (
+    CurvePoint,
     GeometryParameters,
     ProcessingParameters,
     ProcessRequest,
@@ -46,6 +47,7 @@ __all__ = [
     "AutoAstroResponse",
     "CreateTokenRequest",
     "CreatedTokenResponse",
+    "CurvePoint",
     "DepthLayerInfo",
     "DepthMetadataResponse",
     "DepthShiftRequest",

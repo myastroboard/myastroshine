@@ -107,6 +107,7 @@ Celery job queue (`PROCESSING_MODE=queue`), and the progress WebSockets.
 | temperature | 2000 | 8000 | 6500 | int (Kelvin) |
 | tint | -50 | 50 | 0 | int |
 | depth_shift_intensity | -100 | 100 | 0 | int |
+| curve_points | - | - | `[]` | array of `{x, y}` |
 
 `geometry` is a nested object applied **before** enhancement (rotate -> flip ->
 straighten -> crop; crop coordinates are fractions of the rotated/flipped image):
@@ -122,6 +123,17 @@ straighten -> crop; crop coordinates are fractions of the rotated/flipped image)
 
 `crop_x + crop_w` and `crop_y + crop_h` must not exceed 1. A crop or a quarter
 turn changes the result's dimensions.
+
+`curve_points` is a tone curve: a list of `{x, y}` 8-bit input/output level
+pairs (both 0-255). `[]` (the default) means no curve. Otherwise: at least 2
+points, the first at `x=0` and the last at `x=255`, and `x` strictly
+increasing across the list - the backend interpolates a smooth curve between
+them (see `docs/ALGORITHMS.md` "Tone curve"), so the frontend only needs to
+send the points the user actually dragged, not a full 256-entry table:
+
+```json
+{ "curve_points": [{ "x": 0, "y": 0 }, { "x": 128, "y": 150 }, { "x": 255, "y": 255 }] }
+```
 
 The canonical model is `app/models/processing.py`; keep this table in sync with it.
 

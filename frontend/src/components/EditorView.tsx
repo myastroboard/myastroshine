@@ -7,6 +7,7 @@ import { ImagePreview } from '@/components/ImagePreview';
 import { PresetButtons } from '@/components/PresetButtons';
 import { SavePresetDialog } from '@/components/SavePresetDialog';
 import { SliderPanel } from '@/components/SliderPanel';
+import { ToneCurveEditor } from '@/components/ToneCurveEditor';
 import { useAutoAstro } from '@/hooks/useAutoAstro';
 import { useDepthShift } from '@/hooks/useDepthShift';
 import { useImageProcessing } from '@/hooks/useImageProcessing';
@@ -17,6 +18,7 @@ import { apiClient } from '@/services/api';
 import {
   DEFAULT_PARAMETERS,
   isDefaultGeometry,
+  type CurvePoint,
   type Dimensions,
   type EditorSession,
   type FocusPoint,
@@ -54,6 +56,7 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
     status,
     previewVersion,
     updateParameter,
+    updateCurvePoints,
     applyGeometry,
     resetParameters,
     resetKeys,
@@ -133,6 +136,11 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
   function handleResetSection(keys: SliderParameterKey[]): void {
     clearActivePreset();
     resetKeys(keys);
+  }
+
+  function handleCurveChange(curvePoints: CurvePoint[]): void {
+    clearActivePreset(); // manual edits diverge from any applied preset
+    updateCurvePoints(curvePoints);
   }
 
   function handleFocalPointPick(point: FocusPoint): void {
@@ -285,6 +293,7 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
             {t('editor.save_as_preset')}
           </button>
         </section>
+        <ToneCurveEditor points={parameters.curvePoints} onChange={handleCurveChange} />
         <SliderPanel
           parameters={parameters}
           onParameterChange={handleParameterChange}

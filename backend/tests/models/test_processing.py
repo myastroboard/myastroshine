@@ -38,6 +38,7 @@ _WIRE = {
     "temperature": 5500,
     "tint": 5,
     "depth_shift_intensity": 40,
+    "curve_points": [{"x": 0, "y": 0}, {"x": 128, "y": 160}, {"x": 255, "y": 255}],
 }
 
 
@@ -45,7 +46,45 @@ def test_all_wire_fields_round_trip() -> None:
     params = ProcessingParameters(**_WIRE)
     assert params.depth_shift_intensity == 40
     assert params.geometry.rotate_quarters == 1
+    assert params.curve_points[1].y == 160
     assert params.model_dump() == _WIRE
+
+
+def test_curve_points_defaults_to_empty() -> None:
+    """Omitting curve_points means "no curve" (identity), not a validation error."""
+    assert ProcessingParameters().curve_points == []
+
+
+def test_curve_points_rejects_a_single_point() -> None:
+    with pytest.raises(ValidationError):
+        ProcessingParameters(curve_points=[{"x": 0, "y": 0}])
+
+
+def test_curve_points_must_start_at_zero() -> None:
+    with pytest.raises(ValidationError):
+        ProcessingParameters(curve_points=[{"x": 10, "y": 0}, {"x": 255, "y": 255}])
+
+
+def test_curve_points_must_end_at_255() -> None:
+    with pytest.raises(ValidationError):
+        ProcessingParameters(curve_points=[{"x": 0, "y": 0}, {"x": 250, "y": 255}])
+
+
+def test_curve_points_must_be_strictly_increasing() -> None:
+    with pytest.raises(ValidationError):
+        ProcessingParameters(
+            curve_points=[
+                {"x": 0, "y": 0},
+                {"x": 128, "y": 100},
+                {"x": 128, "y": 200},
+                {"x": 255, "y": 255},
+            ]
+        )
+
+
+def test_curve_point_level_out_of_range_is_rejected() -> None:
+    with pytest.raises(ValidationError):
+        ProcessingParameters(curve_points=[{"x": 0, "y": 0}, {"x": 255, "y": 300}])
 
 
 def test_unknown_field_is_rejected() -> None:

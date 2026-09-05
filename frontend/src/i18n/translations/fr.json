@@ -4,7 +4,8 @@
     "reset": "Réinitialiser",
     "loading": "Chargement...",
     "saving": "Enregistrement...",
-    "name": "Nom"
+    "name": "Nom",
+    "close": "Fermer"
   },
   "language_switcher": {
     "aria_label": "Langue"
@@ -81,8 +82,11 @@
     "dialog_aria_label": "Visionneuse Depth Shift",
     "layer_alt": "Couche de profondeur {index}",
     "intensity_label": "Intensité",
-    "intensity_aria_label": "Intensité du décalage de profondeur",
-    "close": "Fermer"
+    "intensity_aria_label": "Intensité du décalage de profondeur"
+  },
+  "tone_curve": {
+    "title": "Courbe de tons",
+    "help": "Faites glisser un point pour modifier la courbe, double-cliquez sur une zone vide pour en ajouter un, double-cliquez sur un point pour le supprimer."
   },
   "crop_tool": {
     "title": "Recadrer et pivoter",

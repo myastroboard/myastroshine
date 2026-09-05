@@ -110,7 +110,7 @@ export function DepthShiftViewer({
           className="absolute right-4 top-4 rounded-md border border-white/10 bg-black/60 px-3 py-1.5 text-sm text-white/85 backdrop-blur-sm transition-colors hover:bg-black/80"
           onClick={onClose}
         >
-          {t('depth_shift_viewer.close')}
+          {t('common.close')}
         </button>
       </div>
     </div>

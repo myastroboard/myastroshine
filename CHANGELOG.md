@@ -39,16 +39,26 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   choice client-side. `scripts/validate_i18n.py` (new CI job) checks key
   parity, leaf types, and `{placeholder}` names between the two files.
   Backend-owned strings (API error messages, log lines) stay English-only.
-- In-app update check: a discreet footer banner appears once a newer GitHub
-  release is published, with a link to it and an expandable "What's new"
-  showing that release's notes. `GET /api/version/check-updates`
-  (`VersionCheckService`) queries GitHub's releases API and caches the result
-  in memory for 4 hours, so the frontend's 4-hourly poll can never translate
-  into hitting GitHub's rate limit; every failure path (timeout, GitHub's own
-  rate limit, a malformed response, ...) degrades to no banner rather than an
-  error. The frontend re-verifies the version comparison itself before
-  showing anything, so a stale/incorrect cache can never present as a
-  downgrade.
+- Permanent page footer (name, version, GitHub link - inspired by
+  MyAstroBoard's own footer bar), replacing the version number that used to
+  sit in the header. In-app update check folds into it: once a newer GitHub
+  release is published, a discreet second line appears with a link to it and
+  a "What's new" that opens the release notes in a modal, rendered from
+  markdown (headings, bold, lists, links) rather than shown as raw
+  `### `/`**` syntax. `GET /api/version/check-updates` (`VersionCheckService`)
+  queries GitHub's releases API and caches the result in memory for 4 hours,
+  so the frontend's 4-hourly poll can never translate into hitting GitHub's
+  rate limit; every failure path (timeout, GitHub's own rate limit, a
+  malformed response, ...) degrades to no notice rather than an error. The
+  frontend re-verifies the version comparison itself before showing
+  anything, so a stale/incorrect cache can never present as a downgrade.
+- Tone curve editor: an interactive curve graph (drag points to reshape,
+  double-click to add or remove a point) alongside the adjustment sliders.
+  Backed by a new `curve_points` parameter and a monotone cubic Hermite
+  spline LUT stage in the processing pipeline, so a handful of dragged
+  points make a smooth curve - not a faceted polyline - and can never
+  overshoot past a control point's value into crushed shadows or blown
+  highlights.
 
 ## [0.1.0] - 2026-09-04
 

@@ -10,8 +10,9 @@ import cv2
 import numpy as np
 import pytest
 
-from app.models import GeometryParameters, ProcessingParameters
+from app.models import CurvePoint, GeometryParameters, ProcessingParameters
 from app.services.image_processing import ImageProcessingService
+from app.utils.math_utils import curve_points_to_lut
 
 
 @pytest.fixture
@@ -231,6 +232,33 @@ def test_white_balance_warm_shifts_towards_red(
     assert warm[:, :, 0].mean() < sample_image[:, :, 0].mean()  # blue drops
 
 
+def test_tone_curve_empty_is_identity(
+    service: ImageProcessingService, sample_image: np.ndarray
+) -> None:
+    """No control points -> no-op, matching ``curve_points``'s empty default."""
+    assert np.array_equal(service.apply_tone_curve(sample_image, []), sample_image)
+
+
+def test_tone_curve_applies_the_same_lut_as_math_utils(
+    service: ImageProcessingService, sample_image: np.ndarray
+) -> None:
+    """The service wires straight into ``curve_points_to_lut`` via ``cv2.LUT``."""
+    points = [CurvePoint(x=0, y=0), CurvePoint(x=128, y=90), CurvePoint(x=255, y=255)]
+    out = service.apply_tone_curve(sample_image, points)
+
+    expected = cv2.LUT(sample_image, curve_points_to_lut([(0, 0), (128, 90), (255, 255)]))
+    assert np.array_equal(out, expected)
+
+
+def test_tone_curve_darkens_midtones(
+    service: ImageProcessingService, sample_image: np.ndarray
+) -> None:
+    """A curve pulled below the diagonal at the midpoint darkens the image overall."""
+    points = [CurvePoint(x=0, y=0), CurvePoint(x=128, y=80), CurvePoint(x=255, y=255)]
+    out = service.apply_tone_curve(sample_image, points)
+    assert _mean_luma(out) < _mean_luma(sample_image)
+
+
 def test_full_pipeline_stays_in_range(
     service: ImageProcessingService, sample_image: np.ndarray
 ) -> None:
@@ -249,6 +277,7 @@ def test_full_pipeline_stays_in_range(
         sharpness=1.5,
         temperature=4200,
         tint=10,
+        curve_points=[CurvePoint(x=0, y=0), CurvePoint(x=128, y=140), CurvePoint(x=255, y=255)],
     )
     out = service.apply_parameters(sample_image, params)
     height, width = sample_image.shape[:2]

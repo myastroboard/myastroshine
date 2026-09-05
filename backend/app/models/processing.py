@@ -7,6 +7,10 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+_LEVEL_MIN = 0
+_LEVEL_MAX = 255
+_MIN_CURVE_POINTS = 2
+
 
 class GeometryParameters(BaseModel):
     """Framing applied before enhancement: rotate, flip, straighten, crop.
@@ -34,6 +38,15 @@ class GeometryParameters(BaseModel):
         return self
 
 
+class CurvePoint(BaseModel):
+    """One control point of the tone curve: input/output level, both 8-bit."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    x: int = Field(ge=_LEVEL_MIN, le=_LEVEL_MAX)
+    y: int = Field(ge=_LEVEL_MIN, le=_LEVEL_MAX)
+
+
 class ProcessingParameters(BaseModel):
     """Enhancement parameters applied by the processing pipeline.
 
@@ -59,6 +72,22 @@ class ProcessingParameters(BaseModel):
     temperature: int = Field(default=6500, ge=2000, le=8000)
     tint: int = Field(default=0, ge=-50, le=50)
     depth_shift_intensity: int = Field(default=0, ge=-100, le=100)
+    curve_points: list[CurvePoint] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _curve_points_valid(self) -> ProcessingParameters:
+        """Empty means "identity, no curve"; otherwise a full 0-255 function."""
+        points = self.curve_points
+        if not points:
+            return self
+        if len(points) < _MIN_CURVE_POINTS:
+            raise ValueError("curve_points needs at least 2 points, or none for no curve")
+        if points[0].x != _LEVEL_MIN or points[-1].x != _LEVEL_MAX:
+            raise ValueError("curve_points must start at x=0 and end at x=255")
+        xs = [p.x for p in points]
+        if xs != sorted(xs) or len(set(xs)) != len(xs):
+            raise ValueError("curve_points must have strictly increasing x values")
+        return self
 
 
 class ProcessRequest(BaseModel):

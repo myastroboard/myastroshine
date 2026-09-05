@@ -20,14 +20,30 @@ Applied in this order to minimize artifacts (`apply_parameters`):
 3. **Brightness** (`brightness`, -1..1) - pixel offset, `beta = brightness * 50`.
 4. **Highlights / shadows** (-1..1) - masked tone curves; `gray^2` emphasizes
    bright regions, `(1 - gray)^2` emphasizes dark regions, scaled by 0.3.
-5. **Saturation** (0-2) - scale the HSV S channel.
-6. **Vibrance** (0-2) - saturation boost weighted by `(1 - current_saturation)`
+5. **Tone curve** (`curve_points`, empty by default = identity) - a 256-entry
+   lookup table (`app/utils/math_utils.py:curve_points_to_lut`), applied via
+   `cv2.LUT` identically on each BGR channel (a combined RGB curve, not
+   separate per-channel curves). Points are `(input, output)` 8-bit level
+   pairs spanning the full 0-255 range (`ProcessingParameters` validates: at
+   least 2, first at x=0, last at x=255, strictly increasing x); between them
+   the curve is a **monotone cubic Hermite spline** (Fritsch-Carlson tangent
+   correction), not a plain polyline - a handful of dragged points make a
+   smooth curve instead of visible straight-line kinks, and the correction
+   guarantees the spline never overshoots past a control point's value in the
+   segments next to it (an overshoot would locally crush shadows or blow out
+   highlights the user never asked for). A user-drawn curve subsumes and can
+   replace manual contrast/brightness/highlights/shadows tweaking, but doesn't
+   replace those sliders - both stages run, in this order, so a curve is a
+   fine-tuning layer on top of the basic tone controls, matching how most
+   photo editors separate "Basic" tone sliders from a "Curve" panel.
+6. **Saturation** (0-2) - scale the HSV S channel.
+7. **Vibrance** (0-2) - saturation boost weighted by `(1 - current_saturation)`
    so already-saturated pixels move less.
-7. **Clarity** (-1..1) - unsharp mask against a 21x21 Gaussian blur; positive
+8. **Clarity** (-1..1) - unsharp mask against a 21x21 Gaussian blur; positive
    sharpens, negative softens.
-8. **Denoise** (0-100) - bilateral filter; map to diameter 5-20 and
+9. **Denoise** (0-100) - bilateral filter; map to diameter 5-20 and
    sigma_color / sigma_space 75-150. Above 50, add a 3x3 morphological close.
-9. **Star reduction** (`star_reduction` 0-100, `star_sensitivity` /
+10. **Star reduction** (`star_reduction` 0-100, `star_sensitivity` /
    `star_max_size` 0-100) - shrink *individually detected* stars, leaving
    everything else untouched. Detection (`StarDetectionService.detect`, shared
    with the `POST /api/star-mask/{id}` mask-preview endpoint) isolates compact
@@ -71,7 +87,7 @@ Applied in this order to minimize artifacts (`apply_parameters`):
    photo - worse than the black-dot bug it was meant to fix - because
    inpainting fills from the mask boundary rather than shrinking the star's
    own disc in place.
-10. **Sharpness** (0-2) - below 1.0 Gaussian blur, above 1.0 Laplacian-kernel
+11. **Sharpness** (0-2) - below 1.0 Gaussian blur, above 1.0 Laplacian-kernel
     sharpen blended by `(sharpness - 1) * 0.5`.
 
 Preview path downscales to 512 px (`preview_max_size`) for instant feedback; the
@@ -131,7 +147,7 @@ left for erosion to shrink into. This reads as a small round white disc even
 after reduction - expected for a frame's few brightest "anchor" stars (real
 astro-processing tools leave these visible after reduction too), not a defect
 in the shrink algorithm itself. Actually removing a star regardless of
-brightness is a different, more aggressive operation ("starless", v0.4 on the
+brightness is a different, more aggressive operation ("starless", v0.3 on the
 roadmap) than reduction.
 
 ## Depth map (v1, gradient-based)

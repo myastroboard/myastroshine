@@ -4,7 +4,8 @@
     "reset": "Reset",
     "loading": "Loading...",
     "saving": "Saving...",
-    "name": "Name"
+    "name": "Name",
+    "close": "Close"
   },
   "language_switcher": {
     "aria_label": "Language"
@@ -81,8 +82,11 @@
     "dialog_aria_label": "Depth shift viewer",
     "layer_alt": "Depth layer {index}",
     "intensity_label": "Intensity",
-    "intensity_aria_label": "Depth shift intensity",
-    "close": "Close"
+    "intensity_aria_label": "Depth shift intensity"
+  },
+  "tone_curve": {
+    "title": "Tone curve",
+    "help": "Drag a point to reshape the curve, double-click empty space to add one, double-click a point to remove it."
   },
   "crop_tool": {
     "title": "Crop & rotate",
