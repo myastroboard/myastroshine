@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ImagePreview } from '@/components/ImagePreview';
+import { DEFAULT_GEOMETRY } from '@/types';
 
 /** jsdom's default rect is all zeros; give the container real-ish bounds. */
 function mockContainerRect(): void {
@@ -80,51 +81,55 @@ describe('ImagePreview', () => {
     expect(onFocalPointPick).toHaveBeenCalledWith({ x: 0.25, y: 0.25 });
   });
 
-  it('shows a marker once a focal point is set, and lets it be cleared', () => {
-    const onClearFocalPoint = vi.fn();
+  it('shows a marker once a focal point is set', () => {
+    const { container } = render(
+      <ImagePreview originalUrl="/a" processedUrl="/b" focalPoint={{ x: 0.5, y: 0.5 }} />,
+    );
+
+    expect(container.querySelector('svg circle[r="7"]')).toBeInTheDocument();
+  });
+
+  it('shows the crop frame instead of the before/after view while framing', () => {
+    render(
+      <ImagePreview
+        originalUrl="/a"
+        processedUrl="/b"
+        framing={{
+          imageUrl: '/source',
+          dimensions: { width: 4000, height: 3000 },
+          geometry: DEFAULT_GEOMETRY,
+          ratioFrac: null,
+          onGeometryChange: vi.fn(),
+        }}
+      />,
+    );
+
+    expect(screen.getByAltText('Crop source')).toBeInTheDocument();
+    expect(screen.queryByAltText('Processed')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /zoom in/i })).not.toBeInTheDocument();
+  });
+
+  it('reports a crop-rectangle drag as a geometry change while framing', () => {
+    mockContainerRect();
+    const onGeometryChange = vi.fn();
     const { container } = render(
       <ImagePreview
         originalUrl="/a"
         processedUrl="/b"
-        focalPoint={{ x: 0.5, y: 0.5 }}
-        onTogglePickFocalPoint={vi.fn()}
-        onClearFocalPoint={onClearFocalPoint}
+        framing={{
+          imageUrl: '/source',
+          dimensions: { width: 4000, height: 3000 },
+          geometry: DEFAULT_GEOMETRY,
+          ratioFrac: null,
+          onGeometryChange,
+        }}
       />,
     );
 
-    expect(container.querySelector('svg circle[r="7"]')).toBeInTheDocument();
+    const frame = container.querySelector('.cursor-move')!;
+    fireEvent.pointerDown(frame, { clientX: 100, clientY: 50, pointerId: 1 });
+    fireEvent.pointerMove(frame, { clientX: 120, clientY: 50, pointerId: 1 });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Clear focal point' }));
-    expect(onClearFocalPoint).toHaveBeenCalledTimes(1);
-  });
-
-  it('toggles the focal-point button label between set/change/cancel', () => {
-    const onToggle = vi.fn();
-    const { rerender } = render(
-      <ImagePreview originalUrl="/a" processedUrl="/b" onTogglePickFocalPoint={onToggle} />,
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Set focal point' }));
-    expect(onToggle).toHaveBeenCalledTimes(1);
-
-    rerender(
-      <ImagePreview
-        originalUrl="/a"
-        processedUrl="/b"
-        onTogglePickFocalPoint={onToggle}
-        focalPoint={{ x: 0.5, y: 0.5 }}
-      />,
-    );
-    expect(screen.getByRole('button', { name: 'Change focal point' })).toBeInTheDocument();
-
-    rerender(
-      <ImagePreview
-        originalUrl="/a"
-        processedUrl="/b"
-        onTogglePickFocalPoint={onToggle}
-        focalPoint={{ x: 0.5, y: 0.5 }}
-        pickingFocalPoint
-      />,
-    );
-    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    expect(onGeometryChange).toHaveBeenCalled();
   });
 });

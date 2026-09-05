@@ -48,6 +48,19 @@ export function isDefaultGeometry(geometry: GeometryParameters): boolean {
   );
 }
 
+export function geometryEquals(a: GeometryParameters, b: GeometryParameters): boolean {
+  return (
+    a.straighten === b.straighten &&
+    a.rotateQuarters === b.rotateQuarters &&
+    a.flipHorizontal === b.flipHorizontal &&
+    a.flipVertical === b.flipVertical &&
+    a.cropX === b.cropX &&
+    a.cropY === b.cropY &&
+    a.cropW === b.cropW &&
+    a.cropH === b.cropH
+  );
+}
+
 /** One control point of the tone curve: 8-bit input/output level, both 0-255. */
 export interface CurvePoint {
   x: number;
@@ -140,36 +153,93 @@ export interface ParameterBound {
   min: number;
   max: number;
   step: number;
-  group: 'light' | 'corrections' | 'colour' | 'detail' | 'star' | 'depth';
 }
 
 /**
- * Label and hint text live in the i18n translation files, keyed by `key`
- * (`slider_panel.params.<key>.label` / `.hint`), not here - see SliderPanel.tsx.
+ * Slider min/max/step per parameter. Which panel a slider appears in, and in
+ * what order, is decided by {@link EDITOR_STEPS} - not here. Label and hint text
+ * live in the i18n files, keyed by `key` (`slider_panel.params.<key>.label` /
+ * `.hint`) - see `SliderGroup.tsx`.
  */
 export const PARAMETER_BOUNDS: ParameterBound[] = [
-  { key: 'contrast', min: 0.5, max: 3.0, step: 0.01, group: 'light' },
-  { key: 'exposure', min: -1.0, max: 1.0, step: 0.01, group: 'light' },
-  { key: 'highlights', min: -1.0, max: 1.0, step: 0.01, group: 'light' },
-  { key: 'shadows', min: -1.0, max: 1.0, step: 0.01, group: 'light' },
-  { key: 'whites', min: -1.0, max: 1.0, step: 0.01, group: 'light' },
-  { key: 'blacks', min: -1.0, max: 1.0, step: 0.01, group: 'light' },
-  { key: 'vignetteCorrection', min: 0, max: 100, step: 1, group: 'corrections' },
-  { key: 'gradientReduction', min: 0, max: 100, step: 1, group: 'corrections' },
-  { key: 'dehaze', min: 0, max: 100, step: 1, group: 'corrections' },
-  { key: 'clarity', min: -1.0, max: 1.0, step: 0.01, group: 'detail' },
-  { key: 'denoise', min: 0, max: 100, step: 1, group: 'detail' },
-  { key: 'chromaDenoise', min: 0, max: 100, step: 1, group: 'detail' },
-  { key: 'starReduction', min: 0, max: 100, step: 1, group: 'star' },
-  { key: 'starSensitivity', min: 0, max: 100, step: 1, group: 'star' },
-  { key: 'starMaxSize', min: 0, max: 100, step: 1, group: 'star' },
-  { key: 'sharpness', min: 0.0, max: 2.0, step: 0.01, group: 'detail' },
-  { key: 'vibrance', min: 0.0, max: 2.0, step: 0.01, group: 'colour' },
-  { key: 'saturation', min: 0.0, max: 2.0, step: 0.01, group: 'colour' },
-  { key: 'temperature', min: 2000, max: 8000, step: 50, group: 'colour' },
-  { key: 'tint', min: -50, max: 50, step: 1, group: 'colour' },
-  { key: 'depthShiftIntensity', min: -100, max: 100, step: 1, group: 'depth' },
+  { key: 'contrast', min: 0.5, max: 3.0, step: 0.01 },
+  { key: 'exposure', min: -1.0, max: 1.0, step: 0.01 },
+  { key: 'highlights', min: -1.0, max: 1.0, step: 0.01 },
+  { key: 'shadows', min: -1.0, max: 1.0, step: 0.01 },
+  { key: 'whites', min: -1.0, max: 1.0, step: 0.01 },
+  { key: 'blacks', min: -1.0, max: 1.0, step: 0.01 },
+  { key: 'vignetteCorrection', min: 0, max: 100, step: 1 },
+  { key: 'gradientReduction', min: 0, max: 100, step: 1 },
+  { key: 'dehaze', min: 0, max: 100, step: 1 },
+  { key: 'clarity', min: -1.0, max: 1.0, step: 0.01 },
+  { key: 'denoise', min: 0, max: 100, step: 1 },
+  { key: 'chromaDenoise', min: 0, max: 100, step: 1 },
+  { key: 'starReduction', min: 0, max: 100, step: 1 },
+  { key: 'starSensitivity', min: 0, max: 100, step: 1 },
+  { key: 'starMaxSize', min: 0, max: 100, step: 1 },
+  { key: 'sharpness', min: 0.0, max: 2.0, step: 0.01 },
+  { key: 'vibrance', min: 0.0, max: 2.0, step: 0.01 },
+  { key: 'saturation', min: 0.0, max: 2.0, step: 0.01 },
+  { key: 'temperature', min: 2000, max: 8000, step: 50 },
+  { key: 'tint', min: -50, max: 50, step: 1 },
 ];
+
+export const PARAMETER_BOUND_BY_KEY: Partial<Record<SliderParameterKey, ParameterBound>> =
+  Object.fromEntries(PARAMETER_BOUNDS.map((bound) => [bound.key, bound]));
+
+/**
+ * The editor workflow, in retouching order. This mirrors the backend pipeline
+ * order in `app/services/image_processing.py::apply_parameters`: geometry first,
+ * then white balance and background corrections, then tone, curves, colour,
+ * detail, stars. The rail, the inspector panel switch, and the "modified" dots
+ * all derive from this one list.
+ *
+ * `start` and `export` are workflow brackets (no step number): a one-click
+ * starting point, and getting the result out.
+ */
+export type EditorStepId =
+  | 'start'
+  | 'frame'
+  | 'sky'
+  | 'light'
+  | 'curves'
+  | 'colour'
+  | 'detail'
+  | 'stars'
+  | 'depth'
+  | 'export';
+
+export interface EditorStep {
+  id: EditorStepId;
+  /** Position in the workflow (1-8), or null for the start/export brackets. */
+  number: number | null;
+  /** Slider parameters shown in this step's panel, in display order. */
+  params: SliderParameterKey[];
+}
+
+export const EDITOR_STEPS: EditorStep[] = [
+  { id: 'start', number: null, params: [] },
+  { id: 'frame', number: 1, params: [] },
+  {
+    id: 'sky',
+    number: 2,
+    params: ['temperature', 'tint', 'vignetteCorrection', 'gradientReduction', 'dehaze'],
+  },
+  {
+    id: 'light',
+    number: 3,
+    params: ['exposure', 'contrast', 'highlights', 'shadows', 'whites', 'blacks'],
+  },
+  { id: 'curves', number: 4, params: [] },
+  { id: 'colour', number: 5, params: ['saturation', 'vibrance'] },
+  { id: 'detail', number: 6, params: ['clarity', 'denoise', 'chromaDenoise', 'sharpness'] },
+  { id: 'stars', number: 7, params: ['starReduction', 'starSensitivity', 'starMaxSize'] },
+  { id: 'depth', number: 8, params: [] },
+  { id: 'export', number: null, params: [] },
+];
+
+/** The eight numbered workflow steps, in order (excludes start/export). */
+export const NUMBERED_STEPS: EditorStep[] = EDITOR_STEPS.filter((step) => step.number !== null);
 
 export interface Image {
   sessionId: string;

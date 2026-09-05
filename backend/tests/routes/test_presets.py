@@ -2,10 +2,19 @@
 
 from __future__ import annotations
 
+import cv2
+import numpy as np
+
 
 def _upload(client, sample_jpeg: bytes) -> str:
     resp = client.post("/api/upload", files={"file": ("m31.jpg", sample_jpeg, "image/jpeg")})
     return resp.json()["session_id"]
+
+
+def _decode_shape(content: bytes) -> tuple[int, ...]:
+    image = cv2.imdecode(np.frombuffer(content, np.uint8), cv2.IMREAD_COLOR)
+    assert image is not None
+    return image.shape
 
 
 def test_list_returns_the_five_builtins(client) -> None:
@@ -52,6 +61,29 @@ def test_apply_preset_processes_the_session(client, sample_jpeg: bytes) -> None:
     assert response.status_code == 200
     assert response.json()["status"] == "completed"
     assert client.get(f"/api/preview/{session_id}").content != before
+
+
+def test_apply_preset_keeps_the_session_crop(client, sample_jpeg: bytes) -> None:
+    """A preset is a look, not a composition - applying one must not undo the
+    user's crop back to the full frame."""
+    session_id = _upload(client, sample_jpeg)
+    client.post(
+        f"/api/process/{session_id}",
+        json={
+            "parameters": {
+                "geometry": {"crop_x": 0.25, "crop_y": 0.25, "crop_w": 0.5, "crop_h": 0.5}
+            }
+        },
+    )
+    cropped = _decode_shape(
+        client.get(f"/api/preview/{session_id}", params={"full": "true"}).content
+    )
+
+    response = client.post(f"/api/presets/system_nebula/apply/{session_id}")
+    assert response.status_code == 200
+
+    after = _decode_shape(client.get(f"/api/preview/{session_id}", params={"full": "true"}).content)
+    assert after == cropped  # still the cropped rectangle, not the full frame
 
 
 def test_apply_unknown_preset_is_404(client, sample_jpeg: bytes) -> None:
