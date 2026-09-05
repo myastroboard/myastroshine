@@ -40,6 +40,7 @@ from app.routes import (
     star_mask,
     tokens,
     upload,
+    version,
     websockets,
 )
 from app.services.preset import PresetService
@@ -134,6 +135,7 @@ def create_app() -> FastAPI:
         star_mask.router,
         auto_astro.router,
         admin.router,
+        version.router,
     ):
         app.include_router(router, prefix="/api")
 

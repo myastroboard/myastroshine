@@ -32,6 +32,23 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   focal-point picker on the preview (click to set) now actually drives where
   the Depth Shift parallax centers - `focus_point` was accepted by the API
   before this but never used.
+- i18n: FR + EN. Every frontend-owned UI string now goes through
+  `useTranslation()`'s `t()`, backed by `frontend/src/i18n/translations/{en,fr}.json`
+  (`en.json` is the reference language); a compact EN/FR selector sits in the
+  header. Detects the browser language on first load, then persists the
+  choice client-side. `scripts/validate_i18n.py` (new CI job) checks key
+  parity, leaf types, and `{placeholder}` names between the two files.
+  Backend-owned strings (API error messages, log lines) stay English-only.
+- In-app update check: a discreet footer banner appears once a newer GitHub
+  release is published, with a link to it and an expandable "What's new"
+  showing that release's notes. `GET /api/version/check-updates`
+  (`VersionCheckService`) queries GitHub's releases API and caches the result
+  in memory for 4 hours, so the frontend's 4-hourly poll can never translate
+  into hitting GitHub's rate limit; every failure path (timeout, GitHub's own
+  rate limit, a malformed response, ...) degrades to no banner rather than an
+  error. The frontend re-verifies the version comparison itself before
+  showing anything, so a stale/incorrect cache can never present as a
+  downgrade.
 
 ## [0.1.0] - 2026-09-04
 

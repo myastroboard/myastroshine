@@ -9,6 +9,11 @@
   "language_switcher": {
     "aria_label": "Language"
   },
+  "update_banner": {
+    "available": "A new version is available: v{version}",
+    "view_on_github": "View on GitHub",
+    "whats_new": "What's new"
+  },
   "app": {
     "nav_settings": "Settings"
   },

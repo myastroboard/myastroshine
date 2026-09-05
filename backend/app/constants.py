@@ -30,3 +30,9 @@ SESSION_CLEANUP_INTERVAL_SECONDS = 60 * 60  # hourly
 # that decompresses into a huge array (decompression bomb). 8000x8000, comfortably above
 # the ~24MP frame used in tests/benchmarks/.
 MAX_IMAGE_PIXELS = 8000 * 8000
+
+# Update check (app/services/version_check.py) - how long the latest-GitHub-release
+# result is cached before it is fetched again. Long enough to stay well under GitHub's
+# unauthenticated rate limit regardless of how often the frontend polls.
+GITHUB_RELEASES_URL = "https://api.github.com/repos/myastroboard/myastroshine/releases/latest"
+VERSION_CHECK_CACHE_TTL_SECONDS = 4 * 60 * 60  # 4 hours

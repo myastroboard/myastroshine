@@ -291,6 +291,20 @@ export interface StarMaskResult {
   stars: StarSourceInfo[];
 }
 
+// --- Update check -------------------------------------------------------------
+
+/** GitHub's latest release for this repo, cached backend-side (see docs/API.md). */
+export interface VersionCheckResult {
+  currentVersion: string;
+  latestVersion: string | null;
+  updateAvailable: boolean;
+  releaseUrl: string | null;
+  releaseName: string | null;
+  releaseNotes: string | null;
+  publishedAt: string | null;
+  error: string | null;
+}
+
 // --- Stacking (v1.1) ---------------------------------------------------------
 
 export type CombinationMethod = 'median' | 'mean' | 'sigma_clip';

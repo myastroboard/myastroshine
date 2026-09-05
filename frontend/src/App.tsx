@@ -6,6 +6,7 @@ import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { SettingsView } from '@/components/SettingsView';
 import { StackMode, type EditorMode } from '@/components/stacking/StackMode';
 import { StackView } from '@/components/stacking/StackView';
+import { UpdateBanner } from '@/components/UpdateBanner';
 import { useTranslation } from '@/hooks/useTranslation';
 import { apiClient } from '@/services/api';
 import type { EditorSession } from '@/types';
@@ -127,6 +128,8 @@ export default function App() {
           )}
         </main>
       )}
+
+      <UpdateBanner />
     </div>
   );
 }

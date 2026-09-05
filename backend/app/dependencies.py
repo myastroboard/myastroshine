@@ -30,6 +30,7 @@ from app.services.star_detection import StarDetectionService
 from app.services.star_mask import StarMaskService
 from app.services.storage import StorageService
 from app.services.token import TokenService
+from app.services.version_check import VersionCheckService
 from app.utils.rate_limit import enforce_request_rate_limit
 
 DbSession = Annotated[Session, Depends(get_db)]
@@ -147,3 +148,15 @@ def get_stacking_service(
 
 
 StackingServiceDep = Annotated[StackingService, Depends(get_stacking_service)]
+
+# A single long-lived instance, not a fresh one per request: its cache (see
+# VersionCheckService.check_for_updates) only avoids hammering GitHub if it
+# actually persists across requests.
+_version_check_service = VersionCheckService()
+
+
+def get_version_check_service() -> VersionCheckService:
+    return _version_check_service
+
+
+VersionCheckServiceDep = Annotated[VersionCheckService, Depends(get_version_check_service)]
