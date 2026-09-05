@@ -39,6 +39,15 @@ def test_validate_image_extension_allows_missing_extension() -> None:
     assert validate_image_extension("clipboard") == ""
 
 
+@pytest.mark.parametrize(
+    "filename",
+    ["frame.fits", "frame.FIT", "frame.fts", "photo.cr2", "photo.NEF", "photo.dng"],
+)
+def test_validate_image_extension_allows_fits_and_raw(filename: str) -> None:
+    """FITS and camera RAW extensions are accepted (see image_utils.decode_image)."""
+    validate_image_extension(filename)
+
+
 def test_validate_upload_size_enforces_limit() -> None:
     """An oversized upload raises PayloadTooLargeError."""
     with pytest.raises(PayloadTooLargeError, match="exceeds"):

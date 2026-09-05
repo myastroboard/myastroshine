@@ -24,13 +24,13 @@ def test_get_app_settings_returns_current_values(client) -> None:
 def test_post_app_settings_persists_and_is_readable(client) -> None:
     current = client.get("/api/admin/app-settings").json()
     current["max_image_size_mb"] = 300
-    current["denoise_enable_ml"] = True
+    current["stacking_enabled"] = False
 
     response = client.post("/api/admin/app-settings", json=current)
 
     assert response.status_code == 200
     assert response.json()["max_image_size_mb"] == 300
-    assert client.get("/api/admin/app-settings").json()["denoise_enable_ml"] is True
+    assert client.get("/api/admin/app-settings").json()["stacking_enabled"] is False
     assert get_app_settings().max_image_size_mb == 300
 
 

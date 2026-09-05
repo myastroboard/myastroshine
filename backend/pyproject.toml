@@ -33,7 +33,7 @@ plugins = ["pydantic.mypy"]
 disallow_untyped_decorators = false
 
 [[tool.mypy.overrides]]
-module = ["cv2.*", "skimage.*"]
+module = ["cv2.*", "skimage.*", "astropy.*", "rawpy.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

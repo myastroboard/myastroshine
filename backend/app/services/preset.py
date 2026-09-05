@@ -103,26 +103,50 @@ class PresetService:
         self.db = db
 
     def ensure_defaults(self) -> None:
-        """Insert any missing built-in presets. Idempotent."""
-        existing = set(self.db.scalars(select(PresetRecord.preset_id)).all())
-        added = False
-        for spec in _DEFAULTS:
-            if spec["preset_id"] in existing:
-                continue
-            params = ProcessingParameters(**spec["parameters"])
-            self.db.add(
-                PresetRecord(
-                    preset_id=spec["preset_id"],
-                    name=spec["name"],
-                    category="astronomy",
-                    description=spec["description"],
-                    parameters=params.model_dump(),
-                    author="system",
-                    is_favorite=False,
-                )
+        """Insert missing built-in presets and refresh existing ones to match ``_DEFAULTS``.
+
+        Built-ins are fully code-defined - never user-edited, can't even be
+        deleted - so a stored row that drifted from the current spec (e.g. a
+        preset saved before a ``ProcessingParameters`` field was renamed) is
+        always wrong, never a customization to preserve. Re-validating and
+        overwriting name/description/parameters here on every call makes that
+        self-healing instead of raising `extra_forbidden` on every read until
+        someone manually fixes the row. ``is_favorite`` (the one user-set
+        field on a built-in) is left untouched.
+        """
+        existing = {
+            record.preset_id: record
+            for record in self.db.scalars(
+                select(PresetRecord).where(PresetRecord.author == "system")
             )
-            added = True
-        if added:
+        }
+        changed = False
+        for spec in _DEFAULTS:
+            params = ProcessingParameters(**spec["parameters"]).model_dump()
+            record = existing.get(spec["preset_id"])
+            if record is None:
+                self.db.add(
+                    PresetRecord(
+                        preset_id=spec["preset_id"],
+                        name=spec["name"],
+                        category="astronomy",
+                        description=spec["description"],
+                        parameters=params,
+                        author="system",
+                        is_favorite=False,
+                    )
+                )
+                changed = True
+            elif (
+                record.name != spec["name"]
+                or record.description != spec["description"]
+                or record.parameters != params
+            ):
+                record.name = spec["name"]
+                record.description = spec["description"]
+                record.parameters = params
+                changed = True
+        if changed:
             self.db.commit()
 
     def list_presets(self) -> list[PresetOut]:

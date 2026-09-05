@@ -5,6 +5,74 @@ Reference for the image processing pipeline. Implementations live in
 `app/services/depth_map.py`, and the stacking services. All functions operate on
 BGR `uint8` numpy arrays unless noted.
 
+## Upload ingest: FITS / RAW / 16-bit
+
+`decode_image` (`app/utils/image_utils.py`) is the single place upload bytes
+become the BGR `uint8` array everything past it (storage, the pipeline below,
+stacking) operates on - the rest of the app never needs to know what format
+was actually uploaded. The file extension picks the decoder:
+
+- **FITS** (`.fits`/`.fit`/`.fts`, `astropy.io.fits`) - scientific/linear data
+  (8/16/32-bit int or float; `BSCALE`/`BZERO` header scaling applied
+  transparently by astropy). A raw stacked frame looks almost black without a
+  non-linear stretch, so every FITS upload goes through the auto-stretch below
+  regardless of its stored dtype. The first HDU with data wins (some FITS
+  files keep an empty primary HDU and put the image in an extension). 2D data
+  is treated as monochrome (gray-replicated to BGR) - there's no reliable
+  standard header keyword for a Bayer pattern, and guessing one risks a
+  garish checkerboard artifact instead of a real debayer, so a raw one-shot-
+  colour sensor frame is out of scope here. A `(3, H, W)` or `(H, W, 3)` cube
+  is read as R/G/B planes.
+- **Camera RAW** (`.cr2`/`.cr3`/`.nef`/`.arw`/`.dng`/`.orf`/`.rw2`/`.pef`/`.raf`,
+  `rawpy`/libraw) - demosaiced with the camera's as-shot white balance and
+  libraw's default sRGB-ish tone response (`use_camera_wb=True`,
+  `output_bps=8`). Unlike FITS, this isn't scientific linear data by
+  convention - the goal is the same as opening a RAW in any other photo tool:
+  a normally-exposed starting point to edit further with this app's own
+  sliders, not a from-scratch stretch.
+- **Everything else** (including no/unrecognised extension) goes through
+  OpenCV, which sniffs the real format from the bytes. A genuinely 16-bit
+  source (a stacked TIFF/PNG - Siril/DeepSkyStacker/PixInsight all export
+  these) is the same "linear stacked frame" case as FITS in a different
+  container, so it gets the identical auto-stretch rather than a naive
+  `>> 8` bit-shift, which would either crush the background to black or let
+  the single brightest pixel set the ceiling. Decoded via
+  `cv2.IMREAD_UNCHANGED` (not the old `IMREAD_COLOR`, which silently
+  truncated any 16-bit source to 8-bit before this) - grayscale sources are
+  replicated to BGR, a 4th (alpha) channel is dropped, matching the prior
+  behaviour for ordinary 8-bit images exactly.
+
+**Auto-stretch** (`_auto_stretch_to_uint8`) is the same "screen transfer
+function" auto-stretch used across astro tools (PixInsight's AutoSTF, Siril,
+...), applied per plane (each RGB channel independently, which also
+auto-balances each channel's own black level - a deliberate, simpler choice
+over a single shared transform that would preserve the original file's exact
+colour balance):
+
+1. Percentile-clip to [0.1, 99.9] and normalize to 0-1 - guards against hot
+   pixels/cosmic ray hits setting the black or white point off a single
+   outlier pixel (the same small-fraction-of-outliers idea as dehaze's
+   atmospheric-light estimate elsewhere in this doc).
+2. Shadow (black) point = median - 2.8 * (MAD * 1.4826) (a robust,
+   noise-based clip - 1.4826 scales median-absolute-deviation to a
+   Gaussian-equivalent standard deviation), re-normalized to 0-1.
+3. Solve for the midtones-transfer-function balance `m` that maps the new
+   median (the background level) to 0.25, then apply
+   `MTF(x; m) = ((m-1)x) / ((2m-1)x - m)` - a rational curve through
+   `(0,0)`, `(m, 0.5)`, `(1,1)` - to every pixel. This is what actually
+   reveals faint nebulosity/background stars instead of a flat near-black
+   frame: a linear capture's real signal usually sits in the bottom few
+   percent of the range, and MTF pulls it out non-linearly without blowing
+   out the already-bright stars the percentile clip preserved headroom for.
+
+Known limitation: because each channel is stretched independently, a FITS/RAW
+frame that was already colour-calibrated before saving can come out slightly
+rebalanced rather than reproduced exactly - the app's own white balance
+sliders (temperature/tint) are there to correct it afterwards. Likewise, if a
+16-bit TIFF/PNG is already a *finished*, non-linear export (not a linear
+stack), this stretch will over-brighten it - export finished work as 8-bit
+instead.
+
 ## Single-image pipeline
 
 Applied in this order to minimize artifacts (`apply_parameters`):
@@ -61,8 +129,9 @@ Applied in this order to minimize artifacts (`apply_parameters`):
    squaring path is measurably faster at 24MP.
 9. **Tone curve** (`curve_points`, empty by default = identity) - a 256-entry
    lookup table (`app/utils/math_utils.py:curve_points_to_lut`), applied via
-   `cv2.LUT` identically on each BGR channel (a combined RGB curve, not
-   separate per-channel curves). Points are `(input, output)` 8-bit level
+   `cv2.LUT` identically on each BGR channel (a combined RGB curve - see
+   "Colour curves" below for independent per-channel curves). Points are
+   `(input, output)` 8-bit level
    pairs spanning the full 0-255 range (`ProcessingParameters` validates: at
    least 2, first at x=0, last at x=255, strictly increasing x); between them
    the curve is a **monotone cubic Hermite spline** (Fritsch-Carlson tangent
@@ -75,20 +144,33 @@ Applied in this order to minimize artifacts (`apply_parameters`):
    replace those sliders - both stages run, in this order, so a curve is a
    fine-tuning layer on top of the basic tone controls, matching how most
    photo editors separate "Basic" tone sliders from a "Curve" panel.
-10. **Saturation** (0-2) - scale the HSV S channel.
-11. **Vibrance** (0-2) - saturation boost weighted by `(1 - current_saturation)`
+10. **Colour curves** (`red_curve_points` / `green_curve_points` /
+   `blue_curve_points`, each empty by default = identity) - the same
+   `curve_points_to_lut` LUT/spline as the master tone curve above, but one
+   independent curve per channel (`cv2.split`, `cv2.LUT` per channel,
+   `cv2.merge`) instead of one curve applied identically to all three. For
+   colour grading, or a colour cast a single white-balance gain can't reach
+   at just one tonal range (e.g. a slightly green background sky only in the
+   midtones - white balance is one multiplicative gain per channel, uniform
+   across the whole tonal range, so it can't fix a cast that only shows up
+   at one brightness level). Runs immediately after the master curve, so it's
+   a further fine-tuning layer on top of it, same relationship the master
+   curve has with the basic tone sliders. Any of the three left empty is
+   skipped independently - a red-only edit never touches green/blue.
+11. **Saturation** (0-2) - scale the HSV S channel.
+12. **Vibrance** (0-2) - saturation boost weighted by `(1 - current_saturation)`
    so already-saturated pixels move less.
-12. **Clarity** (-1..1) - unsharp mask against a 21x21 Gaussian blur; positive
+13. **Clarity** (-1..1) - unsharp mask against a 21x21 Gaussian blur; positive
    sharpens, negative softens.
-13. **Denoise** (0-100) - bilateral filter; map to diameter 5-20 and
+14. **Denoise** (0-100) - bilateral filter; map to diameter 5-20 and
    sigma_color / sigma_space 75-150. Above 50, add a 3x3 morphological close.
-14. **Chroma denoise** (`chroma_denoise`, 0-100) - the same bilateral filter as
+15. **Chroma denoise** (`chroma_denoise`, 0-100) - the same bilateral filter as
    Denoise, applied only to the Cr/Cb channels (`COLOR_BGR2YCrCb`), leaving
    luma untouched. Colour speckle is usually more objectionable than luma
    noise in a stacked astro frame, and can be smoothed much harder than luma
    without an apparent loss of detail, since detail lives almost entirely in
    luma.
-15. **Star reduction** (`star_reduction` 0-100, `star_sensitivity` /
+16. **Star reduction** (`star_reduction` 0-100, `star_sensitivity` /
    `star_max_size` 0-100) - shrink *individually detected* stars, leaving
    everything else untouched. Detection (`StarDetectionService.detect`, shared
    with the `POST /api/star-mask/{id}` mask-preview endpoint) isolates compact
@@ -132,7 +214,7 @@ Applied in this order to minimize artifacts (`apply_parameters`):
    photo - worse than the black-dot bug it was meant to fix - because
    inpainting fills from the mask boundary rather than shrinking the star's
    own disc in place.
-16. **Sharpness** (0-2) - below 1.0 Gaussian blur, above 1.0 Laplacian-kernel
+17. **Sharpness** (0-2) - below 1.0 Gaussian blur, above 1.0 Laplacian-kernel
     sharpen blended by `(sharpness - 1) * 0.5`.
 
 Preview path downscales to 512 px (`preview_max_size`) for instant feedback; the
@@ -220,8 +302,21 @@ layers are cached under `{storage}/{session_id}/depth/`.
 `depth_statistics(depth_map)` reports min/max/mean/median and the percent of
 pixels above 200 (`bright_areas_percent`).
 
-An ML backend (MiDaS / `Intel/dpt-hybrid-midas`) is planned for v0.2 behind
-`DEPTH_DETECTION_METHOD=ml`.
+**ML backend - evaluated, not adopted (2026-09-05).** Tested both MiDaS Small
+(`model-small.onnx`, 66MB, ONNX Runtime, 13ms/frame) and `Intel/dpt-hybrid-midas`
+(ViT-hybrid, ~490MB, ~0.7s/frame on CPU) on a real single-exposure test photo
+(NGC 281): both produced a near-featureless smooth gradient with no star or
+nebula structure (Laplacian std of the normalized depth map: MiDaS Small 0.82,
+DPT-Hybrid 0.82 - essentially identical despite DPT-Hybrid being ~7x larger),
+versus 1.60 for the gradient method above, which clearly resolves individual
+stars. Both integrations were verified correct first on a synthetic scene with
+real depth cues (sharp foreground vs. blurred background), where they behave
+as expected - the gap is specific to starfield content, not a bug. Root cause:
+both models are trained on natural-photo depth cues (defocus blur increasing
+with distance, perspective, occlusion) that a single deep-sky exposure simply
+doesn't contain, and a larger network can't recover cues that aren't in the
+pixels. No ML dependency added; the gradient method above stays the only depth
+backend.
 
 ### Focal point
 
@@ -263,13 +358,23 @@ saved as a normal session so the single-image routes work on it.
 
 | Operation | Typical time (3840x2160) |
 |-----------|--------------------------|
-| Contrast / brightness / white balance | 5-15 ms |
+| Contrast / exposure / white balance | 5-15 ms |
 | Highlights / shadows | 20-30 ms |
+| Whites / blacks | ~200-250 ms (measured at 24MP, scaled) |
+| Vignette correction | ~90 ms (downscaled gain map) |
+| Gradient reduction | ~90 ms (downscaled background estimate) |
+| Dehaze | ~200-250 ms (downscaled dark-channel/transmission) |
 | Clarity (unsharp) | 30-50 ms |
 | Denoise (bilateral) | 100-300 ms |
+| Chroma denoise (bilateral, Cr/Cb only) | ~100 ms |
 | Depth map (Sobel) | 50-100 ms |
 | Registration per frame (ORB) | ~0.6 s |
 | Registration per frame (SIFT) | ~1.8 s |
+
+Whites/blacks and highlights/shadows cost the same shape of work (a full-res
+grayscale conversion + masked blend) but were measured at different times -
+if you see one much cheaper than the other, re-measure both rather than
+trusting either number blindly.
 
 Cache intermediate results, vectorize with numpy, and offload heavy jobs to
 Celery (phase 2+).

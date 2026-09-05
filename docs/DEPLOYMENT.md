@@ -110,8 +110,6 @@ after changing it).
 | General | `max_image_size_mb` | 100 |
 | General | `session_expiry_hours` | 24 |
 | General | `preview_max_size` | 512 |
-| General | `denoise_enable_ml` | false |
-| General | `depth_detection_method` | `gradient` |
 | General | `stacking_enabled` / `stacking_max_frames` / `stacking_detector` / `stacking_combination_default` / `stacking_cosmic_ray_threshold` | see `app/utils/app_settings.py` |
 | Webhooks | AstroDex bearer tokens (create / revoke) | - |
 | Webhooks | `astrodex_callback_urls` (allowlist) | empty |

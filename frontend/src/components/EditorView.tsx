@@ -18,6 +18,7 @@ import { apiClient } from '@/services/api';
 import {
   DEFAULT_PARAMETERS,
   isDefaultGeometry,
+  type CurveChannel,
   type CurvePoint,
   type Dimensions,
   type EditorSession,
@@ -56,7 +57,7 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
     status,
     previewVersion,
     updateParameter,
-    updateCurvePoints,
+    updateChannelCurve,
     applyGeometry,
     resetParameters,
     resetKeys,
@@ -138,9 +139,9 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
     resetKeys(keys);
   }
 
-  function handleCurveChange(curvePoints: CurvePoint[]): void {
+  function handleCurveChange(channel: CurveChannel, points: CurvePoint[]): void {
     clearActivePreset(); // manual edits diverge from any applied preset
-    updateCurvePoints(curvePoints);
+    updateChannelCurve(channel, points);
   }
 
   function handleFocalPointPick(point: FocusPoint): void {
@@ -293,7 +294,15 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
             {t('editor.save_as_preset')}
           </button>
         </section>
-        <ToneCurveEditor points={parameters.curvePoints} onChange={handleCurveChange} />
+        <ToneCurveEditor
+          curves={{
+            rgb: parameters.curvePoints,
+            red: parameters.redCurvePoints,
+            green: parameters.greenCurvePoints,
+            blue: parameters.blueCurvePoints,
+          }}
+          onChange={handleCurveChange}
+        />
         <SliderPanel
           parameters={parameters}
           onParameterChange={handleParameterChange}

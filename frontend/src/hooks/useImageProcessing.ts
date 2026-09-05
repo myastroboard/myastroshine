@@ -3,7 +3,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiClient } from '@/services/api';
 import { processingStatusClient } from '@/services/ws';
 import {
+  CURVE_CHANNEL_FIELD,
   DEFAULT_PARAMETERS,
+  type CurveChannel,
   type CurvePoint,
   type GeometryParameters,
   type JobStatus,
@@ -71,10 +73,12 @@ export function useImageProcessing(sessionId: string) {
     [applyParameters],
   );
 
-  const updateCurvePoints = useCallback(
-    (curvePoints: CurvePoint[]) => {
+  /** `channel` picks which curve field (see CURVE_CHANNEL_FIELD) gets the new points. */
+  const updateChannelCurve = useCallback(
+    (channel: CurveChannel, points: CurvePoint[]) => {
+      const field = CURVE_CHANNEL_FIELD[channel];
       setParameters((prev) => {
-        const next = { ...prev, curvePoints };
+        const next = { ...prev, [field]: points };
         clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(() => void applyParameters(next), DEBOUNCE_MS);
         return next;
@@ -135,7 +139,7 @@ export function useImageProcessing(sessionId: string) {
     previewVersion,
     error,
     updateParameter,
-    updateCurvePoints,
+    updateChannelCurve,
     applyGeometry,
     applyParameters,
     resetParameters,

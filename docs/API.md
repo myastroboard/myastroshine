@@ -88,18 +88,45 @@ Celery job queue (`PROCESSING_MODE=queue`), and the progress WebSockets.
 | GET | `/version` | The version this instance is running | v0.2 |
 | GET | `/version/check-updates` | Latest GitHub release, cached ~4h | v0.2 |
 
+## Upload formats
+
+`POST /upload` and `POST /stack/{stack_id}/upload-frame` accept:
+
+- **8-bit JPEG/PNG/TIFF** - used as-is.
+- **16-bit PNG/TIFF** (e.g. a stacked frame exported from Siril/DeepSkyStacker/
+  PixInsight) - auto-stretched (see `docs/ALGORITHMS.md` "FITS / RAW / 16-bit
+  ingest"), not truncated to 8-bit by a naive bit-shift.
+- **FITS** (`.fits` / `.fit` / `.fts`, via `astropy`) - scientific/linear data,
+  always auto-stretched regardless of its stored bit depth. 2D data is read as
+  monochrome; a 3-plane array is read as RGB. No Bayer-pattern debayering for
+  a raw one-shot-colour sensor frame - out of scope, see ALGORITHMS.md.
+- **Camera RAW** (`.cr2` `.cr3` `.nef` `.arw` `.dng` `.orf` `.rw2` `.pef`
+  `.raf`, via `rawpy`/libraw) - demosaiced with the camera's as-shot white
+  balance, standard sRGB-ish tone response (a normal starting point to edit
+  further, not a scientific stretch like FITS).
+
+`415 UNSUPPORTED_FORMAT` for anything else, an unreadable file, or a decoded
+pixel count over the configured cap (`MAX_IMAGE_PIXELS` - a decompression-bomb
+guard, independent of `max_image_size_mb`'s compressed-byte-size check).
+
 ## Processing parameters
 
 | Parameter | Min | Max | Default | Type |
 |-----------|-----|-----|---------|------|
 | contrast | 0.5 | 3.0 | 1.0 | float |
-| brightness | -1.0 | 1.0 | 0.0 | float |
+| exposure | -1.0 | 1.0 | 0.0 | float |
 | saturation | 0.0 | 2.0 | 1.0 | float |
 | highlights | -1.0 | 1.0 | 0.0 | float |
 | shadows | -1.0 | 1.0 | 0.0 | float |
+| whites | -1.0 | 1.0 | 0.0 | float |
+| blacks | -1.0 | 1.0 | 0.0 | float |
 | clarity | -1.0 | 1.0 | 0.0 | float |
 | vibrance | 0.0 | 2.0 | 1.0 | float |
 | denoise | 0 | 100 | 0 | int |
+| chroma_denoise | 0 | 100 | 0 | int |
+| vignette_correction | 0 | 100 | 0 | int |
+| gradient_reduction | 0 | 100 | 0 | int |
+| dehaze | 0 | 100 | 0 | int |
 | star_reduction | 0 | 100 | 0 | int |
 | star_sensitivity | 0 | 100 | 50 | int |
 | star_max_size | 0 | 100 | 30 | int |
@@ -108,6 +135,9 @@ Celery job queue (`PROCESSING_MODE=queue`), and the progress WebSockets.
 | tint | -50 | 50 | 0 | int |
 | depth_shift_intensity | -100 | 100 | 0 | int |
 | curve_points | - | - | `[]` | array of `{x, y}` |
+| red_curve_points | - | - | `[]` | array of `{x, y}` |
+| green_curve_points | - | - | `[]` | array of `{x, y}` |
+| blue_curve_points | - | - | `[]` | array of `{x, y}` |
 
 `geometry` is a nested object applied **before** enhancement (rotate -> flip ->
 straighten -> crop; crop coordinates are fractions of the rotated/flipped image):
@@ -157,11 +187,12 @@ relays live events from Redis until a terminal status arrives, then closes.
 ```
 
 `status`: `queued`, `processing`, `completed`, `failed` (or `unknown` if the
-`job_id` is not found). Image steps: `geometry`, `color_correction`, `contrast`,
-`brightness`, `highlights_shadows`, `saturation`, `vibrance`, `clarity`,
-`denoise`, `star_reduction`, `sharpness`, `rendering`, `done`. Stack steps:
-`registration`, `background_normalization`, `cosmic_ray_rejection`,
-`combination`, `done`.
+`job_id` is not found). Image steps: `geometry`, `color_correction`,
+`vignette_correction`, `gradient_reduction`, `dehaze`, `contrast`, `exposure`,
+`highlights_shadows`, `whites_blacks`, `tone_curve`, `saturation`, `vibrance`,
+`clarity`, `denoise`, `chroma_denoise`, `star_reduction`, `sharpness`,
+`rendering`, `done`. Stack steps: `registration`, `background_normalization`,
+`cosmic_ray_rejection`, `combination`, `done`.
 
 In the default `PROCESSING_MODE=sync`, the job is already `completed` when
 `/process` returns; the WebSocket just replays that final state.
@@ -261,12 +292,12 @@ the frontend can sync its sliders in one round trip:
   "preview_url": "/api/preview/{id}",
   "estimated_time_seconds": 0,
   "ws_status_url": "/ws/processing-status/job-...",
-  "parameters": { "contrast": 1.8, "brightness": 0.1, "star_reduction": 35, "..." : "..." }
+  "parameters": { "contrast": 1.8, "exposure": 0.1, "star_reduction": 35, "..." : "..." }
 }
 ```
 
 Scope is deliberately limited to what histogram/black-point/star-density can
-drive with confidence: `contrast`, `brightness`, `highlights`, `shadows`, and
+drive with confidence: `contrast`, `exposure`, `highlights`, `shadows`, and
 `star_reduction`. Everything else stays at its `ProcessingParameters` default.
 See `docs/ALGORITHMS.md` "Auto Astro" for the heuristic.
 

@@ -153,23 +153,6 @@ function GeneralSection({ draft, patch }: SectionProps) {
         onChange={(previewMaxSize) => patch({ previewMaxSize })}
       />
 
-      <GroupLabel>{t('settings.groups.processing')}</GroupLabel>
-      <SelectRow
-        id="depth-method"
-        label={t('settings.general.depth_method.label')}
-        hint={t('settings.general.depth_method.hint')}
-        value={draft.depthDetectionMethod}
-        options={['gradient', 'ml']}
-        onChange={(depthDetectionMethod) => patch({ depthDetectionMethod })}
-      />
-      <ToggleRow
-        id="denoise-ml"
-        label={t('settings.general.denoise_ml.label')}
-        hint={t('settings.general.denoise_ml.hint')}
-        checked={draft.denoiseEnableMl}
-        onChange={(denoiseEnableMl) => patch({ denoiseEnableMl })}
-      />
-
       <GroupLabel>{t('settings.groups.stacking_defaults')}</GroupLabel>
       <ToggleRow
         id="stacking-enabled"

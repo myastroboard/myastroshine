@@ -36,7 +36,7 @@ export function StackUploadZone({ frames, onAddFiles }: StackUploadZoneProps) {
     <input
       type="file"
       multiple
-      accept=".jpg,.jpeg,.png,.tiff"
+      accept=".jpg,.jpeg,.png,.tiff,.tif,.fits,.fit,.fts,.cr2,.cr3,.nef,.arw,.dng,.orf,.rw2,.pef,.raf"
       className="hidden"
       onChange={(event) => onAddFiles(Array.from(event.target.files ?? []))}
     />

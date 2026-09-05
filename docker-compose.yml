@@ -64,6 +64,14 @@ services:
       - redis
       - api
     restart: unless-stopped
+    # Never serves HTTP, so the image's own HEALTHCHECK (curl :8002/api/health)
+    # would always fail here - a real Celery ping instead of inheriting that.
+    healthcheck:
+      test: ["CMD", "celery", "-A", "app.tasks.celery_app", "inspect", "ping", "--timeout", "10"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 15s
 
   redis:
     image: redis:7-alpine

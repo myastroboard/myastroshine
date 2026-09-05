@@ -32,8 +32,6 @@ const SETTINGS: AppSettings = {
   astrodexCallbackUrls: [],
   astrodexMaxRetries: 3,
   astrodexRetryDelaySeconds: 5,
-  denoiseEnableMl: false,
-  depthDetectionMethod: 'gradient',
   stackingEnabled: true,
   stackingMaxFrames: 100,
   stackingDetector: 'orb',
@@ -99,10 +97,10 @@ describe('SettingsView', () => {
     renderView();
     await screen.findByLabelText('Maximum upload size');
 
-    const toggle = screen.getByRole('switch', { name: 'ML denoising' });
-    expect(toggle).toHaveAttribute('aria-checked', 'false');
-    fireEvent.click(toggle);
+    const toggle = screen.getByRole('switch', { name: 'Stacking enabled' });
     expect(toggle).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
   });
 
   it('edits rate limiting settings under the Advanced section', async () => {

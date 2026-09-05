@@ -25,7 +25,7 @@
     "choose_file_hint": "ou choisissez un fichier pour commencer",
     "choose_file_button": "Choisir un fichier",
     "uploading_button": "Téléversement...",
-    "accepted_formats": "JPEG, PNG ou TIFF, jusqu'à 100 Mo"
+    "accepted_formats": "JPEG, PNG, TIFF, FITS ou RAW appareil photo, jusqu'à 100 Mo"
   },
   "editor": {
     "depth_shift_failed": "Échec du décalage de profondeur : {error}",
@@ -86,7 +86,14 @@
   },
   "tone_curve": {
     "title": "Courbe de tons",
-    "help": "Faites glisser un point pour modifier la courbe, double-cliquez sur une zone vide pour en ajouter un, double-cliquez sur un point pour le supprimer."
+    "help": "Faites glisser un point pour modifier la courbe, double-cliquez sur une zone vide pour en ajouter un, double-cliquez sur un point pour le supprimer.",
+    "channel_tabs_aria_label": "Canal de la courbe",
+    "channels": {
+      "rgb": "RVB",
+      "red": "Rouge",
+      "green": "Vert",
+      "blue": "Bleu"
+    }
   },
   "crop_tool": {
     "title": "Recadrer et pivoter",
@@ -229,14 +236,13 @@
     "save_changes": "Enregistrer les modifications",
     "sections_aria_label": "Sections des paramètres",
     "sections": {
-      "general": { "label": "Général", "blurb": "Téléversements, traitement et valeurs par défaut de l'empilement." },
+      "general": { "label": "Général", "blurb": "Téléversements et valeurs par défaut de l'empilement." },
       "webhooks": { "label": "Webhooks", "blurb": "Jetons AstroDex et livraison des rappels." },
       "advanced": { "label": "Avancé", "blurb": "Réseau et niveaux de journalisation." },
       "logs": { "label": "Journaux", "blurb": "Consulter, vider et exporter le journal de l'application." }
     },
     "groups": {
       "uploads_and_sessions": "Téléversements et sessions",
-      "processing": "Traitement",
       "stacking_defaults": "Valeurs par défaut de l'empilement",
       "callback_delivery": "Livraison des rappels",
       "network": "Réseau",
@@ -247,8 +253,6 @@
       "max_upload": { "label": "Taille maximale de téléversement", "hint": "Les téléversements plus volumineux sont refusés. Mégaoctets." },
       "session_ttl": { "label": "Durée de vie de la session", "hint": "Durée de conservation d'une session et de ses fichiers de travail. Heures." },
       "preview_size": { "label": "Taille de l'aperçu", "hint": "Plus grand côté de l'image d'aperçu rapide. Pixels." },
-      "depth_method": { "label": "Détection de profondeur", "hint": "Méthode utilisée pour estimer la carte de profondeur pour l'effet de parallaxe." },
-      "denoise_ml": { "label": "Débruitage par IA", "hint": "Meilleure qualité, nettement plus lent, et nécessite la présence du modèle." },
       "stacking_enabled": { "label": "Empilement activé", "hint": "Afficher le mode d'empilement multi-images." },
       "stacking_max": { "label": "Nombre maximal d'images", "hint": "Limite supérieure d'images acceptées pour un empilement." },
       "stacking_aligner": { "label": "Alignement", "hint": "Détecteur de caractéristiques utilisé pour recaler les images." },

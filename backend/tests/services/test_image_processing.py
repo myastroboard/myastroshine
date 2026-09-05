@@ -156,9 +156,9 @@ def test_chroma_denoise_reduces_color_speckle_without_flattening_luma(
 ) -> None:
     rng = np.random.default_rng(3)
     base = np.full((100, 100, 3), 120, dtype=np.uint8)
-    noisy = np.clip(
-        base.astype(np.int32) + rng.integers(-40, 40, base.shape), 0, 255
-    ).astype(np.uint8)
+    noisy = np.clip(base.astype(np.int32) + rng.integers(-40, 40, base.shape), 0, 255).astype(
+        np.uint8
+    )
     out = service.apply_chroma_denoise(noisy, 80)
 
     def _chroma_std(image: np.ndarray) -> float:
@@ -374,6 +374,41 @@ def test_tone_curve_darkens_midtones(
     assert _mean_luma(out) < _mean_luma(sample_image)
 
 
+def test_channel_curves_empty_is_identity(
+    service: ImageProcessingService, sample_image: np.ndarray
+) -> None:
+    """All three channels empty -> no-op, matching the fields' empty default."""
+    assert np.array_equal(service.apply_channel_curves(sample_image, [], [], []), sample_image)
+
+
+def test_channel_curves_only_touches_the_channel_with_points(
+    service: ImageProcessingService, sample_image: np.ndarray
+) -> None:
+    """A curve on just one channel leaves the other two byte-identical."""
+    points = [CurvePoint(x=0, y=0), CurvePoint(x=128, y=60), CurvePoint(x=255, y=255)]
+    out = service.apply_channel_curves(sample_image, [], [], points)  # blue only
+
+    assert not np.array_equal(out[:, :, 0], sample_image[:, :, 0])  # blue changed
+    assert np.array_equal(out[:, :, 1], sample_image[:, :, 1])  # green untouched
+    assert np.array_equal(out[:, :, 2], sample_image[:, :, 2])  # red untouched
+
+
+def test_channel_curves_applies_the_same_lut_as_math_utils(
+    service: ImageProcessingService, sample_image: np.ndarray
+) -> None:
+    """Each channel wires straight into ``curve_points_to_lut`` via ``cv2.LUT``, independently."""
+    red_points = [CurvePoint(x=0, y=0), CurvePoint(x=128, y=170), CurvePoint(x=255, y=255)]
+    blue_points = [CurvePoint(x=0, y=0), CurvePoint(x=128, y=60), CurvePoint(x=255, y=255)]
+    out = service.apply_channel_curves(sample_image, red_points, [], blue_points)
+
+    blue, green, red = cv2.split(sample_image)
+    expected_blue = cv2.LUT(blue, curve_points_to_lut([(0, 0), (128, 60), (255, 255)]))
+    expected_red = cv2.LUT(red, curve_points_to_lut([(0, 0), (128, 170), (255, 255)]))
+    assert np.array_equal(out[:, :, 0], expected_blue.squeeze())
+    assert np.array_equal(out[:, :, 1], green)
+    assert np.array_equal(out[:, :, 2], expected_red.squeeze())
+
+
 def test_full_pipeline_stays_in_range(
     service: ImageProcessingService, sample_image: np.ndarray
 ) -> None:
@@ -399,6 +434,16 @@ def test_full_pipeline_stays_in_range(
         temperature=4200,
         tint=10,
         curve_points=[CurvePoint(x=0, y=0), CurvePoint(x=128, y=140), CurvePoint(x=255, y=255)],
+        red_curve_points=[
+            CurvePoint(x=0, y=0),
+            CurvePoint(x=128, y=150),
+            CurvePoint(x=255, y=255),
+        ],
+        blue_curve_points=[
+            CurvePoint(x=0, y=0),
+            CurvePoint(x=128, y=100),
+            CurvePoint(x=255, y=255),
+        ],
     )
     out = service.apply_parameters(sample_image, params)
     height, width = sample_image.shape[:2]

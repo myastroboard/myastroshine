@@ -50,6 +50,12 @@
   --color-success: #34d399;
   --color-warning: #fbbf24;
 
+  /* Channel colours - the colour-curves tool only (ToneCurveEditor), not a
+     status token: which of R/G/B a curve edits, not what state something is in. */
+  --color-channel-red: #f87171;
+  --color-channel-green: #34d399;
+  --color-channel-blue: #60a5fa;
+
   /* Radius. */
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
