@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { ActionButtons } from '@/components/ActionButtons';
 import { CropTool } from '@/components/CropTool';
@@ -10,6 +10,7 @@ import { SliderPanel } from '@/components/SliderPanel';
 import { useDepthShift } from '@/hooks/useDepthShift';
 import { useImageProcessing } from '@/hooks/useImageProcessing';
 import { usePresets } from '@/hooks/usePresets';
+import { useStarMask } from '@/hooks/useStarMask';
 import { apiClient } from '@/services/api';
 import {
   DEFAULT_PARAMETERS,
@@ -49,10 +50,34 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
   const { presets, applyPreset, activePreset, savePreset, deletePreset, clearActivePreset } =
     usePresets(session.sessionId);
   const depthShift = useDepthShift(session.sessionId);
+  const starMask = useStarMask(session.sessionId);
+  const { detect: detectStars } = starMask;
   const [showDepthViewer, setShowDepthViewer] = useState(false);
   const [showSavePreset, setShowSavePreset] = useState(false);
   const [showCrop, setShowCrop] = useState(false);
   const [presetVersion, setPresetVersion] = useState(0);
+  const [starMaskEnabled, setStarMaskEnabled] = useState(false);
+
+  function handleStarMaskToggle(enabled: boolean): void {
+    setStarMaskEnabled(enabled);
+    if (enabled) {
+      void detectStars(parameters.starSensitivity, parameters.starMaxSize);
+    } else {
+      starMask.clear();
+    }
+  }
+
+  // Re-run detection (debounced) whenever the star controls change while the
+  // mask overlay is showing, so it tracks the same sliders it previews for.
+  useEffect(() => {
+    if (!starMaskEnabled) {
+      return undefined;
+    }
+    const timeout = setTimeout(() => {
+      void detectStars(parameters.starSensitivity, parameters.starMaxSize);
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [starMaskEnabled, parameters.starSensitivity, parameters.starMaxSize, detectStars]);
 
   const geometryChanged = !isDefaultGeometry(parameters.geometry);
   const aspectRatio = displayedAspect(session.dimensions, parameters.geometry);
@@ -118,6 +143,7 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
           histogram={session.histogram}
           aspectRatio={aspectRatio}
           isLoading={status === 'processing'}
+          starMaskOverlay={starMaskEnabled ? starMask.stars : null}
           onDepthShiftClick={() => {
             if (depthShift.layerUrls.length === 0) {
               void depthShift.generate();
@@ -198,6 +224,10 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
           onParameterChange={handleParameterChange}
           onReset={handleReset}
           isProcessing={status === 'processing'}
+          starMaskEnabled={starMaskEnabled}
+          onStarMaskToggle={handleStarMaskToggle}
+          starMaskSourceCount={starMask.sourceCount}
+          starMaskLoading={starMask.isLoading}
         />
       </aside>
     </div>

@@ -10,6 +10,10 @@ export interface SliderPanelProps {
   onParameterChange: (key: SliderParameterKey, value: number) => void;
   onReset: () => void;
   isProcessing?: boolean;
+  starMaskEnabled?: boolean;
+  onStarMaskToggle?: (enabled: boolean) => void;
+  starMaskSourceCount?: number | null;
+  starMaskLoading?: boolean;
 }
 
 const GROUP_LABELS: Record<ParameterBound['group'], string> = {
@@ -28,6 +32,10 @@ export function SliderPanel({
   onParameterChange,
   onReset,
   isProcessing = false,
+  starMaskEnabled = false,
+  onStarMaskToggle,
+  starMaskSourceCount = null,
+  starMaskLoading = false,
 }: SliderPanelProps) {
   const groups = Object.keys(GROUP_LABELS) as ParameterBound['group'][];
 
@@ -65,6 +73,28 @@ export function SliderPanel({
               />
             </div>
           ))}
+          {group === 'star' && onStarMaskToggle && (
+            <label className="flex items-center justify-between gap-2 text-sm text-muted">
+              <span className="inline-flex items-center gap-1.5">
+                Show star mask
+                {starMaskEnabled && (
+                  <span className="text-xs tabular-nums text-faint">
+                    {starMaskLoading
+                      ? '...'
+                      : starMaskSourceCount !== null
+                        ? `${starMaskSourceCount} sources`
+                        : ''}
+                  </span>
+                )}
+              </span>
+              <input
+                type="checkbox"
+                className="size-4 accent-accent"
+                checked={starMaskEnabled}
+                onChange={(event) => onStarMaskToggle(event.target.checked)}
+              />
+            </label>
+          )}
         </fieldset>
       ))}
     </div>

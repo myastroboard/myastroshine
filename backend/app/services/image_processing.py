@@ -9,12 +9,14 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable
+from typing import cast
 
 import cv2
 import numpy as np
 
 from app.logging_config import get_logger
 from app.models import GeometryParameters, ProcessingParameters
+from app.services.star_detection import StarDetectionService
 from app.utils.math_utils import kelvin_to_rgb_gain, tint_to_rgb_gain, to_uint8
 
 StepCallback = Callable[[str, int], None]
@@ -24,7 +26,7 @@ logger = get_logger(__name__)
 _EPS = 1e-3  # a parameter within this of its default is treated as "unchanged"
 _NEUTRAL_KELVIN = 6500
 _DENOISE_MORPH_THRESHOLD = 50
-_STAR_KERNEL_SIZE = 9  # px; compact bright features up to this size read as stars
+_STAR_FALLOFF_MARGIN = 1.6  # widen each star's blend footprint past its own radius
 
 
 def _unchanged(value: float, default: float) -> bool:
@@ -33,6 +35,9 @@ def _unchanged(value: float, default: float) -> bool:
 
 class ImageProcessingService:
     """Applies enhancement parameters to an image."""
+
+    def __init__(self) -> None:
+        self._star_detector = StarDetectionService()
 
     def apply_geometry(self, image: np.ndarray, geom: GeometryParameters) -> np.ndarray:
         """Rotate / flip / straighten / crop the image before enhancement.
@@ -160,39 +165,52 @@ class ImageProcessingService:
             out = cv2.morphologyEx(out, cv2.MORPH_CLOSE, kernel)
         return out
 
-    def apply_star_reduction(self, image: np.ndarray, amount: int) -> np.ndarray:
-        """Shrink and dim compact bright points (stars) to emphasise the DSO.
+    def apply_star_reduction(
+        self, image: np.ndarray, amount: int, sensitivity: int = 50, max_size: int = 30
+    ) -> np.ndarray:
+        """Shrink individually-detected stars to emphasise the DSO.
 
-        Stars are isolated with a white top-hat: small bright features on a
-        smoothly varying background. Diffuse nebulosity varies slowly, so the
-        top-hat leaves it near zero and it stays out of the mask. Inside the
-        mask the image is blended toward an eroded, slightly darkened copy, so
-        star disks contract while the object is untouched. 0 = off .. 100 = strong.
+        Each star is located by :class:`StarDetectionService` (per-star blob
+        detection) rather than a single image-wide mask, so only genuine
+        compact bright points are touched - diffuse nebulosity is never
+        dimmed, unlike the old global top-hat blend. Inside each star's own
+        soft-edged footprint, the image is blended toward a `cv2.inpaint`
+        reconstruction - a seamless fill sampled from the real surrounding
+        background/nebulosity - so star disks fade into their surroundings
+        rather than the darkened-erosion fill this replaced, which crushed
+        small isolated stars to a visible black dot (erosion takes the local
+        minimum; for a star on a dark sky that minimum is near-zero, and
+        darkening it further only made it worse). ``amount``: 0 = off .. 100 =
+        strong. ``sensitivity`` / ``max_size`` (0-100) tune what counts as a
+        star; see :meth:`StarDetectionService.detect`.
         """
         if amount <= 0:
             return image
         strength = amount / 100.0
 
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        kernel = cv2.getStructuringElement(
-            cv2.MORPH_ELLIPSE, (_STAR_KERNEL_SIZE, _STAR_KERNEL_SIZE)
-        )
-        tophat = cv2.morphologyEx(gray, cv2.MORPH_TOPHAT, kernel).astype(np.float32)
-        peak = float(tophat.max())
-        if peak < 1.0:
+        stars = self._star_detector.detect(image, sensitivity, max_size)
+        if not stars:
             return image
 
-        mask = np.clip(tophat / peak, 0.0, 1.0)
-        # Grow then feather so star cores keep full weight after blurring.
-        grown = cv2.dilate(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
-        mask = cv2.GaussianBlur(np.sqrt(np.maximum(mask, grown)), (0, 0), sigmaX=1.2)
+        height, width = image.shape[:2]
+        star_mask = np.zeros((height, width), dtype=np.uint8)
+        for star in stars:
+            cv2.circle(
+                star_mask,
+                (round(star.x), round(star.y)),
+                max(1, round(star.radius * _STAR_FALLOFF_MARGIN)),
+                255,
+                thickness=-1,
+            )
+        inpainted = cv2.inpaint(image, star_mask, 3, cv2.INPAINT_TELEA)
+
+        mask = cast(
+            "np.ndarray",
+            cv2.GaussianBlur(star_mask.astype(np.float32) / 255.0, (0, 0), sigmaX=1.2),
+        )
         weight = np.clip(mask * (0.4 + 0.6 * strength), 0.0, 1.0)[:, :, np.newaxis]
 
-        small = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-        reduced = cv2.erode(image, small, iterations=1 + round(strength * 3)).astype(np.float32)
-        reduced *= 1.0 - 0.6 * strength
-
-        blended = image.astype(np.float32) * (1.0 - weight) + reduced * weight
+        blended = image.astype(np.float32) * (1.0 - weight) + inpainted.astype(np.float32) * weight
         return to_uint8(blended)
 
     def apply_sharpness(self, image: np.ndarray, sharpness: float) -> np.ndarray:
@@ -234,7 +252,12 @@ class ImageProcessingService:
             ("vibrance", lambda r: self.apply_vibrance(r, params.vibrance)),
             ("clarity", lambda r: self.apply_clarity(r, params.clarity)),
             ("denoise", lambda r: self.apply_denoise(r, params.denoise)),
-            ("star_reduction", lambda r: self.apply_star_reduction(r, params.star_reduction)),
+            (
+                "star_reduction",
+                lambda r: self.apply_star_reduction(
+                    r, params.star_reduction, params.star_sensitivity, params.star_max_size
+                ),
+            ),
             ("sharpness", lambda r: self.apply_sharpness(r, params.sharpness)),
         ]
 

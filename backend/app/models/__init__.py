@@ -31,6 +31,7 @@ from app.models.stack import (
     StackStatistics,
     UploadFrameResponse,
 )
+from app.models.star_mask import StarMaskRequest, StarMaskResponse, StarSourceInfo
 from app.models.token import (
     CreatedTokenResponse,
     CreateTokenRequest,
@@ -67,6 +68,9 @@ __all__ = [
     "StackResultResponse",
     "StackSessionResponse",
     "StackStatistics",
+    "StarMaskRequest",
+    "StarMaskResponse",
+    "StarSourceInfo",
     "TokenListResponse",
     "TokenOut",
     "UploadFrameResponse",

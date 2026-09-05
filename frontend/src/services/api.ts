@@ -17,6 +17,7 @@ import type {
   StackResult,
   StackSession,
   StackSettings,
+  StarMaskResult,
   UploadFrameResult,
   UploadResponse,
   WebhookResponse,
@@ -235,6 +236,13 @@ export const apiClient = {
     return request<DepthShiftResult>(`/depth-shift/${sessionId}`, {
       method: 'POST',
       json: { numLayers, intensity },
+    });
+  },
+
+  detectStars(sessionId: string, sensitivity: number, maxSize: number): Promise<StarMaskResult> {
+    return request<StarMaskResult>(`/star-mask/${sessionId}`, {
+      method: 'POST',
+      json: { sensitivity, maxSize },
     });
   },
 

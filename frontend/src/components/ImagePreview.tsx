@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState, type PointerEvent } from 'react';
 
 import { HistogramDisplay } from '@/components/HistogramDisplay';
-import type { HistogramData } from '@/types';
+import type { HistogramData, StarSourceInfo } from '@/types';
 
 export interface ImagePreviewProps {
   originalUrl: string;
@@ -11,6 +11,8 @@ export interface ImagePreviewProps {
   aspectRatio?: number;
   isLoading?: boolean;
   onDepthShiftClick?: () => void;
+  /** Detected star circles to draw over the preview, or null to hide the overlay. */
+  starMaskOverlay?: StarSourceInfo[] | null;
 }
 
 const MIN_ZOOM = 1;
@@ -25,6 +27,7 @@ export function ImagePreview({
   aspectRatio,
   isLoading = false,
   onDepthShiftClick,
+  starMaskOverlay,
 }: ImagePreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [splitPercent, setSplitPercent] = useState(50);
@@ -102,6 +105,31 @@ export function ImagePreview({
             className="pointer-events-none absolute inset-0 h-full w-full object-contain"
             style={{ clipPath: `inset(0 ${100 - splitPercent}% 0 0)` }}
           />
+          {starMaskOverlay && starMaskOverlay.length > 0 && (
+            // viewBox width:height matches the container's own aspect ratio, so
+            // the (non-uniform in general) preserveAspectRatio="none" stretch is
+            // actually uniform here - circles stay round. See radius conversion
+            // below: a longest-side fraction needs `* max(ratio, 1)` to land in
+            // these viewBox units.
+            <svg
+              viewBox={`0 0 ${ratio} 1`}
+              preserveAspectRatio="none"
+              className="pointer-events-none absolute inset-0 h-full w-full stroke-accent"
+              fill="none"
+              aria-hidden
+            >
+              {starMaskOverlay.map((star, index) => (
+                <circle
+                  key={index}
+                  cx={star.x * ratio}
+                  cy={star.y}
+                  r={Math.max(star.radius * Math.max(ratio, 1), 0.006)}
+                  strokeWidth={0.006}
+                  opacity={0.85}
+                />
+              ))}
+            </svg>
+          )}
         </div>
 
         {/* Divider + grab handle */}

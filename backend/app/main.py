@@ -36,6 +36,7 @@ from app.routes import (
     presets,
     processing,
     stack,
+    star_mask,
     tokens,
     upload,
     websockets,
@@ -129,6 +130,7 @@ def create_app() -> FastAPI:
         presets.router,
         tokens.router,
         stack.router,
+        star_mask.router,
         admin.router,
     ):
         app.include_router(router, prefix="/api")

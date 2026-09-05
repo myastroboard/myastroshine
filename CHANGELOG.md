@@ -6,7 +6,18 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- Star reduction rebuilt on per-star detection (`StarDetectionService`, a
+  thresholded top-hat + `cv2.connectedComponentsWithStats`, at native
+  resolution) instead of a single image-wide top-hat mask, so only genuine
+  stars are shrunk and diffuse nebulosity is never dimmed. Each star fades
+  into a `cv2.inpaint`-reconstructed local background rather than a darkened
+  copy, so full-strength reduction doesn't leave black dots. New
+  `star_sensitivity` / `star_max_size` parameters tune what counts as a star.
+- Star mask preview: `POST /api/star-mask/{session_id}` reports detected star
+  positions for a live "N sources detected" overlay in the editor, toggled from
+  the Stars panel.
 
 ## [0.1.0] - 2026-09-04
 

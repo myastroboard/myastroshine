@@ -1,8 +1,9 @@
 # Processing algorithms
 
 Reference for the image processing pipeline. Implementations live in
-`app/services/image_processing.py`, `app/services/depth_map.py`, and the stacking
-services. All functions operate on BGR `uint8` numpy arrays unless noted.
+`app/services/image_processing.py`, `app/services/star_detection.py`,
+`app/services/depth_map.py`, and the stacking services. All functions operate on
+BGR `uint8` numpy arrays unless noted.
 
 ## Single-image pipeline
 
@@ -26,13 +27,38 @@ Applied in this order to minimize artifacts (`apply_parameters`):
    sharpens, negative softens.
 8. **Denoise** (0-100) - bilateral filter; map to diameter 5-20 and
    sigma_color / sigma_space 75-150. Above 50, add a 3x3 morphological close.
-9. **Star reduction** (0-100) - shrink and dim compact bright points to
-   emphasise the diffuse object. A white top-hat (9x9 ellipse) isolates small
-   bright features: nebulosity varies too slowly to register, so it stays out
-   of the mask. The mask is dilated (5x5), feathered (`sqrt`, then a 1.2 sigma
-   blur) and scaled by `0.4 + 0.6 * amount`. Inside it the image is blended
-   toward an eroded (1-4 iterations of a 3x3 ellipse), `1 - 0.6 * amount`
-   darkened copy, so star disks contract while the object is untouched.
+9. **Star reduction** (`star_reduction` 0-100, `star_sensitivity` /
+   `star_max_size` 0-100) - shrink *individually detected* stars, leaving
+   everything else untouched. Detection (`StarDetectionService.detect`, shared
+   with the `POST /api/star-mask/{id}` mask-preview endpoint) isolates compact
+   bright features with the same 9x9-ellipse white top-hat as before
+   (nebulosity varies too slowly to register), thresholds it, and finds each
+   star as one connected bright region (`cv2.connectedComponentsWithStats`);
+   its equivalent radius comes from the region's pixel area
+   (`sqrt(area / pi)`). `star_sensitivity` maps inversely to that threshold
+   (higher sensitivity -> lower threshold -> fainter/smaller points register);
+   `star_max_size` caps the equivalent radius counted as a star, so bright
+   diffuse cores (galaxy nuclei, nebula knots) aren't shrunk as if they were
+   one. Runs at native resolution - an earlier version used
+   `skimage.feature.blob_dog` on a downscaled copy to stay inside the
+   performance budget, but the downscale's anti-aliasing routinely erased
+   small/faint stars before detection ever saw them (a busy real star field
+   visibly under-caught); connected components is a single near-linear pass,
+   cheap enough at full 24MP resolution that no downscale is needed. For each
+   detected star, a soft-edged circle (radius
+   `1.6x` the detected radius, Gaussian-feathered) is drawn into a mask *local
+   to that star*; the old implementation built one image-wide mask from the
+   raw top-hat, which is what let it drag down nearby nebulosity and leave
+   halos. The mask is scaled by `0.4 + 0.6 * amount`, and inside it the image
+   is blended toward a `cv2.inpaint` (Telea) reconstruction of each star's
+   footprint - seamlessly filled from the real surrounding background/
+   nebulosity - so star disks fade into their surroundings while the object,
+   and everything not individually detected as a star, is untouched. An
+   earlier version of this blended toward a darkened, eroded copy instead;
+   erosion takes the local minimum, which for a small star on a dark sky
+   crushes straight to near-zero and showed up as a visible black dot at full
+   strength - `cv2.inpaint` doesn't have that failure mode since its fill is
+   always sampled from real neighbouring pixels.
 10. **Sharpness** (0-2) - below 1.0 Gaussian blur, above 1.0 Laplacian-kernel
     sharpen blended by `(sharpness - 1) * 0.5`.
 

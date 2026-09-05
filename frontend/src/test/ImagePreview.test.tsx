@@ -26,4 +26,24 @@ describe('ImagePreview', () => {
     fireEvent.click(reset);
     expect(reset).toHaveTextContent('100%');
   });
+
+  it('draws one circle per detected star when a mask overlay is given', () => {
+    const { container } = render(
+      <ImagePreview
+        originalUrl="/a"
+        processedUrl="/b"
+        starMaskOverlay={[
+          { x: 0.2, y: 0.3, radius: 0.02 },
+          { x: 0.8, y: 0.7, radius: 0.03 },
+        ]}
+      />,
+    );
+
+    expect(container.querySelectorAll('svg circle')).toHaveLength(2);
+  });
+
+  it('renders no overlay circles without a mask', () => {
+    const { container } = render(<ImagePreview originalUrl="/a" processedUrl="/b" />);
+    expect(container.querySelectorAll('svg circle')).toHaveLength(0);
+  });
 });
