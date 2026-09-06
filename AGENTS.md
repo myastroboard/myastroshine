@@ -63,6 +63,9 @@ Keep the "Non-negotiables" section intact.
   token gets added with a `.dark` override. Exception: chrome layered on top of
   an image stays dark in both themes (see `docs/DESIGN.md`). Verify new surfaces
   in both themes.
+- **Surfaces: `.panel` or `.panel-inset`, nothing else.** `.panel` frames a
+  region; `.panel-inset` is a block nested inside one. Don't hand-roll
+  `rounded border bg-surface`.
 - Keep the existing stack (React 19 + Vite + Tailwind v4). No new frameworks.
 - Mobile-first / responsive: verify layout at small widths.
 

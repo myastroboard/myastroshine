@@ -81,7 +81,8 @@ Compose these; do not re-implement them per component.
 
 | Class | Use |
 |-------|-----|
-| `.panel` / `.panel-inset` | Glass card surface (section / nested) |
+| `.panel` | Frames a region - a grid column, a settings pane, a result block. Glass, hairline border, soft shadow. |
+| `.panel-inset` | A block nested *inside* a `.panel` - a stat list, the histogram, an image mat. Recessed (`bg-raised`), no shadow. |
 | `.eyebrow` | Uppercase section label |
 | `.btn` + `.btn-primary\|-amber\|-outline\|-ghost\|-danger` | Buttons (`.btn-sm` for compact). `-primary` is the teal gradient, `-amber` is the AstroDex gradient |
 | `.field` | Text input / select / textarea |
@@ -93,18 +94,24 @@ Compose these; do not re-implement them per component.
 
 ## Rules of thumb
 
+- **Two surface levels, nothing else.** `.panel` for a region, `.panel-inset`
+  for a block nested in one. Never hand-roll `rounded border bg-surface` - if a
+  surface isn't one of those two, it shouldn't be a surface.
 - Section spacing: `gap-5`/`gap-6`; inside a panel `gap-4`; tight groups `gap-2`.
 - Panel padding: `p-4 sm:p-5` (that is what `.panel` does).
 - Numbers (percentages, counts, versions): add `tabular-nums`.
-- Editor layout: three panes, `lg:grid-cols-[10.5rem_19rem_minmax(0,1fr)]` -
-  a numbered **workflow rail** (`EditorRail`), the active step's **inspector**
-  (`EditorInspector`), then the **preview**. The preview column is
-  `lg:sticky lg:top-20` so the image and histogram stay visible while the
-  inspector scrolls. Below `lg` the rail is a horizontal scroll strip and the
-  three panes stack. The workflow order lives in one place - `EDITOR_STEPS` in
-  `types/index.ts` - and mirrors the backend pipeline order.
-- Settings-style rows: label + one-line description on the left, control on the
-  right, hairline divider between rows (see `SettingsView`).
+- Editor layout: three `.panel` columns,
+  `lg:grid-cols-[12.5rem_19rem_minmax(0,1fr)]` - a numbered **workflow rail**
+  (`EditorRail`), the active step's **inspector** (`EditorInspector`), then the
+  **preview** (the image matted in a `bg-black` inset with the histogram in a
+  `.panel-inset` below, one card). The preview column is `lg:sticky lg:top-20`
+  so it stays visible while the inspector scrolls. Below `lg` the rail is a
+  horizontal scroll strip and the three panes stack. The workflow order lives in
+  one place - `EDITOR_STEPS` in `types/index.ts` - and mirrors the backend
+  pipeline order.
+- Settings: the section nav and the section content are each a `.panel`
+  (`lg:grid-cols-[210px_minmax(0,1fr)]`). Rows inside: label + one-line
+  description on the left, control on the right, hairline divider between rows.
 - Footer: app name + version on the left; the **Theme** and **Language**
   controls (`ThemeSwitcher`, `LanguageSwitcher` - compact `.field` selects) plus
   the GitHub link on the right. The update notice folds in as a second line.

@@ -215,6 +215,10 @@ body::after {
 
 @layer components {
   /* --- Surfaces ------------------------------------------------------- */
+  /* Two levels, nothing else: `.panel` frames a region (a grid column, a
+     settings pane, a result block); `.panel-inset` is a block nested inside a
+     panel (a stat list, the histogram, an image mat). Never hand-roll
+     `rounded border bg-*` - reach for one of these. */
 
   .panel {
     @apply rounded-xl border border-line p-4 sm:p-5;

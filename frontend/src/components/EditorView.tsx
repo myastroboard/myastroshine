@@ -276,8 +276,8 @@ export function EditorView({ session, astrodexContext, onExit }: EditorViewProps
   const isProcessing = status === 'processing';
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[10.5rem_19rem_minmax(0,1fr)] lg:items-start">
-      <div className="flex flex-col gap-3">
+    <div className="grid gap-5 lg:grid-cols-[12.5rem_19rem_minmax(0,1fr)] lg:items-start">
+      <div className="panel flex flex-col gap-3">
         <button
           type="button"
           className="btn btn-ghost btn-sm self-start"
@@ -387,7 +387,7 @@ export function EditorView({ session, astrodexContext, onExit }: EditorViewProps
                 {t('editor.depth_shift_failed', { error: depthShift.error })}
               </p>
             ) : depthShift.layerUrls.length === 0 ? (
-              <div className="grid h-40 place-items-center rounded-xl border border-hairline bg-surface text-xs text-faint">
+              <div className="panel grid h-40 place-items-center text-xs text-faint">
                 {t('editor.generating_depth_map')}
               </div>
             ) : (

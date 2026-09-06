@@ -118,10 +118,10 @@ export function ImagePreview({
   const maxWidth = ratio < 1 ? `calc(70vh * ${ratio})` : '100%';
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="panel flex flex-col gap-3">
       <div
         ref={containerRef}
-        className={`relative mx-auto max-h-[70vh] w-full touch-pan-y select-none overflow-hidden rounded-xl border border-hairline bg-black ${
+        className={`relative mx-auto max-h-[70vh] w-full touch-pan-y select-none overflow-hidden rounded-lg border border-hairline bg-black ${
           framingActive ? '' : pickingFocalPoint ? 'cursor-crosshair' : 'cursor-ew-resize'
         }`}
         style={{ aspectRatio: ratio, maxWidth }}
@@ -285,7 +285,7 @@ export function ImagePreview({
       </div>
 
       {histogram && (
-        <div className="rounded-lg border border-hairline bg-surface p-3">
+        <div className="panel-inset">
           <HistogramDisplay data={histogram} />
         </div>
       )}

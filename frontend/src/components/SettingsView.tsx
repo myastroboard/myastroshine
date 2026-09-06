@@ -47,9 +47,9 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
         </p>
       )}
 
-      <div className="mt-8 grid gap-x-10 gap-y-6 lg:grid-cols-[188px_minmax(0,1fr)]">
+      <div className="mt-8 grid gap-x-8 gap-y-6 lg:grid-cols-[210px_minmax(0,1fr)]">
         <nav
-          className="flex gap-1 overflow-x-auto lg:sticky lg:top-20 lg:h-fit lg:flex-col lg:overflow-visible"
+          className="panel flex gap-1 overflow-x-auto lg:sticky lg:top-20 lg:h-fit lg:flex-col lg:overflow-visible"
           aria-label={t('settings.sections_aria_label')}
         >
           {SECTIONS.map((entry) => (
@@ -70,7 +70,7 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
           ))}
         </nav>
 
-        <div className="min-w-0">
+        <div className="panel min-w-0">
           <div className="mb-5 border-b border-line-strong pb-3">
             <h2 className="text-sm font-semibold text-ink">{t(`settings.sections.${section}.label`)}</h2>
             <p className="mt-0.5 text-xs text-muted">{t(`settings.sections.${section}.blurb`)}</p>
