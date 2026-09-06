@@ -89,7 +89,14 @@ export default function App() {
             className="flex items-center gap-2.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-accent"
             onClick={() => navigate('editor')}
           >
-            <BrandMark />
+            <img
+              src="/logo.png"
+              alt=""
+              width={28}
+              height={28}
+              className="h-7 w-7 shrink-0"
+              draggable={false}
+            />
             <span className="text-sm font-semibold tracking-tight text-ink">
               {import.meta.env.VITE_APP_NAME ?? 'MyAstroShine'}
             </span>
@@ -137,21 +144,5 @@ export default function App() {
 
       <Footer />
     </div>
-  );
-}
-
-/** Compact aperture mark used in the header. */
-function BrandMark() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" role="img" aria-label="MyAstroShine" fill="none">
-      <circle cx="12" cy="12" r="9" className="stroke-line-strong" strokeWidth="1.5" />
-      <circle cx="12" cy="12" r="3.25" className="fill-accent" />
-      <path
-        d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"
-        className="stroke-accent"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-    </svg>
   );
 }

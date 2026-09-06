@@ -24,6 +24,8 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and content panes, and the stacking result blocks now use one framing system
   instead of three ad-hoc ones. The preview image is matted with its histogram
   in a single card.
+- New application logo: the header now shows the MyAstroShine icon, and the
+  browser-tab favicon is a matching amber-star-and-orbit mark.
 
 ## [0.2.0] - 2026-09-06
 
