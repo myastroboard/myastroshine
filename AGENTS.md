@@ -56,6 +56,13 @@ Keep the "Non-negotiables" section intact.
 - **No static inline styles.** Put static presentation in a CSS class or a Tailwind
   utility. Allowed: runtime show/hide and genuinely per-instance dynamic values
   (a computed pixel offset for the depth-shift parallax, a progress-bar width).
+- **Both themes, always.** The app ships light (default) and dark, switched from
+  the footer. Style through the semantic tokens in `src/styles/index.css`
+  (`bg-surface`, `text-muted`, `hover:bg-hover`, ...) - never a hardcoded
+  light/dark-specific colour (`bg-white/10`, `text-white`, a raw hex). A missing
+  token gets added with a `.dark` override. Exception: chrome layered on top of
+  an image stays dark in both themes (see `docs/DESIGN.md`). Verify new surfaces
+  in both themes.
 - Keep the existing stack (React 19 + Vite + Tailwind v4). No new frameworks.
 - Mobile-first / responsive: verify layout at small widths.
 

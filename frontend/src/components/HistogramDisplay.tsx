@@ -9,9 +9,9 @@ export interface HistogramDisplayProps {
 export function HistogramDisplay({ data }: HistogramDisplayProps) {
   const { t } = useTranslation();
   const channels: Array<[keyof HistogramData, string]> = [
-    ['r', 'stroke-red-400'],
-    ['g', 'stroke-green-400'],
-    ['b', 'stroke-blue-400'],
+    ['r', 'stroke-channel-red'],
+    ['g', 'stroke-channel-green'],
+    ['b', 'stroke-channel-blue'],
   ];
   const max = Math.max(1, ...data.r, ...data.g, ...data.b);
 

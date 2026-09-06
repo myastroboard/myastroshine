@@ -68,7 +68,7 @@ export function EditorRail({ activeStep, onStepChange, parameters, focalPoint }:
               className={`group flex shrink-0 items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent lg:w-full ${
                 active
                   ? 'bg-accent-wash text-ink'
-                  : 'text-muted hover:bg-white/[0.04] hover:text-ink'
+                  : 'text-muted hover:bg-hover hover:text-ink'
               }`}
             >
               <span

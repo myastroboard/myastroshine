@@ -6,7 +6,19 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- Light theme, now the default, matching the MyAstroBoard visual charter (deep
+  teal primary accent, amber ecosystem accent, frosted panels over a lightly
+  teal-tinted ground). The dark theme is unchanged.
+- A **Theme** control in the footer - System / Light / Dark. "System" follows the
+  operating system's light/dark setting and updates live when it changes. The
+  choice is remembered per browser.
+
+### Changed
+
+- The language switcher moved from the header to the footer, next to the new
+  theme control; the header now carries only the brand and Settings.
 
 ## [0.2.0] - 2026-09-06
 

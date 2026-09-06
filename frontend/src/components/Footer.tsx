@@ -1,5 +1,7 @@
 import { useState } from 'react';
 
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { WhatsNewModal } from '@/components/WhatsNewModal';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useVersionCheck } from '@/hooks/useVersionCheck';
@@ -22,13 +24,17 @@ export function Footer() {
   return (
     <footer className="border-t border-hairline bg-canvas/95 px-4 py-3 text-xs text-faint backdrop-blur-md sm:px-6">
       <div className="mx-auto flex max-w-[1360px] flex-col gap-1.5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <span>
             {appName} &middot; v{version}
           </span>
-          <a href={GITHUB_URL} target="_blank" rel="noreferrer" className="hover:text-muted">
-            GitHub
-          </a>
+          <div className="flex items-center gap-3">
+            <ThemeSwitcher />
+            <LanguageSwitcher />
+            <a href={GITHUB_URL} target="_blank" rel="noreferrer" className="hover:text-muted">
+              GitHub
+            </a>
+          </div>
         </div>
 
         {updateAvailable && result?.latestVersion && (

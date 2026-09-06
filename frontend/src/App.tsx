@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { EditorView } from '@/components/EditorView';
 import { Footer } from '@/components/Footer';
 import { ImageUpload } from '@/components/ImageUpload';
-import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { SettingsView } from '@/components/SettingsView';
 import { StackMode, type EditorMode } from '@/components/stacking/StackMode';
 import { StackView } from '@/components/stacking/StackView';
@@ -95,17 +94,14 @@ export default function App() {
               {import.meta.env.VITE_APP_NAME ?? 'MyAstroShine'}
             </span>
           </button>
-          <div className="flex items-center gap-3">
-            <LanguageSwitcher />
-            <button
-              type="button"
-              className={route === 'settings' ? 'btn btn-outline btn-sm' : 'btn btn-ghost btn-sm'}
-              aria-current={route === 'settings' ? 'page' : undefined}
-              onClick={() => navigate(route === 'settings' ? 'editor' : 'settings')}
-            >
-              {t('app.nav_settings')}
-            </button>
-          </div>
+          <button
+            type="button"
+            className={route === 'settings' ? 'btn btn-outline btn-sm' : 'btn btn-ghost btn-sm'}
+            aria-current={route === 'settings' ? 'page' : undefined}
+            onClick={() => navigate(route === 'settings' ? 'editor' : 'settings')}
+          >
+            {t('app.nav_settings')}
+          </button>
         </div>
       </header>
 

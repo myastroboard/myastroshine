@@ -62,7 +62,7 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
                 'shrink-0 rounded-md px-3 py-2 text-left text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent ' +
                 (section === entry
                   ? 'bg-raised font-medium text-ink'
-                  : 'text-muted hover:bg-white/[0.04] hover:text-ink')
+                  : 'text-muted hover:bg-hover hover:text-ink')
               }
             >
               {t(`settings.sections.${entry}.label`)}
