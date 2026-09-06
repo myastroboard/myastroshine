@@ -124,9 +124,6 @@ class StorageService:
         paths = sorted(self.stack_dir(stack_id).glob("frame_*.png"))
         return [image_utils.load_image(path) for path in paths]
 
-    def count_stack_frames(self, stack_id: str) -> int:
-        return len(list(self.stack_dir(stack_id).glob("frame_*.png")))
-
     def delete_stack(self, stack_id: str) -> None:
         path = self.stack_dir(stack_id)
         if path.exists():

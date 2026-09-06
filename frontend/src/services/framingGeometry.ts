@@ -17,9 +17,9 @@ export const CORNERS: HandleId[] = ['nw', 'ne', 'se', 'sw'];
 export const EDGES: HandleId[] = ['n', 'e', 's', 'w'];
 
 /** Smallest crop rectangle, as a fraction of the framed image. */
-export const MIN_FRAC = 0.08;
+const MIN_FRAC = 0.08;
 
-export function clamp(value: number, lo: number, hi: number): number {
+function clamp(value: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, value));
 }
 

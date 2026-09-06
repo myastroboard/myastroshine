@@ -108,6 +108,9 @@ body {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   font-feature-settings: 'cv05', 'cv11', 'ss01';
+  /* A horizontal drag that overshoots a slider shouldn't trigger the browser's
+     swipe-to-go-back gesture and drop the editor. */
+  overscroll-behavior-x: contain;
 }
 
 /* Two ambient halos, fixed behind everything (amber top-right, teal bottom-left). */

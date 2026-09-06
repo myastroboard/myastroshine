@@ -59,6 +59,9 @@ export interface DepthBundle {
 
 export interface ExportBundle {
   canSendToAstroDex: boolean;
+  astrodexSending: boolean;
+  astrodexSent: boolean;
+  astrodexError: string | null;
   onDownload: () => void;
   onSendToAstroDex: () => void;
   onSaveAsPreset: () => void;
@@ -165,6 +168,9 @@ export function EditorInspector(props: EditorInspectorProps) {
         <ExportPanel
           isProcessing={props.isProcessing}
           canSendToAstroDex={props.exportActions.canSendToAstroDex}
+          astrodexSending={props.exportActions.astrodexSending}
+          astrodexSent={props.exportActions.astrodexSent}
+          astrodexError={props.exportActions.astrodexError}
           onDownload={props.exportActions.onDownload}
           onSendToAstroDex={props.exportActions.onSendToAstroDex}
           onSaveAsPreset={props.exportActions.onSaveAsPreset}

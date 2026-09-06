@@ -23,7 +23,7 @@ rawpy==0.27.1
 
 # Database
 SQLAlchemy==2.0.52
-alembic==1.19.1
+alembic==1.19.2
 
 # HTTP client (AstroDex webhooks, GitHub release checks)
 httpx==0.28.1

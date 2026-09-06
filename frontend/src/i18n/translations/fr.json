@@ -37,6 +37,10 @@
     "save_as_preset": "Enregistrer comme préréglage",
     "reset_all": "Réinitialiser tous les réglages",
     "next_step": "Suivant : {step}",
+    "new_photo": "Nouvelle photo",
+    "discard_title": "Abandonner vos modifications ?",
+    "discard_body": "Charger une autre photo abandonnera les réglages faits sur celle-ci.",
+    "discard_confirm": "Abandonner et continuer",
     "rail": {
       "aria_label": "Étapes de retouche",
       "modified": "modifié par rapport au défaut",
@@ -86,9 +90,11 @@
     }
   },
   "export_panel": {
-    "heading": "Export",
     "download": "Télécharger",
-    "send_to_astrodex": "Envoyer vers AstroDex"
+    "send_to_astrodex": "Envoyer vers AstroDex",
+    "sending": "Envoi...",
+    "sent": "Envoyé vers AstroDex.",
+    "send_failed": "Échec de l'envoi vers AstroDex : {error}"
   },
   "image_preview": {
     "processed_alt": "Traitée",

@@ -66,11 +66,6 @@ class UnauthorizedError(AppError):
     error_code = "UNAUTHORIZED"
 
 
-class UpstreamUnavailableError(AppError):
-    status_code = 503
-    error_code = "ASTRODEX_UNREACHABLE"
-
-
 class ImageProcessingError(AppError):
     status_code = 500
     error_code = "PROCESSING_FAILED"

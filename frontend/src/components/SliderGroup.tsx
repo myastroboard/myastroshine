@@ -68,7 +68,7 @@ export function SliderGroup({
 }
 
 /** Small "i" affordance; reveals `hint` in a popover on hover or keyboard focus. */
-export function ParameterHint({
+function ParameterHint({
   paramKey,
   label,
   hint,

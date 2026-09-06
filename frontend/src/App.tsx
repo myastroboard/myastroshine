@@ -76,6 +76,11 @@ export default function App() {
     setMode('single');
   }
 
+  function handleExitEditor(): void {
+    setSession(null);
+    setError(null);
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-40 border-b border-hairline bg-canvas/80 backdrop-blur-md">
@@ -115,12 +120,18 @@ export default function App() {
               </p>
             )}
 
-            <StackMode mode={mode} onModeChange={setMode} />
+            {(mode === 'stack' || !session) && (
+              <StackMode mode={mode} onModeChange={setMode} />
+            )}
 
             {mode === 'stack' ? (
               <StackView onEnhanceComposite={handleEnhanceComposite} />
             ) : session ? (
-              <EditorView session={session} astrodexContext={astrodexContext} />
+              <EditorView
+                session={session}
+                astrodexContext={astrodexContext}
+                onExit={handleExitEditor}
+              />
             ) : (
               <ImageUpload onUpload={handleUpload} isLoading={isUploading} />
             )}

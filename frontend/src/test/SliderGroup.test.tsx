@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { SliderGroup } from '@/components/SliderGroup';
-import { DEFAULT_PARAMETERS } from '@/types';
+import { DEFAULT_PARAMETERS, type SliderParameterKey } from '@/types';
 
 describe('SliderGroup', () => {
   it('renders one labelled slider per key and reports changes with the key and value', () => {
@@ -51,7 +51,7 @@ describe('SliderGroup', () => {
   it('skips a key with no numeric bounds', () => {
     render(
       <SliderGroup
-        keys={['depthShiftIntensity']}
+        keys={['bogusKey' as SliderParameterKey]}
         parameters={DEFAULT_PARAMETERS}
         onParameterChange={vi.fn()}
       />,

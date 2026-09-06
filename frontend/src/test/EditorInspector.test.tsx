@@ -46,6 +46,9 @@ function makeProps(overrides: Partial<EditorInspectorProps> = {}): EditorInspect
     },
     exportActions: {
       canSendToAstroDex: false,
+      astrodexSending: false,
+      astrodexSent: false,
+      astrodexError: null,
       onDownload: vi.fn(),
       onSendToAstroDex: vi.fn(),
       onSaveAsPreset: vi.fn(),

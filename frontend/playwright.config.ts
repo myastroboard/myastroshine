@@ -21,6 +21,9 @@ export default defineConfig({
   use: {
     baseURL: `http://localhost:${FRONTEND_PORT}`,
     trace: 'on-first-retry',
+    // The app auto-detects the browser language; pin it so the specs' English
+    // selectors hold regardless of the runner's locale.
+    locale: 'en-US',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [
