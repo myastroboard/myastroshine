@@ -37,6 +37,10 @@
     "save_as_preset": "Save as preset",
     "reset_all": "Reset all adjustments",
     "next_step": "Next: {step}",
+    "new_photo": "New photo",
+    "discard_title": "Discard your edits?",
+    "discard_body": "Loading another photo will discard the adjustments you've made to this one.",
+    "discard_confirm": "Discard and continue",
     "rail": {
       "aria_label": "Editing workflow",
       "modified": "changed from default",
@@ -86,9 +90,11 @@
     }
   },
   "export_panel": {
-    "heading": "Export",
     "download": "Download",
-    "send_to_astrodex": "Send to AstroDex"
+    "send_to_astrodex": "Send to AstroDex",
+    "sending": "Sending...",
+    "sent": "Sent to AstroDex.",
+    "send_failed": "Could not send to AstroDex: {error}"
   },
   "image_preview": {
     "processed_alt": "Processed",

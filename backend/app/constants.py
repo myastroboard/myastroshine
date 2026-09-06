@@ -8,9 +8,6 @@ from __future__ import annotations
 
 API_TITLE = "MyAstroShine"
 
-# The API always listens here; 8000 is left free for other local projects.
-API_PORT = 8002
-
 # Logging - rotating file handler in DATA_DIR (see app/logging_config.py).
 LOG_FILE_NAME = "myastroshine.log"
 WORKER_LOG_FILE_NAME = "worker.log"

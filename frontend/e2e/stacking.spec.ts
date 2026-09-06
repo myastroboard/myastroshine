@@ -22,6 +22,8 @@ test('stack three frames and enhance the composite', async ({ page }) => {
   await page.getByRole('button', { name: 'Enhance composite' }).click();
 
   // Handoff: back to the single-image editor on the composite session.
-  await expect(page.getByRole('button', { name: 'Download' })).toBeVisible();
+  const rail = page.locator('nav[aria-label="Editing workflow"]');
+  await expect(rail).toBeVisible();
+  await rail.getByRole('button', { name: 'Light' }).click();
   await expect(page.getByRole('slider', { name: 'Contrast' })).toBeVisible();
 });

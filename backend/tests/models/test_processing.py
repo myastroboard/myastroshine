@@ -2,7 +2,9 @@
 
 The frontend sends these fields in snake_case (its case-conversion layer relies
 on this). Every field must round-trip; unknown fields must be rejected so a
-mis-cased key like ``depthShiftIntensity`` fails loudly instead of being ignored.
+mis-cased key like ``starReduction`` fails loudly instead of being ignored -
+except keys this app used to define and has since retired, which are dropped so
+an older stored preset still loads.
 """
 
 from __future__ import annotations
@@ -43,7 +45,6 @@ _WIRE = {
     "sharpness": 1.2,
     "temperature": 5500,
     "tint": 5,
-    "depth_shift_intensity": 40,
     "curve_points": [{"x": 0, "y": 0}, {"x": 128, "y": 160}, {"x": 255, "y": 255}],
     "red_curve_points": [{"x": 0, "y": 0}, {"x": 128, "y": 170}, {"x": 255, "y": 255}],
     "green_curve_points": [{"x": 0, "y": 0}, {"x": 128, "y": 150}, {"x": 255, "y": 255}],
@@ -55,7 +56,6 @@ _CURVE_FIELDS = ["curve_points", "red_curve_points", "green_curve_points", "blue
 
 def test_all_wire_fields_round_trip() -> None:
     params = ProcessingParameters(**_WIRE)
-    assert params.depth_shift_intensity == 40
     assert params.geometry.rotate_quarters == 1
     assert params.curve_points[1].y == 160
     assert params.red_curve_points[1].y == 170
@@ -113,7 +113,14 @@ def test_curve_point_level_out_of_range_is_rejected() -> None:
 
 def test_unknown_field_is_rejected() -> None:
     with pytest.raises(ValidationError):
-        ProcessingParameters(depthShiftIntensity=40)  # type: ignore[call-arg]
+        ProcessingParameters(starReduction=40)  # type: ignore[call-arg]
+
+
+def test_retired_key_is_dropped_not_rejected() -> None:
+    """A stored preset from an older version may still carry a retired key."""
+    params = ProcessingParameters(**{"contrast": 1.4, "depth_shift_intensity": 0})
+    assert params.contrast == 1.4
+    assert not hasattr(params, "depth_shift_intensity")
 
 
 def test_whites_blacks_out_of_range_is_rejected() -> None:

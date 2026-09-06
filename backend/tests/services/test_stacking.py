@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 import numpy as np
 import pytest
 
+from app.db.models import StackRecord
 from app.exceptions import InvalidParameterError, ResourceNotFoundError
 from app.models import InitiateStackRequest
 from app.services.session import SessionService
@@ -33,6 +36,25 @@ def test_initiate_then_upload_marks_ready(
         record = stacking.add_frame(record.stack_id, i, star_field)
     assert record.received_frames == 3
     assert record.status == "ready"
+
+
+def test_cleanup_removes_expired_stacks_and_their_frames(
+    stacking: StackingService, star_field: np.ndarray
+) -> None:
+    """cleanup_old_stacks drops only expired rows and their frame PNGs."""
+    live = stacking.initiate(InitiateStackRequest(frame_count=2))
+    dead = stacking.initiate(InitiateStackRequest(frame_count=2))
+    stacking.add_frame(dead.stack_id, 0, star_field)
+    assert stacking.storage.stack_dir(dead.stack_id).exists()
+    dead.expires_at = datetime.now(UTC) - timedelta(hours=1)
+    stacking.db.commit()
+
+    removed = stacking.cleanup_old_stacks()
+
+    assert removed == 1
+    assert stacking.db.get(StackRecord, live.stack_id) is not None
+    assert stacking.db.get(StackRecord, dead.stack_id) is None
+    assert not stacking.storage.stack_dir(dead.stack_id).exists()
 
 
 def test_process_produces_an_enhanceable_session(

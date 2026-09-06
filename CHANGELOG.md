@@ -42,6 +42,11 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   pipeline. A focal-point picker on the preview (click to set) drives where
   the Depth Shift parallax centers - `focus_point` was accepted by the API
   before this but never used.
+- A **"New photo"** button on the editor returns to the upload screen -
+  previously the only way back was a full reload. Leaving with unsaved edits
+  (the button, or a browser back / reload / mobile edge-swipe) now asks first,
+  so a mis-swipe on a slider no longer silently loses the work. The mode
+  switcher is hidden while a photo is open.
 - i18n: FR + EN. Every frontend-owned UI string now goes through
   `useTranslation()`'s `t()`, backed by `frontend/src/i18n/translations/{en,fr}.json`
   (`en.json` is the reference language); a compact EN/FR selector sits in the
@@ -130,9 +135,26 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Neither field ever did anything - `depth_detection_method` had no reader in
   `DepthMapService`/`DepthShiftService` even before this evaluation. An old
   `app_settings.json` with these keys still loads fine; they're just ignored.
+- The `depth_shift_intensity` processing parameter and its unused
+  `ProcessRequest.apply_depth_shift` companion - dead since they were added
+  (no pipeline stage ever read them; the Depth Shift viewer has always kept
+  its own intensity state). `ProcessingParameters` now silently drops the
+  retired key on the way in, so a stored preset from an older version still
+  loads instead of hitting `extra_forbidden`.
+- Dead-code sweep before the release: the unused `useAstroDexIntegration`
+  hook is now wired to the "Send to AstroDex" button (which gains
+  sending / sent / error feedback); the unused `react-router-dom` dependency
+  (routing is hand-rolled hash-based), the unreachable `UpstreamUnavailableError`
+  exception, the never-called `StorageService.count_stack_frames`, the unused
+  `API_PORT` constant, and the unused `get_astrodex_service` DI wrapper are gone.
 
 ### Fixed
 
+- Expired multi-frame stacks were never cleaned up - only the composite
+  session they produce was. `StackRecord` rows and their uploaded frame PNGs
+  under `DATA_DIR/stacks/` now expire on the same hourly schedule as sessions
+  (`StackingService.cleanup_old_stacks`), so a long-running instance doesn't
+  accumulate them forever.
 - `GET /api/presets` 500ing whenever a built-in preset stored before a
   `ProcessingParameters` field rename (e.g. this release's `brightness` ->
   `exposure`) no longer matched the current model (`extra_forbidden` on the

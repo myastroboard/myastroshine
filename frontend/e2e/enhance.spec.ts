@@ -1,14 +1,22 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 const SAMPLE = 'e2e/fixtures/sample.png';
 
-test('upload, adjust a slider, and download the result', async ({ page }) => {
+/** Upload the sample and wait for the editor (its workflow rail) to mount. */
+async function openEditor(page: Page): Promise<void> {
   await page.goto('/');
-
   await page.locator('input[type=file]').setInputFiles(SAMPLE);
+  await expect(page.locator('nav[aria-label="Editing workflow"]')).toBeVisible();
+}
 
-  const download = page.getByRole('button', { name: 'Download' });
-  await expect(download).toBeVisible();
+/** Click a step in the workflow rail (Start / Framing / Light / ... / Export). */
+async function openStep(page: Page, name: string): Promise<void> {
+  await page.locator('nav[aria-label="Editing workflow"]').getByRole('button', { name }).click();
+}
+
+test('upload, adjust a slider, and download the result', async ({ page }) => {
+  await openEditor(page);
+  await openStep(page, 'Light');
 
   const processed = page.waitForResponse(
     (r) => r.url().includes('/api/process/') && r.request().method() === 'POST' && r.ok(),
@@ -16,19 +24,20 @@ test('upload, adjust a slider, and download the result', async ({ page }) => {
   await page.getByRole('slider', { name: 'Contrast' }).fill('2');
   await processed;
 
-  const [file] = await Promise.all([
-    page.waitForEvent('download'),
-    download.click(),
-  ]);
+  await openStep(page, 'Export');
+  const download = page.getByRole('button', { name: 'Download' });
+  await expect(download).toBeVisible();
+
+  const [file] = await Promise.all([page.waitForEvent('download'), download.click()]);
   expect(file.suggestedFilename()).toMatch(/^myastroshine_.*\.jpg$/);
 });
 
 test('adjusting a slider refreshes the processed preview', async ({ page }) => {
-  await page.goto('/');
-  await page.locator('input[type=file]').setInputFiles(SAMPLE);
-  await expect(page.getByRole('button', { name: 'Download' })).toBeVisible();
+  await openEditor(page);
+  await openStep(page, 'Light');
 
   const processed = page.locator('img[alt="Processed"]');
+  await expect(processed).toBeVisible();
   const before = await processed.getAttribute('src');
 
   await Promise.all([
@@ -41,11 +50,10 @@ test('adjusting a slider refreshes the processed preview', async ({ page }) => {
 });
 
 test('the before/after divider drags without selecting content', async ({ page }) => {
-  await page.goto('/');
-  await page.locator('input[type=file]').setInputFiles(SAMPLE);
-  await expect(page.getByRole('button', { name: 'Download' })).toBeVisible();
+  await openEditor(page);
 
   const frame = page.locator('img[alt="Processed"]');
+  await expect(frame).toBeVisible();
   const box = (await frame.boundingBox())!;
   const clip = () =>
     page.locator('img[alt="Original"]').evaluate((el) => getComputedStyle(el).clipPath);
@@ -61,9 +69,8 @@ test('the before/after divider drags without selecting content', async ({ page }
 });
 
 test('opens the depth shift viewer', async ({ page }) => {
-  await page.goto('/');
-  await page.locator('input[type=file]').setInputFiles(SAMPLE);
-  await expect(page.getByRole('button', { name: 'Download' })).toBeVisible();
+  await openEditor(page);
+  await openStep(page, 'Depth');
 
   await page.getByRole('button', { name: 'Open Depth Shift viewer' }).click();
 
@@ -82,9 +89,8 @@ test('opens the depth shift viewer', async ({ page }) => {
 });
 
 test('save the current parameters as a preset', async ({ page }) => {
-  await page.goto('/');
-  await page.locator('input[type=file]').setInputFiles(SAMPLE);
-  await expect(page.getByRole('button', { name: 'Download' })).toBeVisible();
+  await openEditor(page);
+  await openStep(page, 'Export');
 
   await page.getByRole('button', { name: 'Save as preset' }).click();
 
@@ -94,11 +100,14 @@ test('save the current parameters as a preset', async ({ page }) => {
   const name = `E2E ${Date.now()}`;
   await page.getByPlaceholder('My nebula look').fill(name);
   await Promise.all([
-    page.waitForResponse((r) => r.url().endsWith('/api/presets') && r.request().method() === 'POST' && r.ok()),
+    page.waitForResponse(
+      (r) => r.url().endsWith('/api/presets') && r.request().method() === 'POST' && r.ok(),
+    ),
     page.getByRole('button', { name: 'Save', exact: true }).click(),
   ]);
-
   await expect(dialog).toBeHidden();
+
+  await openStep(page, 'Start');
   const chip = page.getByRole('button', { name, exact: true });
   await expect(chip).toBeVisible();
 
@@ -115,14 +124,12 @@ test('save the current parameters as a preset', async ({ page }) => {
   await expect(chip).toHaveCount(0);
 });
 
-test('crop and rotate applies a new framing', async ({ page }) => {
-  await page.goto('/');
-  await page.locator('input[type=file]').setInputFiles(SAMPLE);
-  await expect(page.getByRole('button', { name: 'Download' })).toBeVisible();
+test('framing crops and rotates on the preview', async ({ page }) => {
+  await openEditor(page);
+  await openStep(page, 'Framing');
 
-  await page.getByRole('button', { name: 'Crop & rotate' }).click();
-  const done = page.getByRole('button', { name: 'Done' });
-  await expect(done).toBeVisible();
+  const apply = page.getByRole('button', { name: 'Apply framing' });
+  await expect(apply).toBeVisible();
 
   await page.getByLabel('Straighten').fill('12');
 
@@ -139,44 +146,72 @@ test('crop and rotate applies a new framing', async ({ page }) => {
 
   await Promise.all([
     page.waitForResponse((r) => r.url().includes('/api/process/') && r.ok()),
-    done.click(),
+    apply.click(),
   ]);
-  await expect(done).toBeHidden();
-  // the before/after split still works after a crop: "before" is now the
-  // original with the same geometry applied, so the two frames stay aligned
+
+  // committed: the Framing rail step now carries the "changed from default" dot
+  await expect(
+    page.locator('nav[aria-label="Editing workflow"]').getByRole('button', { name: 'Framing' }),
+  ).toHaveAccessibleName(/changed from default/);
+
+  // leaving Framing, the before/after split has both frames aligned again
+  await openStep(page, 'Light');
   await expect(page.locator('img[alt="Original"]')).toHaveCount(1);
-  await expect(page.getByRole('button', { name: 'Crop & rotate' })).toHaveClass(/btn-primary/);
+  await expect(page.locator('img[alt="Processed"]')).toBeVisible();
+});
+
+test('"New photo" confirms before discarding edits, then returns to upload', async ({ page }) => {
+  await openEditor(page);
+
+  // no edits yet -> leaves straight away
+  await page.getByRole('button', { name: 'New photo' }).click();
+  await expect(page.getByRole('button', { name: 'Choose a file' })).toBeVisible();
+
+  // re-enter, make an edit (dirty client-side at once), and the exit is guarded
+  await page.locator('input[type=file]').setInputFiles(SAMPLE);
+  await openStep(page, 'Light');
+  await page.getByRole('slider', { name: 'Contrast' }).fill('1.7');
+
+  await page.getByRole('button', { name: 'New photo' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Discard your edits?' });
+  await expect(dialog).toBeVisible();
+
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole('slider', { name: 'Contrast' })).toHaveValue('1.7');
+
+  await page.getByRole('button', { name: 'New photo' }).click();
+  await dialog.getByRole('button', { name: 'Discard and continue' }).click();
+  await expect(page.getByRole('button', { name: 'Choose a file' })).toBeVisible();
 });
 
 test('applying a preset moves the sliders and star reduction works', async ({ page }) => {
-  await page.goto('/');
-  await page.locator('input[type=file]').setInputFiles(SAMPLE);
-  await expect(page.getByRole('button', { name: 'Download' })).toBeVisible();
+  await openEditor(page);
 
+  await openStep(page, 'Light');
   const contrast = page.getByRole('slider', { name: 'Contrast' });
   await expect(contrast).toHaveValue('1');
 
+  await openStep(page, 'Start');
   const nebula = page.getByRole('button', { name: 'Nebula', exact: true });
   await Promise.all([
     page.waitForResponse((r) => r.url().includes('/apply/') && r.ok()),
     nebula.click(),
   ]);
-  await expect(contrast).not.toHaveValue('1'); // preset pushed its value into the slider
   await expect(nebula).toHaveAttribute('aria-pressed', 'true');
 
-  // The "Stars" section of the slider panel is collapsed by default.
-  await page
-    .locator('details', { has: page.locator('#param-starReduction') })
-    .locator('summary')
-    .getByText('Stars')
-    .click();
+  await openStep(page, 'Light');
+  await expect(contrast).not.toHaveValue('1'); // preset pushed its value into the slider
 
+  await openStep(page, 'Stars');
   const stars = page.getByRole('slider', { name: 'Star reduction' });
   await Promise.all([
     page.waitForResponse((r) => r.url().includes('/api/process/') && r.ok()),
     stars.fill('60'),
   ]);
   await expect(stars).toHaveValue('60');
+
   // a manual edit deselects the preset
+  await openStep(page, 'Start');
   await expect(nebula).toHaveAttribute('aria-pressed', 'false');
 });

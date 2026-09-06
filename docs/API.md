@@ -133,7 +133,6 @@ guard, independent of `max_image_size_mb`'s compressed-byte-size check).
 | sharpness | 0.0 | 2.0 | 1.0 | float |
 | temperature | 2000 | 8000 | 6500 | int (Kelvin) |
 | tint | -50 | 50 | 0 | int |
-| depth_shift_intensity | -100 | 100 | 0 | int |
 | curve_points | - | - | `[]` | array of `{x, y}` |
 | red_curve_points | - | - | `[]` | array of `{x, y}` |
 | green_curve_points | - | - | `[]` | array of `{x, y}` |

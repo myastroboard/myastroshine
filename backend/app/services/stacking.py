@@ -11,6 +11,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import numpy as np
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -209,3 +210,21 @@ class StackingService:
 
     def get_result(self, stack_id: str) -> StackRecord:
         return self._get(stack_id)
+
+    def cleanup_old_stacks(self) -> int:
+        """Delete expired stack rows and their uploaded frames. Returns the count.
+
+        The composite a stack produces becomes its own ``SessionRecord`` and is
+        expired by ``SessionService.cleanup_old_sessions``; this only clears the
+        ``StackRecord`` and the raw frame PNGs under ``DATA_DIR/stacks/``, which
+        nothing else touches.
+        """
+        now = datetime.now(UTC)
+        expired = self.db.scalars(select(StackRecord).where(StackRecord.expires_at < now)).all()
+        for record in expired:
+            self.storage.delete_stack(record.stack_id)
+            self.db.delete(record)
+        self.db.commit()
+        if expired:
+            logger.info("expired stacks cleaned", count=len(expired))
+        return len(expired)

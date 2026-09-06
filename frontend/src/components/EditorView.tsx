@@ -5,6 +5,7 @@ import { EditorInspector } from '@/components/EditorInspector';
 import { EditorRail } from '@/components/EditorRail';
 import { ImagePreview } from '@/components/ImagePreview';
 import { SavePresetDialog } from '@/components/SavePresetDialog';
+import { useAstroDexIntegration } from '@/hooks/useAstroDexIntegration';
 import { useAutoAstro } from '@/hooks/useAutoAstro';
 import { useDepthShift } from '@/hooks/useDepthShift';
 import { useImageProcessing } from '@/hooks/useImageProcessing';
@@ -16,6 +17,7 @@ import {
   DEFAULT_GEOMETRY,
   DEFAULT_PARAMETERS,
   geometryEquals,
+  hasEdits,
   isDefaultGeometry,
   type CurveChannel,
   type CurvePoint,
@@ -36,6 +38,8 @@ export interface AstroDexContext {
 export interface EditorViewProps {
   session: EditorSession;
   astrodexContext: AstroDexContext | null;
+  /** Leave the editor and go back to the upload screen. */
+  onExit: () => void;
 }
 
 /** Aspect ratio of the enhanced result, given the framing. */
@@ -50,7 +54,7 @@ function displayedAspect(dimensions: Dimensions | undefined, geometry: GeometryP
 }
 
 /** Main editing surface: workflow rail + step inspector + persistent preview. */
-export function EditorView({ session, astrodexContext }: EditorViewProps) {
+export function EditorView({ session, astrodexContext, onExit }: EditorViewProps) {
   const { t } = useTranslation();
   const {
     parameters,
@@ -69,6 +73,7 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
   const depthShift = useDepthShift(session.sessionId);
   const starMask = useStarMask(session.sessionId);
   const autoAstro = useAutoAstro(session.sessionId);
+  const astrodex = useAstroDexIntegration();
   const { detect: detectStars } = starMask;
 
   const [activeStep, setActiveStep] = useState<EditorStepId>('start');
@@ -80,6 +85,31 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
   const [pickingFocalPoint, setPickingFocalPoint] = useState(false);
   const [framingGeom, setFramingGeom] = useState<GeometryParameters>(parameters.geometry);
   const [framingRatioFrac, setFramingRatioFrac] = useState<number | null>(null);
+  const [confirmExit, setConfirmExit] = useState(false);
+
+  const dirty = hasEdits(parameters) || focalPoint !== null;
+
+  // Warn before a full-page navigation (mobile edge-swipe back, reload, tab
+  // close) drops unsaved edits - there is no server-side draft to recover.
+  useEffect(() => {
+    if (!dirty) {
+      return undefined;
+    }
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
+
+  function handleExitRequest(): void {
+    if (dirty) {
+      setConfirmExit(true);
+    } else {
+      onExit();
+    }
+  }
 
   // Keep the framing draft in step with geometry applied elsewhere (a preset,
   // Auto Astro, or a global reset). Draft-only edits don't change the reference,
@@ -235,7 +265,7 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
     if (!astrodexContext) {
       return;
     }
-    void apiClient.sendToAstroDex(
+    void astrodex.sendImage(
       session.sessionId,
       astrodexContext.imageId,
       astrodexContext.callbackUrl,
@@ -247,12 +277,29 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
 
   return (
     <div className="grid gap-5 lg:grid-cols-[10.5rem_19rem_minmax(0,1fr)] lg:items-start">
-      <EditorRail
-        activeStep={activeStep}
-        onStepChange={handleStepChange}
-        parameters={parameters}
-        focalPoint={focalPoint}
-      />
+      <div className="flex flex-col gap-3">
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm self-start"
+          onClick={handleExitRequest}
+        >
+          <svg viewBox="0 0 12 12" className="h-3 w-3 stroke-current" fill="none" aria-hidden>
+            <path
+              d="M7.5 2 3 6l4.5 4"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          {t('editor.new_photo')}
+        </button>
+        <EditorRail
+          activeStep={activeStep}
+          onStepChange={handleStepChange}
+          parameters={parameters}
+          focalPoint={focalPoint}
+        />
+      </div>
 
       <EditorInspector
         activeStep={activeStep}
@@ -300,6 +347,9 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
         }}
         exportActions={{
           canSendToAstroDex: Boolean(astrodexContext),
+          astrodexSending: astrodex.isLoading,
+          astrodexSent: astrodex.success,
+          astrodexError: astrodex.error,
           onDownload: () => void handleDownload(),
           onSendToAstroDex: handleSendToAstroDex,
           onSaveAsPreset: () => setShowSavePreset(true),
@@ -358,6 +408,42 @@ export function EditorView({ session, astrodexContext }: EditorViewProps) {
           onSave={(name, description) => savePreset({ name, description, parameters })}
           onClose={() => setShowSavePreset(false)}
         />
+      )}
+
+      {confirmExit && (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t('editor.discard_title')}
+          onClick={(event) => event.target === event.currentTarget && setConfirmExit(false)}
+        >
+          <div className="panel flex w-full max-w-sm flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <h2 className="text-sm font-semibold text-ink">{t('editor.discard_title')}</h2>
+              <p className="text-xs text-muted">{t('editor.discard_body')}</p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setConfirmExit(false)}
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger btn-sm"
+                onClick={() => {
+                  setConfirmExit(false);
+                  onExit();
+                }}
+              >
+                {t('editor.discard_confirm')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

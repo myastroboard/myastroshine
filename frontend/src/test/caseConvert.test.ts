@@ -6,13 +6,13 @@ describe('caseConvert', () => {
   it('converts nested object keys to snake_case', () => {
     const input = {
       sessionId: 'abc',
-      parameters: { depthShiftIntensity: 10, contrast: 1.5 },
+      parameters: { starReduction: 10, contrast: 1.5 },
       depthLayers: [{ layerId: 0, imageUrl: '/x' }],
     };
 
     expect(keysToSnakeCase(input)).toEqual({
       session_id: 'abc',
-      parameters: { depth_shift_intensity: 10, contrast: 1.5 },
+      parameters: { star_reduction: 10, contrast: 1.5 },
       depth_layers: [{ layer_id: 0, image_url: '/x' }],
     });
   });
@@ -21,13 +21,13 @@ describe('caseConvert', () => {
     const input = {
       preset_id: 'system_nebula',
       is_favorite: false,
-      parameters: { depth_shift_intensity: 0 },
+      parameters: { star_reduction: 0 },
     };
 
     expect(keysToCamelCase(input)).toEqual({
       presetId: 'system_nebula',
       isFavorite: false,
-      parameters: { depthShiftIntensity: 0 },
+      parameters: { starReduction: 0 },
     });
   });
 

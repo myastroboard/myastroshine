@@ -35,7 +35,6 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
-    readonly errorCode?: string,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -45,8 +44,8 @@ export class ApiError extends Error {
 async function readError(response: Response): Promise<ApiError> {
   const text = await response.text();
   try {
-    const body = JSON.parse(text) as { error?: string; error_code?: string };
-    return new ApiError(response.status, body.error ?? text, body.error_code);
+    const body = JSON.parse(text) as { error?: string };
+    return new ApiError(response.status, body.error ?? text);
   } catch {
     return new ApiError(response.status, text || response.statusText);
   }
@@ -86,7 +85,7 @@ export interface SavePresetInput {
   parameters: ProcessingParameters;
 }
 
-export interface SavePresetResult {
+interface SavePresetResult {
   presetId: string;
   name: string;
   createdAt: string;

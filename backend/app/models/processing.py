@@ -47,14 +47,29 @@ class CurvePoint(BaseModel):
     y: int = Field(ge=_LEVEL_MIN, le=_LEVEL_MAX)
 
 
+#: Fields removed from ``ProcessingParameters`` over time. Dropped on the way in
+#: (see ``_drop_retired_keys``) so a stored preset / session parameter set from
+#: an older version still loads instead of failing ``extra="forbid"``.
+_RETIRED_KEYS = ("depth_shift_intensity",)
+
+
 class ProcessingParameters(BaseModel):
     """Enhancement parameters applied by the processing pipeline.
 
-    ``extra="forbid"``: an unknown key (e.g. a mis-cased ``depthShiftIntensity``)
-    is a 400, not a silently-ignored field.
+    ``extra="forbid"``: a genuinely unknown key (e.g. a mis-cased
+    ``depthShiftIntensity``) is a 400, not a silently-ignored field. Keys that
+    this app used to define but has since removed (``_RETIRED_KEYS``) are the
+    one exception - they are dropped rather than rejected.
     """
 
     model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_retired_keys(cls, data: object) -> object:
+        if isinstance(data, dict) and any(key in data for key in _RETIRED_KEYS):
+            return {k: v for k, v in data.items() if k not in _RETIRED_KEYS}
+        return data
 
     geometry: GeometryParameters = Field(default_factory=GeometryParameters)
     contrast: float = Field(default=1.0, ge=0.5, le=3.0)
@@ -77,7 +92,6 @@ class ProcessingParameters(BaseModel):
     sharpness: float = Field(default=1.0, ge=0.0, le=2.0)
     temperature: int = Field(default=6500, ge=2000, le=8000)
     tint: int = Field(default=0, ge=-50, le=50)
-    depth_shift_intensity: int = Field(default=0, ge=-100, le=100)
     curve_points: list[CurvePoint] = Field(default_factory=list)
     red_curve_points: list[CurvePoint] = Field(default_factory=list)
     green_curve_points: list[CurvePoint] = Field(default_factory=list)
@@ -113,8 +127,6 @@ class ProcessRequest(BaseModel):
     """Body of ``POST /api/process/{session_id}``."""
 
     parameters: ProcessingParameters
-    apply_depth_shift: bool = False
-    depth_shift_intensity: int = Field(default=0, ge=-100, le=100)
 
 
 class ProcessResponse(BaseModel):

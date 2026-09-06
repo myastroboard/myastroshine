@@ -95,7 +95,6 @@ export interface ProcessingParameters {
   sharpness: number;
   temperature: number;
   tint: number;
-  depthShiftIntensity: number;
   curvePoints: CurvePoint[];
   redCurvePoints: CurvePoint[];
   greenCurvePoints: CurvePoint[];
@@ -124,12 +123,33 @@ export const DEFAULT_PARAMETERS: ProcessingParameters = {
   sharpness: 1.0,
   temperature: 6500,
   tint: 0,
-  depthShiftIntensity: 0,
   curvePoints: [], // empty = no curve (identity); the editor shows DEFAULT_CURVE_POINTS instead
   redCurvePoints: [],
   greenCurvePoints: [],
   blueCurvePoints: [],
 };
+
+/** True once any parameter, the framing, or a tone curve has left its default -
+ * i.e. there is edit work that would be lost by leaving the editor. */
+export function hasEdits(p: ProcessingParameters): boolean {
+  if (!isDefaultGeometry(p.geometry)) {
+    return true;
+  }
+  for (const key of Object.keys(DEFAULT_PARAMETERS) as (keyof ProcessingParameters)[]) {
+    if (key === 'geometry') {
+      continue;
+    }
+    const value = p[key];
+    if (Array.isArray(value)) {
+      if (value.length > 0) {
+        return true;
+      }
+    } else if (value !== DEFAULT_PARAMETERS[key]) {
+      return true;
+    }
+  }
+  return false;
+}
 
 /** Curve fields, keyed by the channel the ToneCurveEditor tab selector edits. */
 export const CURVE_CHANNELS = ['rgb', 'red', 'green', 'blue'] as const;
@@ -148,7 +168,7 @@ export type SliderParameterKey = Exclude<
   'geometry' | 'curvePoints' | 'redCurvePoints' | 'greenCurvePoints' | 'blueCurvePoints'
 >;
 
-export interface ParameterBound {
+interface ParameterBound {
   key: SliderParameterKey;
   min: number;
   max: number;
@@ -159,9 +179,9 @@ export interface ParameterBound {
  * Slider min/max/step per parameter. Which panel a slider appears in, and in
  * what order, is decided by {@link EDITOR_STEPS} - not here. Label and hint text
  * live in the i18n files, keyed by `key` (`slider_panel.params.<key>.label` /
- * `.hint`) - see `SliderGroup.tsx`.
+ * `.hint`) - see `SliderGroup.tsx`. Consumers use {@link PARAMETER_BOUND_BY_KEY}.
  */
-export const PARAMETER_BOUNDS: ParameterBound[] = [
+const PARAMETER_BOUNDS: ParameterBound[] = [
   { key: 'contrast', min: 0.5, max: 3.0, step: 0.01 },
   { key: 'exposure', min: -1.0, max: 1.0, step: 0.01 },
   { key: 'highlights', min: -1.0, max: 1.0, step: 0.01 },
@@ -237,18 +257,6 @@ export const EDITOR_STEPS: EditorStep[] = [
   { id: 'depth', number: 8, params: [] },
   { id: 'export', number: null, params: [] },
 ];
-
-/** The eight numbered workflow steps, in order (excludes start/export). */
-export const NUMBERED_STEPS: EditorStep[] = EDITOR_STEPS.filter((step) => step.number !== null);
-
-export interface Image {
-  sessionId: string;
-  originalUrl: string;
-  processedUrl: string;
-  width: number;
-  height: number;
-  fileSize: number;
-}
 
 export interface UploadResponse {
   sessionId: string;
