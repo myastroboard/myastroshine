@@ -6,6 +6,10 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.2.0] - 2026-09-06
+
 ### Added
 
 - Star reduction rebuilt on per-star detection (`StarDetectionService`, a
