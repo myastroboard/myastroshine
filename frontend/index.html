@@ -1,15 +1,36 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="MyAstroShine - astronomical image enhancement" />
-    <meta name="theme-color" content="#060b12" />
+    <meta name="theme-color" content="#eef2f5" />
+    <script>
+      /* Resolve the theme before first paint so there is no flash. Mirrors
+         src/theme/context.ts (THEME_STORAGE_KEY, the system/light/dark logic). */
+      (function () {
+        try {
+          var pref = localStorage.getItem('myastroshine_theme') || 'system';
+          var dark =
+            pref === 'dark' ||
+            (pref === 'system' &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (dark) {
+            document.documentElement.classList.add('dark');
+            var meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) meta.setAttribute('content', '#060b12');
+          }
+        } catch (e) {}
+      })();
+    </script>
     <title>MyAstroShine</title>
     <style>
       /* Pre-paint background so there is no flash before the stylesheet loads. */
       html {
+        background: #eef2f5;
+      }
+      html.dark {
         background: #060b12;
       }
     </style>

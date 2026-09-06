@@ -1,7 +1,9 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Footer } from '@/components/Footer';
+import { I18nProvider } from '@/i18n/I18nContext';
+import { ThemeProvider } from '@/theme/ThemeContext';
 import { apiClient } from '@/services/api';
 import type { VersionCheckResult } from '@/types';
 
@@ -10,6 +12,16 @@ vi.mock('@/services/api', () => ({
 }));
 
 const mocked = vi.mocked(apiClient);
+
+function renderFooter() {
+  return render(
+    <ThemeProvider>
+      <I18nProvider>
+        <Footer />
+      </I18nProvider>
+    </ThemeProvider>,
+  );
+}
 
 const BASE_RESULT: VersionCheckResult = {
   currentVersion: '1.0.0',
@@ -27,9 +39,14 @@ describe('Footer', () => {
     vi.clearAllMocks();
   });
 
+  afterEach(() => {
+    localStorage.clear();
+    document.documentElement.classList.remove('dark');
+  });
+
   it('always shows the app name and a GitHub link', async () => {
     mocked.checkForUpdates.mockResolvedValue({ ...BASE_RESULT });
-    render(<Footer />);
+    renderFooter();
 
     expect(screen.getByText(/MyAstroShine/)).toBeInTheDocument();
     const link = screen.getByRole('link', { name: 'GitHub' });
@@ -37,9 +54,18 @@ describe('Footer', () => {
     await waitFor(() => expect(mocked.checkForUpdates).toHaveBeenCalled());
   });
 
+  it('carries the theme and language switchers', async () => {
+    mocked.checkForUpdates.mockResolvedValue({ ...BASE_RESULT });
+    renderFooter();
+
+    expect(screen.getByRole('combobox', { name: 'Theme' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Language' })).toBeInTheDocument();
+    await waitFor(() => expect(mocked.checkForUpdates).toHaveBeenCalled());
+  });
+
   it('has no update notice when no update is available', async () => {
     mocked.checkForUpdates.mockResolvedValue({ ...BASE_RESULT });
-    render(<Footer />);
+    renderFooter();
 
     await waitFor(() => expect(mocked.checkForUpdates).toHaveBeenCalled());
     expect(screen.queryByText(/new version/i)).not.toBeInTheDocument();
@@ -54,7 +80,7 @@ describe('Footer', () => {
       releaseName: 'Release v2.0.0',
       releaseNotes: '### Added\n- Something new.',
     });
-    render(<Footer />);
+    renderFooter();
 
     expect(await screen.findByText(/v2\.0\.0/)).toBeInTheDocument();
     const releaseLink = screen.getByRole('link', { name: 'View on GitHub' });
@@ -73,7 +99,7 @@ describe('Footer', () => {
       releaseName: 'Release v2.0.0',
       releaseNotes: '### Added\n- Something new.',
     });
-    render(<Footer />);
+    renderFooter();
 
     await screen.findByText(/v2\.0\.0/);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

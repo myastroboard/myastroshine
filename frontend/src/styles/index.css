@@ -4,57 +4,66 @@
  * MyAstroShine design system.
  *
  * Shares its charter with MyAstroBoard: a sky/teal primary accent, an amber
- * ecosystem accent, deep navy-teal surfaces, a fixed background gradient with
- * two ambient halos, and glass panels. The image is still the loudest thing on
- * screen - chrome stays quiet, colour is used sparingly. See docs/DESIGN.md.
+ * ecosystem accent, a fixed background gradient with two ambient halos, and
+ * glass panels. The image is still the loudest thing on screen - chrome stays
+ * quiet, colour is used sparingly. See docs/DESIGN.md.
  *
- * Dark-only for now (<html class="dark">). Tokens are semantic so a light
- * palette and the "red night" mode can be added later as overrides without
- * touching component code.
+ * Light is the default. The `.dark` class - set on <html> before first paint
+ * (see index.html), driven by the footer Theme control or the OS setting -
+ * overrides the same semantic tokens with the dark palette. Because every
+ * component reads tokens, the MyAstroBoard "red night" mode can be added the
+ * same way later (`[data-theme="red"]`) without touching component code.
  */
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  /* Surfaces - deep navy-teal, four elevation steps. */
-  --color-canvas: #060b12;
-  --color-surface: #0b1521;
-  --color-raised: #122232;
-  --color-overlay: #17293b;
+  /* ---- Light palette (default). The `.dark` block below overrides these. ---- */
+
+  /* Surfaces - near-white, four elevation steps over the teal-tinted ground. */
+  --color-canvas: #eef2f5;
+  --color-surface: #ffffff;
+  --color-raised: #f4f7f9;
+  --color-overlay: #e9eef2;
 
   /* Hairlines - cool and low-contrast; separation from line, then shadow. */
-  --color-hairline: #1b2a37;
-  --color-line: #253846;
-  --color-line-strong: #35505f;
+  --color-hairline: #e4e9ee;
+  --color-line: #d4dde4;
+  --color-line-strong: #b6c4ce;
 
-  /* Text - cool off-white, never pure #fff. */
-  --color-ink: #e7edf3;
-  --color-muted: #9aabb9;
-  --color-faint: #647889;
-  --color-ghost: #43535f;
+  /* Text - slate, not pure black. */
+  --color-ink: #1f2937;
+  --color-muted: #4b5563;
+  --color-faint: #6b7a86;
+  --color-ghost: #9aa8b2;
 
-  /* Primary accent - sky/teal (MyAstroBoard dark accent). */
-  --color-accent: #38bdf8;
-  --color-accent-strong: #7dd3fc;
-  --color-accent-deep: #0ea5e9;
-  --color-accent-wash: #0c2634;
-  --color-on-accent: #04141d;
+  /* Primary accent - deep teal (MyAstroBoard light accent). `-strong` is the
+     lighter top highlight used by the button gradient. */
+  --color-accent: #0e7490;
+  --color-accent-strong: #12a1c0;
+  --color-accent-deep: #0b5f77;
+  --color-accent-wash: #dbeef2;
+  --color-on-accent: #ffffff;
 
   /* Amber - the AstroDex / ecosystem accent. */
   --color-amber: #f59e0b;
   --color-amber-strong: #fbbf24;
-  --color-amber-wash: #2a2008;
+  --color-amber-wash: #fef3e2;
+  --color-on-amber: #2a1a02;
 
-  /* Status - saturated to read on the dark ground. */
-  --color-danger: #f87171;
-  --color-danger-wash: #2a1618;
-  --color-success: #34d399;
-  --color-warning: #fbbf24;
+  /* Status. */
+  --color-danger: #dc2626;
+  --color-danger-wash: #fef2f2;
+  --color-success: #059669;
+  --color-warning: #d97706;
 
-  /* Channel colours - the colour-curves tool only (ToneCurveEditor), not a
-     status token: which of R/G/B a curve edits, not what state something is in. */
-  --color-channel-red: #f87171;
-  --color-channel-green: #34d399;
-  --color-channel-blue: #60a5fa;
+  /* Chrome hover wash - flips per theme (teal-tint on light, white on dark). */
+  --color-hover: rgb(14 116 144 / 0.08);
+
+  /* Channel colours - the colour-curves tool only (ToneCurveEditor) and the
+     histogram, not a status token: which of R/G/B, not what state. */
+  --color-channel-red: #dc2626;
+  --color-channel-green: #059669;
+  --color-channel-blue: #2563eb;
 
   /* Radius. */
   --radius-sm: 0.375rem;
@@ -62,13 +71,12 @@
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
 
-  /* Elevation. */
-  --shadow-panel: 0 1px 2px rgb(0 0 0 / 0.4);
-  --shadow-pop: 0 8px 28px -8px rgb(0 0 0 / 0.55), 0 2px 6px -2px rgb(0 0 0 / 0.4);
-  --shadow-glass:
-    inset 0 1px 0 0 rgb(255 255 255 / 0.03), 0 10px 28px -14px rgb(0 0 0 / 0.6);
+  /* Elevation - soft, navy-tinted on light; the `.dark` block deepens them. */
+  --shadow-panel: 0 1px 2px rgb(15 23 42 / 0.06);
+  --shadow-pop: 0 8px 24px -8px rgb(15 23 42 / 0.14), 0 2px 6px -2px rgb(15 23 42 / 0.08);
+  --shadow-glass: 0 12px 32px -14px rgb(8 47 73 / 0.16);
   --shadow-premium:
-    0 24px 60px -20px rgb(0 0 0 / 0.7), 0 8px 20px -12px rgb(0 0 0 / 0.5);
+    0 24px 56px -20px rgb(8 47 73 / 0.22), 0 8px 20px -12px rgb(8 47 73 / 0.12);
 
   /* Motion. */
   --ease-premium: cubic-bezier(0.22, 1, 0.36, 1);
@@ -83,9 +91,62 @@
 }
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 
   /* Non-utility gradients and halos (raw CSS below). */
+  --bg-gradient: linear-gradient(160deg, #eef2f5 0%, #e9eff2 46%, #e3edf0 100%);
+  --gradient-accent: linear-gradient(135deg, #12a1c0 0%, #0e7490 54%, #0b5f77 100%);
+  --halo-accent: color-mix(in oklab, var(--color-accent) 6%, transparent);
+  --halo-amber: color-mix(in oklab, var(--color-amber) 5%, transparent);
+}
+
+/* ---- Dark palette. Overrides the tokens above wherever <html> carries .dark. ---- */
+.dark {
+  color-scheme: dark;
+
+  --color-canvas: #060b12;
+  --color-surface: #0b1521;
+  --color-raised: #122232;
+  --color-overlay: #17293b;
+
+  --color-hairline: #1b2a37;
+  --color-line: #253846;
+  --color-line-strong: #35505f;
+
+  --color-ink: #e7edf3;
+  --color-muted: #9aabb9;
+  --color-faint: #647889;
+  --color-ghost: #43535f;
+
+  --color-accent: #38bdf8;
+  --color-accent-strong: #7dd3fc;
+  --color-accent-deep: #0ea5e9;
+  --color-accent-wash: #0c2634;
+  --color-on-accent: #04141d;
+
+  --color-amber: #f59e0b;
+  --color-amber-strong: #fbbf24;
+  --color-amber-wash: #2a2008;
+  --color-on-amber: #04141d;
+
+  --color-danger: #f87171;
+  --color-danger-wash: #2a1618;
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+
+  --color-hover: rgb(255 255 255 / 0.05);
+
+  --color-channel-red: #f87171;
+  --color-channel-green: #34d399;
+  --color-channel-blue: #60a5fa;
+
+  --shadow-panel: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-pop: 0 8px 28px -8px rgb(0 0 0 / 0.55), 0 2px 6px -2px rgb(0 0 0 / 0.4);
+  --shadow-glass:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.03), 0 10px 28px -14px rgb(0 0 0 / 0.6);
+  --shadow-premium:
+    0 24px 60px -20px rgb(0 0 0 / 0.7), 0 8px 20px -12px rgb(0 0 0 / 0.5);
+
   --bg-gradient: linear-gradient(160deg, #060b12 0%, #0a1420 46%, #0c2231 100%);
   --gradient-accent: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 54%, #22d3ee 100%);
   --halo-accent: color-mix(in oklab, var(--color-accent) 13%, transparent);
@@ -204,7 +265,7 @@ body::after {
   }
 
   .btn-amber {
-    @apply text-on-accent;
+    @apply text-on-amber;
     background-image: linear-gradient(180deg, var(--color-amber-strong) 0%, var(--color-amber) 100%);
   }
 
@@ -213,11 +274,11 @@ body::after {
   }
 
   .btn-outline {
-    @apply border border-line-strong text-ink hover:bg-white/[0.05] active:bg-white/[0.02];
+    @apply border border-line-strong text-ink hover:bg-hover active:bg-hover;
   }
 
   .btn-ghost {
-    @apply text-muted hover:bg-white/[0.05] hover:text-ink;
+    @apply text-muted hover:bg-hover hover:text-ink;
   }
 
   .btn-danger {
@@ -290,7 +351,7 @@ body::after {
   }
 
   .slider:hover::-webkit-slider-thumb {
-    background: #fff;
+    background: var(--color-accent-strong);
   }
 
   .slider:active::-webkit-slider-thumb {

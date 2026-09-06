@@ -66,7 +66,7 @@ export function PresetButtons({
                 className={`absolute right-1 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded transition ${
                   confirming
                     ? 'bg-danger-wash text-danger opacity-100'
-                    : 'text-faint opacity-0 hover:bg-white/10 hover:text-danger focus-visible:opacity-100 group-hover:opacity-100'
+                    : 'text-faint opacity-0 hover:bg-hover hover:text-danger focus-visible:opacity-100 group-hover:opacity-100'
                 }`}
                 aria-label={
                   confirming

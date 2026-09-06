@@ -3,12 +3,17 @@
 MyAstroShine shares its visual charter with **MyAstroBoard** - the two apps
 should feel like one product family. The language:
 
-- a **sky/teal primary accent** (`--color-accent`, `#38bdf8`) and an **amber
-  ecosystem accent** (`--color-amber`, `#f59e0b`, reserved for AstroDex);
-- **deep navy-teal surfaces** in four elevation steps;
+- a **teal primary accent** (`--color-accent`) and an **amber ecosystem accent**
+  (`--color-amber`, `#f59e0b`, reserved for AstroDex) - deep teal `#0e7490` in
+  light, sky `#38bdf8` in dark;
+- **surfaces in four elevation steps** - frosted white in light, deep navy-teal
+  in dark;
 - a **fixed background gradient** with two soft ambient halos (amber top-right,
   teal bottom-left);
 - **glass panels** - translucent surface, hairline border, soft depth shadow.
+
+**Light is the default; dark is a footer toggle away.** Both are driven by the
+same semantic tokens - see principle 7.
 
 It is still restrained: the astronomical image is the loudest thing on screen,
 chrome is quiet, and saturated colour is used sparingly (one primary action per
@@ -36,14 +41,23 @@ here, extend the token layer or the component classes in
    ring; never remove an outline without replacing it.
 6. **Motion is small and fast.** 130-200 ms, `--ease-premium`. Respect
    `prefers-reduced-motion` (handled globally in `index.css`).
-7. **Dark-only for now.** Tokens are semantic, so a light palette
-   (`:root:not(.dark)`) and the MyAstroBoard "red night" mode
-   (`[data-theme="red"]`) can be added later without touching component code.
+7. **Two themes, one token set.** `:root` in `frontend/src/styles/index.css`
+   holds the **light** palette (the default); the `.dark` class - set on `<html>`
+   before first paint, from the footer **Theme** control (System / Light / Dark)
+   or the OS setting - overrides the same `--color-*` / `--shadow-*` tokens with
+   the dark palette. Components never branch on theme. The MyAstroBoard "red
+   night" mode (`[data-theme="red"]`) can be added the same way later without
+   touching component code. **Exception:** chrome layered *on top of an image*
+   (the split-view divider, framing handles, the zoom toolbar, the Depth Shift
+   HUD) stays dark-on-image in both themes.
 
 ## Tokens
 
 Defined in `@theme` in `frontend/src/styles/index.css`; Tailwind generates the
 matching utilities (`bg-surface`, `text-muted`, `border-line`, `btn-amber`, ...).
+Every `--color-*` and `--shadow-*` plus the raw gradient/halo vars are **theme
+values** - `@theme` / `:root` carries the light set, and the `.dark {}` block
+redeclares them. Radius, motion, and type never change with theme.
 
 | Group | Tokens |
 |-------|--------|
@@ -51,8 +65,10 @@ matching utilities (`bg-surface`, `text-muted`, `border-line`, `btn-amber`, ...)
 | Lines | `hairline` `line` `line-strong` |
 | Text | `ink` `muted` `faint` `ghost` |
 | Primary accent | `accent` `accent-strong` `accent-deep` `accent-wash` `on-accent` |
-| Amber accent | `amber` `amber-strong` `amber-wash` |
+| Amber accent | `amber` `amber-strong` `amber-wash` `on-amber` |
 | Status | `danger` `danger-wash` `success` `warning` |
+| Chrome hover | `hover` (theme-flipped wash for `hover:bg-hover` on rails, tabs, ghost buttons) |
+| Channels | `channel-red` `channel-green` `channel-blue` (tone curve + histogram) |
 | Radius | `--radius-sm|md|lg|xl` (6 / 8 / 12 / 16 px) |
 | Elevation | `--shadow-panel` `--shadow-pop` `--shadow-glass` `--shadow-premium` |
 | Gradients / halos | `--bg-gradient` `--gradient-accent` `--halo-accent` `--halo-amber` (raw CSS, not utilities) |
@@ -89,7 +105,14 @@ Compose these; do not re-implement them per component.
   `types/index.ts` - and mirrors the backend pipeline order.
 - Settings-style rows: label + one-line description on the left, control on the
   right, hairline divider between rows (see `SettingsView`).
-- Overlays on top of an image: `bg-black/55` + `backdrop-blur-sm` + `border-white/10`.
-- Never introduce a raw hex colour or a new font in a component - add a token.
+- Footer: app name + version on the left; the **Theme** and **Language**
+  controls (`ThemeSwitcher`, `LanguageSwitcher` - compact `.field` selects) plus
+  the GitHub link on the right. The update notice folds in as a second line.
+- Overlays on top of an image: `bg-black/55` + `backdrop-blur-sm` + `border-white/10` -
+  this is the one place a fixed dark treatment is correct in both themes.
+- Never introduce a raw hex colour, a theme-specific colour (`bg-white/10`,
+  `text-white`), or a new font in a component - add / reuse a token, and give a
+  new token a `.dark` override.
 - No static inline styles (`AGENTS.md` section 5); dynamic values only
   (`transform: scale(zoom)`, progress-bar `width`).
+- Verify every new surface in **both** themes (footer Theme -> Light / Dark).

@@ -39,6 +39,12 @@
   "language_switcher": {
     "aria_label": "Langue"
   },
+  "theme_switcher": {
+    "aria_label": "Thème",
+    "system": "Système",
+    "light": "Clair",
+    "dark": "Sombre"
+  },
   "update_banner": {
     "available": "Une nouvelle version est disponible : v{version}",
     "view_on_github": "Voir sur GitHub",
