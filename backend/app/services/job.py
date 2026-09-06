@@ -8,12 +8,13 @@ the latest state here for late subscribers / catch-up.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import func
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
+from app.constants import STALE_JOB_SECONDS
 from app.db.models import JobRecord
 from app.exceptions import RateLimitedError, ResourceNotFoundError
 from app.logging_config import get_logger
@@ -47,13 +48,42 @@ class JobService:
         return record
 
     def count_active_for_ip(self, client_ip: str) -> int:
-        """Non-terminal jobs currently attributed to ``client_ip``."""
+        """Non-terminal jobs from ``client_ip`` that are still plausibly running.
+
+        A job left non-terminal for longer than ``STALE_JOB_SECONDS`` (a worker
+        died mid-run, or the queue never picked it up) is treated as dead and
+        does not count - otherwise a handful of stuck rows would permanently
+        exhaust the per-IP concurrency budget. ``cleanup_stale_jobs`` sweeps
+        those rows for good on the hourly schedule.
+        """
+        cutoff = datetime.now(UTC) - timedelta(seconds=STALE_JOB_SECONDS)
         return (
             self.db.query(func.count(JobRecord.job_id))
-            .filter(JobRecord.client_ip == client_ip, JobRecord.status.notin_(TERMINAL_STATUSES))
+            .filter(
+                JobRecord.client_ip == client_ip,
+                JobRecord.status.notin_(TERMINAL_STATUSES),
+                JobRecord.created_at > cutoff,
+            )
             .scalar()
             or 0
         )
+
+    def cleanup_stale_jobs(self) -> int:
+        """Mark long-abandoned non-terminal jobs failed. Returns the count."""
+        cutoff = datetime.now(UTC) - timedelta(seconds=STALE_JOB_SECONDS)
+        stale = self.db.scalars(
+            select(JobRecord).where(
+                JobRecord.status.notin_(TERMINAL_STATUSES),
+                JobRecord.created_at <= cutoff,
+            )
+        ).all()
+        for record in stale:
+            record.status = "failed"
+            record.error = "abandoned (no result within the expected time)"
+        self.db.commit()
+        if stale:
+            logger.info("stale jobs cleaned", count=len(stale))
+        return len(stale)
 
     def assert_under_concurrency_limit(self, client_ip: str | None) -> None:
         """Raise :class:`RateLimitedError` once ``client_ip`` has too many active jobs.

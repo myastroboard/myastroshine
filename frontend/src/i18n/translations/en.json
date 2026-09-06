@@ -7,6 +7,35 @@
     "name": "Name",
     "close": "Close"
   },
+  "errors": {
+    "busy": "The server is busy - wait a moment and try again.",
+    "unavailable": "The server is temporarily unavailable - try again shortly.",
+    "server": "Something went wrong on the server. Try again in a moment."
+  },
+  "presets": {
+    "builtin": {
+      "system_nebula": {
+        "name": "Nebula",
+        "description": "Strong contrast and clarity for emission nebulae."
+      },
+      "system_galaxy": {
+        "name": "Galaxy",
+        "description": "Balanced tone recovery for spiral and elliptical galaxies."
+      },
+      "system_deep_field": {
+        "name": "Deep Field",
+        "description": "Aggressive shadow lift and noise reduction for faint wide fields."
+      },
+      "system_lunar": {
+        "name": "Lunar",
+        "description": "High micro-contrast and sharpness, muted colour for the Moon."
+      },
+      "system_cluster": {
+        "name": "Cluster",
+        "description": "Crisp stars for open and globular clusters."
+      }
+    }
+  },
   "language_switcher": {
     "aria_label": "Language"
   },

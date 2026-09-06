@@ -1,10 +1,13 @@
 import { useCallback, useState } from 'react';
 
+import { useTranslation } from '@/hooks/useTranslation';
 import { apiClient } from '@/services/api';
+import { errorMessage } from '@/services/apiError';
 import type { DepthStatistics, FocusPoint } from '@/types';
 
 /** Requests depth-map generation and exposes the resulting layer URLs. */
 export function useDepthShift(sessionId: string) {
+  const { t } = useTranslation();
   const [layerUrls, setLayerUrls] = useState<string[]>([]);
   const [statistics, setStatistics] = useState<DepthStatistics | null>(null);
   const [intensity, setIntensity] = useState(50);
@@ -25,12 +28,12 @@ export function useDepthShift(sessionId: string) {
         setLayerUrls(result.depthLayers.map((layer) => layer.imageUrl));
         setStatistics(result.statistics);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Depth shift failed');
+        setError(errorMessage(err, t, 'Depth shift failed'));
       } finally {
         setIsLoading(false);
       }
     },
-    [sessionId, intensity],
+    [sessionId, intensity, t],
   );
 
   return { layerUrls, statistics, intensity, setIntensity, generate, isLoading, error };

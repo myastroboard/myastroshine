@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 
+from app.constants import STALE_JOB_SECONDS
 from app.exceptions import RateLimitedError, ResourceNotFoundError
 from app.services.job import JobService
 from app.utils import app_settings
@@ -102,6 +105,42 @@ def test_concurrency_limit_ignores_finished_jobs(
 
 def test_concurrency_limit_skips_unattributed_requests(db_session) -> None:
     JobService(db_session).assert_under_concurrency_limit(None)  # must not raise
+
+
+def _age_job(db_session, job_id: str, seconds: int) -> None:
+    job = JobService(db_session).get(job_id)
+    job.created_at = datetime.now(UTC) - timedelta(seconds=seconds)
+    db_session.commit()
+
+
+def test_stale_non_terminal_jobs_stop_counting_toward_the_limit(
+    db_session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A job stuck 'queued' past STALE_JOB_SECONDS is treated as dead."""
+    monkeypatch.setattr("app.services.job.get_settings", _NotTestEnv)
+    app_settings.save_app_settings({"max_concurrent_jobs_per_ip": 1})
+    service = JobService(db_session)
+
+    stuck = service.create("sess-1", client_ip="1.2.3.4")
+    _age_job(db_session, stuck.job_id, STALE_JOB_SECONDS + 60)
+
+    assert service.count_active_for_ip("1.2.3.4") == 0
+    service.assert_under_concurrency_limit("1.2.3.4")  # must not raise
+
+
+def test_cleanup_stale_jobs_fails_only_the_old_non_terminal_ones(db_session) -> None:
+    service = JobService(db_session)
+    recent = service.create("sess-1", client_ip="1.2.3.4")
+    old = service.create("sess-2", client_ip="1.2.3.4")
+    _age_job(db_session, old.job_id, STALE_JOB_SECONDS + 60)
+    done = service.create("sess-3", client_ip="1.2.3.4")
+    service.update(done.job_id, status="completed")
+    _age_job(db_session, done.job_id, STALE_JOB_SECONDS + 60)
+
+    assert service.cleanup_stale_jobs() == 1
+    assert service.get(old.job_id).status == "failed"
+    assert service.get(recent.job_id).status == "queued"
+    assert service.get(done.job_id).status == "completed"
 
 
 def test_concurrency_limit_is_a_noop_under_app_env_test(db_session) -> None:

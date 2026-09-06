@@ -7,6 +7,35 @@
     "name": "Nom",
     "close": "Fermer"
   },
+  "errors": {
+    "busy": "Le serveur est occupé - patientez un instant puis réessayez.",
+    "unavailable": "Le serveur est momentanément indisponible - réessayez dans un instant.",
+    "server": "Une erreur est survenue côté serveur. Réessayez dans un instant."
+  },
+  "presets": {
+    "builtin": {
+      "system_nebula": {
+        "name": "Nébuleuse",
+        "description": "Contraste et clarté marqués pour les nébuleuses en émission."
+      },
+      "system_galaxy": {
+        "name": "Galaxie",
+        "description": "Récupération tonale équilibrée pour les galaxies spirales et elliptiques."
+      },
+      "system_deep_field": {
+        "name": "Champ profond",
+        "description": "Fort relèvement des ombres et débruitage pour les champs larges et faibles."
+      },
+      "system_lunar": {
+        "name": "Lune",
+        "description": "Micro-contraste et netteté élevés, couleur atténuée pour la Lune."
+      },
+      "system_cluster": {
+        "name": "Amas",
+        "description": "Étoiles nettes pour les amas ouverts et globulaires."
+      }
+    }
+  },
   "language_switcher": {
     "aria_label": "Langue"
   },
