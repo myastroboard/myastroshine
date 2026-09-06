@@ -53,7 +53,10 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   header. Detects the browser language on first load, then persists the
   choice client-side. `scripts/validate_i18n.py` (new CI job) checks key
   parity, leaf types, and `{placeholder}` names between the two files.
-  Backend-owned strings (API error messages, log lines) stay English-only.
+  Backend-owned *detail* strings (log lines, specific error text) stay
+  English-only, but the five built-in preset names / descriptions and a few
+  whole classes of API failure (server busy, temporarily unavailable, 5xx)
+  are now shown in the user's language.
 - Permanent page footer (name, version, GitHub link - inspired by
   MyAstroBoard's own footer bar), replacing the version number that used to
   sit in the header. In-app update check folds into it: once a newer GitHub
@@ -150,6 +153,13 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- A processing job that got stuck non-terminal (a worker died mid-run, or a
+  queued job was never picked up) counted against the per-IP concurrency limit
+  forever - a few stuck rows would eventually make every enhance / Auto Astro
+  fail with "Too many concurrent processing jobs". Such a job now stops
+  counting once it is older than `STALE_JOB_SECONDS` (15 min, well above any
+  real operation), and the hourly cleanup marks it failed for good
+  (`JobService.cleanup_stale_jobs`).
 - Expired multi-frame stacks were never cleaned up - only the composite
   session they produce was. `StackRecord` rows and their uploaded frame PNGs
   under `DATA_DIR/stacks/` now expire on the same hourly schedule as sessions

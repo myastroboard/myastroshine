@@ -52,10 +52,11 @@ def task_process_stack(stack_id: str, job_id: str) -> str:
 
 @celery_app.task(name="myastroshine.cleanup_sessions")
 def task_cleanup_sessions() -> int:
-    """Delete expired sessions and stacks, and the files each owns."""
+    """Delete expired sessions and stacks (and their files), and fail stale jobs."""
     storage = StorageService()
     with database.SessionLocal() as db:
         sessions = SessionService(db, storage)
         removed = sessions.cleanup_old_sessions()
         removed += StackingService(db, sessions, storage).cleanup_old_stacks()
+        removed += JobService(db).cleanup_stale_jobs()
         return removed

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { useTranslation } from '@/hooks/useTranslation';
 import { apiClient } from '@/services/api';
+import { errorMessage } from '@/services/apiError';
 import { processingStatusClient } from '@/services/ws';
 import {
   CURVE_CHANNEL_FIELD,
@@ -23,6 +25,7 @@ const DEBOUNCE_MS = 500;
  * the preview URL so the browser re-fetches the (same-URL) processed image.
  */
 export function useImageProcessing(sessionId: string) {
+  const { t } = useTranslation();
   const [parameters, setParameters] = useState<ProcessingParameters>(DEFAULT_PARAMETERS);
   const [status, setStatus] = useState<JobStatus | 'idle'>('idle');
   const [progress, setProgress] = useState(0);
@@ -55,10 +58,10 @@ export function useImageProcessing(sessionId: string) {
         ws.connect();
       } catch (err) {
         setStatus('failed');
-        setError(err instanceof Error ? err.message : 'Processing failed');
+        setError(errorMessage(err, t, 'Processing failed'));
       }
     },
-    [sessionId],
+    [sessionId, t],
   );
 
   const updateParameter = useCallback(

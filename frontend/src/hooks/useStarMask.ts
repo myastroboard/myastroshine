@@ -1,10 +1,13 @@
 import { useCallback, useState } from 'react';
 
+import { useTranslation } from '@/hooks/useTranslation';
 import { apiClient } from '@/services/api';
+import { errorMessage } from '@/services/apiError';
 import type { StarSourceInfo } from '@/types';
 
 /** Requests a star-mask preview and exposes the detected sources. */
 export function useStarMask(sessionId: string) {
+  const { t } = useTranslation();
   const [stars, setStars] = useState<StarSourceInfo[]>([]);
   const [sourceCount, setSourceCount] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -19,12 +22,12 @@ export function useStarMask(sessionId: string) {
         setStars(result.stars);
         setSourceCount(result.sourceCount);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Star detection failed');
+        setError(errorMessage(err, t, 'Star detection failed'));
       } finally {
         setIsLoading(false);
       }
     },
-    [sessionId],
+    [sessionId, t],
   );
 
   const clear = useCallback(() => {

@@ -21,6 +21,15 @@ export function PresetButtons({
   const { t } = useTranslation();
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
+  // Built-in presets are the same 5 for everyone, so their name / description
+  // are translated; a user preset keeps the name the user typed.
+  const label = (preset: Preset) =>
+    preset.author === 'system' ? t(`presets.builtin.${preset.presetId}.name`) : preset.name;
+  const description = (preset: Preset) =>
+    preset.author === 'system'
+      ? t(`presets.builtin.${preset.presetId}.description`)
+      : preset.description;
+
   useEffect(() => {
     if (!confirmId) {
       return;
@@ -42,13 +51,13 @@ export function PresetButtons({
               className={`chip ${active ? 'chip-active' : ''} ${deletable ? 'pr-8' : ''}`}
               aria-pressed={active}
               onClick={() => onPresetApply(preset.presetId)}
-              title={preset.description}
+              title={description(preset)}
             >
               <span
                 aria-hidden
                 className={`h-1.5 w-1.5 rounded-full ${active ? 'bg-accent' : 'bg-line-strong'}`}
               />
-              {preset.name}
+              {label(preset)}
             </button>
 
             {deletable && (

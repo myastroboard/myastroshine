@@ -22,6 +22,13 @@ LOG_LEVELS = ("debug", "info", "warning", "error", "critical")
 # due for cleanup, this decides how often we look. Not user-tunable - nobody needs to.
 SESSION_CLEANUP_INTERVAL_SECONDS = 60 * 60  # hourly
 
+# A processing job still non-terminal after this long has been abandoned (a worker died
+# mid-run, or a queued job was never picked up). It stops counting toward the per-IP
+# concurrency limit (app/services/job.py) and the hourly cleanup marks it failed - so a
+# few stuck rows can't permanently brick processing for an IP. Well above the slowest
+# real operation (a large multi-frame stack finishes in minutes).
+STALE_JOB_SECONDS = 15 * 60
+
 # Decoded-pixel-count cap (app/utils/image_utils.py:decode_image), independent of the
 # compressed upload byte-size limit (max_image_size_mb) - guards against a small file
 # that decompresses into a huge array (decompression bomb). 8000x8000, comfortably above
