@@ -73,7 +73,7 @@ export function StackUploadZone({ frames, onAddFiles }: StackUploadZoneProps) {
       )}
 
       {hasFrames && (
-        <ul className="flex flex-col divide-y divide-hairline rounded-lg border border-hairline bg-surface px-3 text-xs">
+        <ul className="panel-inset flex flex-col divide-y divide-hairline px-3 py-0 text-xs">
           {frames.map((frame) => (
             <li key={frame.index} className="flex items-center justify-between gap-3 py-2">
               <span className="truncate text-muted">

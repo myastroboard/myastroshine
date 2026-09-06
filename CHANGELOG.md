@@ -19,6 +19,11 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - The language switcher moved from the header to the footer, next to the new
   theme control; the header now carries only the brand and Settings.
+- Consistent card surfaces across the editor, Settings, and stacking: the
+  editor's three columns (workflow rail, inspector, preview), the Settings nav
+  and content panes, and the stacking result blocks now use one framing system
+  instead of three ad-hoc ones. The preview image is matted with its histogram
+  in a single card.
 
 ## [0.2.0] - 2026-09-06
 

@@ -32,13 +32,13 @@ export function StackResults({ result, onEnhance, onDownload }: StackResultsProp
   ];
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="panel flex flex-col gap-4">
       <img
         src={result.stackedImageUrl}
         alt={t('stacking.results.composite_alt')}
-        className="w-full rounded-xl border border-hairline"
+        className="w-full rounded-lg border border-hairline bg-black"
       />
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 rounded-lg border border-hairline bg-surface p-4 text-xs">
+      <dl className="panel-inset grid grid-cols-2 gap-x-4 gap-y-2.5 p-4 text-xs">
         {rows.map(([label, value]) => (
           <div key={label} className="flex items-baseline justify-between gap-2">
             <dt className="text-faint">{label}</dt>
