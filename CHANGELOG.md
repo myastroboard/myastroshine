@@ -8,6 +8,12 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Edit milestones: a timeline under the preview where you can save the current
+  adjustments (sliders, curves, framing, and the Depth Shift focal point) as a
+  checkpoint and click back to it if you push an edit too far. The first
+  milestone is always the original image. Milestones live only in the browser
+  for the image being edited - loading another photo starts over, and there is
+  no server-side copy.
 - Light theme, now the default, matching the MyAstroBoard visual charter (deep
   teal primary accent, amber ecosystem accent, frosted panels over a lightly
   teal-tinted ground). The dark theme is unchanged.

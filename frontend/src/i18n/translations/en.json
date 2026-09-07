@@ -122,6 +122,14 @@
       "export": {
         "help": "Get the result out: download it, hand it to AstroDex, or save the current settings as a reusable preset."
       }
+    },
+    "milestones": {
+      "title": "Milestones",
+      "help": "Save the current adjustments so you can jump back to this point if you push a slider too far. Kept only for this image.",
+      "add": "Save milestone",
+      "origin": "Original",
+      "point": "Milestone {n}",
+      "restore_aria": "Restore {label}"
     }
   },
   "export_panel": {

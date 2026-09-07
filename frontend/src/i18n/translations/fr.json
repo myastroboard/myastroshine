@@ -122,6 +122,14 @@
       "export": {
         "help": "Sortez le résultat : téléchargez-le, envoyez-le vers AstroDex, ou enregistrez les réglages actuels comme préréglage réutilisable."
       }
+    },
+    "milestones": {
+      "title": "Jalons",
+      "help": "Enregistrez les réglages actuels pour revenir à ce point si vous poussez un curseur trop loin. Gardés uniquement pour cette image.",
+      "add": "Enregistrer un jalon",
+      "origin": "Origine",
+      "point": "Jalon {n}",
+      "restore_aria": "Restaurer {label}"
     }
   },
   "export_panel": {
