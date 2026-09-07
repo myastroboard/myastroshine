@@ -151,6 +151,35 @@ export function hasEdits(p: ProcessingParameters): boolean {
   return false;
 }
 
+/** Deep value-equality for two curves (their control-point lists). */
+function curvePointsEqual(a: CurvePoint[], b: CurvePoint[]): boolean {
+  return a.length === b.length && a.every((p, i) => p.x === b[i].x && p.y === b[i].y);
+}
+
+/** True when two parameter sets would produce the same processed image - every
+ * scalar, the framing, and all four tone curves match. Mirrors the key walk in
+ * {@link hasEdits}. */
+export function parametersEqual(a: ProcessingParameters, b: ProcessingParameters): boolean {
+  if (!geometryEquals(a.geometry, b.geometry)) {
+    return false;
+  }
+  for (const key of Object.keys(DEFAULT_PARAMETERS) as (keyof ProcessingParameters)[]) {
+    if (key === 'geometry') {
+      continue;
+    }
+    const av = a[key];
+    const bv = b[key];
+    if (Array.isArray(av) || Array.isArray(bv)) {
+      if (!Array.isArray(av) || !Array.isArray(bv) || !curvePointsEqual(av, bv)) {
+        return false;
+      }
+    } else if (av !== bv) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /** Curve fields, keyed by the channel the ToneCurveEditor tab selector edits. */
 export const CURVE_CHANNELS = ['rgb', 'red', 'green', 'blue'] as const;
 export type CurveChannel = (typeof CURVE_CHANNELS)[number];

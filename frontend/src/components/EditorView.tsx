@@ -4,11 +4,13 @@ import { DepthShiftViewer } from '@/components/DepthShiftViewer';
 import { EditorInspector } from '@/components/EditorInspector';
 import { EditorRail } from '@/components/EditorRail';
 import { ImagePreview } from '@/components/ImagePreview';
+import { MilestoneTimeline } from '@/components/MilestoneTimeline';
 import { SavePresetDialog } from '@/components/SavePresetDialog';
 import { useAstroDexIntegration } from '@/hooks/useAstroDexIntegration';
 import { useAutoAstro } from '@/hooks/useAutoAstro';
 import { useDepthShift } from '@/hooks/useDepthShift';
 import { useImageProcessing } from '@/hooks/useImageProcessing';
+import { useMilestones, type Milestone } from '@/hooks/useMilestones';
 import { usePresets } from '@/hooks/usePresets';
 import { useStarMask } from '@/hooks/useStarMask';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -67,6 +69,7 @@ export function EditorView({ session, astrodexContext, onExit }: EditorViewProps
     resetCurves,
     resetKeys,
     syncParameters,
+    restoreParameters,
   } = useImageProcessing(session.sessionId);
   const { presets, applyPreset, activePreset, savePreset, deletePreset, clearActivePreset } =
     usePresets(session.sessionId);
@@ -86,6 +89,12 @@ export function EditorView({ session, astrodexContext, onExit }: EditorViewProps
   const [framingGeom, setFramingGeom] = useState<GeometryParameters>(parameters.geometry);
   const [framingRatioFrac, setFramingRatioFrac] = useState<number | null>(null);
   const [confirmExit, setConfirmExit] = useState(false);
+
+  const {
+    milestones,
+    activeId: activeMilestoneId,
+    capture: captureMilestone,
+  } = useMilestones(session.sessionId, parameters, focalPoint);
 
   const dirty = hasEdits(parameters) || focalPoint !== null;
 
@@ -229,6 +238,17 @@ export function EditorView({ session, astrodexContext, onExit }: EditorViewProps
   function handleCurveChange(channel: CurveChannel, points: CurvePoint[]): void {
     clearActivePreset(); // manual edits diverge from any applied preset
     updateChannelCurve(channel, points);
+  }
+
+  function handleMilestoneRestore(milestone: Milestone): void {
+    clearActivePreset();
+    setFocalPoint(milestone.focalPoint);
+    restoreParameters(milestone.parameters); // sets state + reprocesses
+    setPresetVersion((v) => v + 1); // cache-bust the preview URLs
+    // Keep an already-open depth viewer in step with the restored focal point.
+    if (depthShift.layerUrls.length > 0) {
+      void depthShift.generate(7, milestone.focalPoint ?? undefined);
+    }
   }
 
   function handleFocalPointPick(point: FocusPoint): void {
@@ -378,6 +398,14 @@ export function EditorView({ session, astrodexContext, onExit }: EditorViewProps
           focalPoint={framingActive ? null : focalPoint}
           pickingFocalPoint={activeStep === 'depth' && pickingFocalPoint}
           onFocalPointPick={handleFocalPointPick}
+        />
+
+        <MilestoneTimeline
+          milestones={milestones}
+          activeId={activeMilestoneId}
+          onCapture={captureMilestone}
+          onRestore={handleMilestoneRestore}
+          disabled={isProcessing}
         />
 
         {showDepthViewer && (

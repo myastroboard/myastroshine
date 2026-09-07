@@ -149,6 +149,20 @@ export function useImageProcessing(sessionId: string) {
     setParameters(next);
   }, []);
 
+  /**
+   * Restore a full parameter snapshot (an edit milestone) - like
+   * {@link resetParameters} but for an arbitrary state. Cancels any pending
+   * debounced slider update so it can't clobber the restore a moment later.
+   */
+  const restoreParameters = useCallback(
+    (next: ProcessingParameters) => {
+      clearTimeout(debounceRef.current);
+      setParameters(next);
+      void applyParameters(next);
+    },
+    [applyParameters],
+  );
+
   useEffect(() => () => clearTimeout(debounceRef.current), []);
 
   return {
@@ -165,5 +179,6 @@ export function useImageProcessing(sessionId: string) {
     resetCurves,
     resetKeys,
     syncParameters,
+    restoreParameters,
   };
 }
