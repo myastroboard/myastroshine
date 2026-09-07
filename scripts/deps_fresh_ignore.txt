@@ -8,8 +8,9 @@
 #   numpy        # pinned to 2.x until scikit-image supports 3.x
 #   react        # holding on 19 until the router upgrade is done
 
-# TypeScript 7 (the native port) is out, but typescript-eslint 8 caps at
-# `typescript <6.1.0` and most editor tooling has not caught up. Hold at 5.9.x
-# until typescript-eslint ships TS 7 support, then bump both together.
+# TypeScript 7 (the native port) is out, but typescript-eslint 8 declares a
+# `typescript >=4.8.4 <6.1.0` peer dependency (still true as of 8.70.0), so ESLint
+# would break against TS 6.1+ / 7.x. Held at 6.0.x - the highest that peer range
+# allows. Bump to 7 together with typescript-eslint once it ships TS 7 support.
 typescript
 
