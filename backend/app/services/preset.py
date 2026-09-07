@@ -58,7 +58,9 @@ _DEFAULTS: list[JsonDict] = [
     {
         "preset_id": "system_deep_field",
         "name": "Deep Field",
-        "description": "Aggressive background separation and noise reduction for faint wide fields.",
+        "description": (
+            "Aggressive background separation and noise reduction for faint wide fields."
+        ),
         "parameters": {
             "contrast": 1.6,
             "clarity": 0.5,

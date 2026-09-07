@@ -15,7 +15,7 @@ pydantic-settings==2.15.0
 opencv-python-headless==5.0.0.93
 scikit-image==0.26.0
 Pillow==12.3.0
-numpy==2.5.2
+numpy==2.5.3
 
 # FITS + camera RAW input (backend/app/utils/image_utils.py: decode_image)
 astropy==8.0.1
