@@ -1,11 +1,13 @@
 # MyAstroShine
 
-**Status:** Alpha - v0.1.0, unreleased
-**License:** AGPL-3.0-or-later
-**Ecosystem:** MyAstroBoard / AstroDex integration + Standalone
+**Status:** Alpha - v0.x, see [VERSION](VERSION) 
 
-> **Alpha software.** MyAstroShine is under active development and has never been
-> tagged or released. The full v1.0 + v1.1 feature set is implemented and the
+**License:** AGPL-3.0-or-later
+
+**Ecosystem:** MyAstroBoard / Astrodex integration (not activated yet) + Standalone
+
+> **Alpha software.** MyAstroShine is under active development
+> The full v1.0 + v1.1 feature set is implemented and the
 > frontend is wired end to end, but the code has not been through a production
 > shakedown. Expect breaking changes to the API, storage layout, and settings
 > between commits; there are no published Docker images or version tags yet, and
