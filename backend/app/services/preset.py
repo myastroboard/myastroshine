@@ -50,7 +50,7 @@ _DEFAULTS: list[JsonDict] = [
             "contrast": 1.4,
             "clarity": 0.6,
             "saturation": 1.15,
-            "shadows": 0.3,
+            "shadows": -0.25,
             "denoise": 30,
             "sharpness": 1.15,
         },
@@ -58,12 +58,12 @@ _DEFAULTS: list[JsonDict] = [
     {
         "preset_id": "system_deep_field",
         "name": "Deep Field",
-        "description": "Aggressive shadow lift and noise reduction for faint wide fields.",
+        "description": "Aggressive background separation and noise reduction for faint wide fields.",
         "parameters": {
             "contrast": 1.6,
             "clarity": 0.5,
             "highlights": -0.2,
-            "shadows": 0.4,
+            "shadows": -0.35,
             "vibrance": 1.15,
             "denoise": 40,
             "sharpness": 1.1,

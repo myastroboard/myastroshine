@@ -69,3 +69,14 @@ def test_get_preset_parameters_are_valid(db_session) -> None:
     preset = service.get_preset("system_lunar")
     params = ProcessingParameters(**preset.parameters)
     assert params.sharpness == 1.5
+
+
+def test_deep_sky_presets_use_negative_shadows(db_session) -> None:
+    """Galaxy and Deep Field should darken the sky background, not lift it."""
+    service = PresetService(db_session)
+
+    galaxy = ProcessingParameters(**service.get_preset("system_galaxy").parameters)
+    deep_field = ProcessingParameters(**service.get_preset("system_deep_field").parameters)
+
+    assert galaxy.shadows < 0
+    assert deep_field.shadows < 0

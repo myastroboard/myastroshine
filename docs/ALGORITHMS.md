@@ -160,8 +160,9 @@ Applied in this order to minimize artifacts (`apply_parameters`):
 11. **Saturation** (0-2) - scale the HSV S channel.
 12. **Vibrance** (0-2) - saturation boost weighted by `(1 - current_saturation)`
    so already-saturated pixels move less.
-13. **Clarity** (-1..1) - unsharp mask against a 21x21 Gaussian blur; positive
-   sharpens, negative softens.
+13. **Clarity** (-1..1) - unsharp mask against a Gaussian blur with
+   `sigmaX=9` (`cv2.GaussianBlur` auto-selects an odd kernel from sigma,
+   around the high-20px range here); positive sharpens, negative softens.
 14. **Denoise** (0-100) - bilateral filter; map to diameter 5-20 and
    sigma_color / sigma_space 75-150. Above 50, add a 3x3 morphological close.
 15. **Chroma denoise** (`chroma_denoise`, 0-100) - the same bilateral filter as

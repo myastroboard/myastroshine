@@ -348,8 +348,8 @@ class ImageProcessingService:
         if denoise <= 0:
             return image
         strength = denoise / 100.0
-        diameter = int(5 + strength * 10)
-        sigma = 40.0 + strength * 60.0
+        diameter = int(5 + strength * 15)
+        sigma = 75.0 + strength * 75.0
         out = cv2.bilateralFilter(image, diameter, sigma, sigma)
         if denoise > _DENOISE_MORPH_THRESHOLD:
             kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
@@ -368,8 +368,8 @@ class ImageProcessingService:
         if amount <= 0:
             return image
         strength = amount / 100.0
-        diameter = int(5 + strength * 10)
-        sigma = 40.0 + strength * 60.0
+        diameter = int(5 + strength * 15)
+        sigma = 75.0 + strength * 75.0
         y, cr, cb = cv2.split(cv2.cvtColor(image, cv2.COLOR_BGR2YCrCb))
         cr = cv2.bilateralFilter(cr, diameter, sigma, sigma)
         cb = cv2.bilateralFilter(cb, diameter, sigma, sigma)

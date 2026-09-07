@@ -19,6 +19,12 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - The language switcher moved from the header to the footer, next to the new
   theme control; the header now carries only the brand and Settings.
+- Denoise and Chroma denoise now use the documented bilateral-filter range
+  (diameter 5-20, sigma 75-150) so high slider values deliver the intended
+  stronger noise cleanup on deep-sky frames.
+- Built-in deep-sky presets were rebalanced to darken shadows instead of
+  lifting them (Galaxy `shadows: -0.25`, Deep Field `shadows: -0.35`) for
+  better object-vs-background separation, matching the Auto Astro strategy.
 - Consistent card surfaces across the editor, Settings, and stacking: the
   editor's three columns (workflow rail, inspector, preview), the Settings nav
   and content panes, and the stacking result blocks now use one framing system
