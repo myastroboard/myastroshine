@@ -499,6 +499,7 @@ export interface StackSettings {
   weighting: StackWeighting;
   cosmeticCorrection: boolean;
   qualityFilter: QualityFilter;
+  postProcess: boolean;
 }
 
 export interface FrameQuality {
@@ -558,6 +559,7 @@ export interface StackStatistics {
   snrImprovement: number;
   measuredNoiseReduction: number | null;
   calibrated: boolean;
+  postProcessed: boolean;
 }
 
 export interface StackResult {

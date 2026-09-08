@@ -9,6 +9,7 @@ export const DEFAULT_STACK_SETTINGS: StackSettings = {
   weighting: 'noise',
   cosmeticCorrection: true,
   qualityFilter: 'moderate',
+  postProcess: true,
 };
 
 /** Local state for the stacking configuration panel. */

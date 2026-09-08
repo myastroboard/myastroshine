@@ -94,6 +94,7 @@ class _FramePlan:
 @dataclass
 class IntegrationResult:
     composite: np.ndarray  # (H, W, 3) float32, linear
+    coverage: np.ndarray  # (H, W) int32 - how many frames contributed to each pixel
     frames_stacked: int
     registration_failures: int
     reference_index: int
@@ -151,7 +152,7 @@ class IntegrationService:
             stack_id, kept, reference, half_shape, aligned, cal, cosmetic, on_progress
         )
         try:
-            composite, rejected = self._combine(
+            composite, rejected, coverage = self._combine(
                 aligned_path, weights, combination, rejection, full_shape, on_progress
             )
         finally:
@@ -161,6 +162,7 @@ class IntegrationService:
         registered = [p for p in kept if p.rms > 0]
         return IntegrationResult(
             composite=composite,
+            coverage=coverage,
             frames_stacked=len(kept),
             registration_failures=(len(registrable) - len(kept)) if aligned else 0,
             reference_index=reference.index,
@@ -215,7 +217,7 @@ class IntegrationService:
             )
 
         pool = [p for p in plans if not p.quality_rejected]
-        reference = max(pool, key=lambda p: p.star_count)
+        reference = _pick_reference(pool, plans)
         reference.registered = True
         reference.matrix = np.eye(2, 3, dtype=np.float64)
 
@@ -321,12 +323,13 @@ class IntegrationService:
         rejection: str,
         shape: tuple[int, int, int],
         on_progress: ProgressFn | None,
-    ) -> tuple[np.ndarray, int]:
+    ) -> tuple[np.ndarray, int, np.ndarray]:
         height, width, channels = shape
         memmap = open_memmap(aligned_path, mode="r")
         w = (weights / weights.sum()).astype(np.float32).reshape(-1, 1, 1, 1)
         min_cover = max(2, math.ceil(_MIN_COVERAGE * len(weights)))
         composite = np.zeros(shape, dtype=np.float32)
+        coverage = np.zeros((height, width), dtype=np.int32)
         rejected = 0
 
         row_bytes = len(weights) * width * channels * 4
@@ -337,14 +340,15 @@ class IntegrationService:
             with contextlib.suppress(OSError):
                 aligned.touch()  # fresh mtime: the stale-work sweep must leave a live run alone
             block = np.asarray(memmap[:, y0:y1], dtype=np.float32)  # (K, th, W, C)
-            tile, cut = _reduce_tile(block, w, combination, rejection, min_cover)
+            tile, cut, cover = _reduce_tile(block, w, combination, rejection, min_cover)
             composite[y0:y1] = tile
+            coverage[y0:y1] = cover
             rejected += cut
             if on_progress:
                 on_progress("integration", 75 + int(25 * y1 / height))
 
         del memmap
-        return composite, rejected
+        return composite, rejected, coverage
 
     # -- helpers ------------------------------------------------------------
 
@@ -374,6 +378,37 @@ class IntegrationService:
             cosmetic=cosmetic,
         )
         return replace(frame, data=data)
+
+
+_REF_TIME_WEIGHT = 0.4
+_REF_FWHM_WEIGHT = 0.5
+
+
+def _pick_reference(pool: list[_FramePlan], plans: list[_FramePlan]) -> _FramePlan:
+    """Choose the registration reference: the frame nearest the session centre.
+
+    Not "most stars" - on an alt-az mount a frame where a rich cluster has
+    drifted to centre, or a transparency spike, is an outlier, and using it as
+    the reference shrinks the common footprint and off-centres the target. This
+    prefers a **typical** star count near the temporal middle (which halves the
+    field rotation to either end) and, among those, the sharpest.
+    """
+    position = {id(plan): step for step, plan in enumerate(plans)}
+    stars = np.array([p.star_count for p in pool], dtype=np.float64)
+    fwhm = np.array([p.fwhm for p in pool if p.fwhm > 0], dtype=np.float64)
+    median_stars = max(float(np.median(stars)), 1.0)
+    median_fwhm = float(np.median(fwhm)) if fwhm.size else 0.0
+    middle = max(len(plans) / 2.0, 1.0)
+
+    def cost(plan: _FramePlan) -> float:
+        star_dev = abs(plan.star_count - median_stars) / median_stars
+        time_dev = abs(position[id(plan)] - middle) / middle
+        sharp_dev = (
+            max(0.0, plan.fwhm / median_fwhm - 1.0) if median_fwhm > 0 and plan.fwhm > 0 else 0.0
+        )
+        return star_dev + _REF_TIME_WEIGHT * time_dev + _REF_FWHM_WEIGHT * sharp_dev
+
+    return min(pool, key=cost)
 
 
 def _as_rgb(frame: LinearFrame) -> np.ndarray:
@@ -423,7 +458,7 @@ def _frame_weights(
 
 def _reduce_tile(
     block: np.ndarray, weights: np.ndarray, combination: str, rejection: str, min_cover: int
-) -> tuple[np.ndarray, int]:
+) -> tuple[np.ndarray, int, np.ndarray]:
     """Reject outliers then combine one row-tile across the stack axis.
 
     Iterative sigma-clip around the mean (fast, sum-based - ``np.nanmedian``
@@ -452,10 +487,11 @@ def _reduce_tile(
             block = np.where(coverage >= min_cover, np.clip(block, lo, hi), block)
             keep = finite
 
+    frame_coverage = coverage[..., 0].astype(np.int32)  # how many frames hit each pixel
     if combination == "median":
         tile = np.nanmedian(np.where(keep, block, np.nan), axis=0)
-        return np.nan_to_num(tile, nan=0.0), rejected
+        return np.nan_to_num(tile, nan=0.0), rejected, frame_coverage
 
     weight_sum = (keep * weights).sum(axis=0)
     tile = (np.where(keep, block, 0.0) * weights).sum(axis=0) / np.maximum(weight_sum, _TINY)
-    return np.where(weight_sum > 0, tile, 0.0).astype(np.float32), rejected
+    return np.where(weight_sum > 0, tile, 0.0).astype(np.float32), rejected, frame_coverage

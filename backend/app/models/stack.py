@@ -30,6 +30,7 @@ class InitiateStackRequest(BaseModel):
     weighting: Weighting = "noise"
     cosmetic_correction: bool = True
     quality_filter: QualityFilter = "moderate"
+    post_process: bool = True
 
 
 class ProcessStackRequest(BaseModel):
@@ -45,6 +46,7 @@ class ProcessStackRequest(BaseModel):
     weighting: Weighting | None = None
     cosmetic_correction: bool | None = None
     quality_filter: QualityFilter | None = None
+    post_process: bool | None = None
 
 
 class StackSessionResponse(BaseModel):
@@ -123,6 +125,7 @@ class StackStatistics(BaseModel):
     snr_improvement: float
     measured_noise_reduction: float | None = None
     calibrated: bool = False
+    post_processed: bool = False
 
 
 class StackResultResponse(BaseModel):

@@ -546,17 +546,47 @@ ever resident):
    wedge - the per-pixel sigma there is unreliable). `median` combination uses a
    true `nanmedian` (slower, opt-in).
 
-The composite is saved as 32-bit `composite.npy` plus an auto-stretched 8-bit
-session for the editor. `quality_report` records the reference frame, the mean
-registration RMS, the rejected-sample count, whether calibration ran, and the
-`frames` table (per-frame metrics + accept/reject). `snr_improvement` is
-`sqrt(effective N)` where effective N = `(sum w)^2 / sum(w^2)`;
-`measured_noise_reduction` is the reference-frame vs composite high-pass noise
-ratio. On a real Seestar set the composite is full-resolution, sub-pixel
-aligned, ~8x lower noise than a single sub, with dusk/cloud subs auto-dropped.
+The reference is **not** simply the frame with the most stars: on an alt-az
+mount that is often an outlier pointing or a transparency spike, and aligning
+to it shrinks the common footprint and off-centres the target. `_pick_reference`
+picks the frame nearest the **session's temporal middle** (which halves the
+field rotation to either end) with a typical star count and good sharpness.
 
-**Still to come:** a post-stack stretch / background-extraction / colour-
-calibration step and an auto-crop to the common frame footprint (Phase 4).
+### Post-stack cleanup (`app/services/post_stack.py`)
+
+With `post_process` on (the default), `apply_post_stack` cleans the linear
+composite before it becomes an editable session:
+
+1. **Crop the rotation wedge** - `_combine` emits a per-pixel frame-coverage
+   map; rows/columns where most pixels were reached by fewer than half the
+   frames are trimmed (capped at 45% of either axis).
+2. **Background extraction** - each channel's sky is sampled on a 22x22 tile
+   lattice (an 8th-percentile per tile, the sky between the stars); a degree-2
+   polynomial is fitted, tiles whose residual is over 1.8 robust sigma (plus
+   their neighbours) are dropped as objects and it is refitted (3 iterations);
+   the surface is subtracted and the image flattened toward the darkest real
+   sky. Degree 2 by design - a paraboloid can only be a smooth gradient, never
+   a nebula.
+3. **Colour calibration** - the per-channel sky level is equalised (neutral grey
+   background), then the channels are scaled so their means match (gains clamped
+   to 0.5-2x).
+
+Everything stays linear; `composite.npy` holds the cleaned 32-bit stack. A full
+stretch, denoise and photometric calibration are still the editor's job.
+
+The composite is saved as 32-bit `composite.npy` plus a colour-preserving
+auto-stretched 8-bit session for the editor (`stretch_composite_bgr`: sky
+neutralised, one shared MTF from the luminance). `quality_report` records the
+reference frame, the mean registration RMS, the rejected-sample count, whether
+calibration / post-processing ran, and the `frames` table (per-frame metrics +
+accept/reject). `snr_improvement` is `sqrt(effective N)` where effective N =
+`(sum w)^2 / sum(w^2)`; `measured_noise_reduction` is the reference-frame vs
+composite high-pass noise ratio. On a real 100-sub Seestar set: the Bubble
+Nebula centred, the wedge cropped, a neutral flat background, ~9x lower noise.
+
+**Still to come (Phase 4b/c):** float32 through the creative pipeline
+(`ImageProcessingService` is uint8-only) so STF / background extraction / colour
+calibration become non-destructive editor steps on the 32-bit data.
 
 ## Performance notes
 

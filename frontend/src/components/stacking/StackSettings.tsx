@@ -113,6 +113,21 @@ export function StackSettings({ settings, onChange }: StackSettingsProps) {
         </select>
         <span className="text-[11px] text-ghost">{t('stacking.settings.quality_hint')}</span>
       </label>
+
+      <label className="flex items-start gap-2">
+        <input
+          type="checkbox"
+          className="mt-0.5 size-3.5 accent-accent"
+          checked={settings.postProcess}
+          onChange={(event) => onChange({ ...settings, postProcess: event.target.checked })}
+        />
+        <span className="flex flex-col gap-0.5">
+          <span className="label">{t('stacking.settings.post_process_label')}</span>
+          <span className="text-[11px] text-ghost">
+            {t('stacking.settings.post_process_hint')}
+          </span>
+        </span>
+      </label>
     </div>
   );
 }

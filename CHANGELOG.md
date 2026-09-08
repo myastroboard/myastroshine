@@ -85,8 +85,16 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   moderate) drops a clouded, soft, trailed or dawn sub before it can pollute the
   stack, the frame grid shows each sub's score and why it was dropped, and
   unchecking a frame rescues it from the filter on the next run. `weighting:
-  "quality"` now uses that same score. Still to come: a post-stack stretch /
-  colour-calibration step. See `initial_plan/12_STACKING_REBUILD.md`.
+  "quality"` now uses that same score. The finished composite is **cleaned up**
+  before it opens in the editor (**Clean up the composite**, on by default): the
+  field-rotation edges are cropped away, a low-order sky-gradient is subtracted
+  (a degree-2 fit that cannot carve into a nebula), and the colour is
+  neutralised and balanced. Combined with a better reference-frame choice (the
+  middle of the session, not the frame with the most stars) a real 100-sub set
+  now comes out framed on the target with a flat neutral background instead of
+  noisy rainbow speckle. Still to come: the creative pipeline on 32-bit data so
+  the stretch / background / colour steps are non-destructive in the editor. See
+  `initial_plan/12_STACKING_REBUILD.md`.
 
 ### Changed
 
@@ -152,6 +160,19 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- The stacking composite preview no longer comes out as noisy rainbow speckle
+  with the target barely visible. The linear stack is now shown with the sky
+  background neutralised and **one shared stretch** for all three channels
+  (derived from the luminance, a lower background target so read noise stays in
+  the shadows) instead of a per-channel auto-stretch that turned the channel
+  imbalance into chroma noise. A real background model / colour calibration is
+  still a post-stack step - the preview is a sane first look, not the finished
+  image.
+- The registration reference frame is chosen better: the frame nearest the
+  **middle of the session** with a typical star count and good sharpness, not
+  simply the one with the most stars. On an alt-az mount the most-stars frame is
+  often an outlier pointing (a cluster drifted to centre, a transparency spike);
+  using it shrank the aligned footprint and pushed the target into a corner.
 - Stacking in the default sync processing mode left its job record stuck at
   "queued" forever - a few stacks (or re-stacks) in a session would trip "Too
   many concurrent processing jobs" and stay tripped. Sync-mode stacks now mark

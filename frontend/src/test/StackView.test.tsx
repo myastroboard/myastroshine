@@ -53,6 +53,7 @@ const RESULT: StackResult = {
     snrImprovement: 1.41,
     measuredNoiseReduction: null,
     calibrated: false,
+    postProcessed: true,
   },
   frames: FRAMES,
   calibration: EMPTY_CALIBRATION,

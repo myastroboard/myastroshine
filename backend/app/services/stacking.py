@@ -32,16 +32,17 @@ from app.services.calibration import CALIBRATION_KINDS, CalibrationMasters, Cali
 from app.services.frame_quality import FrameQuality
 from app.services.integration import IntegrationService, highpass_noise
 from app.services.job import JobService
+from app.services.post_stack import PostStackReport, apply_post_stack
 from app.services.session import SessionService
 from app.services.storage import PreparedFrame, StorageService
 from app.utils.app_settings import get_app_settings
-from app.utils.linear_ingest import LinearFrame, ingest_frame, to_display_bgr
+from app.utils.linear_ingest import LinearFrame, ingest_frame, stretch_composite_bgr
 
 logger = get_logger(__name__)
 
 _MIN_FRAMES = 2
 _COLOR_NDIM = 3
-_FULL_RES = 1_000_000  # to_display_bgr max_size: large enough to never downscale the composite
+_FULL_RES = 100_000  # stretch_composite_bgr max_size: large enough to never downscale the composite
 _MAX_CALIBRATION_FRAMES = 256  # per kind - well above any real dark/flat/bias run
 
 
@@ -74,6 +75,7 @@ class StackingService:
             weighting=config.weighting,
             cosmetic_correction=config.cosmetic_correction,
             quality_filter=config.quality_filter,
+            post_process=config.post_process,
             excluded_frames=[],
             included_frames=[],
             expires_at=datetime.now(UTC)
@@ -211,7 +213,7 @@ class StackingService:
         session = self.sessions.create_session(
             image_path="", original_filename=f"stack_{stack_id[:8]}.png"
         )
-        display = to_display_bgr(LinearFrame(data=composite), _FULL_RES)
+        display = stretch_composite_bgr(composite, _FULL_RES)
         self.storage.save_original(session.session_id, display)
         session.image_path = str(self.storage.original_path(session.session_id))
 
@@ -275,9 +277,15 @@ class StackingService:
             on_progress=on_progress,
         )
 
+        composite = result.composite
+        post_stack = None
+        if record.post_process:
+            self._emit(job_id, stack_id, "post-processing", 96)
+            composite, post_stack = apply_post_stack(result.composite, result.coverage)
+
         measured = None
         if result.reference_noise > 0:
-            composite_noise = _background_noise(result.composite)
+            composite_noise = _background_noise(composite)
             if composite_noise > 0:
                 measured = round(result.reference_noise / composite_noise, 2)
 
@@ -290,6 +298,7 @@ class StackingService:
             "aligned": result.aligned,
             "calibrated": calibrated,
             "quality_filter": record.quality_filter,
+            "post_process": _post_stack_dict(post_stack),
             "frames": [_quality_dict(q) for q in result.frame_quality],
         }
         stats = StackStatistics(
@@ -303,8 +312,9 @@ class StackingService:
             snr_improvement=round(math.sqrt(result.effective_frames), 2),
             measured_noise_reduction=measured,
             calibrated=calibrated,
+            post_processed=post_stack is not None,
         )
-        return result.composite, stats
+        return composite, stats
 
     def _emit(
         self,
@@ -432,6 +442,16 @@ def _background_noise(pixels: np.ndarray) -> float:
     """Robust high-pass noise of the composite (central crop, gradient removed)."""
     gray = pixels.mean(axis=2) if pixels.ndim == _COLOR_NDIM else pixels
     return highpass_noise(gray.astype(np.float32))
+
+
+def _post_stack_dict(report: PostStackReport | None) -> dict[str, Any] | None:
+    if report is None:
+        return None
+    return {
+        "cropped": list(report.cropped) if report.cropped else None,
+        "background_gradient": report.background_gradient,
+        "channel_gains": list(report.channel_gains),
+    }
 
 
 def _quality_dict(quality: FrameQuality) -> dict[str, Any]:
