@@ -20,10 +20,13 @@ logger = get_logger(__name__)
 
 _settings = get_settings()
 _database_url = _settings.resolved_database_url
-# ``timeout`` lets a second process (the API and the Celery worker both call
-# ``init_db``) wait out a migration in progress instead of failing on a lock.
+# ``timeout`` lets a caller wait out a brief write lock (a stack upload commits
+# per frame; the beat runs cleanup writes) instead of erroring immediately. WAL
+# would remove reader/writer contention entirely but its shared-memory file does
+# not work over a Docker Desktop bind mount, so processing runs on the Celery
+# worker instead (PROCESSING_MODE=queue) to keep the API off the hot path.
 _connect_args = (
-    {"check_same_thread": False, "timeout": 30} if _database_url.startswith("sqlite") else {}
+    {"check_same_thread": False, "timeout": 15} if _database_url.startswith("sqlite") else {}
 )
 _BACKEND_DIR = Path(__file__).resolve().parents[2]  # .../backend (or /app in the image)
 

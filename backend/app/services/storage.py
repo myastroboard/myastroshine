@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import shutil
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +37,15 @@ _CALIBRATION_KINDS = ("dark", "flat", "bias", "dark_flat")
 _FRAME_STORE_SCALE = 65535.0
 _FLOAT_STORE_BIT_DEPTH = 32
 _UINT8_MAX = 255.0
+
+
+@dataclass(frozen=True)
+class PreparedFrame:
+    """A frame ready to write: packed pixels, metadata, and its thumbnail."""
+
+    data: np.ndarray
+    meta: dict[str, Any] = field(default_factory=dict)
+    thumbnail: np.ndarray = field(default_factory=lambda: np.zeros((1, 1, 3), np.uint8))
 
 
 def _pack_frame(data: np.ndarray, source_bit_depth: int) -> np.ndarray:
@@ -259,26 +269,35 @@ class StorageService:
 
     # -- stacking: linear frame store ------------------------------------
 
+    def prepare_linear_frame(self, frame: LinearFrame) -> PreparedFrame:
+        """The CPU-heavy half of persisting a frame (packing + the thumbnail),
+        with no filesystem or DB touch - safe to run across a threadpool."""
+        return PreparedFrame(
+            data=_pack_frame(frame.data, frame.source_bit_depth),
+            meta={
+                "is_cfa": frame.is_cfa,
+                "bayer_pattern": frame.bayer_pattern,
+                "source_bit_depth": frame.source_bit_depth,
+                "already_stretched": frame.already_stretched,
+                "acquisition": frame.metadata,
+            },
+            thumbnail=to_display_bgr(frame, _STACK_THUMB_MAX_SIZE),
+        )
+
+    def write_linear_frame(self, stack_id: str, index: int, prepared: PreparedFrame) -> None:
+        """Write a :meth:`prepare_linear_frame` result to disk (fast: three files)."""
+        self.stack_frames_dir(stack_id, create=True)
+        np.save(self.linear_frame_path(stack_id, index), prepared.data)
+        self._frame_meta_path(stack_id, index).write_text(
+            json.dumps(prepared.meta), encoding="utf-8"
+        )
+        image_utils.save_image(
+            prepared.thumbnail, self.stack_thumb_path(stack_id, index), quality=80
+        )
+
     def save_linear_frame(self, stack_id: str, index: int, frame: LinearFrame) -> None:
         """Persist one ingested frame: a compact ``.npy`` + a metadata sidecar + a thumbnail."""
-        self.stack_frames_dir(stack_id, create=True)
-        np.save(
-            self.linear_frame_path(stack_id, index),
-            _pack_frame(frame.data, frame.source_bit_depth),
-        )
-        meta: dict[str, Any] = {
-            "is_cfa": frame.is_cfa,
-            "bayer_pattern": frame.bayer_pattern,
-            "source_bit_depth": frame.source_bit_depth,
-            "already_stretched": frame.already_stretched,
-            "acquisition": frame.metadata,
-        }
-        self._frame_meta_path(stack_id, index).write_text(json.dumps(meta), encoding="utf-8")
-        image_utils.save_image(
-            to_display_bgr(frame, _STACK_THUMB_MAX_SIZE),
-            self.stack_thumb_path(stack_id, index),
-            quality=80,
-        )
+        self.write_linear_frame(stack_id, index, self.prepare_linear_frame(frame))
 
     def load_linear_frame(self, stack_id: str, index: int) -> LinearFrame:
         meta = json.loads(self._frame_meta_path(stack_id, index).read_text(encoding="utf-8"))

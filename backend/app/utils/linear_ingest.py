@@ -283,18 +283,23 @@ def to_display_bgr(frame: LinearFrame, max_size: int = 256) -> np.ndarray:
     tile; the real debayer happens in the stacking pipeline. Each channel is
     stretched independently with the same screen-transfer-function auto-stretch
     the single-image FITS ingest uses.
+
+    The linear plane is **downscaled to the thumbnail size first**, then
+    stretched - the STF's median/MAD pass over a few thousand pixels is
+    visually the same as over two megapixels and ~20x cheaper (thumbnail
+    generation dominates a multi-frame upload).
     """
     if frame.is_cfa and frame.bayer_pattern:
         planes = _cfa_superpixel(frame.data, frame.bayer_pattern)
     elif frame.is_color:
         planes = [frame.data[..., 0], frame.data[..., 1], frame.data[..., 2]]
     else:
-        stretched = _auto_stretch_to_uint8(frame.data)
-        return cv2.cvtColor(make_preview(stretched, max_size), cv2.COLOR_GRAY2BGR)
+        small = make_preview(frame.data, max_size)
+        return cv2.cvtColor(_auto_stretch_to_uint8(small), cv2.COLOR_GRAY2BGR)
 
-    red, green, blue = (_auto_stretch_to_uint8(p) for p in planes)
-    bgr = cv2.merge([blue, green, red])
-    return make_preview(bgr, max_size)
+    small_planes = (make_preview(p, max_size) for p in planes)
+    red, green, blue = (_auto_stretch_to_uint8(p) for p in small_planes)
+    return cv2.merge([blue, green, red])
 
 
 def superpixel_rgb(frame: LinearFrame) -> LinearFrame:

@@ -33,9 +33,9 @@ from app.services.frame_quality import FrameQuality
 from app.services.integration import IntegrationService, highpass_noise
 from app.services.job import JobService
 from app.services.session import SessionService
-from app.services.storage import StorageService
+from app.services.storage import PreparedFrame, StorageService
 from app.utils.app_settings import get_app_settings
-from app.utils.linear_ingest import LinearFrame, to_display_bgr
+from app.utils.linear_ingest import LinearFrame, ingest_frame, to_display_bgr
 
 logger = get_logger(__name__)
 
@@ -98,6 +98,32 @@ class StackingService:
         if not already:
             record.received_frames += 1
         record.frame_count = max(record.frame_count, index + 1)
+        if record.received_frames >= _MIN_FRAMES:
+            record.status = "ready"
+        self.db.commit()
+        self.db.refresh(record)
+        return record
+
+    def prepare_frame(self, data: bytes, filename: str | None) -> PreparedFrame:
+        """Decode + pack + thumbnail one upload - pure CPU, run across a threadpool."""
+        return self.storage.prepare_linear_frame(ingest_frame(data, filename))
+
+    def add_frames(
+        self, stack_id: str, start_index: int, prepared: list[PreparedFrame]
+    ) -> StackRecord:
+        """Write a batch of prepared frames to disk with a single DB commit."""
+        record = self._get(stack_id)
+        if record.status not in ("waiting_for_frames", "ready"):
+            raise InvalidParameterError(f"Stack {stack_id} is not accepting frames")
+        max_frames = get_app_settings().stacking_max_frames
+        for offset, item in enumerate(prepared):
+            index = start_index + offset
+            if not 0 <= index < max_frames:
+                raise InvalidParameterError(f"frame_index must be 0..{max_frames - 1}")
+            if not self.storage.has_linear_frame(stack_id, index):
+                record.received_frames += 1
+            self.storage.write_linear_frame(stack_id, index, item)
+            record.frame_count = max(record.frame_count, index + 1)
         if record.received_frames >= _MIN_FRAMES:
             record.status = "ready"
         self.db.commit()
