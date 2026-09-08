@@ -398,9 +398,6 @@ export interface AppSettings {
   astrodexRetryDelaySeconds: number;
   stackingEnabled: boolean;
   stackingMaxFrames: number;
-  stackingDetector: 'orb' | 'sift';
-  stackingCombinationDefault: CombinationMethod;
-  stackingCosmicRayThreshold: number;
   logLevel: LogLevel;
   consoleLogLevel: LogLevel;
 }
@@ -484,16 +481,19 @@ export interface VersionCheckResult {
   error: string | null;
 }
 
-// --- Stacking (v1.1) ---------------------------------------------------------
+// --- Stacking (linear rebuild) ----------------------------------------------
+// See initial_plan/12_STACKING_REBUILD.md.
 
-export type CombinationMethod = 'median' | 'mean' | 'sigma_clip';
-export type RegistrationMethod = 'sift' | 'orb';
+export type CombinationMethod = 'average' | 'median';
+export type RegistrationTransform = 'translation' | 'similarity' | 'affine';
+export type RejectionAlgo = 'none' | 'sigma' | 'winsorized_sigma';
+export type StackWeighting = 'none' | 'noise' | 'quality';
 
 export interface StackSettings {
-  registrationMethod: RegistrationMethod;
+  registrationTransform: RegistrationTransform;
   combinationMethod: CombinationMethod;
-  cosmicRayRejection: boolean;
-  backgroundNormalization: boolean;
+  rejectionAlgo: RejectionAlgo;
+  weighting: StackWeighting;
 }
 
 export interface StackSession {
@@ -510,13 +510,20 @@ export interface UploadFrameResult {
   status: string;
 }
 
+/** One uploaded frame, for the frame grid. */
+export interface StackFrameInfo {
+  index: number;
+  thumbUrl: string;
+  excluded: boolean;
+}
+
 export interface StackStatistics {
   framesStacked: number;
-  framesRejected: number;
+  framesExcluded: number;
   combinationMethod: string;
-  cosmicRaysRemoved: number;
-  registrationSuccessRate: number;
+  registrationTransform: string;
   snrImprovement: number;
+  measuredNoiseReduction: number | null;
 }
 
 export interface StackResult {
@@ -527,5 +534,6 @@ export interface StackResult {
   sessionId: string | null;
   stackedImageUrl: string | null;
   statistics: StackStatistics | null;
+  frames: StackFrameInfo[];
   error: string | null;
 }

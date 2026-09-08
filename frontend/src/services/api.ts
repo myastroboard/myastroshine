@@ -17,6 +17,7 @@ import type {
   ProcessResponse,
   ProcessingParameters,
   PublicConfig,
+  StackFrameInfo,
   StackResult,
   StackSession,
   StackSettings,
@@ -323,6 +324,26 @@ export const apiClient = {
       throw await readError(response);
     }
     return keysToCamelCase<UploadFrameResult>(await response.json());
+  },
+
+  async uploadStackArchive(stackId: string, file: File): Promise<StackSession> {
+    const form = new FormData();
+    form.append('file', file);
+    const response = await fetch(`${API_URL}/stack/${stackId}/upload-archive`, {
+      method: 'POST',
+      body: form,
+    });
+    if (!response.ok) {
+      throw await readError(response);
+    }
+    return keysToCamelCase<StackSession>(await response.json());
+  },
+
+  excludeStackFrame(stackId: string, index: number, excluded: boolean): Promise<StackFrameInfo> {
+    return request<StackFrameInfo>(`/stack/${stackId}/frame/${index}/exclude`, {
+      method: 'POST',
+      json: { excluded },
+    });
   },
 
   processStack(stackId: string): Promise<StackResult> {

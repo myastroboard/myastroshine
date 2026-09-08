@@ -16,7 +16,7 @@ def test_get_app_settings_returns_current_values(client) -> None:
 
     assert response.status_code == 200
     body = response.json()
-    assert body["stacking_detector"] == "orb"
+    assert body["stacking_max_frames"] == 500
     # conftest allow-lists this host
     assert body["astrodex_callback_urls"] == ["http://astrodex.test/api/webhooks/enhanced-images"]
 

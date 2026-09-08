@@ -8,6 +8,8 @@ vi.mock('@/services/api', () => ({
   apiClient: {
     initiateStack: vi.fn(),
     uploadStackFrame: vi.fn(),
+    uploadStackArchive: vi.fn(),
+    excludeStackFrame: vi.fn(),
     processStack: vi.fn(),
     getStack: vi.fn(),
     downloadImage: vi.fn(),
@@ -44,12 +46,13 @@ describe('StackView', () => {
       stackedImageUrl: '/api/preview/composite-session?full=true',
       statistics: {
         framesStacked: 2,
-        framesRejected: 0,
-        combinationMethod: 'median',
-        cosmicRaysRemoved: 3,
-        registrationSuccessRate: 100,
+        framesExcluded: 0,
+        combinationMethod: 'average',
+        registrationTransform: 'similarity',
         snrImprovement: 1.41,
+        measuredNoiseReduction: null,
       },
+      frames: [],
       error: null,
     });
   });
@@ -66,7 +69,10 @@ describe('StackView', () => {
       expect(screen.getByText(/SNR improvement/i)).toBeInTheDocument();
     });
     expect(screen.getByText('1.41x')).toBeInTheDocument();
-    expect(mocked.initiateStack).toHaveBeenCalledWith(2, expect.objectContaining({ combinationMethod: 'median' }));
+    expect(mocked.initiateStack).toHaveBeenCalledWith(
+      2,
+      expect.objectContaining({ combinationMethod: 'average' }),
+    );
     expect(mocked.uploadStackFrame).toHaveBeenCalledTimes(2);
   });
 

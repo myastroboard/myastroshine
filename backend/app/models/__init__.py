@@ -27,7 +27,9 @@ from app.models.processing import (
 from app.models.session import SessionInfo
 from app.models.settings import AppSettingsResponse, AppSettingsUpdate
 from app.models.stack import (
+    ExcludeFrameRequest,
     InitiateStackRequest,
+    StackFrameInfo,
     StackResultResponse,
     StackSessionResponse,
     StackStatistics,
@@ -54,6 +56,7 @@ __all__ = [
     "DepthShiftResponse",
     "DepthStatistics",
     "Dimensions",
+    "ExcludeFrameRequest",
     "FocusPoint",
     "GeometryParameters",
     "HistogramData",
@@ -69,6 +72,7 @@ __all__ = [
     "SavePresetRequest",
     "SavePresetResponse",
     "SessionInfo",
+    "StackFrameInfo",
     "StackResultResponse",
     "StackSessionResponse",
     "StackStatistics",

@@ -325,10 +325,22 @@
     "save_changes": "Enregistrer les modifications",
     "sections_aria_label": "Sections des paramètres",
     "sections": {
-      "general": { "label": "Général", "blurb": "Téléversements et valeurs par défaut de l'empilement." },
-      "webhooks": { "label": "Webhooks", "blurb": "Jetons AstroDex et livraison des rappels." },
-      "advanced": { "label": "Avancé", "blurb": "Réseau et niveaux de journalisation." },
-      "logs": { "label": "Journaux", "blurb": "Consulter, vider et exporter le journal de l'application." }
+      "general": {
+        "label": "Général",
+        "blurb": "Téléversements et valeurs par défaut de l'empilement."
+      },
+      "webhooks": {
+        "label": "Webhooks",
+        "blurb": "Jetons AstroDex et livraison des rappels."
+      },
+      "advanced": {
+        "label": "Avancé",
+        "blurb": "Réseau et niveaux de journalisation."
+      },
+      "logs": {
+        "label": "Journaux",
+        "blurb": "Consulter, vider et exporter le journal de l'application."
+      }
     },
     "groups": {
       "uploads_and_sessions": "Téléversements et sessions",
@@ -339,27 +351,66 @@
       "logging": "Journalisation"
     },
     "general": {
-      "max_upload": { "label": "Taille maximale de téléversement", "hint": "Les téléversements plus volumineux sont refusés. Mégaoctets." },
-      "session_ttl": { "label": "Durée de vie de la session", "hint": "Durée de conservation d'une session et de ses fichiers de travail. Heures." },
-      "preview_size": { "label": "Taille de l'aperçu", "hint": "Plus grand côté de l'image d'aperçu rapide. Pixels." },
-      "stacking_enabled": { "label": "Empilement activé", "hint": "Afficher le mode d'empilement multi-images." },
-      "stacking_max": { "label": "Nombre maximal d'images", "hint": "Limite supérieure d'images acceptées pour un empilement." },
-      "stacking_aligner": { "label": "Alignement", "hint": "Détecteur de caractéristiques utilisé pour recaler les images." },
-      "stacking_combine": { "label": "Combinaison", "hint": "Méthode par défaut pour combiner les images alignées." },
-      "stacking_sigma": { "label": "Sigma rayons cosmiques", "hint": "Seuil de rejet en écarts-types robustes." }
+      "max_upload": {
+        "label": "Taille maximale de téléversement",
+        "hint": "Les téléversements plus volumineux sont refusés. Mégaoctets."
+      },
+      "session_ttl": {
+        "label": "Durée de vie de la session",
+        "hint": "Durée de conservation d'une session et de ses fichiers de travail. Heures."
+      },
+      "preview_size": {
+        "label": "Taille de l'aperçu",
+        "hint": "Plus grand côté de l'image d'aperçu rapide. Pixels."
+      },
+      "stacking_enabled": {
+        "label": "Empilement activé",
+        "hint": "Afficher le mode d'empilement multi-images."
+      },
+      "stacking_max": {
+        "label": "Nombre maximal d'images",
+        "hint": "Limite supérieure d'images acceptées pour un empilement."
+      }
     },
     "webhooks": {
-      "allowlist": { "label": "Liste blanche des URL de rappel", "hint": "Un préfixe d'URL par ligne. Une liste vide autorise n'importe quel hôte (développement uniquement)." },
-      "max_retries": { "label": "Nombre maximal de tentatives", "hint": "Tentatives de livraison avant qu'un webhook soit marqué en échec." },
-      "retry_delay": { "label": "Délai entre les tentatives", "hint": "Délai de base entre les tentatives. Secondes." }
+      "allowlist": {
+        "label": "Liste blanche des URL de rappel",
+        "hint": "Un préfixe d'URL par ligne. Une liste vide autorise n'importe quel hôte (développement uniquement)."
+      },
+      "max_retries": {
+        "label": "Nombre maximal de tentatives",
+        "hint": "Tentatives de livraison avant qu'un webhook soit marqué en échec."
+      },
+      "retry_delay": {
+        "label": "Délai entre les tentatives",
+        "hint": "Délai de base entre les tentatives. Secondes."
+      }
     },
     "advanced": {
-      "cors_origins": { "label": "Origines CORS", "hint": "Une origine par ligne. Prend effet après le redémarrage du service api." },
-      "rate_limit_enabled": { "label": "Limitation de débit", "hint": "Limite la fréquence à laquelle une IP peut téléverser, traiter ou empiler des images." },
-      "rate_limit_per_minute": { "label": "Requêtes par minute", "hint": "Par IP, partagé entre les points d'accès téléversement/traitement/empilement." },
-      "max_concurrent_jobs": { "label": "Tâches simultanées", "hint": "Nombre maximal de tâches d'amélioration/empilement en cours, par IP." },
-      "log_file_level": { "label": "Niveau du journal fichier", "hint": "Niveau écrit dans le fichier journal en rotation." },
-      "log_console_level": { "label": "Niveau du journal console", "hint": "Niveau affiché dans les journaux du conteneur." }
+      "cors_origins": {
+        "label": "Origines CORS",
+        "hint": "Une origine par ligne. Prend effet après le redémarrage du service api."
+      },
+      "rate_limit_enabled": {
+        "label": "Limitation de débit",
+        "hint": "Limite la fréquence à laquelle une IP peut téléverser, traiter ou empiler des images."
+      },
+      "rate_limit_per_minute": {
+        "label": "Requêtes par minute",
+        "hint": "Par IP, partagé entre les points d'accès téléversement/traitement/empilement."
+      },
+      "max_concurrent_jobs": {
+        "label": "Tâches simultanées",
+        "hint": "Nombre maximal de tâches d'amélioration/empilement en cours, par IP."
+      },
+      "log_file_level": {
+        "label": "Niveau du journal fichier",
+        "hint": "Niveau écrit dans le fichier journal en rotation."
+      },
+      "log_console_level": {
+        "label": "Niveau du journal console",
+        "hint": "Niveau affiché dans les journaux du conteneur."
+      }
     },
     "logs": {
       "level_label": "Niveau",
@@ -373,9 +424,6 @@
     }
   },
   "stacking": {
-    "registration_label": "Recalage",
-    "background_normalization_label": "Normalisation du fond de ciel",
-    "cosmic_ray_rejection_label": "Rejet des rayons cosmiques",
     "combination_label": "Combinaison",
     "mode": {
       "single": "Image unique",
@@ -384,25 +432,45 @@
     "progress": {
       "heading": "Empilement"
     },
+    "steps": {
+      "registration": "Alignement",
+      "normalization": "Normalisation",
+      "integration": "Intégration"
+    },
     "results": {
       "failed": "Échec de l'empilement : {error}",
       "status_ellipsis": "Empilement {status}...",
       "composite_alt": "Composite empilé",
       "frames_stacked": "Images empilées",
-      "frames_rejected": "Images rejetées",
-      "cosmic_rays_removed": "Rayons cosmiques supprimés",
-      "registration_success": "Taux de réussite du recalage",
+      "frames_excluded": "Images exclues",
       "snr_improvement": "Amélioration du RSB",
+      "measured_noise_reduction": "Réduction de bruit mesurée",
       "enhance_composite": "Améliorer le composite",
       "download_composite": "Télécharger le composite"
     },
     "settings": {
-      "alignment_label": "Alignement",
-      "orb_option": "ORB (rapide)",
-      "sift_option": "SIFT (précis)",
-      "median_option": "Médiane",
-      "mean_option": "Moyenne",
-      "sigma_clip_option": "Sigma-clip"
+      "transform_label": "Alignement",
+      "transform": {
+        "translation": "Décalage seul",
+        "similarity": "Décalage + rotation + échelle",
+        "affine": "Affine"
+      },
+      "combination": {
+        "average": "Moyenne",
+        "median": "Médiane"
+      },
+      "rejection_label": "Rejet de pixels",
+      "rejection": {
+        "none": "Aucun",
+        "sigma": "Sigma clip",
+        "winsorized_sigma": "Sigma winsorisé"
+      },
+      "weighting_label": "Pondération des images",
+      "weighting": {
+        "none": "Égale",
+        "noise": "Par le bruit",
+        "quality": "Par la qualité"
+      }
     },
     "upload_zone": {
       "add_frames": "Ajouter des images",
@@ -419,7 +487,7 @@
       "settings_heading": "Paramètres d'empilement",
       "stacking_button": "Empilement en cours...",
       "stack_n_frames": "Empiler {count} images",
-      "hint": "Téléversez au moins 2 images similaires (JPEG, PNG ou TIFF). Plus il y a d'images, plus le rapport signal/bruit augmente, environ selon la racine carrée du nombre d'images."
+      "hint": "Téléversez au moins 2 images similaires (JPEG, PNG, TIFF ou FITS). Plus il y a d'images, plus le rapport signal/bruit augmente, environ selon la racine carrée du nombre d'images."
     }
   }
 }

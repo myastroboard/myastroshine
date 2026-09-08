@@ -63,12 +63,9 @@ class AppSettings(BaseModel):
     astrodex_max_retries: int = Field(default=3, ge=1, le=10)
     astrodex_retry_delay_seconds: float = Field(default=5.0, ge=0, le=60)
 
-    # Stacking (v1.1+)
+    # Stacking (linear rebuild - see initial_plan/12_STACKING_REBUILD.md)
     stacking_enabled: bool = True
-    stacking_max_frames: int = Field(default=100, ge=2, le=1000)
-    stacking_detector: str = "orb"  # orb | sift
-    stacking_combination_default: str = "median"  # median | mean | sigma_clip
-    stacking_cosmic_ray_threshold: float = Field(default=3.0, ge=0.5, le=10.0)
+    stacking_max_frames: int = Field(default=500, ge=2, le=5000)
 
     # Logging - file level and console level (changeable at runtime, see #4)
     log_level: str = "info"

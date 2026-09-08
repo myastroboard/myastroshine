@@ -11,8 +11,10 @@ Layout (per docs/ARCHITECTURE):
 
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -20,8 +22,12 @@ from app.config import get_settings
 from app.logging_config import get_logger
 from app.utils import image_utils
 from app.utils.app_settings import get_app_settings
+from app.utils.linear_ingest import LinearFrame, to_display_bgr
 
 logger = get_logger(__name__)
+
+_STACK_THUMB_MAX_SIZE = 256
+_FRAME_INDEX_WIDTH = 5  # frames/00000.npy .. supports 99999 frames
 
 
 class StorageService:
@@ -105,7 +111,7 @@ class StorageService:
     def count_layers(self, session_id: str) -> int:
         return len(list(self.depth_dir(session_id).glob("layer_*.png")))
 
-    # -- stacking (v1.1) -----------------------------------------------
+    # -- stacking: paths ---------------------------------------------------
 
     def stack_dir(self, stack_id: str, *, create: bool = False) -> Path:
         path = self.root / "stacks" / stack_id
@@ -113,16 +119,85 @@ class StorageService:
             path.mkdir(parents=True, exist_ok=True)
         return path
 
-    def stack_frame_path(self, stack_id: str, index: int) -> Path:
-        return self.stack_dir(stack_id) / f"frame_{index:03d}.png"
+    def stack_frames_dir(self, stack_id: str, *, create: bool = False) -> Path:
+        path = self.stack_dir(stack_id) / "frames"
+        if create:
+            path.mkdir(parents=True, exist_ok=True)
+        return path
 
-    def save_stack_frame(self, stack_id: str, index: int, image: np.ndarray) -> None:
+    def stack_accum_dir(self, stack_id: str, *, create: bool = False) -> Path:
+        """Where the streaming-integration memmap accumulators live (Phase 1)."""
+        path = self.stack_dir(stack_id) / "accum"
+        if create:
+            path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    def linear_frame_path(self, stack_id: str, index: int) -> Path:
+        return self.stack_frames_dir(stack_id) / f"{index:0{_FRAME_INDEX_WIDTH}d}.npy"
+
+    def _frame_meta_path(self, stack_id: str, index: int) -> Path:
+        return self.stack_frames_dir(stack_id) / f"{index:0{_FRAME_INDEX_WIDTH}d}.json"
+
+    def stack_thumb_path(self, stack_id: str, index: int) -> Path:
+        return self.stack_frames_dir(stack_id) / f"{index:0{_FRAME_INDEX_WIDTH}d}_thumb.jpg"
+
+    def stack_composite_path(self, stack_id: str) -> Path:
+        """The 32-bit linear composite (``.npy``), before any stretch/enhancement."""
+        return self.stack_dir(stack_id) / "composite.npy"
+
+    # -- stacking: linear frame store ------------------------------------
+
+    def save_linear_frame(self, stack_id: str, index: int, frame: LinearFrame) -> None:
+        """Persist one ingested frame: float32 ``.npy`` + a metadata sidecar + a thumbnail."""
+        self.stack_frames_dir(stack_id, create=True)
+        np.save(self.linear_frame_path(stack_id, index), frame.data.astype(np.float32))
+        meta: dict[str, Any] = {
+            "is_cfa": frame.is_cfa,
+            "bayer_pattern": frame.bayer_pattern,
+            "source_bit_depth": frame.source_bit_depth,
+            "already_stretched": frame.already_stretched,
+            "acquisition": frame.metadata,
+        }
+        self._frame_meta_path(stack_id, index).write_text(json.dumps(meta), encoding="utf-8")
+        image_utils.save_image(
+            to_display_bgr(frame, _STACK_THUMB_MAX_SIZE),
+            self.stack_thumb_path(stack_id, index),
+            quality=80,
+        )
+
+    def load_linear_frame(self, stack_id: str, index: int) -> LinearFrame:
+        meta = json.loads(self._frame_meta_path(stack_id, index).read_text(encoding="utf-8"))
+        data = np.load(self.linear_frame_path(stack_id, index))
+        return LinearFrame(
+            data=data,
+            is_cfa=bool(meta["is_cfa"]),
+            bayer_pattern=meta["bayer_pattern"],
+            source_bit_depth=int(meta["source_bit_depth"]),
+            already_stretched=bool(meta["already_stretched"]),
+            metadata=dict(meta.get("acquisition", {})),
+        )
+
+    def load_frame_acquisition(self, stack_id: str, index: int) -> dict[str, Any]:
+        """The metadata sidecar for one frame (acquisition keywords, CFA flags)."""
+        return dict(json.loads(self._frame_meta_path(stack_id, index).read_text(encoding="utf-8")))
+
+    def has_linear_frame(self, stack_id: str, index: int) -> bool:
+        return self.linear_frame_path(stack_id, index).exists()
+
+    def stack_frame_indices(self, stack_id: str) -> list[int]:
+        """Sorted indices of every frame currently on disk for this stack."""
+        frames_dir = self.stack_frames_dir(stack_id)
+        if not frames_dir.exists():
+            return []
+        return sorted(int(p.stem) for p in frames_dir.glob("[0-9]" * _FRAME_INDEX_WIDTH + ".npy"))
+
+    def save_stack_composite(self, stack_id: str, composite: np.ndarray) -> None:
         self.stack_dir(stack_id, create=True)
-        image_utils.save_image(image, self.stack_frame_path(stack_id, index))
+        np.save(self.stack_composite_path(stack_id), composite.astype(np.float32))
 
-    def load_stack_frames(self, stack_id: str) -> list[np.ndarray]:
-        paths = sorted(self.stack_dir(stack_id).glob("frame_*.png"))
-        return [image_utils.load_image(path) for path in paths]
+    def load_stack_composite(self, stack_id: str) -> np.ndarray:
+        composite: np.ndarray = np.load(self.stack_composite_path(stack_id))
+        return composite
 
     def delete_stack(self, stack_id: str) -> None:
         path = self.stack_dir(stack_id)

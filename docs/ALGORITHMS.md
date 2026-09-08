@@ -419,29 +419,48 @@ picked point read as "near" in the parallax, not just whatever happens to be
 detailed. `w=0.5` is a first-pass constant, like other heuristics this
 session, to revisit if real testing shows the centering too strong/weak.
 
-## Stacking (v1.1)
+## Stacking (linear rebuild)
 
-`StackingService.process` runs: registration -> background normalisation
-(optional) -> cosmic-ray masking (optional) -> combination. The composite is
-saved as a normal session so the single-image routes work on it.
+The v1.1 pipeline (ORB/SIFT homography on stretched 8-bit frames, MAD "cosmic
+ray" masking, uint8 combination) was never run on real data and produced a
+near-black composite on a real Seestar set. It is being rebuilt around linear
+`float32` data - see `initial_plan/12_STACKING_REBUILD.md` for the full plan,
+the reference comparison against Siril/DSS/APP/WBPP, and the phased approach.
 
-- **Registration** (`RegistrationService`) - ORB (default, fast) or SIFT
-  keypoints -> knnMatch + Lowe ratio 0.75 -> RANSAC homography (reproj 5.0) ->
-  `warpPerspective` to `frames[0]`. Needs >= 4 good matches; frames that fail are
-  returned unchanged and counted in `frames_rejected`.
-- **Background normalisation** (`NormalizationService`) - median of a 32 px edge
-  border per frame; shift all frames to the common median.
-- **Cosmic-ray masking** (`CosmicRayService.build_mask`) - per-pixel median plus
-  a **MAD-based** robust sigma (`1.4826 * MAD`, so one ray does not inflate its
-  own estimate); a sample is flagged when it exceeds both `threshold` sigma
-  (`STACKING_COSMIC_RAY_THRESHOLD`, default 3.0) **and** 12 absolute levels.
-- **Combination** (`CombinationService.combine`, honours the reject mask via
-  `nan`-aware ops):
-  - `median` - robust, default.
-  - `mean` - best SNR, only safe with cosmic-ray masking on.
-  - `sigma_clip` - 2 iterations of mean +/- 2.5 sigma clipping.
+### Linear ingest (`app/utils/linear_ingest.py`)
 
-`estimate_snr_improvement(N) = sqrt(N)`.
+`ingest_frame(bytes, filename)` -> `LinearFrame`: `float32` pixel data in a
+nominal `[0, 1]` range, linear (no screen stretch), CFA mosaic kept intact.
+
+- **FITS** - `BZERO`/`BSCALE` applied by astropy, divided by the dtype full
+  range. A `BAYERPAT` header marks the frame CFA and the 2D data stays a
+  mosaic; acquisition keywords (`EXPTIME`, `GAIN`, `CCD-TEMP`, ...) are kept in
+  `metadata`. `(3, H, W)` / `(H, W, 3)` cubes read as R/G/B planes.
+  `ROWORDER = BOTTOM-UP` is flipped.
+- **Camera RAW** - `rawpy` linear postprocess (`gamma=(1, 1)`,
+  `no_auto_bright=True`, 16-bit, camera WB). Debayered by libraw.
+- **Everything else** via OpenCV. 16-bit is scaled to `[0, 1]` as linear; 8-bit
+  is a low-precision, already-stretched preview - flagged `already_stretched`
+  and passed through an approximate sRGB EOTF.
+
+`to_display_bgr(frame)` auto-stretches a frame to a BGR thumbnail (CFA gets a
+2x2 superpixel de-mosaic); `superpixel_rgb(frame)` is the placeholder debayer
+for the Phase 0 pipeline (half-res, no interpolation).
+
+### Integration (`StackingService`, Phase 0)
+
+`process` loads each kept frame (superpixel-debayering CFA), accumulates a
+**running mean** in one float64 accumulator (one IO pass, memory-bounded to a
+single frame), and saves a 32-bit `composite.npy` plus an 8-bit auto-stretched
+session for the editor. Manually excluded frames (`excluded_frames`) are
+skipped. `snr_improvement` is `sqrt(N_kept)`; `measured_noise_reduction` is the
+single-frame vs composite background-noise ratio.
+
+**Not yet implemented (Phase 1+):** star-based registration, additive +
+multiplicative normalization, Winsorized-sigma pixel rejection, frame weighting,
+calibration frames, per-frame quality scoring. The v1.1 `RegistrationService` /
+`NormalizationService` / `CosmicRayService` / `CombinationService` modules are
+unused by `process` and are removed when Phase 1 lands.
 
 ## Performance notes
 

@@ -43,6 +43,17 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   needs before a session exists (the upload size cap, stacking limits). The
   upload screen's size hint and its pre-flight check now follow the operator's
   configured `max_image_size_mb` instead of a hardcoded 100 MB.
+- Stacking rebuild (in progress): multi-frame stacking is being reworked to run
+  on linear, full-bit-depth data instead of stretched 8-bit previews - the old
+  pipeline was never run on real data and produced a near-black result on a real
+  Seestar set. This release lays the foundation: a unified linear ingest (FITS
+  Bayer mosaics kept intact and debayered in-pipeline, camera RAW demosaiced
+  linearly, 8-bit previews sRGB-linearised), a `.zip` archive upload so a
+  thousand-frame session is one request, per-frame thumbnails, and a
+  frame-by-frame include/exclude toggle (`POST /api/stack/{id}/frame/{i}/exclude`)
+  for dropping a sub with a trail or cloud. Integration is currently a
+  memory-bounded running mean; star-based alignment, pixel rejection, frame
+  weighting and calibration frames follow. See `initial_plan/12_STACKING_REBUILD.md`.
 
 ### Changed
 
@@ -67,6 +78,12 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `scikit-image` is no longer a dependency - it had been unused since the v0.2
   star-detection rebuild switched off `skimage.feature.blob_dog`, and the new
   star-removal estimate is pure OpenCV.
+- Stacking's `sift`/`orb` alignment, `median`/`mean`/`sigma_clip` combination
+  and the cosmic-ray toggle are replaced by a transform model
+  (`translation`/`similarity`/`affine`), `average`/`median` combination, a pixel
+  rejection algorithm and a frame-weighting mode. The `stacking_detector`,
+  `stacking_combination_default` and `stacking_cosmic_ray_threshold` settings are
+  gone; `stacking_max_frames` now defaults to 500.
 
 ## [0.2.0] - 2026-09-06
 

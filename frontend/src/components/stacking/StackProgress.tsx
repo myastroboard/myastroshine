@@ -8,10 +8,9 @@ export interface StackProgressProps {
 }
 
 const PIPELINE: { key: string; translationKey: string }[] = [
-  { key: 'registration', translationKey: 'stacking.registration_label' },
-  { key: 'background_normalization', translationKey: 'stacking.background_normalization_label' },
-  { key: 'cosmic_ray_rejection', translationKey: 'stacking.cosmic_ray_rejection_label' },
-  { key: 'combination', translationKey: 'stacking.combination_label' },
+  { key: 'registration', translationKey: 'stacking.steps.registration' },
+  { key: 'normalization', translationKey: 'stacking.steps.normalization' },
+  { key: 'integration', translationKey: 'stacking.steps.integration' },
 ];
 
 /** Step-by-step stacking progress display (v1.1+). */

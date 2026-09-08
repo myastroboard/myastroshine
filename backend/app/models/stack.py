@@ -1,4 +1,9 @@
-"""Stacking (v1.1) request/response models."""
+"""Stacking request/response models (linear rebuild).
+
+See ``initial_plan/12_STACKING_REBUILD.md``. The v1.1 ``sift``/``orb`` +
+``median``/``sigma_clip`` + cosmic-ray-toggle contract is replaced by a
+transform model, a pixel-rejection algorithm, and a per-frame weighting mode.
+"""
 
 from __future__ import annotations
 
@@ -6,22 +11,26 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-RegistrationMethod = Literal["sift", "orb"]
-CombinationMethod = Literal["median", "mean", "sigma_clip"]
+RegistrationTransform = Literal["translation", "similarity", "affine"]
+CombinationMethod = Literal["average", "median"]
+RejectionAlgo = Literal["none", "sigma", "winsorized_sigma"]
+Weighting = Literal["none", "noise", "quality"]
+
+_MAX_FRAMES = 5000  # hard ceiling; the operator's stacking_max_frames is the real gate
 
 
 class InitiateStackRequest(BaseModel):
     """Body of ``POST /api/stack/initiate``."""
 
-    frame_count: int = Field(ge=2, le=100)
-    registration_method: RegistrationMethod = "orb"
-    combination_method: CombinationMethod = "median"
-    cosmic_ray_rejection: bool = True
-    background_normalization: bool = True
+    frame_count: int = Field(ge=2, le=_MAX_FRAMES)
+    registration_transform: RegistrationTransform = "similarity"
+    combination_method: CombinationMethod = "average"
+    rejection_algo: RejectionAlgo = "winsorized_sigma"
+    weighting: Weighting = "noise"
 
 
 class StackSessionResponse(BaseModel):
-    """Returned by ``POST /api/stack/initiate``."""
+    """Returned by ``POST /api/stack/initiate`` and the upload endpoints."""
 
     stack_id: str
     status: str
@@ -38,15 +47,29 @@ class UploadFrameResponse(BaseModel):
     status: str
 
 
+class StackFrameInfo(BaseModel):
+    """One uploaded frame, for the frame grid in the UI."""
+
+    index: int
+    thumb_url: str
+    excluded: bool
+
+
+class ExcludeFrameRequest(BaseModel):
+    """Body of ``POST /api/stack/{stack_id}/frame/{index}/exclude``."""
+
+    excluded: bool
+
+
 class StackStatistics(BaseModel):
     """Summary of a completed stack."""
 
     frames_stacked: int
-    frames_rejected: int
+    frames_excluded: int
     combination_method: str
-    cosmic_rays_removed: int
-    registration_success_rate: float
+    registration_transform: str
     snr_improvement: float
+    measured_noise_reduction: float | None = None
 
 
 class StackResultResponse(BaseModel):
@@ -59,4 +82,5 @@ class StackResultResponse(BaseModel):
     session_id: str | None = None
     stacked_image_url: str | None = None
     statistics: StackStatistics | None = None
+    frames: list[StackFrameInfo] = Field(default_factory=list)
     error: str | None = None

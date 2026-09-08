@@ -20,9 +20,9 @@ from app.logging_config import get_logger
 logger = get_logger(__name__)
 
 _STANDARD_FORMATS = {".jpg", ".jpeg", ".png", ".tiff", ".tif"}
-_FITS_FORMATS = {".fits", ".fit", ".fts"}
-_RAW_FORMATS = {".cr2", ".cr3", ".nef", ".arw", ".dng", ".orf", ".rw2", ".pef", ".raf"}
-SUPPORTED_FORMATS = _STANDARD_FORMATS | _FITS_FORMATS | _RAW_FORMATS
+FITS_FORMATS = {".fits", ".fit", ".fts"}
+RAW_FORMATS = {".cr2", ".cr3", ".nef", ".arw", ".dng", ".orf", ".rw2", ".pef", ".raf"}
+SUPPORTED_FORMATS = _STANDARD_FORMATS | FITS_FORMATS | RAW_FORMATS
 
 _ENCODE_EXT = {"jpeg": ".jpg", "jpg": ".jpg", "png": ".png", "tiff": ".tif", "tif": ".tif"}
 
@@ -191,7 +191,8 @@ def _to_bgr_uint8(decoded: np.ndarray) -> np.ndarray:
     return decoded
 
 
-def _extension_of(filename: str | None) -> str:
+def extension_of(filename: str | None) -> str:
+    """Lowercased file extension (with the dot), or ``""`` if there is none."""
     if not filename or "." not in filename:
         return ""
     return filename[filename.rfind(".") :].lower()
@@ -213,10 +214,10 @@ def decode_image(data: bytes, filename: str | None = None) -> np.ndarray:
     decompression bomb - the compressed upload can be small while the decoded
     array is huge).
     """
-    ext = _extension_of(filename)
-    if ext in _FITS_FORMATS:
+    ext = extension_of(filename)
+    if ext in FITS_FORMATS:
         image = _decode_fits(data)
-    elif ext in _RAW_FORMATS:
+    elif ext in RAW_FORMATS:
         image = _decode_raw(data)
     else:
         buffer = np.frombuffer(data, dtype=np.uint8)

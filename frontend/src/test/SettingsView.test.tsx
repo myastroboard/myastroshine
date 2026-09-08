@@ -33,10 +33,7 @@ const SETTINGS: AppSettings = {
   astrodexMaxRetries: 3,
   astrodexRetryDelaySeconds: 5,
   stackingEnabled: true,
-  stackingMaxFrames: 100,
-  stackingDetector: 'orb',
-  stackingCombinationDefault: 'median',
-  stackingCosmicRayThreshold: 3,
+  stackingMaxFrames: 500,
   logLevel: 'info',
   consoleLogLevel: 'warning',
 };
@@ -80,7 +77,7 @@ describe('SettingsView', () => {
 
     await waitFor(() => expect(mocked.saveAppSettings).toHaveBeenCalledTimes(1));
     expect(mocked.saveAppSettings).toHaveBeenCalledWith(
-      expect.objectContaining({ maxImageSizeMb: 250, stackingDetector: 'orb' }),
+      expect.objectContaining({ maxImageSizeMb: 250, stackingMaxFrames: 500 }),
     );
   });
 

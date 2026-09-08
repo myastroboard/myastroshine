@@ -1,12 +1,18 @@
-"""StackingService - the multi-frame stacking pipeline (v1.1).
+"""StackingService - the multi-frame stacking pipeline (linear rebuild).
 
-initiate -> upload frames -> process (register -> normalise -> reject cosmic
-rays -> combine). The composite becomes a normal session so the single-image
-enhancement routes work on it unchanged.
+initiate -> upload frames (each ingested to a linear ``LinearFrame``) -> process
+-> the composite becomes a normal session so the single-image enhancement routes
+work on it unchanged.
+
+**Phase 0 status**: ``process`` currently does a naive memory-bounded running
+mean (CFA frames superpixel-debayered first), *no registration and no pixel
+rejection yet*. Star-based alignment, Winsorized-sigma rejection and frame
+weighting arrive in Phase 1. See ``initial_plan/12_STACKING_REBUILD.md``.
 """
 
 from __future__ import annotations
 
+import math
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -16,25 +22,21 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db.models import StackRecord
-from app.exceptions import (
-    InvalidParameterError,
-    ResourceNotFoundError,
-)
+from app.exceptions import InvalidParameterError, ResourceNotFoundError
 from app.logging_config import get_logger
 from app.models import InitiateStackRequest, StackStatistics
 from app.services import progress
-from app.services.combination import CombinationService
-from app.services.cosmic_ray import CosmicRayService
 from app.services.job import JobService
-from app.services.normalization import NormalizationService
-from app.services.registration import RegistrationService
 from app.services.session import SessionService
 from app.services.storage import StorageService
 from app.utils.app_settings import get_app_settings
+from app.utils.linear_ingest import LinearFrame, superpixel_rgb, to_display_bgr
 
 logger = get_logger(__name__)
 
 _MIN_FRAMES = 2
+_MONO_NDIM = 2
+_FULL_RES = 1_000_000  # to_display_bgr max_size: large enough to never downscale the composite
 
 
 class StackingService:
@@ -58,10 +60,11 @@ class StackingService:
         record = StackRecord(
             stack_id=str(uuid.uuid4()),
             frame_count=config.frame_count,
-            registration_method=config.registration_method,
+            registration_transform=config.registration_transform,
             combination_method=config.combination_method,
-            cosmic_ray_rejection=config.cosmic_ray_rejection,
-            background_normalization=config.background_normalization,
+            rejection_algo=config.rejection_algo,
+            weighting=config.weighting,
+            excluded_frames=[],
             expires_at=datetime.now(UTC) + timedelta(hours=app_settings.session_expiry_hours),
         )
         self.db.add(record)
@@ -70,15 +73,15 @@ class StackingService:
         logger.info("stack initiated", stack_id=record.stack_id, frames=config.frame_count)
         return record
 
-    def add_frame(self, stack_id: str, index: int, image: np.ndarray) -> StackRecord:
+    def add_frame(self, stack_id: str, index: int, frame: LinearFrame) -> StackRecord:
         record = self._get(stack_id)
         if record.status not in ("waiting_for_frames", "ready"):
             raise InvalidParameterError(f"Stack {stack_id} is not accepting frames")
         if not 0 <= index < record.frame_count:
             raise InvalidParameterError(f"frame_index must be 0..{record.frame_count - 1}")
 
-        already = self.storage.stack_frame_path(stack_id, index).exists()
-        self.storage.save_stack_frame(stack_id, index, image)
+        already = self.storage.has_linear_frame(stack_id, index)
+        self.storage.save_linear_frame(stack_id, index, frame)
         if not already:
             record.received_frames += 1
         if record.received_frames >= record.frame_count:
@@ -87,22 +90,35 @@ class StackingService:
         self.db.refresh(record)
         return record
 
+    def set_frame_excluded(self, stack_id: str, index: int, excluded: bool) -> StackRecord:
+        """Toggle a frame in/out of the stack (a trail, a cloud, a bad sub)."""
+        record = self._get(stack_id)
+        if not self.storage.has_linear_frame(stack_id, index):
+            raise ResourceNotFoundError(f"Frame {index} not uploaded for stack {stack_id}")
+        current = set(record.excluded_frames or [])
+        if excluded:
+            current.add(index)
+        else:
+            current.discard(index)
+        record.excluded_frames = sorted(current)
+        self.db.commit()
+        self.db.refresh(record)
+        return record
+
     def process(self, stack_id: str, job_id: str | None = None) -> StackRecord:
         record = self._get(stack_id)
-        frames = self.storage.load_stack_frames(stack_id)
-        if len(frames) < _MIN_FRAMES:
+        indices = self.storage.stack_frame_indices(stack_id)
+        excluded = set(record.excluded_frames or [])
+        kept = [i for i in indices if i not in excluded]
+        if len(kept) < _MIN_FRAMES:
             raise InvalidParameterError("At least 2 frames are required to stack")
-
-        shapes = {f.shape for f in frames}
-        if len(shapes) != 1:
-            raise InvalidParameterError("All frames must have identical dimensions")
 
         record.status = "processing"
         self.db.commit()
-        self._emit(job_id, stack_id, "registration", 10)
+        self._emit(job_id, stack_id, "integration", 20)
 
         try:
-            composite, stats = self._run_pipeline(record, frames, job_id, stack_id)
+            composite, stats = self._integrate(record, stack_id, kept, len(excluded), job_id)
         except Exception as exc:
             record.status = "failed"
             record.error = str(exc)
@@ -111,10 +127,12 @@ class StackingService:
             logger.exception("stack processing failed", stack_id=stack_id)
             raise
 
+        self.storage.save_stack_composite(stack_id, composite)
         session = self.sessions.create_session(
             image_path="", original_filename=f"stack_{stack_id[:8]}.png"
         )
-        self.storage.save_original(session.session_id, composite)
+        display = to_display_bgr(LinearFrame(data=composite), _FULL_RES)
+        self.storage.save_original(session.session_id, display)
         session.image_path = str(self.storage.original_path(session.session_id))
 
         record.session_id = session.session_id
@@ -127,9 +145,62 @@ class StackingService:
             "stack completed",
             stack_id=stack_id,
             session_id=session.session_id,
-            snr=stats.snr_improvement,
+            frames=stats.frames_stacked,
         )
         return record
+
+    def _integrate(
+        self,
+        record: StackRecord,
+        stack_id: str,
+        indices: list[int],
+        excluded_count: int,
+        job_id: str | None,
+    ) -> tuple[np.ndarray, StackStatistics]:
+        """Naive memory-bounded running mean (Phase 0). One accumulator, one IO pass."""
+        accumulator: np.ndarray | None = None
+        reference_shape: tuple[int, ...] | None = None
+        first_frame_noise: float | None = None
+
+        for step, index in enumerate(indices):
+            pixels = self._prepared_pixels(stack_id, index)
+            if accumulator is None:
+                accumulator = np.zeros(pixels.shape, dtype=np.float64)
+                reference_shape = pixels.shape
+                first_frame_noise = _background_noise(pixels)
+            elif pixels.shape != reference_shape:
+                raise InvalidParameterError(
+                    "All frames must share dimensions and colour layout after debayering"
+                )
+            accumulator += pixels
+            if step % 25 == 0:
+                self._emit(
+                    job_id, stack_id, "integration", 20 + int(60 * step / max(1, len(indices)))
+                )
+
+        assert accumulator is not None  # noqa: S101 - len(indices) >= 2 guaranteed by the caller
+        composite = (accumulator / len(indices)).astype(np.float32)
+
+        measured = None
+        if first_frame_noise:
+            composite_noise = _background_noise(composite)
+            if composite_noise > 0:
+                measured = round(first_frame_noise / composite_noise, 2)
+
+        stats = StackStatistics(
+            frames_stacked=len(indices),
+            frames_excluded=excluded_count,
+            combination_method=record.combination_method,
+            registration_transform=record.registration_transform,
+            snr_improvement=round(math.sqrt(len(indices)), 2),
+            measured_noise_reduction=measured,
+        )
+        return composite, stats
+
+    def _prepared_pixels(self, stack_id: str, index: int) -> np.ndarray:
+        frame = superpixel_rgb(self.storage.load_linear_frame(stack_id, index))
+        pixels = frame.data.astype(np.float64)
+        return pixels[..., np.newaxis] if pixels.ndim == _MONO_NDIM else pixels
 
     def _emit(
         self,
@@ -155,43 +226,6 @@ class StackingService:
             },
         )
 
-    def _run_pipeline(
-        self,
-        record: StackRecord,
-        frames: list[np.ndarray],
-        job_id: str | None = None,
-        stack_id: str = "",
-    ) -> tuple[np.ndarray, StackStatistics]:
-        registration = RegistrationService(record.registration_method).register(frames)
-        aligned = registration.aligned
-
-        if record.background_normalization:
-            self._emit(job_id, stack_id, "background_normalization", 45)
-            aligned = NormalizationService().normalize_backgrounds(aligned)
-
-        reject_mask = None
-        rays_removed = 0
-        if record.cosmic_ray_rejection:
-            self._emit(job_id, stack_id, "cosmic_ray_rejection", 65)
-            reject_mask = CosmicRayService().build_mask(
-                aligned, get_app_settings().stacking_cosmic_ray_threshold
-            )
-            rays_removed = int(reject_mask.sum())
-
-        self._emit(job_id, stack_id, "combination", 85)
-        combiner = CombinationService()
-        composite = combiner.combine(aligned, record.combination_method, reject_mask)
-
-        stats = StackStatistics(
-            frames_stacked=len(aligned),
-            frames_rejected=sum(1 for ok in registration.aligned_flags if not ok),
-            combination_method=record.combination_method,
-            cosmic_rays_removed=rays_removed,
-            registration_success_rate=round(registration.success_rate * 100, 1),
-            snr_improvement=round(combiner.estimate_snr_improvement(len(aligned)), 2),
-        )
-        return composite, stats
-
     def dispatch(
         self, stack_id: str, jobs: JobService, client_ip: str | None = None
     ) -> tuple[StackRecord, str]:
@@ -216,8 +250,7 @@ class StackingService:
 
         The composite a stack produces becomes its own ``SessionRecord`` and is
         expired by ``SessionService.cleanup_old_sessions``; this only clears the
-        ``StackRecord`` and the raw frame PNGs under ``DATA_DIR/stacks/``, which
-        nothing else touches.
+        ``StackRecord`` and the frame files under ``DATA_DIR/stacks/``.
         """
         now = datetime.now(UTC)
         expired = self.db.scalars(select(StackRecord).where(StackRecord.expires_at < now)).all()
@@ -228,3 +261,10 @@ class StackingService:
         if expired:
             logger.info("expired stacks cleaned", count=len(expired))
         return len(expired)
+
+
+def _background_noise(pixels: np.ndarray) -> float:
+    """Robust std of a corner patch - a rough per-frame read-noise proxy."""
+    patch = pixels[: max(8, pixels.shape[0] // 8), : max(8, pixels.shape[1] // 8)]
+    median = float(np.median(patch))
+    return float(1.4826 * np.median(np.abs(patch - median)))

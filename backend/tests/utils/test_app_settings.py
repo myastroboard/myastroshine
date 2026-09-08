@@ -38,17 +38,17 @@ def test_defaults_when_no_file() -> None:
 
     settings = get_app_settings()
     assert settings.max_image_size_mb == AppSettings().max_image_size_mb
-    assert settings.stacking_detector == "orb"
+    assert settings.stacking_max_frames == AppSettings().stacking_max_frames
 
 
 def test_save_merges_persists_and_refreshes_cache() -> None:
     """save_app_settings writes the whole object and updates the in-memory copy."""
-    save_app_settings({"max_image_size_mb": 250, "stacking_detector": "sift"})
+    save_app_settings({"max_image_size_mb": 250, "stacking_max_frames": 300})
 
     assert get_app_settings().max_image_size_mb == 250
     on_disk = json.loads(get_settings().app_settings_file.read_text(encoding="utf-8"))
     assert on_disk["max_image_size_mb"] == 250
-    assert on_disk["stacking_detector"] == "sift"
+    assert on_disk["stacking_max_frames"] == 300
 
 
 def test_unknown_keys_are_ignored() -> None:
