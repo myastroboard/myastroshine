@@ -451,7 +451,8 @@
       "download_composite": "Télécharger le composite",
       "alignment_rms": "Résidu d'alignement",
       "calibrated": "Calibration",
-      "calibrated_yes": "Appliquée"
+      "calibrated_yes": "Appliquée",
+      "frames_auto_rejected": "Rejetées auto"
     },
     "settings": {
       "transform_label": "Alignement",
@@ -475,6 +476,14 @@
         "none": "Égale",
         "noise": "Par le bruit",
         "quality": "Par la qualité"
+      },
+      "quality_label": "Rejet auto des mauvaises poses",
+      "quality_hint": "Note chaque brute (étoiles, netteté, rondeur, fond de ciel) et écarte les pires automatiquement. Vous pouvez récupérer une pose ensuite.",
+      "quality": {
+        "off": "Désactivé",
+        "lenient": "Souple",
+        "moderate": "Modéré",
+        "strict": "Strict"
       }
     },
     "upload_zone": {
@@ -513,7 +522,15 @@
     "grid": {
       "frame_aria": "Image {n}",
       "exclude": "Exclure cette image de l'empilement",
-      "remove": "Retirer {name}"
+      "remove": "Retirer {name}",
+      "quality_title": "{stars} étoiles · FWHM {fwhm}",
+      "reject": {
+        "clouds": "nuages",
+        "soft": "flou",
+        "trailed": "filée",
+        "bright_sky": "ciel clair",
+        "other": "rejetée"
+      }
     },
     "calibration": {
       "title": "Images de calibration",

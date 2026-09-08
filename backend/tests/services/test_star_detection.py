@@ -61,3 +61,15 @@ def test_detected_radius_is_positive_and_bounded(detector: StarDetectionService)
     assert found
     for star in found:
         assert 0 < star.radius < 30
+
+
+def test_roundness_flags_a_trailed_star(detector: StarDetectionService) -> None:
+    """A round star scores ~1.0; a streak (tracking error) scores well below."""
+    image = np.zeros((160, 200, 3), dtype=np.uint8)
+    cv2.circle(image, (50, 80), 3, (255, 255, 255), -1)  # round
+    cv2.line(image, (120, 80), (150, 80), (255, 255, 255), 3)  # horizontal streak
+
+    found = sorted(detector.detect(image, sensitivity=70, max_size=40), key=lambda s: s.x)
+    assert len(found) == 2
+    assert found[0].roundness > 0.8  # the disc
+    assert found[1].roundness < 0.5  # the streak

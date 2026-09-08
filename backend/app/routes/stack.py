@@ -31,6 +31,7 @@ from app.models import (
     CalibrationFrameCounts,
     CalibrationSummary,
     ExcludeFrameRequest,
+    FrameQualityInfo,
     InitiateStackRequest,
     ProcessStackRequest,
     StackFrameInfo,
@@ -53,16 +54,41 @@ router = APIRouter(prefix="/stack", tags=["stacking"])
 _ARCHIVE_MEMBER_CAP = 5000  # zip-bomb guard: refuse an archive claiming more members than this
 
 
+_QUALITY_FIELDS = (
+    "star_count",
+    "fwhm",
+    "roundness",
+    "background",
+    "snr",
+    "score",
+    "weight",
+    "accepted",
+    "reject_reason",
+)
+
+
 def _frame_infos(record: StackRecord, storage: StorageService) -> list[StackFrameInfo]:
     excluded = set(record.excluded_frames or [])
-    return [
-        StackFrameInfo(
-            index=index,
-            thumb_url=f"/api/stack/{record.stack_id}/frame/{index}/thumb",
-            excluded=index in excluded,
+    rescued = set(record.included_frames or [])
+    quality_by_index = {
+        f["index"]: f for f in (record.quality_report or {}).get("frames", [])
+    }
+    infos: list[StackFrameInfo] = []
+    for index in storage.stack_frame_indices(record.stack_id):
+        raw = quality_by_index.get(index)
+        quality = (
+            FrameQualityInfo(**{k: raw[k] for k in _QUALITY_FIELDS}) if raw is not None else None
         )
-        for index in storage.stack_frame_indices(record.stack_id)
-    ]
+        auto_rejected = quality is not None and not quality.accepted and index not in rescued
+        infos.append(
+            StackFrameInfo(
+                index=index,
+                thumb_url=f"/api/stack/{record.stack_id}/frame/{index}/thumb",
+                excluded=index in excluded or auto_rejected,
+                quality=quality,
+            )
+        )
+    return infos
 
 
 def _calibration_summary(record: StackRecord, storage: StorageService) -> CalibrationSummary:

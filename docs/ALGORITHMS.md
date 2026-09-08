@@ -472,6 +472,28 @@ is calibrated **on the CFA mosaic, before debayer**:
   median of its own Bayer phase. This is the honest replacement for the removed
   "cosmic ray" MAD mask.
 
+### Frame quality (`app/services/frame_quality.py`)
+
+Every frame the registration pass measures is scored: `score_frames` normalises
+star count, star **FWHM** (`2 x` the median detected-star radius) and
+**roundness** (`min(w, h) / max(w, h)` of each star's bounding box), sky
+background and background noise against the stack's own medians, and produces:
+
+- a **score** 0-100 (mostly SNR, then star count, sharpness, roundness) for the
+  UI;
+- the `weighting = "quality"` integration weight: `SNR^2` tempered by star count
+  and sharpness, each clamped to 0.25-4x and normalised to a median of 1;
+- an **accept / reject** verdict when `quality_filter` is not `off`. Thresholds
+  scale with the level (`lenient` / `moderate` / `strict`) and are all relative
+  to the median: `star_count < f x median` -> `clouds`, `fwhm > k x median` ->
+  `soft`, `roundness < r` -> `trailed`, `background > median + s x MAD` ->
+  `bright_sky`. Below four frames nothing is judged (the medians are too shaky).
+
+Rejected frames are dropped before the reference pick and the combine, and
+counted in `frames_auto_rejected`. The user overrides per frame: unchecking a
+frame adds it to `included_frames` (protected from the filter on the next run),
+checking it drops that protection.
+
 ### Registration (`app/services/star_match.py`)
 
 `StarMatchService.align(source_centroids, target_centroids, transform)` aligns
@@ -495,10 +517,12 @@ thousand-frame stack fits in bounded RAM (only a few frames and one row-tile
 ever resident):
 
 1. **Register** - calibrate then superpixel-debayer each frame (half resolution
-   is plenty for centroids), detect stars (`StarDetectionService`), and measure
-   background / 95th-percentile scale / high-pass noise. The frame with the most
-   stars is the **reference**; every other frame is asterism-matched to it.
-   Frames that fail to match are dropped and counted in `frames_excluded`.
+   is plenty for centroids), detect stars (`StarDetectionService`), measure
+   background / 95th-percentile scale / high-pass noise / FWHM / roundness, and
+   **score** the frames (see Frame quality above) - the ones the `quality_filter`
+   rejects are dropped here. The best-scored remaining frame is the
+   **reference**; every other kept frame is asterism-matched to it. Frames that
+   fail to match are dropped and counted in `frames_excluded`.
 2. **Align** - reload each kept frame, calibrate it and **interpolating**-debayer
    it at full resolution, warp it into the reference frame (`cv2.INTER_LANCZOS4`,
    NaN outside the frame footprint - the transform's translation scaled up from
@@ -510,23 +534,23 @@ ever resident):
    **iterative sigma-clip around the mean** (2 iterations, k=3 - fast, sum-based;
    `np.nanmedian` on the stack axis is ~100x slower), then `winsorized_sigma`
    clamps the outliers (count preserved) or `sigma` drops them, then a
-   **weighted mean** (`none` / `noise` = `1/noise^2` / `quality` =
-   `stars/noise^2`, per-frame weight clamped to 0.25-4x the median). Rejection is
-   skipped where fewer than 30% of frames cover a pixel (the field-rotation
+   **weighted mean** (`none` = equal / `noise` = `1/noise^2` clamped 0.25-4x /
+   `quality` = the frame-quality score's combined weight). Rejection is skipped
+   where fewer than 30% of frames cover a pixel (the field-rotation
    wedge - the per-pixel sigma there is unreliable). `median` combination uses a
    true `nanmedian` (slower, opt-in).
 
 The composite is saved as 32-bit `composite.npy` plus an auto-stretched 8-bit
 session for the editor. `quality_report` records the reference frame, the mean
-registration RMS, the rejected-sample count, and whether calibration ran.
-`snr_improvement` is `sqrt(effective N)` where effective N = `(sum w)^2 /
-sum(w^2)`; `measured_noise_reduction` is the reference-frame vs composite
-high-pass noise ratio. On a real Seestar set the composite is full-resolution,
-sub-pixel aligned, ~8x lower noise than a single sub.
+registration RMS, the rejected-sample count, whether calibration ran, and the
+`frames` table (per-frame metrics + accept/reject). `snr_improvement` is
+`sqrt(effective N)` where effective N = `(sum w)^2 / sum(w^2)`;
+`measured_noise_reduction` is the reference-frame vs composite high-pass noise
+ratio. On a real Seestar set the composite is full-resolution, sub-pixel
+aligned, ~8x lower noise than a single sub, with dusk/cloud subs auto-dropped.
 
-**Still to come:** per-frame quality scores and auto-reject (Phase 3), then a
-post-stack stretch / background-extraction / colour-calibration step and an
-auto-crop to the common frame footprint (Phase 4).
+**Still to come:** a post-stack stretch / background-extraction / colour-
+calibration step and an auto-crop to the common frame footprint (Phase 4).
 
 ## Performance notes
 

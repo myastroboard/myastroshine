@@ -451,7 +451,8 @@
       "download_composite": "Download composite",
       "alignment_rms": "Alignment residual",
       "calibrated": "Calibration",
-      "calibrated_yes": "Applied"
+      "calibrated_yes": "Applied",
+      "frames_auto_rejected": "Auto-rejected"
     },
     "settings": {
       "transform_label": "Alignment",
@@ -475,6 +476,14 @@
         "none": "Equal",
         "noise": "By noise",
         "quality": "By quality"
+      },
+      "quality_label": "Auto-reject bad frames",
+      "quality_hint": "Score every sub (stars, sharpness, roundness, sky) and drop the worst automatically. You can rescue any frame afterwards.",
+      "quality": {
+        "off": "Off",
+        "lenient": "Lenient",
+        "moderate": "Moderate",
+        "strict": "Strict"
       }
     },
     "upload_zone": {
@@ -513,7 +522,15 @@
     "grid": {
       "frame_aria": "Frame {n}",
       "exclude": "Exclude this frame from the stack",
-      "remove": "Remove {name}"
+      "remove": "Remove {name}",
+      "quality_title": "{stars} stars · FWHM {fwhm}",
+      "reject": {
+        "clouds": "clouds",
+        "soft": "soft",
+        "trailed": "trailed",
+        "bright_sky": "bright sky",
+        "other": "rejected"
+      }
     },
     "calibration": {
       "title": "Calibration frames",

@@ -8,6 +8,7 @@ export const DEFAULT_STACK_SETTINGS: StackSettings = {
   rejectionAlgo: 'winsorized_sigma',
   weighting: 'noise',
   cosmeticCorrection: true,
+  qualityFilter: 'moderate',
 };
 
 /** Local state for the stacking configuration panel. */

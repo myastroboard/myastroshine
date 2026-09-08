@@ -416,19 +416,21 @@ is set (else `403`).
 Being rebuilt - see `initial_plan/12_STACKING_REBUILD.md`. Frames are ingested as
 linear `float32` (FITS CFA mosaics kept intact, camera RAW demosaiced linearly,
 8-bit previews sRGB-linearised). The pipeline calibrates each frame (master
-dark/flat/bias when uploaded), registers by asterism matching, normalises to the
-reference, and combines with sigma rejection and noise weighting, all in bounded
-memory. See docs/ALGORITHMS.md.
+dark/flat/bias when uploaded), scores every sub and auto-rejects the worst,
+registers by asterism matching, normalises to the reference, and combines with
+sigma rejection and weighting, all in bounded memory. See docs/ALGORITHMS.md.
 
 1. `POST /stack/initiate` `{ frame_count, registration_transform?, combination_method?,
-   rejection_algo?, weighting?, cosmetic_correction? }` -> `202 { stack_id, status:
-   "waiting_for_frames", frame_count, received_frames }`.
+   rejection_algo?, weighting?, cosmetic_correction?, quality_filter? }` -> `202
+   { stack_id, status: "waiting_for_frames", frame_count, received_frames }`.
    - `registration_transform`: `translation` / `similarity` (default) / `affine`
    - `combination_method`: `average` (default) / `median`
    - `rejection_algo`: `none` / `sigma` / `winsorized_sigma` (default)
-   - `weighting`: `none` / `noise` (default) / `quality`
+   - `weighting`: `none` / `noise` (default) / `quality` (the frame-quality score)
    - `cosmetic_correction`: bool (default `true`) - replace hot/dead pixels
      (from the master dark/flat) with a neighbour median
+   - `quality_filter`: `off` / `lenient` / `moderate` (default) / `strict` -
+     auto-reject strength for the per-frame quality scorer
 2. `POST /stack/{stack_id}/upload-frame` (multipart: `frame_index`, `file`) ->
    `202 { frame_index, received_frames, frame_count, status }`. `status` becomes
    `"ready"` once every frame is in.
@@ -440,8 +442,9 @@ memory. See docs/ALGORITHMS.md.
    the same response. Image members are ingested in filename order and assigned
    indices from `received_frames` upward, up to `frame_count`.
 5. `POST /stack/{stack_id}/frame/{index}/exclude` `{ excluded: bool }` ->
-   `200 { index, thumb_url, excluded }`. Toggles a frame in or out of the stack
-   (a trail, a cloud). Excluded frames are skipped by `process`.
+   `200 { index, thumb_url, excluded, quality }`. Toggles a frame in or out of
+   the stack. `excluded: false` also **rescues** the frame from the quality
+   auto-reject on the next run; `excluded: true` drops that protection.
 6. `GET /stack/{stack_id}/frame/{index}/thumb` -> a ~256 px auto-stretched JPEG
    for the frame grid. Not rate-limited.
 7. `POST /stack/{stack_id}/calibration/{kind}/frames` (multipart: `files` = many
@@ -453,8 +456,8 @@ memory. See docs/ALGORITHMS.md.
    sub of that kind and any master derived from it.
 9. `POST /stack/{stack_id}/process` runs the pipeline synchronously and returns
    `200`. An optional body `{ registration_transform?, combination_method?,
-   rejection_algo?, weighting?, cosmetic_correction? }` re-stacks with a changed
-   setting - no re-upload, each run makes a fresh composite session:
+   rejection_algo?, weighting?, cosmetic_correction?, quality_filter? }` re-stacks
+   with a changed setting - no re-upload, each run makes a fresh composite session:
 
 ```json
 {
@@ -463,15 +466,21 @@ memory. See docs/ALGORITHMS.md.
   "session_id": "<composite session>",
   "stacked_image_url": "/api/preview/<session_id>?full=true",
   "statistics": {
-    "frames_stacked": 48, "frames_excluded": 2, "combination_method": "average",
-    "registration_transform": "similarity", "snr_improvement": 6.93,
-    "measured_noise_reduction": 5.1, "calibrated": true
+    "frames_stacked": 46, "frames_excluded": 4, "frames_auto_rejected": 2,
+    "combination_method": "average", "registration_transform": "similarity",
+    "snr_improvement": 6.78, "measured_noise_reduction": 5.1, "calibrated": true
   },
-  "frames": [{ "index": 0, "thumb_url": "/api/stack/.../frame/0/thumb", "excluded": false }],
+  "frames": [{ "index": 0, "thumb_url": "/api/stack/.../frame/0/thumb", "excluded": false,
+    "quality": { "star_count": 1180, "fwhm": 2.8, "roundness": 0.86, "background": 0.008,
+      "snr": 74.0, "score": 88.0, "weight": 1.05, "accepted": true, "reject_reason": null } }],
   "calibration": { "frames": { "dark": 20, "flat": 15, "bias": 0, "dark_flat": 0 },
     "cosmetic_correction": true }
 }
 ```
+
+An auto-rejected frame comes back with `excluded: true` and
+`quality.accepted: false` (`reject_reason` one of `clouds` / `soft` / `trailed`
+/ `bright_sky`); `quality` is `null` until the stack has been run once.
 
 The composite is a normal session: enhance it with `POST /process`, fetch it with
 `GET /preview`, download it with `POST /download`. `GET /stack/{stack_id}` returns

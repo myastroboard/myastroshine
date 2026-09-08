@@ -89,6 +89,59 @@ def test_cfa_stack_registers_a_shift(storage: StorageService) -> None:
     assert result.registration_rms < 2.0
 
 
+def _thin_mosaic(height: int, width: int) -> np.ndarray:
+    """A near-starless CFA frame - a cloudy sub."""
+    frame = _mosaic(height, width, (0.10, 0.14, 0.12))
+    for cy, cx in ((20, 20), (60, 90), (100, 40)):
+        frame[cy : cy + 2, cx : cx + 2] += 0.5
+    return np.clip(frame, 0, 1)
+
+
+def test_quality_filter_drops_a_star_poor_frame(storage: StorageService) -> None:
+    """A cloudy (near-starless) sub is quality-rejected and does not reach the composite."""
+    height, width = 140, 180
+    for i in range(5):
+        _save_cfa(storage, "s", i, _star_mosaic(height, width, seed=1, shift=0))
+    _save_cfa(storage, "s", 5, _thin_mosaic(height, width))
+
+    result = IntegrationService(storage).integrate(
+        "s",
+        list(range(6)),
+        transform="similarity",
+        combination="average",
+        rejection="none",
+        weighting="quality",
+        quality_filter="moderate",
+    )
+
+    assert result.quality_rejected == 1
+    assert len(result.frame_quality) == 6
+    assert [q.index for q in result.frame_quality if not q.accepted] == [5]
+    assert result.frames_stacked <= 5  # never the cloudy frame
+    assert len(result.weights) == result.frames_stacked
+
+
+def test_protected_frame_is_not_quality_rejected(storage: StorageService) -> None:
+    height, width = 140, 180
+    for i in range(5):
+        _save_cfa(storage, "s", i, _star_mosaic(height, width, seed=1, shift=0))
+    _save_cfa(storage, "s", 5, _thin_mosaic(height, width))
+
+    result = IntegrationService(storage).integrate(
+        "s",
+        list(range(6)),
+        transform="similarity",
+        combination="average",
+        rejection="none",
+        weighting="none",
+        quality_filter="moderate",
+        protected={5},
+    )
+
+    assert result.quality_rejected == 0
+    assert result.frame_quality[5].accepted is False  # still flagged in the report
+
+
 def test_calibration_through_integrate_flattens_a_gradient(storage: StorageService) -> None:
     height, width = 120, 160
     ramp = np.linspace(0.6, 1.0, width, dtype=np.float32)[None, :]

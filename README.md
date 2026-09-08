@@ -26,10 +26,19 @@ but also runs standalone.
 - **Adjustment sliders**: real-time fine-tuning of every parameter
 - **Geometry**: rotate, flip, straighten, and crop before the pixel pipeline runs
 - **Depth Shift**: a parallax effect that adds a sense of 3D depth
-- **Stacking (v1.1+)**: align and combine 5-100 frames to raise SNR
+- **Stacking**: align and combine 5-2000 frames to raise SNR
 - **Presets**: five built-ins plus user presets, applied to any session
 - **AstroDex integration**: capture in AstroDex, enhance here, send back via signed webhook
 - **Standalone workflow**: manual upload, edit, download
+
+**Why this tool?**
+To have something simple and quick that still gives nice results: no complex pipeline, no cloud dependency. My main concern is keeping **my data** under **my control**.
+
+**Does it replace professional tools?**
+Clearly not, and that's not the goal. Think of it as a fast, self-hosted companion for everyday enhancement, not a substitute for PixInsight, Siril or similar.
+
+**Can I try it?**
+Sure, it's just a Docker app, spin it up and go.
 
 ## Repository layout
 

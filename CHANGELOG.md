@@ -79,9 +79,14 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   "cosmic ray" step; toggle with **Repair hot & dead pixels**). The Bayer
   mosaic is now debayered with an **edge-aware interpolating** demosaic at full
   resolution for the align/combine passes (registration still measures on the
-  cheap half-res superpixel). Still to come: per-frame quality scores with
-  auto-reject, then a post-stack stretch / colour-calibration step. See
-  `initial_plan/12_STACKING_REBUILD.md`.
+  cheap half-res superpixel). Every sub is now **scored** (star count, FWHM,
+  roundness, sky background, SNR) and the worst are **auto-rejected**: the
+  **Auto-reject bad frames** setting (off / lenient / moderate / strict, default
+  moderate) drops a clouded, soft, trailed or dawn sub before it can pollute the
+  stack, the frame grid shows each sub's score and why it was dropped, and
+  unchecking a frame rescues it from the filter on the next run. `weighting:
+  "quality"` now uses that same score. Still to come: a post-stack stretch /
+  colour-calibration step. See `initial_plan/12_STACKING_REBUILD.md`.
 
 ### Changed
 

@@ -1,6 +1,7 @@
 import { useTranslation } from '@/hooks/useTranslation';
 import type {
   CombinationMethod,
+  QualityFilter,
   RegistrationTransform,
   RejectionAlgo,
   StackSettings as StackSettingsValue,
@@ -16,6 +17,7 @@ const TRANSFORMS: RegistrationTransform[] = ['translation', 'similarity', 'affin
 const COMBINATIONS: CombinationMethod[] = ['average', 'median'];
 const REJECTIONS: RejectionAlgo[] = ['none', 'sigma', 'winsorized_sigma'];
 const WEIGHTINGS: StackWeighting[] = ['none', 'noise', 'quality'];
+const QUALITY_FILTERS: QualityFilter[] = ['off', 'lenient', 'moderate', 'strict'];
 
 /** Stacking configuration panel: registration, combination, rejection, weighting. */
 export function StackSettings({ settings, onChange }: StackSettingsProps) {
@@ -92,6 +94,24 @@ export function StackSettings({ settings, onChange }: StackSettingsProps) {
             </option>
           ))}
         </select>
+      </label>
+
+      <label className="flex flex-col gap-1.5">
+        <span className="label">{t('stacking.settings.quality_label')}</span>
+        <select
+          className="field"
+          value={settings.qualityFilter}
+          onChange={(event) =>
+            onChange({ ...settings, qualityFilter: event.target.value as QualityFilter })
+          }
+        >
+          {QUALITY_FILTERS.map((value) => (
+            <option key={value} value={value}>
+              {t(`stacking.settings.quality.${value}`)}
+            </option>
+          ))}
+        </select>
+        <span className="text-[11px] text-ghost">{t('stacking.settings.quality_hint')}</span>
       </label>
     </div>
   );

@@ -52,6 +52,9 @@ class StarSource:
     x: float
     y: float
     radius: float
+    #: bounding-box aspect, ``min(w, h) / max(w, h)`` - 1.0 round, lower = elongated
+    #: (a tracking error or wind gust trails the stars). Used by the frame-quality scorer.
+    roundness: float = 1.0
 
 
 class StarDetectionService:
@@ -114,5 +117,10 @@ class StarDetectionService:
             if radius > max_radius:
                 continue
             cx, cy = centroids[label]
-            stars.append(StarSource(x=float(cx), y=float(cy), radius=radius))
+            box_w = int(stats[label, cv2.CC_STAT_WIDTH])
+            box_h = int(stats[label, cv2.CC_STAT_HEIGHT])
+            roundness = min(box_w, box_h) / max(box_w, box_h, 1)
+            stars.append(
+                StarSource(x=float(cx), y=float(cy), radius=radius, roundness=roundness)
+            )
         return stars
