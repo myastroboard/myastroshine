@@ -3,19 +3,17 @@
 The classic deep-sky workflow: pull the stars out so the starless image can be
 stretched / sharpened / denoised hard without bloating the stars, then screen-
 blend the stars back at an adjustable strength. Detection is shared with star
-reduction (:class:`StarDetectionService`); this service owns the reconstruction
-of what sits under the stars and the recombination. See docs/ALGORITHMS.md
+reduction (:class:`StarDetectionService`); this service owns the estimate of
+what sits under the stars and the recombination. See docs/ALGORITHMS.md
 "Star removal (starless)".
 """
 
 from __future__ import annotations
 
-import math
 from typing import cast
 
 import cv2
 import numpy as np
-from skimage.morphology import reconstruction
 
 from app.logging_config import get_logger
 from app.services.star_detection import StarDetectionService
@@ -23,8 +21,8 @@ from app.utils.math_utils import to_uint8
 
 logger = get_logger(__name__)
 
-# Circle drawn per detected star. Generous - the reconstruction estimate under
-# the mask *is* the surrounding nebula continued inward, so an oversized mask
+# Circle drawn per detected star. Generous - the estimate under the mask is a
+# smoothed, star-free version of the surrounding nebula, so an oversized mask
 # only softens the nebula slightly there, whereas an undersized one leaves a
 # bright core and a dark halo ring (the classic bad starless artifact). Star
 # reduction can afford 1.6x because it only shrinks; removal has to clear the
@@ -32,12 +30,17 @@ logger = get_logger(__name__)
 _STAR_MARGIN = 3.0
 _MIN_MASK_RADIUS = 4  # px; even a 1px detection needs a real footprint cleared
 _MASK_FEATHER_SIGMA = 2.5
-# The star estimate (opening by reconstruction) runs on a downscaled copy: the
-# nebula under a star is low-frequency, and a full-res geodesic reconstruction
-# at 24MP would cost seconds. 640px keeps small-scale nebula structure while
-# staying cheap.
-_ESTIMATE_MAX_SIZE = 640
-_ERODE_DISK_SCALE = 1.6  # erosion radius (at the downscale) vs. the largest star
+# The starless estimate: a two-pass median blur on a downscaled copy. A median
+# window rejects stars as outliers even where they crowd 30-40% of it, so it
+# holds up on a dense Milky Way field where an opening / geodesic reconstruction
+# (tried first) left a blotchy mesh of star-blob remnants; two passes flatten
+# the crowded case further. Runs downscaled - the nebula under a star is
+# low-frequency, and it only fills the feathered star mask anyway.
+_ESTIMATE_MAX_SIZE = 520  # small: a dense faint-star field only smooths out once
+# the stars are near sub-pixel, and the estimate only fills the feathered mask
+_ESTIMATE_MEDIAN_PASSES = 2
+_ESTIMATE_KERNEL_SCALE = 3.0  # median window (at the downscale) vs. the largest star
+_ESTIMATE_SMOOTH_SIGMA = 3.0  # tidies the upscale seam and the last of the field
 # Where the image still rises well above the starless estimate *next to* a
 # detected star, that star is bloated past its circle - grow the mask to cover
 # it. Bounded to a neighbourhood of the detected stars so an undetected faint
@@ -64,9 +67,9 @@ class StarlessService:
         """Return ``(starless, stars_layer)`` for a BGR ``uint8`` image.
 
         ``removal_amount`` (1-100) linearly blends between the original and the
-        fully star-free reconstruction, so a lower value thins the field rather
-        than clearing it. ``stars_layer`` is the removed flux on black, ready
-        for :meth:`recombine`. With no stars detected the image is returned
+        fully star-free estimate, so a lower value thins the field rather than
+        clearing it. ``stars_layer`` is the removed flux on black, ready for
+        :meth:`recombine`. With no stars detected the image is returned
         unchanged alongside an all-black layer.
         """
         stars = self._detector.detect(image, sensitivity, max_size)
@@ -97,12 +100,13 @@ class StarlessService:
     def _starless_estimate(self, image: np.ndarray, max_size: int) -> np.ndarray:
         """What the nebulosity looks like with the stars gone.
 
-        Opening by reconstruction (erode, then geodesic dilation back under the
-        original) removes every bright feature smaller than the erosion element
-        while keeping the exact level and shape of everything larger - so it
-        follows the nebula's own gradient inward with no plateau or ring, unlike
-        a plain opening or an inpaint fill. Runs per channel on a downscaled
-        copy, then resized back up.
+        Two passes of a median blur on a downscaled copy: the median window is
+        sized past the largest maskable star, so a star is an outlier the median
+        rejects - it survives even a dense field where stars crowd a big
+        fraction of the window, which a morphological opening / reconstruction
+        does not (that left a blotchy mesh of star remnants on a real Milky Way
+        field). The result is smooth and low-frequency, which is all a fill
+        under a feathered star mask needs.
         """
         height, width = image.shape[:2]
         scale = _ESTIMATE_MAX_SIZE / max(height, width)
@@ -113,26 +117,22 @@ class StarlessService:
                 interpolation=cv2.INTER_AREA,
             )
             if scale < 1.0
-            else image
+            else image.copy()
         )
         max_radius = 1.5 + (max_size / 100.0) * 20.0  # mirrors StarDetectionService.detect()
-        disk_radius = max(2, math.ceil(max_radius * min(scale, 1.0) * _ERODE_DISK_SCALE))
-        element = cv2.getStructuringElement(
-            cv2.MORPH_ELLIPSE, (disk_radius * 2 + 1, disk_radius * 2 + 1)
-        )
+        kernel = round(max_radius * min(scale, 1.0) * _ESTIMATE_KERNEL_SCALE)
+        kernel = min(max(5, kernel | 1), 2 * min(small.shape[:2]) - 1)  # odd, >=5, fits
 
-        opened = np.empty_like(small)
-        for channel in range(small.shape[2]):
-            plane = small[:, :, channel]
-            seed = cv2.erode(plane, element)
-            opened[:, :, channel] = reconstruction(seed, plane, method="dilation").astype(np.uint8)
+        for _ in range(_ESTIMATE_MEDIAN_PASSES):
+            small = cv2.medianBlur(small, kernel)
+        small = cv2.GaussianBlur(small, (0, 0), sigmaX=_ESTIMATE_SMOOTH_SIGMA)
 
         if scale < 1.0:
             return cast(
                 "np.ndarray",
-                cv2.resize(opened, (width, height), interpolation=cv2.INTER_LINEAR),
+                cv2.resize(small, (width, height), interpolation=cv2.INTER_LINEAR),
             )
-        return opened
+        return small
 
     @staticmethod
     def _grow_over_bloated_stars(

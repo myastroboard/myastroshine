@@ -87,7 +87,6 @@
       "colour": "Couleur",
       "detail": "Détail",
       "stars": "Étoiles",
-      "starless": "Suppression d'étoiles",
       "depth": "Profondeur",
       "export": "Export"
     },
@@ -115,10 +114,7 @@
         "help": "Texture locale : micro-contraste, réduction du bruit et netteté. À faire une fois tons et couleurs réglés."
       },
       "stars": {
-        "help": "Détectez chaque étoile et réduisez-la pour faire ressortir les nébulosités faibles. Utilisez le masque pour vérifier la détection d'abord."
-      },
-      "starless": {
-        "help": "Séparez les étoiles de la nébuleuse. Montez Retirer pour les extraire : les curseurs de chaque étape agissent alors sur la seule nébuleuse ; Rétablir les étoiles les réincorpore à la fin en fondu écran. Mettez Rétablir les étoiles à 0 pour voir l'image sans étoiles."
+        "help": "Deux façons de traiter les étoiles : les réduire sur place, ou les extraire entièrement pour que le reste de la retouche n'agisse que sur la nébuleuse."
       },
       "depth": {
         "help": "Choisissez le point focal, puis ouvrez la visionneuse Depth Shift pour un aperçu de parallaxe interactif."
@@ -274,7 +270,7 @@
       },
       "starRemoval": {
         "label": "Retirer les étoiles",
-        "hint": "Extrait les étoiles pour que tous les autres réglages n'agissent que sur la nébuleuse. La détection utilise la sensibilité et la taille maxi de l'étape Étoiles."
+        "hint": "Extrait les étoiles pour que tous les autres réglages n'agissent que sur la nébuleuse."
       },
       "starRecombine": {
         "label": "Rétablir les étoiles",
@@ -300,6 +296,20 @@
         "label": "Teinte",
         "hint": "Balance des blancs : décale la dominante colorée entre vert et magenta."
       }
+    }
+  },
+  "stars_panel": {
+    "reduce": {
+      "heading": "Réduire",
+      "help": "Réduit chaque étoile sur place. Rapide, toutes les étoiles sont gardées - à utiliser quand vous voulez simplement un champ plus serré."
+    },
+    "remove": {
+      "heading": "Retirer (sans étoiles)",
+      "help": "Extrait les étoiles pour que les autres étapes n'agissent que sur la nébuleuse, puis Rétablir les étoiles les réincorpore à la fin (0 = image sans étoiles). Plus lent, mais permet d'étirer et d'accentuer la nébuleuse sans gonfler les étoiles."
+    },
+    "detection": {
+      "heading": "Détection",
+      "help": "Ce qui compte comme une étoile. Réduire et Retirer utilisent ces réglages. Activez le masque pour vérifier avant de valider."
     }
   },
   "histogram": {

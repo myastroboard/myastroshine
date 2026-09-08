@@ -136,7 +136,7 @@ export function EditorInspector(props: EditorInspectorProps) {
           <p className="text-xs text-faint">{t('editor.steps.frame.unavailable')}</p>
         ))}
 
-      {sliderKeys.length > 0 && (
+      {sliderKeys.length > 0 && activeStep !== 'stars' && (
         <SliderGroup
           keys={sliderKeys}
           parameters={parameters}
@@ -146,7 +146,12 @@ export function EditorInspector(props: EditorInspectorProps) {
       )}
 
       {activeStep === 'stars' && (
-        <StarMaskToggle {...props.stars} />
+        <StarsPanel
+          parameters={parameters}
+          onParameterChange={props.onParameterChange}
+          isProcessing={props.isProcessing}
+          stars={props.stars}
+        />
       )}
 
       {activeStep === 'curves' && (
@@ -237,6 +242,58 @@ function StartPanel({
       >
         {t('editor.reset_all')}
       </button>
+    </div>
+  );
+}
+
+/**
+ * The Stars step: two ways to handle stars, grouped so it's clear which is
+ * which and when to reach for it. "Reduce" shrinks each star where it is (quick,
+ * every star kept). "Remove" lifts the stars out entirely so every other step
+ * only touches the nebula, then fades them back in (the starless workflow).
+ * Both read the same "Detection" controls.
+ */
+function StarsPanel({
+  parameters,
+  onParameterChange,
+  isProcessing,
+  stars,
+}: {
+  parameters: ProcessingParameters;
+  onParameterChange: (key: SliderParameterKey, value: number) => void;
+  isProcessing: boolean;
+  stars: StarsBundle;
+}) {
+  const { t } = useTranslation();
+  const sub = (keys: SliderParameterKey[], id: string) => (
+    <div className="flex flex-col gap-2">
+      <span className="text-xs font-medium text-ink">{t(`stars_panel.${id}.heading`)}</span>
+      <p className="text-xs text-faint">{t(`stars_panel.${id}.help`)}</p>
+      <SliderGroup
+        keys={keys}
+        parameters={parameters}
+        onParameterChange={onParameterChange}
+        isProcessing={isProcessing}
+      />
+    </div>
+  );
+  return (
+    <div className="flex flex-col gap-4">
+      {sub(['starReduction'], 'reduce')}
+      {sub(['starRemoval', 'starRecombine'], 'remove')}
+      <div className="flex flex-col gap-2">
+        <span className="text-xs font-medium text-ink">
+          {t('stars_panel.detection.heading')}
+        </span>
+        <p className="text-xs text-faint">{t('stars_panel.detection.help')}</p>
+        <SliderGroup
+          keys={['starSensitivity', 'starMaxSize']}
+          parameters={parameters}
+          onParameterChange={onParameterChange}
+          isProcessing={isProcessing}
+        />
+        <StarMaskToggle {...stars} />
+      </div>
     </div>
   );
 }

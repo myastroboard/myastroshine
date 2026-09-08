@@ -16,7 +16,7 @@ async function openStep(page: Page, name: string): Promise<void> {
 
 test('star removal splits the pipeline, then recombine brings the stars back', async ({ page }) => {
   await openEditor(page);
-  await openStep(page, 'Star removal');
+  await openStep(page, 'Stars');
 
   const processed = page.locator('img[alt="Processed"]');
   await expect(processed).toBeVisible();
@@ -35,9 +35,9 @@ test('star removal splits the pipeline, then recombine brings the stars back', a
   ]);
   await expect(processed).not.toHaveAttribute('src', beforeRemove ?? '');
 
-  // The Star removal rail step now carries the "changed from default" dot.
+  // The Stars rail step now carries the "changed from default" dot.
   await expect(
-    page.locator('nav[aria-label="Editing workflow"]').getByRole('button', { name: 'Star removal' }),
+    page.locator('nav[aria-label="Editing workflow"]').getByRole('button', { name: 'Stars' }),
   ).toHaveAccessibleName(/changed from default/);
 
   // Bringing the stars back triggers another reprocess.
