@@ -76,10 +76,7 @@ class CalibrationMasters:
     @property
     def is_empty(self) -> bool:
         return (
-            self.bias is None
-            and self.dark is None
-            and self.flat is None
-            and self.dark_flat is None
+            self.bias is None and self.dark is None and self.flat is None and self.dark_flat is None
         )
 
 
@@ -127,9 +124,7 @@ class CalibrationService:
             is_cfa=is_cfa,
         )
 
-    def _master(
-        self, stack_id: str, kind: str, light_shape: tuple[int, ...]
-    ) -> np.ndarray | None:
+    def _master(self, stack_id: str, kind: str, light_shape: tuple[int, ...]) -> np.ndarray | None:
         indices = self.storage.cal_frame_indices(stack_id, kind)
         if not indices:
             return None
@@ -323,8 +318,7 @@ def _flag_outliers(master: np.ndarray, *, is_cfa: bool, hot: bool, kappa: float)
         return out
     if master.ndim == _COLOR_NDIM:
         per_channel = [
-            _plane_outliers(master[..., ch], hot=hot, kappa=kappa)
-            for ch in range(master.shape[2])
+            _plane_outliers(master[..., ch], hot=hot, kappa=kappa) for ch in range(master.shape[2])
         ]
         return np.any(per_channel, axis=0)
     return _plane_outliers(master, hot=hot, kappa=kappa)
@@ -375,5 +369,5 @@ def _wh(shape: tuple[int, ...]) -> str:
 def _as_float(value: object) -> float | None:
     try:
         return float(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None

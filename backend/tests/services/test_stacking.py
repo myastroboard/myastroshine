@@ -227,9 +227,7 @@ def test_quality_filter_auto_rejects_a_cloudy_frame(
 ) -> None:
     """A dim, star-poor sub is dropped by the moderate quality filter and the
     per-frame report explains why."""
-    record = stacking.initiate(
-        InitiateStackRequest(frame_count=5, quality_filter="moderate")
-    )
+    record = stacking.initiate(InitiateStackRequest(frame_count=5, quality_filter="moderate"))
     for i, frame in enumerate(_shifted_frames(star_field, 5)):
         stacking.add_frame(record.stack_id, i, frame)
     stacking.add_frame(record.stack_id, 5, _frame(cv2.GaussianBlur(star_field, (0, 0), 3)))
@@ -248,9 +246,7 @@ def test_quality_filter_auto_rejects_a_cloudy_frame(
 def test_rescued_frame_survives_the_next_run(
     stacking: StackingService, star_field: np.ndarray
 ) -> None:
-    record = stacking.initiate(
-        InitiateStackRequest(frame_count=5, quality_filter="moderate")
-    )
+    record = stacking.initiate(InitiateStackRequest(frame_count=5, quality_filter="moderate"))
     for i, frame in enumerate(_shifted_frames(star_field, 5)):
         stacking.add_frame(record.stack_id, i, frame)
     # a hazy sub: bright sky, but the stars are still sharp enough to register

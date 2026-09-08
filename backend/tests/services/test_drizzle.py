@@ -48,8 +48,18 @@ _PATTERN = "GRBG"
 
 
 _STARS = [
-    (30, 24), (95, 70), (60, 50), (24, 85), (110, 20), (45, 95),
-    (130, 60), (75, 30), (18, 45), (140, 100), (55, 15), (100, 90),
+    (30, 24),
+    (95, 70),
+    (60, 50),
+    (24, 85),
+    (110, 20),
+    (45, 95),
+    (130, 60),
+    (75, 30),
+    (18, 45),
+    (140, 100),
+    (55, 15),
+    (100, 90),
 ]
 
 
@@ -82,9 +92,13 @@ def test_drizzle_2x_doubles_the_grid_and_stays_valid(storage: StorageService) ->
         _save(storage, i, _cfa(height, width, dx, dy))
 
     result = IntegrationService(storage, workers=1).integrate(
-        "s", list(range(len(shifts))),
-        transform="similarity", combination="average", rejection="winsorized_sigma",
-        weighting="noise", drizzle=2,
+        "s",
+        list(range(len(shifts))),
+        transform="similarity",
+        combination="average",
+        rejection="winsorized_sigma",
+        weighting="noise",
+        drizzle=2,
     )
 
     assert result.composite.shape == (height * 2, width * 2, 3)

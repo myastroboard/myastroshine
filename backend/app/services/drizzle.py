@@ -50,9 +50,7 @@ def drizzle_accumulate(
     y_lo, y_hi = y_out - half, y_out + half
 
     mask = np.ones((height_in, width_in), dtype=bool) if keep is None else keep.astype(bool)
-    mask &= (
-        (x_hi > -_HALF) & (x_lo < out_w - _HALF) & (y_hi > -_HALF) & (y_lo < out_h - _HALF)
-    )
+    mask &= (x_hi > -_HALF) & (x_lo < out_w - _HALF) & (y_hi > -_HALF) & (y_lo < out_h - _HALF)
     if not mask.any():
         return
 
@@ -71,9 +69,7 @@ def drizzle_accumulate(
 
     for d_row in range(2):
         rows = row0 + d_row
-        overlap_y = np.clip(
-            np.minimum(y_hi, rows + 0.5) - np.maximum(y_lo, rows - 0.5), 0.0, None
-        )
+        overlap_y = np.clip(np.minimum(y_hi, rows + 0.5) - np.maximum(y_lo, rows - 0.5), 0.0, None)
         row_ok = (rows >= 0) & (rows < out_h) & (overlap_y > 0)
         for d_col in range(2):
             cols = col0 + d_col

@@ -120,7 +120,5 @@ class StarDetectionService:
             box_w = int(stats[label, cv2.CC_STAT_WIDTH])
             box_h = int(stats[label, cv2.CC_STAT_HEIGHT])
             roundness = min(box_w, box_h) / max(box_w, box_h, 1)
-            stars.append(
-                StarSource(x=float(cx), y=float(cy), radius=radius, roundness=roundness)
-            )
+            stars.append(StarSource(x=float(cx), y=float(cy), radius=radius, roundness=roundness))
         return stars

@@ -247,9 +247,7 @@ class StorageService:
         directory = self.stack_cal_dir(stack_id, kind)
         if not directory.exists():
             return []
-        return sorted(
-            int(p.stem) for p in directory.glob("[0-9]" * _FRAME_INDEX_WIDTH + ".npy")
-        )
+        return sorted(int(p.stem) for p in directory.glob("[0-9]" * _FRAME_INDEX_WIDTH + ".npy"))
 
     def cal_frame_counts(self, stack_id: str) -> dict[str, int]:
         return {kind: len(self.cal_frame_indices(stack_id, kind)) for kind in _CALIBRATION_KINDS}

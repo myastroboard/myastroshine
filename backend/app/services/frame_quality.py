@@ -103,18 +103,18 @@ def score_frames(measures: Sequence[FrameMeasure], quality_filter: str) -> list[
     raw_weight = (
         np.clip((snr / med_snr) ** 2, *_WEIGHT_CLIP)
         * np.clip(stars / med_stars, *_WEIGHT_CLIP)
-        * (np.clip(med_fwhm / np.where(fwhm > 0, fwhm, med_fwhm or 1.0), *_WEIGHT_CLIP)
-           if med_fwhm > 0
-           else 1.0)
+        * (
+            np.clip(med_fwhm / np.where(fwhm > 0, fwhm, med_fwhm or 1.0), *_WEIGHT_CLIP)
+            if med_fwhm > 0
+            else 1.0
+        )
     )
     weight = raw_weight / max(float(np.median(raw_weight)), _TINY)
 
     # Score (0-100): SNR is the bulk of it, then star count, sharpness, roundness.
     snr_term = np.clip(snr / med_snr, 0.0, _SNR_CLIP) / _SNR_CLIP
     star_term = np.clip(stars / med_stars, 0.0, 1.5) / 1.5
-    fwhm_term = (
-        np.clip(2.0 - fwhm / med_fwhm, 0.0, 1.0) if med_fwhm > 0 else np.ones_like(fwhm)
-    )
+    fwhm_term = np.clip(2.0 - fwhm / med_fwhm, 0.0, 1.0) if med_fwhm > 0 else np.ones_like(fwhm)
     score = 100.0 * np.clip(
         0.45 * snr_term + 0.25 * star_term + 0.2 * fwhm_term + 0.1 * roundness, 0.0, 1.0
     )

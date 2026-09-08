@@ -129,9 +129,10 @@ def _crop_to_coverage(
     kept_height, kept_width = bottom - top, right - left
     trimmed = (height - kept_height) + (width - kept_width)
 
-    if kept_height < (1 - _MAX_CROP_FRACTION) * height or kept_width < (
-        1 - _MAX_CROP_FRACTION
-    ) * width:
+    if (
+        kept_height < (1 - _MAX_CROP_FRACTION) * height
+        or kept_width < (1 - _MAX_CROP_FRACTION) * width
+    ):
         return composite, None  # would remove too much - something is off, leave it
     if trimmed < _MIN_CROP_MARGIN:
         return composite, None  # nothing meaningful to trim
