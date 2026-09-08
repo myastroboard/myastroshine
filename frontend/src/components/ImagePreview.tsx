@@ -61,23 +61,37 @@ export function ImagePreview({
   const [splitPercent, setSplitPercent] = useState(50);
   const [dragging, setDragging] = useState(false);
   const [zoom, setZoom] = useState(1);
+  // Fallback when the caller doesn't know the dimensions (a stacked composite):
+  // read them off the processed image once it loads so the frame isn't forced
+  // to 16:9 - a portrait composite in a 16:9 box shrinks to a thin strip.
+  const [naturalRatio, setNaturalRatio] = useState<number | null>(null);
 
-  const moveSplitTo = useCallback((clientX: number) => {
-    const el = containerRef.current;
-    if (!el) {
-      return;
-    }
-    const rect = el.getBoundingClientRect();
-    const percent = ((clientX - rect.left) / rect.width) * 100;
-    setSplitPercent(Math.max(0, Math.min(100, percent)));
-  }, []);
+  // The images sit inside a `scale(zoom)` transform about the centre, so a
+  // point at container fraction `f` maps to image fraction `0.5 + (f - 0.5) / zoom`.
+  const toImageFraction = useCallback(
+    (fraction: number) => 0.5 + (fraction - 0.5) / zoom,
+    [zoom],
+  );
+
+  const moveSplitTo = useCallback(
+    (clientX: number) => {
+      const el = containerRef.current;
+      if (!el) {
+        return;
+      }
+      const rect = el.getBoundingClientRect();
+      const percent = toImageFraction((clientX - rect.left) / rect.width) * 100;
+      setSplitPercent(Math.max(0, Math.min(100, percent)));
+    },
+    [toImageFraction],
+  );
 
   function handlePointerDown(event: PointerEvent<HTMLDivElement>): void {
     if (pickingFocalPoint) {
       const rect = event.currentTarget.getBoundingClientRect();
       onFocalPointPick?.({
-        x: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)),
-        y: Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height)),
+        x: Math.max(0, Math.min(1, toImageFraction((event.clientX - rect.left) / rect.width))),
+        y: Math.max(0, Math.min(1, toImageFraction((event.clientY - rect.top) / rect.height))),
       });
       return;
     }
@@ -112,7 +126,9 @@ export function ImagePreview({
     ? baseAspectRatio(framing.dimensions, framing.geometry.rotateQuarters)
     : aspectRatio && aspectRatio > 0
       ? aspectRatio
-      : 16 / 9;
+      : naturalRatio && naturalRatio > 0
+        ? naturalRatio
+        : 16 / 9;
   // Portrait frames would blow past the viewport at full column width; cap their
   // width so the frame stays inside 70vh and centres instead of letterboxing.
   const maxWidth = ratio < 1 ? `calc(70vh * ${ratio})` : '100%';
@@ -149,6 +165,12 @@ export function ImagePreview({
                 alt={t('image_preview.processed_alt')}
                 draggable={false}
                 className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+                onLoad={(event) => {
+                  const { naturalWidth, naturalHeight } = event.currentTarget;
+                  if (naturalWidth > 0 && naturalHeight > 0) {
+                    setNaturalRatio(naturalWidth / naturalHeight);
+                  }
+                }}
               />
               {/* Same box as the processed image; clip-path reveals only the left split. */}
               <img
@@ -206,10 +228,12 @@ export function ImagePreview({
               </div>
             )}
 
-            {/* Divider + grab handle */}
+            {/* Divider + grab handle. The images are zoomed about the centre, so
+                the clip edge (splitPercent of the image) lands at this fraction
+                of the unscaled container. */}
             <div
               className="pointer-events-none absolute inset-y-0 z-10 w-px -translate-x-1/2 bg-white/70 shadow-[0_0_0_1px_rgb(0_0_0/0.35)]"
-              style={{ left: `${splitPercent}%` }}
+              style={{ left: `${50 + (splitPercent - 50) * zoom}%` }}
             >
               <span
                 className={`absolute left-1/2 top-1/2 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/25 bg-black/60 backdrop-blur-sm transition-transform ${

@@ -26,23 +26,27 @@ from app.constants import ABANDONED_STACK_SECONDS, STALE_STACK_WORK_SECONDS
 from app.db.models import StackRecord
 from app.exceptions import InvalidParameterError, ResourceNotFoundError
 from app.logging_config import get_logger
-from app.models import InitiateStackRequest, ProcessStackRequest, StackStatistics
+from app.models import (
+    InitiateStackRequest,
+    ProcessStackRequest,
+    StackParameters,
+    StackStatistics,
+)
 from app.services import progress
 from app.services.calibration import CALIBRATION_KINDS, CalibrationMasters, CalibrationService
 from app.services.frame_quality import FrameQuality
 from app.services.integration import IntegrationService, highpass_noise
 from app.services.job import JobService
-from app.services.post_stack import PostStackReport, apply_post_stack
+from app.services.post_stack import PostStackReport, apply_post_stack, render_stack_base
 from app.services.session import SessionService
 from app.services.storage import PreparedFrame, StorageService
 from app.utils.app_settings import get_app_settings
-from app.utils.linear_ingest import LinearFrame, ingest_frame, stretch_composite_bgr
+from app.utils.linear_ingest import LinearFrame, ingest_frame
 
 logger = get_logger(__name__)
 
 _MIN_FRAMES = 2
 _COLOR_NDIM = 3
-_FULL_RES = 100_000  # stretch_composite_bgr max_size: large enough to never downscale the composite
 _MAX_CALIBRATION_FRAMES = 256  # per kind - well above any real dark/flat/bias run
 
 
@@ -213,7 +217,13 @@ class StackingService:
         session = self.sessions.create_session(
             image_path="", original_filename=f"stack_{stack_id[:8]}.png"
         )
-        display = stretch_composite_bgr(composite, _FULL_RES)
+        # Seed the editor's before/after images with the default "Stack" render
+        # (background extraction + colour calibration + stretch); every later
+        # /process rebuilds from composite.npy, so this only has to match the
+        # StackParameters() defaults.
+        display = np.clip(render_stack_base(composite, StackParameters()) * 255.0, 0, 255).astype(
+            np.uint8
+        )
         self.storage.save_original(session.session_id, display)
         session.image_path = str(self.storage.original_path(session.session_id))
 
@@ -281,6 +291,9 @@ class StackingService:
         post_stack = None
         if record.post_process:
             self._emit(job_id, stack_id, "post-processing", 96)
+            # Only the wedge crop is baked into composite.npy; background
+            # extraction / colour calibration / stretch are non-destructive
+            # editor steps (see post_stack.render_stack_base).
             composite, post_stack = apply_post_stack(result.composite, result.coverage)
 
         measured = None
@@ -312,7 +325,7 @@ class StackingService:
             snr_improvement=round(math.sqrt(result.effective_frames), 2),
             measured_noise_reduction=measured,
             calibrated=calibrated,
-            post_processed=post_stack is not None,
+            post_processed=post_stack is not None and post_stack.cropped is not None,
         )
         return composite, stats
 
@@ -447,11 +460,7 @@ def _background_noise(pixels: np.ndarray) -> float:
 def _post_stack_dict(report: PostStackReport | None) -> dict[str, Any] | None:
     if report is None:
         return None
-    return {
-        "cropped": list(report.cropped) if report.cropped else None,
-        "background_gradient": report.background_gradient,
-        "channel_gains": list(report.channel_gains),
-    }
+    return {"cropped": list(report.cropped) if report.cropped else None}
 
 
 def _quality_dict(quality: FrameQuality) -> dict[str, Any]:

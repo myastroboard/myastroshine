@@ -34,9 +34,13 @@ test('collect, upload, review and stack three frames, then enhance the composite
 
   await page.getByRole('button', { name: 'Enhance composite' }).click();
 
-  // Handoff: back to the single-image editor on the composite session.
+  // Handoff: back to the single-image editor on the composite session, opened on
+  // the composite-only "Stack" step with the linear post-stack controls.
   const rail = page.locator('nav[aria-label="Editing workflow"]');
   await expect(rail).toBeVisible();
+  await expect(rail.getByRole('button', { name: 'Stack' })).toBeVisible();
+  await expect(page.getByRole('slider', { name: 'Stretch' })).toBeVisible();
+
   await rail.getByRole('button', { name: 'Light' }).click();
   await expect(page.getByRole('slider', { name: 'Contrast' })).toBeVisible();
 });

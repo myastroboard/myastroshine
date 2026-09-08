@@ -99,16 +99,28 @@ def _stretch_params(
     return float(low), float(high), black_point, balance
 
 
-def _apply_stretch(data: np.ndarray, params: tuple[float, float, float, float]) -> np.ndarray:
-    """Apply a :func:`_stretch_params` result to a plane -> uint8."""
+def _stretch_plane_f32(data: np.ndarray, params: tuple[float, float, float, float]) -> np.ndarray:
+    """Apply a :func:`_stretch_params` result to a plane -> ``float32`` in ``[0, 1]``.
+
+    The linear core of :func:`_apply_stretch`, kept separate so the composite
+    pre-stage (:func:`stretch_composite_linear`) can stay in float instead of
+    quantising to uint8 and back.
+    """
     low, high, black_point, balance = params
     # nan_to_num after the clip: blank/masked pixels (FITS BLANK, the NaN edges
     # of a registered stack, dead pixels) map to black rather than poisoning the
-    # result. (clip already bounds +/-inf.)
-    normalized = np.nan_to_num(np.clip((data.astype(np.float64) - low) / (high - low), 0, 1))
+    # result. (clip already bounds +/-inf.) float32 is plenty for a display
+    # stretch and ~2x faster than float64 over a full-res composite.
+    normalized = np.nan_to_num(np.clip((data.astype(np.float32) - low) / (high - low), 0, 1))
     clipped = np.clip((normalized - black_point) / max(1e-6, 1.0 - black_point), 0, 1)
     stretched = _midtone_transfer(clipped, balance)
-    return np.clip(stretched * 255.0, 0, 255).astype(np.uint8)
+    result: np.ndarray = np.clip(stretched, 0.0, 1.0).astype(np.float32)
+    return result
+
+
+def _apply_stretch(data: np.ndarray, params: tuple[float, float, float, float]) -> np.ndarray:
+    """Apply a :func:`_stretch_params` result to a plane -> uint8."""
+    return np.clip(_stretch_plane_f32(data, params) * 255.0, 0, 255).astype(np.uint8)
 
 
 def _auto_stretch_to_uint8(data: np.ndarray) -> np.ndarray:
@@ -117,6 +129,49 @@ def _auto_stretch_to_uint8(data: np.ndarray) -> np.ndarray:
     if params is None:
         return np.zeros(data.shape, dtype=np.uint8)
     return _apply_stretch(data, params)
+
+
+# -- composite stretch ----------------------------------------------------------
+# A stacked composite is colour, linear and very faint; unlike the per-plane
+# _auto_stretch_to_uint8 (frame thumbnails, mono FITS) it needs the colour kept:
+# neutralise the sky background (so read noise is grey, not rainbow speckle) then
+# apply ONE midtone stretch, derived from the luminance, to all three channels.
+
+_COMPOSITE_BG_PERCENTILE = 25.0
+_COMPOSITE_TARGET_BACKGROUND = 0.10  # deep stack: keep the noise floor dark, not lifted to 0.25
+_COMPOSITE_SHADOW_CLIP = 3.2
+_LUMA_RGB = np.array([0.2126, 0.7152, 0.0722], dtype=np.float32)
+
+
+def stretch_composite_linear(
+    composite: np.ndarray,
+    target_background: float = _COMPOSITE_TARGET_BACKGROUND,
+    shadow_clip: float = _COMPOSITE_SHADOW_CLIP,
+) -> np.ndarray:
+    """Neutralise + one shared midtone stretch of a linear composite -> BGR ``float32`` ``[0, 1]``.
+
+    Input is an ``(H, W)`` or ``(H, W, 3)`` **RGB-plane** linear array (the
+    stacking composite's channel order); output is full-resolution BGR ready for
+    the enhancement pipeline. ``target_background`` sets how hard the stretch
+    lifts the sky (the editor's "Stretch" control maps onto it).
+    """
+    rgb = composite.astype(np.float32)
+    if rgb.ndim == _MONO_NDIM:
+        rgb = np.repeat(rgb[:, :, np.newaxis], _RGB_PLANE_COUNT, axis=2)
+
+    finite = np.isfinite(rgb).all(axis=2)
+    if finite.any():
+        background = np.array(
+            [np.percentile(rgb[..., c][finite], _COMPOSITE_BG_PERCENTILE) for c in range(3)],
+            dtype=np.float32,
+        )
+        rgb = np.clip(np.nan_to_num(rgb - background), 0.0, None)
+
+    params = _stretch_params(rgb @ _LUMA_RGB, target_background, shadow_clip)
+    if params is None:
+        return np.zeros((*rgb.shape[:2], 3), dtype=np.float32)
+    channels = [_stretch_plane_f32(rgb[..., c], params) for c in range(3)]
+    return cv2.merge([channels[2], channels[1], channels[0]])  # RGB planes -> BGR
 
 
 def _decode_fits(data: bytes) -> np.ndarray:

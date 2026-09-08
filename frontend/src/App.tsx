@@ -82,7 +82,7 @@ export default function App() {
   }
 
   function handleEnhanceComposite(sessionId: string): void {
-    setSession({ sessionId });
+    setSession({ sessionId, isStack: true });
     setMode('single');
     setStackWorking(false);
   }

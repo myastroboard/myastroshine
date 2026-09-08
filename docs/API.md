@@ -37,7 +37,9 @@ Per IP, on `/upload`, `/process/{id}`, `/presets/{id}/apply/{session_id}`,
   household IP does).
 - **Concurrent processing jobs** (`max_concurrent_jobs_per_ip`, default 5):
   checked against non-terminal rows in the `jobs` table, so it holds under
-  both `PROCESSING_MODE=sync` and `queue`.
+  both `PROCESSING_MODE=sync` and `queue`. A new `/process` for a session first
+  retires (`superseded`) any still-pending job for that same session, so a burst
+  of slider edits can't exhaust this budget against itself.
 
 Both settings, plus a `rate_limit_enabled` switch, are editable from
 **Settings -> Advanced** (`app_settings.json`, see docs/DEPLOYMENT.md) - no
@@ -158,6 +160,17 @@ straighten -> crop; crop coordinates are fractions of the rotated/flipped image)
 `crop_x + crop_w` and `crop_y + crop_h` must not exceed 1. A crop or a quarter
 turn changes the result's dimensions.
 
+`stack` is a nested object, used **only** for a stacked-composite session (the
+editor's "Stack" step). It runs as a non-destructive pre-stage on the 32-bit
+linear composite, ahead of every other stage; it is ignored for an ordinary
+image upload.
+
+| Field | Min | Max | Default | Type |
+|-------|-----|-----|---------|------|
+| stretch | 0.0 | 1.0 | 0.5 | float (auto-stretch intensity: 0 subtle, 1 aggressive) |
+| background_extraction | 0 | 100 | 100 | int (how much of the fitted sky gradient to remove) |
+| color_calibration | - | - | true | bool (neutralise the sky, balance the channels) |
+
 `curve_points` is a tone curve: a list of `{x, y}` 8-bit input/output level
 pairs (both 0-255). `[]` (the default) means no curve. Otherwise: at least 2
 points, the first at `x=0` and the last at `x=255`, and `x` strictly
@@ -198,15 +211,18 @@ relays live events from Redis until a terminal status arrives, then closes.
 }
 ```
 
-`status`: `queued`, `processing`, `completed`, `failed` (or `unknown` if the
-`job_id` is not found). Image steps: `geometry`, `color_correction`,
+`status`: `queued`, `processing`, `completed`, `failed`, `superseded` (or
+`unknown` if the `job_id` is not found). `superseded` means a newer `/process`
+for the same session arrived while this job was still queued - it will not run
+and its result should be ignored. Image steps: `geometry`, `color_correction`,
 `vignette_correction`, `gradient_reduction`, `dehaze`, `contrast`, `exposure`,
 `highlights_shadows`, `whites_blacks`, `tone_curve`, `channel_curves`,
 `saturation`, `vibrance`, `clarity`, `denoise`, `chroma_denoise`,
 `star_reduction`, `sharpness`, `rendering`, `done`. With `star_removal` set, the
 extra steps `star_removal` (after `dehaze`) and `star_recombine` (last) bracket
-the creative stages. Stack steps: `registration`, `background_normalization`,
-`cosmic_ray_rejection`, `combination`, `done`.
+the creative stages. For a stacked-composite session a `stack_base` step runs
+first (the linear `stack` pre-stage). Stack steps: `registration`,
+`background_normalization`, `cosmic_ray_rejection`, `combination`, `done`.
 
 In the default `PROCESSING_MODE=sync`, the job is already `completed` when
 `/process` returns; the WebSocket just replays that final state.

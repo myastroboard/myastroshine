@@ -40,11 +40,10 @@ from app.logging_config import get_logger
 from app.utils.image_utils import (
     FITS_FORMATS,
     RAW_FORMATS,
-    _apply_stretch,
     _auto_stretch_to_uint8,
-    _stretch_params,
     extension_of,
     make_preview,
+    stretch_composite_linear,
 )
 
 logger = get_logger(__name__)
@@ -304,43 +303,18 @@ def to_display_bgr(frame: LinearFrame, max_size: int = 256) -> np.ndarray:
     return cv2.merge([blue, green, red])
 
 
-_COMPOSITE_BG_PERCENTILE = 25.0
-_COMPOSITE_TARGET_BACKGROUND = 0.10  # deep stack: keep the noise floor dark, not lifted to 0.25
-_COMPOSITE_SHADOW_CLIP = 3.2
-_LUMA_RGB = np.array([0.2126, 0.7152, 0.0722], dtype=np.float32)
-
-
 def stretch_composite_bgr(composite: np.ndarray, max_size: int = 4096) -> np.ndarray:
     """Auto-stretch a linear stacked composite to a display BGR ``uint8`` frame.
 
-    Unlike :func:`to_display_bgr` (per-channel, for frame thumbnails) this keeps
-    the colour: it neutralises the sky background (subtract each channel's low
-    percentile so the background is grey, not tinted) then applies **one** MTF
-    stretch - derived from the luminance - to all three channels, so the deep
-    stack's faint signal comes up without the per-channel imbalance turning read
-    noise into rainbow speckle. A real background model / colour calibration is
-    still a post-stack editing step; this is just a sane default preview.
+    A thin wrapper over :func:`app.utils.image_utils.stretch_composite_linear`
+    (downscale first, then the neutralise + shared-midtone stretch, then quantise)
+    for callers that just want a preview JPEG. The editor drives the same linear
+    core through :func:`app.services.post_stack.render_stack_base` with a tunable
+    target background instead.
     """
-    rgb = composite.astype(np.float32)
-    if rgb.ndim == _MONO_NDIM:
-        rgb = np.repeat(rgb[:, :, np.newaxis], _RGB_PLANE_COUNT, axis=2)
-    rgb = make_preview(rgb, max_size)
-
-    finite = np.isfinite(rgb).all(axis=2)
-    if finite.any():
-        background = np.array(
-            [np.percentile(rgb[..., c][finite], _COMPOSITE_BG_PERCENTILE) for c in range(3)],
-            dtype=np.float32,
-        )
-        rgb = np.clip(np.nan_to_num(rgb - background), 0.0, None)
-
-    params = _stretch_params(
-        rgb @ _LUMA_RGB, _COMPOSITE_TARGET_BACKGROUND, _COMPOSITE_SHADOW_CLIP
-    )
-    if params is None:
-        return np.zeros((*rgb.shape[:2], 3), dtype=np.uint8)
-    channels = [_apply_stretch(rgb[..., c], params) for c in range(3)]
-    return cv2.merge([channels[2], channels[1], channels[0]])  # RGB planes -> BGR
+    small = make_preview(composite.astype(np.float32), max_size)
+    stretched = stretch_composite_linear(small)
+    return np.clip(stretched * 255.0, 0, 255).astype(np.uint8)
 
 
 def superpixel_rgb(frame: LinearFrame) -> LinearFrame:

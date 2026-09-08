@@ -24,6 +24,7 @@ function makeProps(overrides: Partial<EditorInspectorProps> = {}): EditorInspect
       onPresetDelete: vi.fn(),
       onResetAll: vi.fn(),
     },
+    stack: { available: false, onParameterChange: vi.fn(), onReset: vi.fn() },
     framing: {
       available: true,
       dimensions: { width: 4000, height: 3000 },
@@ -142,6 +143,43 @@ describe('EditorInspector', () => {
       'starSensitivity',
       'starMaxSize',
     ]);
+  });
+
+  it('shows the linear post-stack controls on the stack step', () => {
+    const onParameterChange = vi.fn();
+    render(
+      <EditorInspector
+        {...makeProps({
+          activeStep: 'stack',
+          stack: { available: true, onParameterChange, onReset: vi.fn() },
+        })}
+      />,
+    );
+
+    expect(screen.getByLabelText('Stretch')).toBeInTheDocument();
+    expect(screen.getByLabelText('Background extraction')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /Colour calibration/i }));
+    expect(onParameterChange).toHaveBeenCalledWith('colorCalibration', false);
+  });
+
+  it('routes the header Reset on the stack step to its own reset', () => {
+    const onReset = vi.fn();
+    render(
+      <EditorInspector
+        {...makeProps({
+          activeStep: 'stack',
+          parameters: {
+            ...DEFAULT_PARAMETERS,
+            stack: { ...DEFAULT_PARAMETERS.stack, stretch: 0.9 },
+          },
+          stack: { available: true, onParameterChange: vi.fn(), onReset },
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
+    expect(onReset).toHaveBeenCalledTimes(1);
   });
 
   it('opens the Depth Shift viewer from the depth step', () => {

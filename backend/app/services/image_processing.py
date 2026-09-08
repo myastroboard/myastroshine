@@ -1,12 +1,19 @@
 """ImageProcessingService - the single-image enhancement pipeline.
 
 Algorithm details and the recommended operation order live in docs/ALGORITHMS.md.
-Every method takes and returns a BGR ``uint8`` numpy array. Each is an identity
-transform when its parameter sits at the default value.
+Every stage takes and returns a **BGR float32** array in ``[0, 1]``;
+:meth:`ImageProcessingService.apply_parameters` converts the ``uint8`` input to
+float once on the way in and back once on the way out, so a value is quantised
+only at the edges of the pipeline instead of after every stage - this matters
+for a stacked composite pushed hard through the tone chain. Stages that are
+genuinely uint8-native (LUT curves, HSV saturation, bilateral denoise, the star
+detector) keep a short local round-trip. Each stage is an identity transform
+when its parameter sits at the default.
 """
 
 from __future__ import annotations
 
+import functools
 import math
 from collections.abc import Callable
 from typing import cast
@@ -16,13 +23,13 @@ import numpy as np
 
 from app.logging_config import get_logger
 from app.models import CurvePoint, GeometryParameters, ProcessingParameters
+from app.services.post_stack import render_stack_base
 from app.services.star_detection import StarDetectionService
 from app.services.starless import StarlessService
 from app.utils.math_utils import (
     curve_points_to_lut,
     kelvin_to_rgb_gain,
     tint_to_rgb_gain,
-    to_uint8,
 )
 
 StepCallback = Callable[[str, int], None]
@@ -45,6 +52,38 @@ def _unchanged(value: float, default: float) -> bool:
     return abs(value - default) < _EPS
 
 
+def _to_u8(image: np.ndarray) -> np.ndarray:
+    """BGR float32 ``[0, 1]`` -> BGR uint8, for a stage that is uint8-native."""
+    packed: np.ndarray = np.clip(np.rint(image * 255.0), 0, 255).astype(np.uint8)
+    return packed
+
+
+def _to_f32(image: np.ndarray) -> np.ndarray:
+    """BGR uint8 -> BGR float32 ``[0, 1]``."""
+    return image.astype(np.float32) / 255.0
+
+
+def _dtype_flexible[M: Callable[..., np.ndarray]](method: M) -> M:
+    """Let a float32-``[0, 1]`` stage also accept (and return) a uint8 BGR frame.
+
+    :meth:`ImageProcessingService.apply_parameters` drives the whole pipeline in
+    float32 and never triggers the conversion. Direct callers - the upload
+    geometry pass, the per-stage tests - can still hand in a plain uint8 image
+    and get a uint8 image back, with a single round-trip at the boundary.
+    """
+
+    @functools.wraps(method)
+    def wrapper(
+        self: ImageProcessingService, image: np.ndarray, *args: object, **kwargs: object
+    ) -> np.ndarray:
+        if image.dtype == np.uint8:
+            return _to_u8(method(self, _to_f32(image), *args, **kwargs))
+        result: np.ndarray = method(self, image, *args, **kwargs)
+        return result
+
+    return cast("M", wrapper)
+
+
 class ImageProcessingService:
     """Applies enhancement parameters to an image."""
 
@@ -52,6 +91,7 @@ class ImageProcessingService:
         self._star_detector = StarDetectionService()
         self._starless = StarlessService(self._star_detector)
 
+    @_dtype_flexible
     def apply_geometry(self, image: np.ndarray, geom: GeometryParameters) -> np.ndarray:
         """Rotate / flip / straighten / crop the image before enhancement.
 
@@ -96,6 +136,7 @@ class ImageProcessingService:
 
         return result
 
+    @_dtype_flexible
     def apply_white_balance(self, image: np.ndarray, temperature: int, tint: int) -> np.ndarray:
         """Adjust colour temperature (2000-8000K, 6500 neutral) and tint (-50..50)."""
         if temperature == _NEUTRAL_KELVIN and tint == 0:
@@ -104,8 +145,9 @@ class ImageProcessingService:
         r_tint, g_tint, b_tint = tint_to_rgb_gain(tint)
         # image is BGR, so order the gains B, G, R.
         gains = np.array([b_gain * b_tint, g_gain * g_tint, r_gain * r_tint], dtype=np.float32)
-        return to_uint8(image.astype(np.float32) * gains)
+        return np.clip(image * gains, 0.0, 1.0)
 
+    @_dtype_flexible
     def apply_vignette_correction(self, image: np.ndarray, amount: int) -> np.ndarray:
         """Brighten toward the corners to counteract lens vignetting (0-100).
 
@@ -135,8 +177,9 @@ class ImageProcessingService:
             if scale < 1.0
             else gain_small
         )
-        return to_uint8(image.astype(np.float32) * gain[:, :, np.newaxis])
+        return cast("np.ndarray", np.clip(image * gain[:, :, np.newaxis], 0.0, 1.0))
 
+    @_dtype_flexible
     def apply_gradient_reduction(self, image: np.ndarray, amount: int) -> np.ndarray:
         """Flatten smooth background gradients - light pollution, sky glow (0-100).
 
@@ -168,8 +211,9 @@ class ImageProcessingService:
         background_small = cv2.GaussianBlur(small, (0, 0), sigmaX=sigma).astype(np.float32)
         correction_small = (background_small - background_small.mean()) * strength
         correction = cv2.resize(correction_small, (width, height), interpolation=cv2.INTER_LINEAR)
-        return to_uint8(image.astype(np.float32) - correction)
+        return np.clip(image - correction, 0.0, 1.0)
 
+    @_dtype_flexible
     def apply_dehaze(self, image: np.ndarray, amount: int) -> np.ndarray:
         """Dark-channel-prior haze removal (0-100).
 
@@ -192,14 +236,13 @@ class ImageProcessingService:
         if amount <= 0:
             return image
         strength = amount / 100.0
-        img = image.astype(np.float32) / 255.0
+        img = image
         height, width = image.shape[:2]
         scale = _DEHAZE_ESTIMATE_MAX_SIZE / max(height, width)
         small = (
             cv2.resize(
                 image, (round(width * scale), round(height * scale)), interpolation=cv2.INTER_AREA
-            ).astype(np.float32)
-            / 255.0
+            )
             if scale < 1.0
             else img
         )
@@ -222,38 +265,39 @@ class ImageProcessingService:
         )[:, :, np.newaxis]
 
         recovered = (img - atmospheric_light) / transmission + atmospheric_light
-        return to_uint8(np.clip(recovered, 0.0, 1.0) * 255.0)
+        return cast("np.ndarray", np.clip(recovered, 0.0, 1.0))
 
+    @_dtype_flexible
     def apply_contrast(self, image: np.ndarray, contrast: float) -> np.ndarray:
         """Linear stretch about the image mean, with a gentle gamma (0.5..3.0)."""
         if _unchanged(contrast, 1.0):
             return image
-        img = image.astype(np.float32) / 255.0
-        mean = float(img.mean())
-        stretched = (img - mean) * contrast + mean
+        mean = float(image.mean())
+        stretched = (image - mean) * contrast + mean
         gamma = 1.0 / max(1.0 + (contrast - 1.0) * 0.1, 0.5)
-        stretched = np.power(np.clip(stretched, 0.0, 1.0), gamma)
-        return to_uint8(stretched * 255.0)
+        return np.power(np.clip(stretched, 0.0, 1.0), gamma)
 
+    @_dtype_flexible
     def apply_exposure(self, image: np.ndarray, exposure: float) -> np.ndarray:
-        """Offset overall luminance (-1.0..1.0), scaled to +/- 50 levels."""
+        """Offset overall luminance (-1.0..1.0), scaled to +/- 50 levels of 255."""
         if _unchanged(exposure, 0.0):
             return image
-        return to_uint8(image.astype(np.float32) + exposure * 50.0)
+        return np.clip(image + exposure * (50.0 / 255.0), 0.0, 1.0)
 
+    @_dtype_flexible
     def apply_highlights_shadows(
         self, image: np.ndarray, highlights: float, shadows: float
     ) -> np.ndarray:
         """Recover bright / dark detail via luminance-masked tone curves (-1.0..1.0)."""
         if _unchanged(highlights, 0.0) and _unchanged(shadows, 0.0):
             return image
-        img = image.astype(np.float32) / 255.0
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY).astype(np.float32) / 255.0
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         highlight_mask = np.square(gray)[:, :, np.newaxis]
         shadow_mask = np.square(1.0 - gray)[:, :, np.newaxis]
-        img = img + highlight_mask * highlights * 0.3 + shadow_mask * shadows * 0.3
-        return to_uint8(img * 255.0)
+        img = image + highlight_mask * highlights * 0.3 + shadow_mask * shadows * 0.3
+        return np.clip(img, 0.0, 1.0)
 
+    @_dtype_flexible
     def apply_whites_blacks(self, image: np.ndarray, whites: float, blacks: float) -> np.ndarray:
         """Push the white / black clipping points (-1.0..1.0).
 
@@ -265,15 +309,15 @@ class ImageProcessingService:
         """
         if _unchanged(whites, 0.0) and _unchanged(blacks, 0.0):
             return image
-        img = image.astype(np.float32) / 255.0
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY).astype(np.float32) / 255.0
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         # np.square(np.square(x)) (x**4 via repeated squaring) is a fast path;
         # np.power(x, 4) is not - measurably so at 24MP.
         white_mask = np.square(np.square(gray))[:, :, np.newaxis]
         black_mask = np.square(np.square(1.0 - gray))[:, :, np.newaxis]
-        img = img + white_mask * whites * 0.4 + black_mask * blacks * 0.4
-        return to_uint8(img * 255.0)
+        img = image + white_mask * whites * 0.4 + black_mask * blacks * 0.4
+        return np.clip(img, 0.0, 1.0)
 
+    @_dtype_flexible
     def apply_tone_curve(self, image: np.ndarray, curve_points: list[CurvePoint]) -> np.ndarray:
         """Apply a user-drawn tone curve as a 256-entry LUT, identical on each channel.
 
@@ -284,8 +328,9 @@ class ImageProcessingService:
         if not curve_points:
             return image
         lut = curve_points_to_lut([(point.x, point.y) for point in curve_points])
-        return cast("np.ndarray", cv2.LUT(image, lut))
+        return _to_f32(cv2.LUT(_to_u8(image), lut))
 
+    @_dtype_flexible
     def apply_channel_curves(
         self,
         image: np.ndarray,
@@ -307,33 +352,37 @@ class ImageProcessingService:
         """
         if not (red_curve_points or green_curve_points or blue_curve_points):
             return image
-        blue, green, red = cv2.split(image)
+        blue, green, red = cv2.split(_to_u8(image))
         if blue_curve_points:
             blue = cv2.LUT(blue, curve_points_to_lut([(p.x, p.y) for p in blue_curve_points]))
         if green_curve_points:
             green = cv2.LUT(green, curve_points_to_lut([(p.x, p.y) for p in green_curve_points]))
         if red_curve_points:
             red = cv2.LUT(red, curve_points_to_lut([(p.x, p.y) for p in red_curve_points]))
-        return cast("np.ndarray", cv2.merge([blue, green, red]))
+        return _to_f32(cv2.merge([blue, green, red]))
 
+    @_dtype_flexible
     def apply_saturation(self, image: np.ndarray, saturation: float) -> np.ndarray:
         """Scale the HSV saturation channel (0.0..2.0)."""
         if _unchanged(saturation, 1.0):
             return image
-        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV).astype(np.float32)
+        u8 = _to_u8(image)
+        hsv = cv2.cvtColor(u8, cv2.COLOR_BGR2HSV).astype(np.float32)
         hsv[:, :, 1] = np.clip(hsv[:, :, 1] * saturation, 0, 255)
-        return cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
+        return _to_f32(cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR))
 
+    @_dtype_flexible
     def apply_vibrance(self, image: np.ndarray, vibrance: float) -> np.ndarray:
         """Boost saturation weighted towards less-saturated pixels (0.0..2.0)."""
         if _unchanged(vibrance, 1.0):
             return image
-        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV).astype(np.float32)
+        hsv = cv2.cvtColor(_to_u8(image), cv2.COLOR_BGR2HSV).astype(np.float32)
         sat = hsv[:, :, 1] / 255.0
         boost = (1.0 - sat) * (vibrance - 1.0)
         hsv[:, :, 1] = np.clip(hsv[:, :, 1] * (1.0 + boost), 0, 255)
-        return cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
+        return _to_f32(cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR))
 
+    @_dtype_flexible
     def apply_clarity(self, image: np.ndarray, clarity: float) -> np.ndarray:
         """Local contrast via unsharp mask; negative softens (-1.0..1.0)."""
         if _unchanged(clarity, 0.0):
@@ -341,10 +390,13 @@ class ImageProcessingService:
         blurred = cv2.GaussianBlur(image, (0, 0), sigmaX=9)
         if clarity > 0:
             strength = clarity * 1.5
-            return cv2.addWeighted(image, 1.0 + strength, blurred, -strength, 0)
-        strength = abs(clarity) * 0.5
-        return cv2.addWeighted(image, 1.0 - strength, blurred, strength, 0)
+            out = cv2.addWeighted(image, 1.0 + strength, blurred, -strength, 0)
+        else:
+            strength = abs(clarity) * 0.5
+            out = cv2.addWeighted(image, 1.0 - strength, blurred, strength, 0)
+        return np.clip(out, 0.0, 1.0)
 
+    @_dtype_flexible
     def apply_denoise(self, image: np.ndarray, denoise: int) -> np.ndarray:
         """Edge-preserving bilateral filter (0 = off .. 100 = aggressive)."""
         if denoise <= 0:
@@ -352,12 +404,13 @@ class ImageProcessingService:
         strength = denoise / 100.0
         diameter = int(5 + strength * 15)
         sigma = 75.0 + strength * 75.0
-        out = cv2.bilateralFilter(image, diameter, sigma, sigma)
+        out = cv2.bilateralFilter(_to_u8(image), diameter, sigma, sigma)
         if denoise > _DENOISE_MORPH_THRESHOLD:
             kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
             out = cv2.morphologyEx(out, cv2.MORPH_CLOSE, kernel)
-        return out
+        return _to_f32(out)
 
+    @_dtype_flexible
     def apply_chroma_denoise(self, image: np.ndarray, amount: int) -> np.ndarray:
         """Bilateral-filter just the colour (Cr/Cb) channels, leaving luma untouched (0-100).
 
@@ -372,11 +425,12 @@ class ImageProcessingService:
         strength = amount / 100.0
         diameter = int(5 + strength * 15)
         sigma = 75.0 + strength * 75.0
-        y, cr, cb = cv2.split(cv2.cvtColor(image, cv2.COLOR_BGR2YCrCb))
+        y, cr, cb = cv2.split(cv2.cvtColor(_to_u8(image), cv2.COLOR_BGR2YCrCb))
         cr = cv2.bilateralFilter(cr, diameter, sigma, sigma)
         cb = cv2.bilateralFilter(cb, diameter, sigma, sigma)
-        return cast("np.ndarray", cv2.cvtColor(cv2.merge([y, cr, cb]), cv2.COLOR_YCrCb2BGR))
+        return _to_f32(cv2.cvtColor(cv2.merge([y, cr, cb]), cv2.COLOR_YCrCb2BGR))
 
+    @_dtype_flexible
     def apply_star_reduction(
         self, image: np.ndarray, amount: int, sensitivity: int = 50, max_size: int = 30
     ) -> np.ndarray:
@@ -404,7 +458,8 @@ class ImageProcessingService:
             return image
         strength = amount / 100.0
 
-        stars = self._star_detector.detect(image, sensitivity, max_size)
+        u8 = _to_u8(image)
+        stars = self._star_detector.detect(u8, sensitivity, max_size)
         if not stars:
             return image
 
@@ -425,23 +480,24 @@ class ImageProcessingService:
         eroded = cv2.erode(image, small, iterations=1 + round(strength * 3)).astype(np.float32)
         eroded *= 1.0 - 0.6 * strength
 
-        local_background = self._star_detector.local_background(image, max_size).astype(np.float32)
+        local_background = _to_f32(self._star_detector.local_background(u8, max_size))
         reduced = np.maximum(eroded, local_background)
 
-        blended = image.astype(np.float32) * (1.0 - weight) + reduced * weight
-        return to_uint8(blended)
+        blended = image * (1.0 - weight) + reduced * weight
+        return cast("np.ndarray", np.clip(blended, 0.0, 1.0))
 
+    @_dtype_flexible
     def apply_sharpness(self, image: np.ndarray, sharpness: float) -> np.ndarray:
         """Blur below 1.0, Laplacian-kernel sharpen above (0.0..2.0)."""
         if _unchanged(sharpness, 1.0):
             return image
         if sharpness < 1.0:
             radius = round((1.0 - sharpness) * 8) * 2 + 1
-            return cv2.GaussianBlur(image, (radius, radius), 0)
+            return cast("np.ndarray", cv2.GaussianBlur(image, (radius, radius), 0))
         kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]], dtype=np.float32)
         sharp = cv2.filter2D(image, -1, kernel)
         strength = (sharpness - 1.0) * 0.5
-        return cv2.addWeighted(image, 1.0 - strength, sharp, strength, 0)
+        return np.clip(cv2.addWeighted(image, 1.0 - strength, sharp, strength, 0), 0.0, 1.0)
 
     def _background_stages(
         self, params: ProcessingParameters
@@ -507,6 +563,8 @@ class ImageProcessingService:
         image: np.ndarray,
         params: ProcessingParameters,
         on_step: StepCallback | None = None,
+        *,
+        linear_composite: bool = False,
     ) -> np.ndarray:
         """Run the full pipeline in the recommended order.
 
@@ -518,24 +576,38 @@ class ImageProcessingService:
         creative stage runs on the starless image, and ``star_recombine``
         screen-blends the removed star flux back at the end. ``star_removal = 0``
         (the default) is byte-identical to the flat pipeline.
+
+        ``linear_composite``: ``image`` is a linear stacked composite (RGB
+        planes, ``float32``), not a uint8 upload - prepend the ``stack_base``
+        pre-stage (background extraction, colour calibration and the tunable
+        stretch, all from ``params.stack``) which turns it into the BGR
+        ``float32`` the rest of the pipeline expects.
         """
         background = self._background_stages(params)
         creative = self._creative_stages(params)
+        if linear_composite:
+            background = [
+                ("stack_base", lambda r: render_stack_base(r, params.stack)),
+                *background,
+            ]
 
         if params.star_removal <= 0:
             stages = background + creative
         else:
+            # StarlessService is uint8-native (mask units, the detector); round-trip it.
             stars_layer: list[np.ndarray] = []
 
             def split(r: np.ndarray) -> np.ndarray:
                 starless, removed = self._starless.split(
-                    r, params.star_sensitivity, params.star_max_size, params.star_removal
+                    _to_u8(r), params.star_sensitivity, params.star_max_size, params.star_removal
                 )
                 stars_layer.append(removed)
-                return starless
+                return _to_f32(starless)
 
             def recombine(r: np.ndarray) -> np.ndarray:
-                return self._starless.recombine(r, stars_layer[0], params.star_recombine)
+                return _to_f32(
+                    self._starless.recombine(_to_u8(r), stars_layer[0], params.star_recombine)
+                )
 
             stages = [
                 *background,
@@ -544,9 +616,9 @@ class ImageProcessingService:
                 ("star_recombine", recombine),
             ]
 
-        result = image
+        result = _to_f32(image) if image.dtype == np.uint8 else image.astype(np.float32)
         for index, (name, stage) in enumerate(stages):
             if on_step is not None:
                 on_step(name, round(10 + index * 80 / len(stages)))
             result = stage(result)
-        return result
+        return _to_u8(result)

@@ -552,41 +552,59 @@ to it shrinks the common footprint and off-centres the target. `_pick_reference`
 picks the frame nearest the **session's temporal middle** (which halves the
 field rotation to either end) with a typical star count and good sharpness.
 
-### Post-stack cleanup (`app/services/post_stack.py`)
+### Post-stack: wedge crop, then the non-destructive editor pre-stage (`app/services/post_stack.py`)
 
-With `post_process` on (the default), `apply_post_stack` cleans the linear
-composite before it becomes an editable session:
+The post-stack work splits by *when* it runs.
 
-1. **Crop the rotation wedge** - `_combine` emits a per-pixel frame-coverage
-   map; rows/columns where most pixels were reached by fewer than half the
-   frames are trimmed (capped at 45% of either axis).
-2. **Background extraction** - each channel's sky is sampled on a 22x22 tile
-   lattice (an 8th-percentile per tile, the sky between the stars); a degree-2
-   polynomial is fitted, tiles whose residual is over 1.8 robust sigma (plus
-   their neighbours) are dropped as objects and it is refitted (3 iterations);
-   the surface is subtracted and the image flattened toward the darkest real
-   sky. Degree 2 by design - a paraboloid can only be a smooth gradient, never
-   a nebula.
-3. **Colour calibration** - the per-channel sky level is equalised (neutral grey
-   background), then the channels are scaled so their means match (gains clamped
-   to 0.5-2x).
+**`apply_post_stack`** runs once, in `StackingService`, and only **crops the
+rotation wedge** - `_combine` emits a per-pixel frame-coverage map, and
+rows/columns where most pixels were reached by fewer than half the frames are
+trimmed (capped at 45% of either axis). That crop defines the canvas, so it is
+baked into the saved `composite.npy` (still linear 32-bit, otherwise untouched).
 
-Everything stays linear; `composite.npy` holds the cleaned 32-bit stack. A full
-stretch, denoise and photometric calibration are still the editor's job.
+**`render_stack_base`** runs on every editor render (the "Stack" step, driven by
+`ProcessingParameters.stack`), turning the linear composite into the BGR image
+the enhancement pipeline works on:
 
-The composite is saved as 32-bit `composite.npy` plus a colour-preserving
-auto-stretched 8-bit session for the editor (`stretch_composite_bgr`: sky
-neutralised, one shared MTF from the luminance). `quality_report` records the
-reference frame, the mean registration RMS, the rejected-sample count, whether
-calibration / post-processing ran, and the `frames` table (per-frame metrics +
+1. **Background extraction** (`background_extraction`, 0-100) - each channel's
+   sky is sampled on a 22x22 tile lattice (an 8th-percentile per tile, the sky
+   between the stars) **on a copy downscaled to <=640 px**; a degree-2 polynomial
+   is fitted, tiles whose residual is over 1.8 robust sigma (plus their
+   neighbours) are dropped as objects and it is refitted (3 iterations); the
+   fitted surface is cubic-resized back to full resolution and `strength`x of it
+   subtracted, flattening toward the darkest real sky. Degree 2 by design - a
+   paraboloid can only be a smooth gradient, never a nebula. Estimating on the
+   downscale keeps this ~100 ms so it can re-run per slider move.
+2. **Colour calibration** (`color_calibration`, on/off) - the per-channel sky
+   level is equalised (neutral grey background), then the channels are scaled so
+   their means match (gains clamped to 0.5-2x).
+3. **Stretch** (`stretch`, 0-1) - the sky is neutralised (subtract each channel's
+   low percentile) and **one** MTF stretch, derived from the luminance, is
+   applied to all three channels. `stretch` sets the auto-stretch target
+   background by log interpolation (0 -> 0.05, 0.5 -> 0.10, 1 -> 0.20), so higher
+   pulls up fainter signal at the cost of a brighter, noisier background.
+
+Nothing here touches `composite.npy`; every value recomputes the working image
+from the linear data, so the stretch/background/colour choices stay reversible
+and never lose highlight or shadow detail to an early 8-bit quantisation. Denoise
+and photometric calibration are still the rest of the editor's job.
+
+The composite is saved as 32-bit `composite.npy`; the editor session is seeded
+with `render_stack_base` at the `StackParameters()` defaults (so the first
+before/after view matches). `quality_report` records the reference frame, the
+mean registration RMS, the rejected-sample count, whether calibration ran and
+whether the wedge was cropped, and the `frames` table (per-frame metrics +
 accept/reject). `snr_improvement` is `sqrt(effective N)` where effective N =
 `(sum w)^2 / sum(w^2)`; `measured_noise_reduction` is the reference-frame vs
 composite high-pass noise ratio. On a real 100-sub Seestar set: the Bubble
 Nebula centred, the wedge cropped, a neutral flat background, ~9x lower noise.
 
-**Still to come (Phase 4b/c):** float32 through the creative pipeline
-(`ImageProcessingService` is uint8-only) so STF / background extraction / colour
-calibration become non-destructive editor steps on the 32-bit data.
+`ImageProcessingService` runs the whole creative pipeline in BGR float32 `[0, 1]`
+(quantising only at the encode boundary); the stages that are genuinely
+uint8-native - LUT curves, HSV saturation, bilateral denoise, the star detector -
+keep a short local round-trip, and each `apply_*` still accepts a uint8 image
+directly (converting in and out) for the upload geometry pass and the per-stage
+tests.
 
 ## Performance notes
 

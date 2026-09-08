@@ -13,6 +13,7 @@ import {
   type JobStatus,
   type ProcessingParameters,
   type SliderParameterKey,
+  type StackParameters,
 } from '@/types';
 
 const DEBOUNCE_MS = 500;
@@ -32,11 +33,16 @@ export function useImageProcessing(sessionId: string) {
   const [previewVersion, setPreviewVersion] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const wsRef = useRef<ReturnType<typeof processingStatusClient> | null>(null);
 
   const applyParameters = useCallback(
     async (next: ProcessingParameters) => {
       setStatus('processing');
       setError(null);
+      // Drop the previous job's socket - the backend supersedes its job, so it
+      // will never complete and its reconnect loop is just noise.
+      wsRef.current?.disconnect();
+      wsRef.current = null;
       try {
         const response = await apiClient.processImage(sessionId, next);
         if (response.status === 'completed') {
@@ -44,7 +50,12 @@ export function useImageProcessing(sessionId: string) {
           setPreviewVersion((version) => version + 1);
         }
         const ws = processingStatusClient(response.jobId);
+        wsRef.current = ws;
         ws.onStatusUpdate((update) => {
+          if (update.status === 'superseded') {
+            ws.disconnect();
+            return;
+          }
           setStatus(update.status);
           setProgress(update.progressPercent);
           if (update.status === 'completed') {
@@ -68,6 +79,19 @@ export function useImageProcessing(sessionId: string) {
     (key: SliderParameterKey, value: number) => {
       setParameters((prev) => {
         const next = { ...prev, [key]: value };
+        clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => void applyParameters(next), DEBOUNCE_MS);
+        return next;
+      });
+    },
+    [applyParameters],
+  );
+
+  /** Update one field of the linear post-stack pre-stage (the "Stack" step). */
+  const updateStackParameter = useCallback(
+    <K extends keyof StackParameters>(key: K, value: StackParameters[K]) => {
+      setParameters((prev) => {
+        const next = { ...prev, stack: { ...prev.stack, [key]: value } };
         clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(() => void applyParameters(next), DEBOUNCE_MS);
         return next;
@@ -106,6 +130,16 @@ export function useImageProcessing(sessionId: string) {
   const resetParameters = useCallback(() => {
     setParameters(DEFAULT_PARAMETERS);
     void applyParameters(DEFAULT_PARAMETERS);
+  }, [applyParameters]);
+
+  /** Reset the "Stack" step (stretch / background extraction / colour) to defaults. */
+  const resetStack = useCallback(() => {
+    setParameters((prev) => {
+      const next: ProcessingParameters = { ...prev, stack: { ...DEFAULT_PARAMETERS.stack } };
+      clearTimeout(debounceRef.current);
+      void applyParameters(next);
+      return next;
+    });
   }, [applyParameters]);
 
   /** Reset every tone curve (master + R/G/B) back to identity. */
@@ -163,7 +197,13 @@ export function useImageProcessing(sessionId: string) {
     [applyParameters],
   );
 
-  useEffect(() => () => clearTimeout(debounceRef.current), []);
+  useEffect(
+    () => () => {
+      clearTimeout(debounceRef.current);
+      wsRef.current?.disconnect();
+    },
+    [],
+  );
 
   return {
     parameters,
@@ -172,10 +212,12 @@ export function useImageProcessing(sessionId: string) {
     previewVersion,
     error,
     updateParameter,
+    updateStackParameter,
     updateChannelCurve,
     applyGeometry,
     applyParameters,
     resetParameters,
+    resetStack,
     resetCurves,
     resetKeys,
     syncParameters,

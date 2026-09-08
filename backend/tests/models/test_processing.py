@@ -25,6 +25,11 @@ _WIRE = {
         "crop_w": 0.8,
         "crop_h": 0.9,
     },
+    "stack": {
+        "stretch": 0.35,
+        "background_extraction": 80,
+        "color_calibration": False,
+    },
     "contrast": 1.5,
     "exposure": 0.1,
     "saturation": 1.2,
@@ -59,6 +64,8 @@ _CURVE_FIELDS = ["curve_points", "red_curve_points", "green_curve_points", "blue
 def test_all_wire_fields_round_trip() -> None:
     params = ProcessingParameters(**_WIRE)
     assert params.geometry.rotate_quarters == 1
+    assert params.stack.background_extraction == 80
+    assert params.stack.color_calibration is False
     assert params.curve_points[1].y == 160
     assert params.red_curve_points[1].y == 170
     assert params.green_curve_points[1].y == 150

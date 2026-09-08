@@ -1,8 +1,10 @@
 import { useTranslation } from '@/hooks/useTranslation';
 import {
   DEFAULT_PARAMETERS,
-  EDITOR_STEPS,
+  DEFAULT_STACK_PARAMETERS,
+  editorStepsFor,
   isDefaultGeometry,
+  stackParametersEqual,
   type EditorStep,
   type EditorStepId,
   type FocusPoint,
@@ -14,6 +16,8 @@ export interface EditorRailProps {
   onStepChange: (step: EditorStepId) => void;
   parameters: ProcessingParameters;
   focalPoint: FocusPoint | null;
+  /** Show the composite-only "Stack" step. */
+  isStack: boolean;
 }
 
 /** True when a step's controls hold a value that differs from the default. */
@@ -26,6 +30,8 @@ function stepIsModified(
     case 'start':
     case 'export':
       return false;
+    case 'stack':
+      return !stackParametersEqual(parameters.stack, DEFAULT_STACK_PARAMETERS);
     case 'frame':
       return !isDefaultGeometry(parameters.geometry);
     case 'curves':
@@ -43,7 +49,13 @@ function stepIsModified(
 }
 
 /** The numbered workflow rail: pick which group of tools the inspector shows. */
-export function EditorRail({ activeStep, onStepChange, parameters, focalPoint }: EditorRailProps) {
+export function EditorRail({
+  activeStep,
+  onStepChange,
+  parameters,
+  focalPoint,
+  isStack,
+}: EditorRailProps) {
   const { t } = useTranslation();
 
   return (
@@ -51,7 +63,7 @@ export function EditorRail({ activeStep, onStepChange, parameters, focalPoint }:
       aria-label={t('editor.rail.aria_label')}
       className="flex gap-1.5 overflow-x-auto pb-1 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:pb-0"
     >
-      {EDITOR_STEPS.map((step) => {
+      {editorStepsFor(isStack).map((step) => {
         const active = step.id === activeStep;
         const modified = stepIsModified(step, parameters, focalPoint);
         // Set the start / export brackets off from the numbered steps.
@@ -98,6 +110,17 @@ function StepBracketIcon({ id }: { id: EditorStepId }) {
     return (
       <svg viewBox="0 0 12 12" className="h-3 w-3 fill-current" aria-hidden>
         <path d="M6 0l1.3 3.4L11 4.7 8 7l.8 4L6 8.8 3.2 11 4 7 1 4.7l3.7-1.3z" />
+      </svg>
+    );
+  }
+  if (id === 'stack') {
+    return (
+      <svg viewBox="0 0 12 12" className="h-3 w-3 stroke-current" fill="none" aria-hidden>
+        <path
+          d="M6 1 1.5 3.2 6 5.4l4.5-2.2zM1.5 6 6 8.2 10.5 6M1.5 8.8 6 11l4.5-2.2"
+          strokeWidth="1.1"
+          strokeLinejoin="round"
+        />
       </svg>
     );
   }

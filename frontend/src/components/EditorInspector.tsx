@@ -5,7 +5,9 @@ import { SliderGroup } from '@/components/SliderGroup';
 import { ToneCurveEditor } from '@/components/ToneCurveEditor';
 import { useTranslation } from '@/hooks/useTranslation';
 import {
-  EDITOR_STEPS,
+  DEFAULT_STACK_PARAMETERS,
+  editorStepsFor,
+  stackParametersEqual,
   type CurveChannel,
   type CurvePoint,
   type Dimensions,
@@ -15,6 +17,7 @@ import {
   type Preset,
   type ProcessingParameters,
   type SliderParameterKey,
+  type StackParameters,
 } from '@/types';
 
 export interface StartBundle {
@@ -26,6 +29,13 @@ export interface StartBundle {
   onPresetApply: (id: string) => void;
   onPresetDelete: (id: string) => void;
   onResetAll: () => void;
+}
+
+export interface StackBundle {
+  /** True when this session is a stacked composite (unlocks the step). */
+  available: boolean;
+  onParameterChange: <K extends keyof StackParameters>(key: K, value: StackParameters[K]) => void;
+  onReset: () => void;
 }
 
 export interface FramingBundle {
@@ -77,6 +87,7 @@ export interface EditorInspectorProps {
   onResetCurves: () => void;
   isProcessing: boolean;
   start: StartBundle;
+  stack: StackBundle;
   framing: FramingBundle;
   stars: StarsBundle;
   depth: DepthBundle;
@@ -87,22 +98,27 @@ export interface EditorInspectorProps {
 export function EditorInspector(props: EditorInspectorProps) {
   const { t } = useTranslation();
   const { activeStep, onStepChange, parameters } = props;
-  const stepIndex = EDITOR_STEPS.findIndex((step) => step.id === activeStep);
-  const step = EDITOR_STEPS[stepIndex];
-  const nextStep = EDITOR_STEPS[stepIndex + 1];
+  const steps = editorStepsFor(props.stack.available);
+  const stepIndex = steps.findIndex((step) => step.id === activeStep);
+  const step = steps[stepIndex];
+  const nextStep = steps[stepIndex + 1];
 
   const sliderKeys = step.params;
   const sectionResettable = sliderKeys.length > 0;
+  const stackModified = !stackParametersEqual(parameters.stack, DEFAULT_STACK_PARAMETERS);
 
   function handleHeaderReset(): void {
     if (activeStep === 'curves') {
       props.onResetCurves();
+    } else if (activeStep === 'stack') {
+      props.stack.onReset();
     } else if (sectionResettable) {
       props.onResetSection(sliderKeys);
     }
   }
 
-  const showHeaderReset = sectionResettable || activeStep === 'curves';
+  const showHeaderReset =
+    sectionResettable || activeStep === 'curves' || (activeStep === 'stack' && stackModified);
 
   return (
     <div className="panel flex flex-col gap-4">
@@ -118,6 +134,14 @@ export function EditorInspector(props: EditorInspectorProps) {
       <p className="text-xs text-faint">{t(`editor.steps.${step.id}.help`)}</p>
 
       {activeStep === 'start' && <StartPanel {...props.start} isProcessing={props.isProcessing} />}
+
+      {activeStep === 'stack' && (
+        <StackPanel
+          parameters={parameters.stack}
+          onParameterChange={props.stack.onParameterChange}
+          isProcessing={props.isProcessing}
+        />
+      )}
 
       {activeStep === 'frame' &&
         (props.framing.available ? (
@@ -242,6 +266,89 @@ function StartPanel({
       >
         {t('editor.reset_all')}
       </button>
+    </div>
+  );
+}
+
+/**
+ * The Stack step (composite sessions only): the linear post-stack pre-stage.
+ * It runs on the 32-bit stacked composite ahead of every other stage - stretch
+ * the faint signal, subtract the sky gradient, neutralise the colour - all
+ * non-destructive, recomputed from the linear composite on every change.
+ */
+function StackPanel({
+  parameters,
+  onParameterChange,
+  isProcessing,
+}: {
+  parameters: StackParameters;
+  onParameterChange: <K extends keyof StackParameters>(key: K, value: StackParameters[K]) => void;
+  isProcessing: boolean;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1.5 text-sm">
+        <span className="flex items-baseline justify-between">
+          <label htmlFor="stack-stretch" className="text-muted">
+            {t('stack_panel.stretch.label')}
+          </label>
+          <span className="text-xs tabular-nums text-faint">
+            {Math.round(parameters.stretch * 100)}
+          </span>
+        </span>
+        <input
+          id="stack-stretch"
+          type="range"
+          className="slider"
+          min={0}
+          max={1}
+          step={0.01}
+          value={parameters.stretch}
+          disabled={isProcessing}
+          onChange={(event) => onParameterChange('stretch', Number(event.target.value))}
+        />
+        <p className="text-xs text-faint">{t('stack_panel.stretch.hint')}</p>
+      </div>
+
+      <div className="flex flex-col gap-1.5 text-sm">
+        <span className="flex items-baseline justify-between">
+          <label htmlFor="stack-bg" className="text-muted">
+            {t('stack_panel.background_extraction.label')}
+          </label>
+          <span className="text-xs tabular-nums text-faint">
+            {parameters.backgroundExtraction}
+          </span>
+        </span>
+        <input
+          id="stack-bg"
+          type="range"
+          className="slider"
+          min={0}
+          max={100}
+          step={1}
+          value={parameters.backgroundExtraction}
+          disabled={isProcessing}
+          onChange={(event) =>
+            onParameterChange('backgroundExtraction', Number(event.target.value))
+          }
+        />
+        <p className="text-xs text-faint">{t('stack_panel.background_extraction.hint')}</p>
+      </div>
+
+      <label className="flex items-center justify-between gap-2 text-sm text-muted">
+        <span className="flex flex-col gap-0.5">
+          {t('stack_panel.color_calibration.label')}
+          <span className="text-xs text-faint">{t('stack_panel.color_calibration.hint')}</span>
+        </span>
+        <input
+          type="checkbox"
+          className="size-4 shrink-0 accent-accent"
+          checked={parameters.colorCalibration}
+          disabled={isProcessing}
+          onChange={(event) => onParameterChange('colorCalibration', event.target.checked)}
+        />
+      </label>
     </div>
   );
 }

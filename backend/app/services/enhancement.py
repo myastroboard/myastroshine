@@ -7,8 +7,10 @@ and the Celery task call it.
 
 from __future__ import annotations
 
+from sqlalchemy import select
+
 from app.config import get_settings
-from app.db.models import JobRecord
+from app.db.models import JobRecord, StackRecord
 from app.exceptions import AppError, ImageProcessingError
 from app.logging_config import get_logger
 from app.models import ProcessingParameters, ProcessResponse
@@ -41,11 +43,23 @@ class EnhancementService:
     def _emit(self, job_id: str) -> None:
         progress.publish(job_id, JobService.to_event(self.jobs.get(job_id)))
 
+    def _backing_stack_id(self, session_id: str) -> str | None:
+        """The stack whose composite backs this session, if the composite is on disk."""
+        stack_id = self.sessions.db.scalar(
+            select(StackRecord.stack_id).where(StackRecord.session_id == session_id)
+        )
+        if stack_id and self.storage.stack_composite_path(stack_id).exists():
+            return str(stack_id)
+        return None
+
     def dispatch(
         self, session_id: str, params: ProcessingParameters, client_ip: str | None = None
     ) -> ProcessResponse:
         """Create a job and either run it inline or hand it to the queue."""
         self.sessions.get_session(session_id)  # 404/410 before any work
+        # A newer edit obsoletes any still-pending one for this session - retire
+        # them so a burst of slider moves can't exhaust the concurrency budget.
+        self.jobs.supersede_pending_for_session(session_id)
         self.jobs.assert_under_concurrency_limit(client_ip)
         job = self.jobs.create(session_id, client_ip=client_ip)
 
@@ -72,18 +86,34 @@ class EnhancementService:
 
     def run(self, session_id: str, params: ProcessingParameters, job_id: str) -> None:
         """Enhance ``session_id`` with ``params``, tracking ``job_id``."""
+        if self.jobs.get(job_id).status == "superseded":
+            # A newer edit landed while this one waited in the queue.
+            self._emit(job_id)
+            logger.info("skipping superseded job", session_id=session_id, job_id=job_id)
+            return
         self.jobs.update(job_id, status="processing", progress_percent=5, current_step="loading")
         self._emit(job_id)
 
         try:
             self.sessions.get_session(session_id)
-            original = self.storage.load_original(session_id)
 
             def on_step(name: str, percent: int) -> None:
                 self.jobs.update(job_id, current_step=name, progress_percent=percent)
                 self._emit(job_id)
 
-            result = self.processing.apply_parameters(original, params, on_step)
+            stack_id = self._backing_stack_id(session_id)
+            if stack_id is not None:
+                # A stacked-composite session: run the pipeline on the 32-bit
+                # linear composite (STF / background extraction / colour
+                # calibration are the "Stack" step, params.stack) instead of the
+                # pre-stretched uint8 upload.
+                composite = self.storage.load_stack_composite(stack_id)
+                result = self.processing.apply_parameters(
+                    composite, params, on_step, linear_composite=True
+                )
+            else:
+                original = self.storage.load_original(session_id)
+                result = self.processing.apply_parameters(original, params, on_step)
 
             self.jobs.update(job_id, progress_percent=95, current_step="rendering")
             self._emit(job_id)

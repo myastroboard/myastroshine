@@ -1,30 +1,39 @@
 """Post-stack cleanup of a linear composite (``initial_plan/12_STACKING_REBUILD.md``
 Phase 4).
 
-Runs on the ``float32`` composite straight out of :class:`IntegrationService`,
-before it becomes an editable session:
+Two stages, split by *when* they run:
 
-1. **Crop the field-rotation wedge** - an alt-az mount rotates the field over the
-   session, so the edges of the aligned stack are covered by only a handful of
-   frames (noisy, discoloured). Crop to the region most frames actually reached.
-2. **Background extraction** - fit a *low-order* polynomial to the sky between
-   the objects and subtract it, flattening a light-pollution / sky-glow
-   gradient. Low order by design: it physically cannot carve into a nebula.
-3. **Colour calibration** - neutralise the sky (make the background grey) and
-   balance the channels so the star field is roughly white.
+* :func:`apply_post_stack` runs once, in :class:`~app.services.stacking.StackingService`,
+  the moment the composite comes out of :class:`~app.services.integration.IntegrationService`.
+  It only **crops the field-rotation wedge** - an alt-az mount rotates the field
+  over a session, so the edges of the aligned stack are covered by a handful of
+  frames (noisy, discoloured). That crop defines the canvas, so it is baked into
+  the saved ``composite.npy``.
+* :func:`render_stack_base` runs on every editor render, turning that linear
+  composite into the BGR image the enhancement pipeline works on:
+  **background extraction** (fit a low-order polynomial to the sky between the
+  objects and subtract it), **colour calibration** (neutralise the sky, balance
+  the channels), then the **stretch** (screen-transfer-function auto-stretch with
+  a tunable target background). All three are non-destructive - the editor's
+  "Stack" step drives their strength and the linear composite is never touched.
 
-Everything stays linear. A real stretch, denoise and photometric calibration
-are still the editor's job; this only removes the artefacts that make a raw
-stack look broken.
+Everything stays linear until the stretch. A real denoise and photometric
+calibration are still the rest of the editor's job.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
+import cv2
 import numpy as np
 
 from app.logging_config import get_logger
+from app.utils.image_utils import stretch_composite_linear
+
+if TYPE_CHECKING:
+    from app.models import StackParameters
 
 logger = get_logger(__name__)
 
@@ -45,36 +54,58 @@ _BG_REJECT_ITERATIONS = 3
 _BG_POLY_DEGREE = 2
 _BG_MIN_SAMPLES = 10  # below this many object-free tiles, fall back to a flat background
 _BG_FLOOR_PERCENTILE = 10.0  # flatten the sky toward this percentile of the fitted surface
+# Sample + fit the background on a copy no larger than this: the surface is a
+# degree-2 polynomial (low-frequency by construction), so estimating it on a
+# downscaled copy and cubic-resizing back loses nothing and keeps the whole
+# thing fast enough to re-run on every editor render.
+_BG_ESTIMATE_MAX_SIZE = 640
 
 _NEUTRAL_PERCENTILE = 20.0  # per-channel sky level for background neutralisation
 _BALANCE_GAIN_CLIP = (0.5, 2.0)
 _COLOR_NDIM = 3
 _TINY = 1e-8
 
+# The editor "Stretch" control (0..1) maps onto the auto-stretch target
+# background by log interpolation, so 0.5 lands on the composite default (0.10).
+_STRETCH_TARGET_LOW = 0.05
+_STRETCH_TARGET_HIGH = 0.20
+
 
 @dataclass(frozen=True)
 class PostStackReport:
     cropped: tuple[int, int, int, int] | None  # (top, left, height, width) kept, or None
-    background_gradient: float  # peak-to-peak of the subtracted background, in linear units
-    channel_gains: tuple[float, float, float]  # R, G, B multipliers applied
 
 
 def apply_post_stack(
     composite: np.ndarray, coverage: np.ndarray
 ) -> tuple[np.ndarray, PostStackReport]:
-    """Crop, background-subtract and colour-calibrate a linear ``(H, W, 3)`` composite."""
+    """Crop the low-coverage rotation wedge off a linear ``(H, W, 3)`` composite."""
     # _combine already emits 0 for an uncovered pixel; nan_to_num is just defensive.
     composite = np.nan_to_num(composite.astype(np.float32, copy=False))
     cropped, box = _crop_to_coverage(composite, coverage)
-    flattened, gradient = _extract_background(cropped)
-    calibrated, gains = _calibrate_colour(flattened)
-    logger.info(
-        "post-stack cleanup done",
-        cropped=box is not None,
-        background_gradient=round(gradient, 5),
-        channel_gains=[round(g, 3) for g in gains],
-    )
-    return calibrated.astype(np.float32), PostStackReport(box, gradient, gains)
+    logger.info("post-stack wedge crop", cropped=box is not None, box=box)
+    return cropped, PostStackReport(box)
+
+
+def render_stack_base(composite: np.ndarray, params: StackParameters) -> np.ndarray:
+    """Linear composite (already wedge-cropped) -> BGR ``float32`` ``[0, 1]``.
+
+    Background extraction and colour calibration run first, in linear space and
+    only when enabled; the stretch always runs, with a target background the
+    "Stretch" control tunes. The output feeds straight into the enhancement
+    pipeline's background/creative stages.
+    """
+    linear = np.nan_to_num(composite.astype(np.float32, copy=False))
+    if linear.ndim == 2:  # noqa: PLR2004 - a mono stack: give the shared code 3 planes
+        linear = np.repeat(linear[:, :, np.newaxis], _COLOR_NDIM, axis=2)
+
+    if params.background_extraction > 0:
+        linear, _ = extract_background(linear, params.background_extraction / 100.0)
+    if params.color_calibration:
+        linear, _ = calibrate_colour(linear)
+
+    target = _STRETCH_TARGET_LOW * (_STRETCH_TARGET_HIGH / _STRETCH_TARGET_LOW) ** params.stretch
+    return stretch_composite_linear(linear, target_background=target)
 
 
 # -- 1. crop the rotation wedge ---------------------------------------------
@@ -114,27 +145,38 @@ def _crop_to_coverage(
 # -- 2. background extraction ----------------------------------------------
 
 
-def _extract_background(composite: np.ndarray) -> tuple[np.ndarray, float]:
-    """Fit a low-order polynomial to the object-free sky and subtract it.
+def extract_background(composite: np.ndarray, strength: float = 1.0) -> tuple[np.ndarray, float]:
+    """Fit a low-order polynomial to the object-free sky and subtract ``strength`` of it.
 
     Object tiles (a nebula, a galaxy, a bright cluster) are rejected iteratively
     by their residual to the current fit and refitted, so the surface tracks the
     sky *between* the objects. A degree-2 fit can only be a smooth bowl - it
     cannot carve structure out of a nebula even if a few object tiles slip
-    through.
+    through. The tile lattice is sampled on a downscaled copy and the fitted
+    surface cubic-resized back to full resolution.
     """
     height, width = composite.shape[:2]
+    scale = _BG_ESTIMATE_MAX_SIZE / max(height, width)
+    small = (
+        cv2.resize(
+            composite,
+            (max(round(width * scale), _BG_GRID), max(round(height * scale), _BG_GRID)),
+            interpolation=cv2.INTER_AREA,
+        )
+        if scale < 1.0
+        else composite
+    )
+    small_h, small_w = small.shape[:2]
+
     grid = np.linspace(0.0, 1.0, _BG_GRID, dtype=np.float32)
     grid_x, grid_y = np.meshgrid(grid, grid)
-    row_edges = np.linspace(0, height, _BG_GRID + 1, dtype=int)
-    col_edges = np.linspace(0, width, _BG_GRID + 1, dtype=int)
-    full_y, full_x = np.mgrid[0:height, 0:width].astype(np.float32)
-    norm_x, norm_y = full_x / max(width - 1, 1), full_y / max(height - 1, 1)
+    row_edges = np.linspace(0, small_h, _BG_GRID + 1, dtype=int)
+    col_edges = np.linspace(0, small_w, _BG_GRID + 1, dtype=int)
 
-    background = np.zeros_like(composite)
+    background = np.zeros((height, width, _COLOR_NDIM), dtype=np.float32)
     peak = 0.0
     for channel in range(_COLOR_NDIM):
-        plane = composite[..., channel]
+        plane = small[..., channel]
         samples = np.array(
             [
                 [
@@ -161,14 +203,18 @@ def _extract_background(composite: np.ndarray) -> tuple[np.ndarray, float]:
             keep = ~_dilate(~keep)  # also drop tiles touching an object (a soft skirt)
             coeffs = _fit_poly2d(grid_x[keep], grid_y[keep], samples[keep], _BG_POLY_DEGREE)
 
-        surface = _eval_poly2d(norm_x, norm_y, coeffs, _BG_POLY_DEGREE)
+        surface_coarse = _eval_poly2d(grid_x, grid_y, coeffs, _BG_POLY_DEGREE)
+        surface = cv2.resize(
+            surface_coarse.astype(np.float32), (width, height), interpolation=cv2.INTER_CUBIC
+        )
         background[..., channel] = surface
         peak = max(peak, float(surface.max() - surface.min()))
 
     # Flatten toward the *darkest* real sky (a low percentile of the fitted
     # surface), not its median - keeps the sky dark so faint signal stays above it.
-    flattened = composite - background + float(np.percentile(background, _BG_FLOOR_PERCENTILE))
-    return np.clip(flattened, 0.0, None), peak
+    floor = float(np.percentile(background, _BG_FLOOR_PERCENTILE))
+    flattened = composite - strength * (background - floor)
+    return np.clip(flattened, 0.0, None), peak * strength
 
 
 def _dilate(mask: np.ndarray) -> np.ndarray:
@@ -204,7 +250,7 @@ def _eval_poly2d(x: np.ndarray, y: np.ndarray, coeffs: np.ndarray, degree: int) 
 # -- 3. colour calibration -----------------------------------------------
 
 
-def _calibrate_colour(composite: np.ndarray) -> tuple[np.ndarray, tuple[float, float, float]]:
+def calibrate_colour(composite: np.ndarray) -> tuple[np.ndarray, tuple[float, float, float]]:
     """Neutralise the sky background, then balance the channels toward grey."""
     channels = [composite[..., c] for c in range(_COLOR_NDIM)]
     sky = np.array([np.percentile(ch, _NEUTRAL_PERCENTILE) for ch in channels])
