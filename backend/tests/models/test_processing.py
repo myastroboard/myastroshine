@@ -42,6 +42,8 @@ _WIRE = {
     "star_reduction": 20,
     "star_sensitivity": 65,
     "star_max_size": 40,
+    "star_removal": 75,
+    "star_recombine": 40,
     "sharpness": 1.2,
     "temperature": 5500,
     "tint": 5,
@@ -134,6 +136,19 @@ def test_new_percentage_fields_out_of_range_is_rejected() -> None:
     for field in ("chroma_denoise", "vignette_correction", "gradient_reduction", "dehaze"):
         with pytest.raises(ValidationError):
             ProcessingParameters(**{field: 150})
+
+
+def test_starless_fields_default_off_and_reject_out_of_range() -> None:
+    """star_removal / star_recombine are v0.3 additions; an older stored preset
+    without them loads with the feature off."""
+    params = ProcessingParameters(contrast=1.4)
+    assert params.star_removal == 0
+    assert params.star_recombine == 0
+    for field in ("star_removal", "star_recombine"):
+        with pytest.raises(ValidationError):
+            ProcessingParameters(**{field: 101})
+        with pytest.raises(ValidationError):
+            ProcessingParameters(**{field: -1})
 
 
 def test_unknown_geometry_field_is_rejected() -> None:

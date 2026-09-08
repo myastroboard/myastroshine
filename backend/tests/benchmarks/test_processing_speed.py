@@ -61,6 +61,8 @@ def _typical_edit() -> ProcessingParameters:
         sharpness=1.3,
         temperature=7200,
         tint=8,
+        star_removal=100,  # v0.3: forces the starless split - detect, inpaint, recombine
+        star_recombine=60,
     )
 
 

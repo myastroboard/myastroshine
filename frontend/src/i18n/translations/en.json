@@ -87,6 +87,7 @@
       "colour": "Colour",
       "detail": "Detail",
       "stars": "Stars",
+      "starless": "Star removal",
       "depth": "Depth",
       "export": "Export"
     },
@@ -115,6 +116,9 @@
       },
       "stars": {
         "help": "Detect individual stars and shrink them so faint nebulosity stands out. Use the mask to check detection first."
+      },
+      "starless": {
+        "help": "Separate the stars from the nebula. Raise Remove to pull them out, then the sliders in every step act on the nebula alone; Bring stars back screen-blends them in at the end. Drag Bring stars back to 0 to see the pure starless image."
       },
       "depth": {
         "help": "Pick the focal point, then open the Depth Shift viewer for an interactive parallax preview."
@@ -267,6 +271,14 @@
       "starMaxSize": {
         "label": "Star max size",
         "hint": "Caps how large a bright spot can be and still count as a star, so bright cores aren't shrunk."
+      },
+      "starRemoval": {
+        "label": "Remove stars",
+        "hint": "Pulls the stars out so every other adjustment works on the nebula alone. Detection uses the sensitivity and max size from the Stars step."
+      },
+      "starRecombine": {
+        "label": "Bring stars back",
+        "hint": "Screen-blends the removed stars back at the end: 0 keeps the image starless, 100 restores them full strength."
       },
       "sharpness": {
         "label": "Sharpness",

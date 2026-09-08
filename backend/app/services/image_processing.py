@@ -17,6 +17,7 @@ import numpy as np
 from app.logging_config import get_logger
 from app.models import CurvePoint, GeometryParameters, ProcessingParameters
 from app.services.star_detection import StarDetectionService
+from app.services.starless import StarlessService
 from app.utils.math_utils import (
     curve_points_to_lut,
     kelvin_to_rgb_gain,
@@ -49,6 +50,7 @@ class ImageProcessingService:
 
     def __init__(self) -> None:
         self._star_detector = StarDetectionService()
+        self._starless = StarlessService(self._star_detector)
 
     def apply_geometry(self, image: np.ndarray, geom: GeometryParameters) -> np.ndarray:
         """Rotate / flip / straighten / crop the image before enhancement.
@@ -441,18 +443,12 @@ class ImageProcessingService:
         strength = (sharpness - 1.0) * 0.5
         return cv2.addWeighted(image, 1.0 - strength, sharp, strength, 0)
 
-    def apply_parameters(
-        self,
-        image: np.ndarray,
-        params: ProcessingParameters,
-        on_step: StepCallback | None = None,
-    ) -> np.ndarray:
-        """Run the full pipeline in the recommended order.
-
-        Returns the input unchanged when every parameter is at its default.
-        ``on_step(step_name, percent)`` is called as each stage begins.
-        """
-        stages: list[tuple[str, Callable[[np.ndarray], np.ndarray]]] = [
+    def _background_stages(
+        self, params: ProcessingParameters
+    ) -> list[tuple[str, Callable[[np.ndarray], np.ndarray]]]:
+        """Geometry + the sky/optics corrections - these belong on the whole
+        frame (stars included), so they run before any starless split."""
+        return [
             ("geometry", lambda r: self.apply_geometry(r, params.geometry)),
             (
                 "color_correction",
@@ -467,6 +463,14 @@ class ImageProcessingService:
                 lambda r: self.apply_gradient_reduction(r, params.gradient_reduction),
             ),
             ("dehaze", lambda r: self.apply_dehaze(r, params.dehaze)),
+        ]
+
+    def _creative_stages(
+        self, params: ProcessingParameters
+    ) -> list[tuple[str, Callable[[np.ndarray], np.ndarray]]]:
+        """Tone, colour, and detail work - runs on the starless image when star
+        removal is active, so the nebula can be pushed without bloating stars."""
+        return [
             ("contrast", lambda r: self.apply_contrast(r, params.contrast)),
             ("exposure", lambda r: self.apply_exposure(r, params.exposure)),
             (
@@ -497,6 +501,48 @@ class ImageProcessingService:
             ),
             ("sharpness", lambda r: self.apply_sharpness(r, params.sharpness)),
         ]
+
+    def apply_parameters(
+        self,
+        image: np.ndarray,
+        params: ProcessingParameters,
+        on_step: StepCallback | None = None,
+    ) -> np.ndarray:
+        """Run the full pipeline in the recommended order.
+
+        Returns the input unchanged when every parameter is at its default.
+        ``on_step(step_name, percent)`` is called as each stage begins.
+
+        When ``star_removal`` is set, the pipeline splits after the background
+        corrections: the stars are pulled out (``StarlessService.split``), every
+        creative stage runs on the starless image, and ``star_recombine``
+        screen-blends the removed star flux back at the end. ``star_removal = 0``
+        (the default) is byte-identical to the flat pipeline.
+        """
+        background = self._background_stages(params)
+        creative = self._creative_stages(params)
+
+        if params.star_removal <= 0:
+            stages = background + creative
+        else:
+            stars_layer: list[np.ndarray] = []
+
+            def split(r: np.ndarray) -> np.ndarray:
+                starless, removed = self._starless.split(
+                    r, params.star_sensitivity, params.star_max_size, params.star_removal
+                )
+                stars_layer.append(removed)
+                return starless
+
+            def recombine(r: np.ndarray) -> np.ndarray:
+                return self._starless.recombine(r, stars_layer[0], params.star_recombine)
+
+            stages = [
+                *background,
+                ("star_removal", split),
+                *creative,
+                ("star_recombine", recombine),
+            ]
 
         result = image
         for index, (name, stage) in enumerate(stages):

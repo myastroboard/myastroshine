@@ -31,6 +31,9 @@ packages = ["app"]
 strict = true
 plugins = ["pydantic.mypy"]
 disallow_untyped_decorators = false
+# scikit-image ships py.typed but many functions (e.g. morphology.reconstruction)
+# are unannotated; don't fail strict-mode `disallow_untyped_calls` on them.
+untyped_calls_exclude = ["skimage"]
 
 [[tool.mypy.overrides]]
 module = ["cv2.*", "skimage.*", "astropy.*", "rawpy.*"]
@@ -54,4 +57,7 @@ addopts = "-ra --cov=app --cov-report=term-missing"
 filterwarnings = [
     # Emitted only when a newer starlette than we pin is installed locally.
     "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+    # scikit-image 0.26's grayscale reconstruction (StarlessService) still sets
+    # `ndarray.shape` directly, which NumPy 2.5 deprecated - upstream's to fix.
+    "ignore:Setting the shape on a NumPy array has been deprecated:DeprecationWarning",
 ]

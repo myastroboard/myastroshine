@@ -87,6 +87,7 @@
       "colour": "Couleur",
       "detail": "Détail",
       "stars": "Étoiles",
+      "starless": "Suppression d'étoiles",
       "depth": "Profondeur",
       "export": "Export"
     },
@@ -115,6 +116,9 @@
       },
       "stars": {
         "help": "Détectez chaque étoile et réduisez-la pour faire ressortir les nébulosités faibles. Utilisez le masque pour vérifier la détection d'abord."
+      },
+      "starless": {
+        "help": "Séparez les étoiles de la nébuleuse. Montez Retirer pour les extraire : les curseurs de chaque étape agissent alors sur la seule nébuleuse ; Rétablir les étoiles les réincorpore à la fin en fondu écran. Mettez Rétablir les étoiles à 0 pour voir l'image sans étoiles."
       },
       "depth": {
         "help": "Choisissez le point focal, puis ouvrez la visionneuse Depth Shift pour un aperçu de parallaxe interactif."
@@ -267,6 +271,14 @@
       "starMaxSize": {
         "label": "Taille maxi des étoiles",
         "hint": "Limite la taille qu'un point lumineux peut avoir pour compter comme une étoile, afin que les coeurs brillants ne soient pas réduits."
+      },
+      "starRemoval": {
+        "label": "Retirer les étoiles",
+        "hint": "Extrait les étoiles pour que tous les autres réglages n'agissent que sur la nébuleuse. La détection utilise la sensibilité et la taille maxi de l'étape Étoiles."
+      },
+      "starRecombine": {
+        "label": "Rétablir les étoiles",
+        "hint": "Réincorpore les étoiles retirées à la fin en fondu écran : 0 garde l'image sans étoiles, 100 les rétablit pleinement."
       },
       "sharpness": {
         "label": "Netteté",

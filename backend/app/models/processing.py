@@ -89,6 +89,13 @@ class ProcessingParameters(BaseModel):
     star_reduction: int = Field(default=0, ge=0, le=100)
     star_sensitivity: int = Field(default=50, ge=0, le=100)
     star_max_size: int = Field(default=30, ge=0, le=100)
+    # Starless (v0.3): when star_removal > 0 the pipeline splits - stars are
+    # pulled out right after the background corrections, every creative stage
+    # runs on the starless image, then star_recombine screen-blends the removed
+    # star flux back at the end (0 = fully starless output, 100 = full strength).
+    # Detection reuses star_sensitivity / star_max_size above.
+    star_removal: int = Field(default=0, ge=0, le=100)
+    star_recombine: int = Field(default=0, ge=0, le=100)
     sharpness: float = Field(default=1.0, ge=0.0, le=2.0)
     temperature: int = Field(default=6500, ge=2000, le=8000)
     tint: int = Field(default=0, ge=-50, le=50)
