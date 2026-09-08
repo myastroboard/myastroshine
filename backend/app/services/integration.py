@@ -3,13 +3,16 @@
 Three memory-bounded passes over the frames (see
 ``initial_plan/12_STACKING_REBUILD.md`` Phase 1):
 
-1. **Register** - detect stars on every frame, pick the best-quality frame as
-   the reference, match each other frame's asterisms to it
-   (:class:`StarMatchService`) for a transform, and measure each frame's
-   background / scale / noise. Frames that fail to match are rejected.
-2. **Align** - load each kept frame again, superpixel-debayer it, warp it into
-   the reference frame (Lanczos), normalise it (additive + multiplicative to the
-   reference) and stream it to a ``float16`` memmap on disk.
+1. **Register** - calibrate (Phase 2) then superpixel-debayer every frame (half
+   resolution is plenty for star centroids), pick the best-quality frame as the
+   reference, match each other frame's asterisms to it (:class:`StarMatchService`)
+   for a transform, and measure each frame's background / scale / noise. Frames
+   that fail to match are rejected.
+2. **Align** - load each kept frame again, calibrate it and **interpolating**-
+   debayer it at full resolution, warp it into the reference frame (Lanczos,
+   the registration transform's translation scaled up from half to full res),
+   normalise it (additive + multiplicative to the reference) and stream it to a
+   ``float16`` memmap on disk.
 3. **Combine** - tile over the memmap rows; per pixel across the stack, do
    Winsorized-sigma rejection and a weighted mean.
 
@@ -22,7 +25,7 @@ from __future__ import annotations
 import contextlib
 import math
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 import cv2
@@ -31,11 +34,12 @@ from numpy.lib.format import open_memmap
 
 from app.exceptions import InvalidParameterError
 from app.logging_config import get_logger
+from app.services.calibration import CalibrationMasters, CalibrationService
 from app.services.star_detection import StarDetectionService
 from app.services.star_match import StarMatchService
 from app.services.storage import StorageService
 from app.utils.image_utils import _auto_stretch_to_uint8
-from app.utils.linear_ingest import superpixel_rgb
+from app.utils.linear_ingest import LinearFrame, debayer_rgb, superpixel_rgb
 
 logger = get_logger(__name__)
 
@@ -49,6 +53,8 @@ _KAPPA = 3.0  # sigma rejection threshold
 _REJECT_ITERATIONS = 2
 _MAD_TO_SIGMA = 1.4826
 _ROW_TILE = 128
+_MIN_ROW_TILE = 8
+_TILE_BUDGET_BYTES = 48_000_000  # target working-set for one combine tile (K frames x rows x W x C)
 _TINY = 1e-12
 _WEIGHT_CLIP = (0.25, 4.0)  # a frame's weight can be at most 4x / at least 1/4 the median
 _MIN_COVERAGE = 0.3  # skip pixel rejection where < 30% of frames overlap (rotation wedge)
@@ -97,6 +103,7 @@ class IntegrationService:
         self.storage = storage
         self._detector = StarDetectionService()
         self._matcher = StarMatchService()
+        self._calibration = CalibrationService(storage)
 
     def integrate(
         self,
@@ -107,17 +114,24 @@ class IntegrationService:
         combination: str,
         rejection: str,
         weighting: str,
+        calibration: CalibrationMasters | None = None,
+        cosmetic: bool = True,
         on_progress: ProgressFn | None = None,
     ) -> IntegrationResult:
-        plans, reference, shape = self._register(stack_id, indices, transform, on_progress)
+        cal = calibration if calibration is not None and not calibration.is_empty else None
+        plans, reference, half_shape = self._register(
+            stack_id, indices, transform, cal, cosmetic, on_progress
+        )
         aligned = reference.star_count >= _MIN_REFERENCE_STARS
         kept = [p for p in plans if p.registered] if aligned else plans
         weights = _frame_weights(kept, weighting)
 
-        aligned_path = self._align_to_memmap(stack_id, kept, reference, shape, aligned, on_progress)
+        aligned_path, full_shape, reference_noise = self._align_to_memmap(
+            stack_id, kept, reference, half_shape, aligned, cal, cosmetic, on_progress
+        )
         try:
             composite, rejected = self._combine(
-                aligned_path, weights, combination, rejection, shape, on_progress
+                aligned_path, weights, combination, rejection, full_shape, on_progress
             )
         finally:
             with contextlib.suppress(OSError):
@@ -133,7 +147,7 @@ class IntegrationService:
             registration_rms=round(float(np.mean([p.rms for p in registered])), 2)
             if registered
             else 0.0,
-            reference_noise=reference.noise,
+            reference_noise=reference_noise,
             aligned=aligned,
             weights=list(weights),
         )
@@ -141,12 +155,18 @@ class IntegrationService:
     # -- pass 1: registration -------------------------------------------------
 
     def _register(
-        self, stack_id: str, indices: list[int], transform: str, on_progress: ProgressFn | None
+        self,
+        stack_id: str,
+        indices: list[int],
+        transform: str,
+        calibration: CalibrationMasters | None,
+        cosmetic: bool,
+        on_progress: ProgressFn | None,
     ) -> tuple[list[_FramePlan], _FramePlan, tuple[int, int, int]]:
         plans: list[_FramePlan] = []
         shape: tuple[int, int, int] | None = None
         for step, index in enumerate(indices):
-            data = self._prepared(stack_id, index)
+            data = self._prepared(stack_id, index, calibration, cosmetic)
             frame_shape = (data.shape[0], data.shape[1], data.shape[2])
             if shape is None:
                 shape = frame_shape
@@ -199,26 +219,46 @@ class IntegrationService:
         stack_id: str,
         kept: list[_FramePlan],
         reference: _FramePlan,
-        shape: tuple[int, int, int],
+        half_shape: tuple[int, int, int],
         aligned: bool,
+        calibration: CalibrationMasters | None,
+        cosmetic: bool,
         on_progress: ProgressFn | None,
-    ) -> str:
-        height, width, channels = shape
+    ) -> tuple[str, tuple[int, int, int], float]:
+        """Warp + normalise every kept frame into a ``float16`` memmap.
+
+        Registration measured everything on the half-resolution superpixel
+        image; the align pass works at the full-resolution interpolating
+        debayer, so each transform's translation is scaled by the resolution
+        ratio (rotation / scale are ratios and need no change).
+        """
+        ref_frame = self._prepared_full(stack_id, reference.index, calibration, cosmetic)
+        height, width, channels = ref_frame.shape
+        scale_x = width / max(1, half_shape[1])
+        scale_y = height / max(1, half_shape[0])
+        reference_noise = max(highpass_noise(ref_frame @ _RGB_LUMA), _NOISE_FLOOR)
+
         path = self.storage.stack_accum_dir(stack_id, create=True) / "aligned.npy"
         memmap = open_memmap(
             path, mode="w+", dtype=np.float16, shape=(len(kept), height, width, channels)
         )
         for slot, plan in enumerate(kept):
-            frame = self._prepared(stack_id, plan.index)
-            if aligned and plan is not reference and plan.matrix is not None:
-                frame = cv2.warpAffine(
-                    frame,
-                    plan.matrix.astype(np.float32),
-                    (width, height),
-                    flags=cv2.INTER_LANCZOS4,
-                    borderMode=cv2.BORDER_CONSTANT,
-                    borderValue=(math.nan, math.nan, math.nan),
-                )
+            if plan is reference:
+                frame = ref_frame
+            else:
+                frame = self._prepared_full(stack_id, plan.index, calibration, cosmetic)
+                if aligned and plan.matrix is not None:
+                    matrix = plan.matrix.astype(np.float64).copy()
+                    matrix[0, 2] *= scale_x
+                    matrix[1, 2] *= scale_y
+                    frame = cv2.warpAffine(
+                        frame,
+                        matrix.astype(np.float32),
+                        (width, height),
+                        flags=cv2.INTER_LANCZOS4,
+                        borderMode=cv2.BORDER_CONSTANT,
+                        borderValue=(math.nan, math.nan, math.nan),
+                    )
             multiplier = float(np.clip(reference.scale / plan.scale, *_SCALE_CLIP))
             frame = frame * multiplier + (reference.background - multiplier * plan.background)
             memmap[slot] = frame.astype(np.float16)
@@ -226,7 +266,7 @@ class IntegrationService:
                 on_progress("normalization", 50 + int(25 * slot / max(1, len(kept))))
         memmap.flush()
         del memmap
-        return str(path)
+        return str(path), (height, width, channels), reference_noise
 
     # -- pass 3: tiled combine ------------------------------------------
 
@@ -239,15 +279,17 @@ class IntegrationService:
         shape: tuple[int, int, int],
         on_progress: ProgressFn | None,
     ) -> tuple[np.ndarray, int]:
-        height = shape[0]
+        height, width, channels = shape
         memmap = open_memmap(aligned_path, mode="r")
         w = (weights / weights.sum()).astype(np.float32).reshape(-1, 1, 1, 1)
         min_cover = max(2, math.ceil(_MIN_COVERAGE * len(weights)))
         composite = np.zeros(shape, dtype=np.float32)
         rejected = 0
 
-        for y0 in range(0, height, _ROW_TILE):
-            y1 = min(y0 + _ROW_TILE, height)
+        row_bytes = len(weights) * width * channels * 4
+        tile_rows = int(np.clip(_TILE_BUDGET_BYTES // max(1, row_bytes), _MIN_ROW_TILE, _ROW_TILE))
+        for y0 in range(0, height, tile_rows):
+            y1 = min(y0 + tile_rows, height)
             block = np.asarray(memmap[:, y0:y1], dtype=np.float32)  # (K, th, W, C)
             tile, cut = _reduce_tile(block, w, combination, rejection, min_cover)
             composite[y0:y1] = tile
@@ -260,13 +302,47 @@ class IntegrationService:
 
     # -- helpers ------------------------------------------------------------
 
-    def _prepared(self, stack_id: str, index: int) -> np.ndarray:
-        """Load a frame, superpixel-debayer it, and return ``(H, W, 3)`` float32."""
-        frame = superpixel_rgb(self.storage.load_linear_frame(stack_id, index))
-        data = frame.data.astype(np.float32)
-        if data.ndim == _MONO_NDIM:
-            data = np.repeat(data[:, :, np.newaxis], 3, axis=2)
-        return np.ascontiguousarray(data)
+    def _prepared(
+        self, stack_id: str, index: int, calibration: CalibrationMasters | None, cosmetic: bool
+    ) -> np.ndarray:
+        """Calibrate then superpixel-debayer (half-res), returning ``(H, W, 3)`` float32."""
+        frame = self._load_calibrated(stack_id, index, calibration, cosmetic)
+        return _as_rgb(superpixel_rgb(frame))
+
+    def _prepared_full(
+        self, stack_id: str, index: int, calibration: CalibrationMasters | None, cosmetic: bool
+    ) -> np.ndarray:
+        """Calibrate then interpolating-debayer (full-res), returning ``(H, W, 3)`` float32."""
+        return _as_rgb(debayer_rgb(self._load_calibrated(stack_id, index, calibration, cosmetic)))
+
+    def _load_calibrated(
+        self, stack_id: str, index: int, calibration: CalibrationMasters | None, cosmetic: bool
+    ) -> LinearFrame:
+        frame = self.storage.load_linear_frame(stack_id, index)
+        if calibration is None:
+            return frame
+        data = self._calibration.calibrate(
+            frame.data,
+            calibration,
+            light_exposure_s=_exposure_seconds(frame.metadata),
+            cosmetic=cosmetic,
+        )
+        return replace(frame, data=data)
+
+
+def _as_rgb(frame: LinearFrame) -> np.ndarray:
+    """A contiguous ``(H, W, 3)`` float32 view of a debayered / mono frame."""
+    data = frame.data.astype(np.float32)
+    if data.ndim == _MONO_NDIM:
+        data = np.repeat(data[:, :, np.newaxis], 3, axis=2)
+    return np.ascontiguousarray(data)
+
+
+def _exposure_seconds(metadata: dict[str, str]) -> float | None:
+    try:
+        return float(metadata["exposure_s"])
+    except (KeyError, TypeError, ValueError):
+        return None
 
 
 def highpass_noise(gray: np.ndarray) -> float:

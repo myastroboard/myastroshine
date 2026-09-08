@@ -7,6 +7,8 @@
 import type {
   AppSettings,
   AutoAstroResult,
+  CalibrationKind,
+  CalibrationSummary,
   CreatedToken,
   DepthShiftResult,
   FocusPoint,
@@ -363,6 +365,31 @@ export const apiClient = {
     return request<StackFrameInfo>(`/stack/${stackId}/frame/${index}/exclude`, {
       method: 'POST',
       json: { excluded },
+    });
+  },
+
+  async uploadCalibrationFrames(
+    stackId: string,
+    kind: CalibrationKind,
+    files: File[],
+  ): Promise<CalibrationSummary> {
+    const form = new FormData();
+    for (const file of files) {
+      form.append('files', file);
+    }
+    const response = await fetch(`${API_URL}/stack/${stackId}/calibration/${kind}/frames`, {
+      method: 'POST',
+      body: form,
+    });
+    if (!response.ok) {
+      throw await readError(response);
+    }
+    return keysToCamelCase<CalibrationSummary>(await response.json());
+  },
+
+  clearCalibration(stackId: string, kind: CalibrationKind): Promise<CalibrationSummary> {
+    return request<CalibrationSummary>(`/stack/${stackId}/calibration/${kind}`, {
+      method: 'DELETE',
     });
   },
 

@@ -436,7 +436,8 @@
       "registration": "Alignment",
       "normalization": "Normalization",
       "integration": "Integration",
-      "upload": "Uploading frames"
+      "upload": "Uploading frames",
+      "calibration": "Calibration"
     },
     "results": {
       "failed": "Stacking failed: {error}",
@@ -448,7 +449,9 @@
       "measured_noise_reduction": "Measured noise reduction",
       "enhance_composite": "Enhance composite",
       "download_composite": "Download composite",
-      "alignment_rms": "Alignment residual"
+      "alignment_rms": "Alignment residual",
+      "calibrated": "Calibration",
+      "calibrated_yes": "Applied"
     },
     "settings": {
       "transform_label": "Alignment",
@@ -511,6 +514,21 @@
       "frame_aria": "Frame {n}",
       "exclude": "Exclude this frame from the stack",
       "remove": "Remove {name}"
+    },
+    "calibration": {
+      "title": "Calibration frames",
+      "hint": "Optional master dark, flat and bias frames. They are built into every light frame before debayering to remove thermal signal, vignetting and sensor defects.",
+      "count": "{n} frames",
+      "add": "Add",
+      "clear": "Clear",
+      "cosmetic_label": "Repair hot & dead pixels",
+      "masters_note": "Master frames are built when you stack.",
+      "kinds": {
+        "dark": "Darks",
+        "flat": "Flats",
+        "bias": "Bias / offset",
+        "dark_flat": "Dark-flats"
+      }
     }
   }
 }

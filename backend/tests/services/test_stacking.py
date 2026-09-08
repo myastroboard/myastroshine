@@ -160,6 +160,60 @@ def test_unknown_stack_raises(stacking: StackingService) -> None:
         stacking.process("no-such-stack")
 
 
+def test_process_calibrates_when_darks_and_flats_are_present(
+    stacking: StackingService, star_field: np.ndarray
+) -> None:
+    """Uploaded calibration frames build masters and mark the result calibrated."""
+    record = stacking.initiate(InitiateStackRequest(frame_count=4))
+    for i, frame in enumerate(_shifted_frames(star_field, 4)):
+        stacking.add_frame(record.stack_id, i, frame)
+
+    dark = np.full_like(star_field, 6)
+    flat = np.full_like(star_field, 180)
+    stacking.add_calibration_frames(record.stack_id, "dark", [_frame(dark) for _ in range(3)])
+    stacking.add_calibration_frames(record.stack_id, "flat", [_frame(flat) for _ in range(3)])
+
+    done = stacking.process(record.stack_id)
+
+    assert done.status == "completed"
+    assert done.result is not None
+    assert done.result["calibrated"] is True
+    assert done.result["frames_stacked"] == 4
+    assert stacking.storage.master_path(record.stack_id, "dark").exists()
+
+
+def test_process_without_calibration_frames_is_not_calibrated(
+    stacking: StackingService, star_field: np.ndarray
+) -> None:
+    record = stacking.initiate(InitiateStackRequest(frame_count=3))
+    for i, frame in enumerate(_shifted_frames(star_field, 3)):
+        stacking.add_frame(record.stack_id, i, frame)
+
+    done = stacking.process(record.stack_id)
+
+    assert done.result is not None
+    assert done.result["calibrated"] is False
+
+
+def test_add_calibration_frames_rejects_an_unknown_kind(stacking: StackingService) -> None:
+    record = stacking.initiate(InitiateStackRequest(frame_count=2))
+    with pytest.raises(InvalidParameterError, match="kind"):
+        stacking.add_calibration_frames(record.stack_id, "sky", [])
+
+
+def test_clear_calibration_drops_the_subs_and_master(
+    stacking: StackingService, star_field: np.ndarray
+) -> None:
+    record = stacking.initiate(InitiateStackRequest(frame_count=2))
+    stacking.add_calibration_frames(
+        record.stack_id, "bias", [_frame(np.full_like(star_field, 3)) for _ in range(2)]
+    )
+    assert stacking.storage.cal_frame_counts(record.stack_id)["bias"] == 2
+
+    stacking.clear_calibration(record.stack_id, "bias")
+    assert stacking.storage.cal_frame_counts(record.stack_id)["bias"] == 0
+
+
 def test_dispatch_drives_the_job_to_a_terminal_state_in_sync_mode(
     stacking: StackingService, star_field: np.ndarray
 ) -> None:

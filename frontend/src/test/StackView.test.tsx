@@ -10,12 +10,19 @@ vi.mock('@/services/api', () => ({
     initiateStack: vi.fn(),
     uploadStackFrames: vi.fn(),
     excludeStackFrame: vi.fn(),
+    uploadCalibrationFrames: vi.fn(),
+    clearCalibration: vi.fn(),
     processStack: vi.fn(),
     getStack: vi.fn(),
     getConfig: vi.fn(),
     downloadImage: vi.fn(),
   },
 }));
+
+const EMPTY_CALIBRATION = {
+  frames: { dark: 0, flat: 0, bias: 0, darkFlat: 0 },
+  cosmeticCorrection: true,
+};
 
 const mocked = vi.mocked(apiClient);
 
@@ -44,8 +51,10 @@ const RESULT: StackResult = {
     referenceFrame: 0,
     snrImprovement: 1.41,
     measuredNoiseReduction: null,
+    calibrated: false,
   },
   frames: FRAMES,
+  calibration: EMPTY_CALIBRATION,
   error: null,
 };
 
@@ -85,6 +94,11 @@ describe('StackView', () => {
     });
     mocked.getStack.mockResolvedValue({ ...RESULT, status: 'ready', statistics: null });
     mocked.excludeStackFrame.mockResolvedValue({ ...FRAMES[1], excluded: true });
+    mocked.uploadCalibrationFrames.mockResolvedValue({
+      ...EMPTY_CALIBRATION,
+      frames: { ...EMPTY_CALIBRATION.frames, dark: 3 },
+    });
+    mocked.clearCalibration.mockResolvedValue(EMPTY_CALIBRATION);
     mocked.processStack.mockResolvedValue(RESULT);
   });
 
@@ -145,6 +159,22 @@ describe('StackView', () => {
     fireEvent.click(screen.getByRole('button', { name: /enhance composite/i }));
 
     expect(onEnhance).toHaveBeenCalledWith('composite-session');
+  });
+
+  it('uploads calibration frames against a freshly opened stack', async () => {
+    const { container } = render(<StackView onEnhanceComposite={vi.fn()} />);
+
+    const fileInputs = container.querySelectorAll<HTMLInputElement>('input[type="file"]');
+    // [0] is the light-frame dropzone; [1] is the "Darks" calibration row
+    fireEvent.change(fileInputs[1], { target: { files: [frameFile('dark.png')] } });
+
+    await waitFor(() =>
+      expect(mocked.uploadCalibrationFrames).toHaveBeenCalledWith('stack-1', 'dark', [
+        expect.any(File),
+      ]),
+    );
+    expect(mocked.initiateStack).toHaveBeenCalled();
+    await waitFor(() => expect(screen.getAllByText(/3 frames/i).length).toBeGreaterThan(0));
   });
 
   it('will not upload fewer than two frames', async () => {

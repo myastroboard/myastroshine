@@ -112,6 +112,8 @@ class StackRecord(Base):
     rejection_algo: Mapped[str] = mapped_column(String(24), default="winsorized_sigma")
     rejection_params: Mapped[JsonDict | None] = mapped_column(JSON)
     weighting: Mapped[str] = mapped_column(String(12), default="noise")
+    #: replace hot/dead pixels (from the master dark/flat) with a neighbour median.
+    cosmetic_correction: Mapped[bool] = mapped_column(default=True)
     #: frame indices the user has manually excluded (a trail, a cloud, ...).
     excluded_frames: Mapped[list[int]] = mapped_column(JSON, default=list)
     #: reference frame, per-frame metrics, registration residuals.

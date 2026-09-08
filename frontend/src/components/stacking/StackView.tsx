@@ -6,6 +6,7 @@ import { useStackSettings } from '@/hooks/useStackSettings';
 import { useTranslation } from '@/hooks/useTranslation';
 import { apiClient } from '@/services/api';
 
+import { StackCalibrationPanel } from './StackCalibrationPanel';
 import { StackFrameGrid } from './StackFrameGrid';
 import { StackProgress } from './StackProgress';
 import { StackResults } from './StackResults';
@@ -33,10 +34,13 @@ export function StackView({ onEnhanceComposite }: StackViewProps) {
     result,
     progress,
     error,
+    calibration,
     addFiles,
     removePending,
     uploadFrames,
     toggleExclude,
+    addCalibrationFiles,
+    clearCalibrationKind,
     select,
     stack,
     reset,
@@ -140,6 +144,17 @@ export function StackView({ onEnhanceComposite }: StackViewProps) {
           <h2 className="eyebrow">{t('stacking.view.settings_heading')}</h2>
           <StackSettings settings={settings} onChange={setSettings} />
         </section>
+
+        {phase !== 'processing' && (
+          <StackCalibrationPanel
+            calibration={calibration}
+            cosmeticCorrection={settings.cosmeticCorrection}
+            disabled={phase === 'uploading'}
+            onAdd={(kind, files) => void addCalibrationFiles(kind, files)}
+            onClear={(kind) => void clearCalibrationKind(kind)}
+            onToggleCosmetic={(value) => setSettings({ ...settings, cosmeticCorrection: value })}
+          />
+        )}
 
         {(phase === 'collecting' || phase === 'uploading') && totalPicked > 0 && (
           <button

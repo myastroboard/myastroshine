@@ -436,7 +436,8 @@
       "registration": "Alignement",
       "normalization": "Normalisation",
       "integration": "Intégration",
-      "upload": "Envoi des images"
+      "upload": "Envoi des images",
+      "calibration": "Calibration"
     },
     "results": {
       "failed": "Échec de l'empilement : {error}",
@@ -448,7 +449,9 @@
       "measured_noise_reduction": "Réduction de bruit mesurée",
       "enhance_composite": "Améliorer le composite",
       "download_composite": "Télécharger le composite",
-      "alignment_rms": "Résidu d'alignement"
+      "alignment_rms": "Résidu d'alignement",
+      "calibrated": "Calibration",
+      "calibrated_yes": "Appliquée"
     },
     "settings": {
       "transform_label": "Alignement",
@@ -511,6 +514,21 @@
       "frame_aria": "Image {n}",
       "exclude": "Exclure cette image de l'empilement",
       "remove": "Retirer {name}"
+    },
+    "calibration": {
+      "title": "Images de calibration",
+      "hint": "Masters dark, flat et offset optionnels. Ils sont appliqués à chaque brute avant dématriçage pour retirer le signal thermique, le vignettage et les défauts du capteur.",
+      "count": "{n} images",
+      "add": "Ajouter",
+      "clear": "Retirer",
+      "cosmetic_label": "Corriger les pixels chauds et morts",
+      "masters_note": "Les masters sont construits au moment de l'empilement.",
+      "kinds": {
+        "dark": "Darks",
+        "flat": "Flats",
+        "bias": "Offsets",
+        "dark_flat": "Dark-flats"
+      }
     }
   }
 }
