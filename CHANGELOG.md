@@ -35,6 +35,14 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A **Theme** control in the footer - System / Light / Dark. "System" follows the
   operating system's light/dark setting and updates live when it changes. The
   choice is remembered per browser.
+- The upload screen now shows real progress: a percentage and bar while the file
+  transfers (over `XMLHttpRequest`, which `fetch` can't report), then an
+  indeterminate "Preparing your image…" spinner while the server decodes it -
+  previously a large FITS / RAW upload just sat with an unchanged button.
+- `GET /api/config` - a small public endpoint exposing the runtime limits the UI
+  needs before a session exists (the upload size cap, stacking limits). The
+  upload screen's size hint and its pre-flight check now follow the operator's
+  configured `max_image_size_mb` instead of a hardcoded 100 MB.
 
 ### Changed
 

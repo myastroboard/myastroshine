@@ -6,6 +6,7 @@ import { ImageUpload } from '@/components/ImageUpload';
 import { SettingsView } from '@/components/SettingsView';
 import { StackMode, type EditorMode } from '@/components/stacking/StackMode';
 import { StackView } from '@/components/stacking/StackView';
+import { useServerConfig } from '@/hooks/useServerConfig';
 import { useTranslation } from '@/hooks/useTranslation';
 import { apiClient } from '@/services/api';
 import type { EditorSession } from '@/types';
@@ -40,9 +41,13 @@ function useRoute(): Route {
 export default function App() {
   const { t } = useTranslation();
   const route = useRoute();
+  const serverConfig = useServerConfig();
   const [mode, setMode] = useState<EditorMode>('single');
   const [session, setSession] = useState<EditorSession | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  // 0-1 while the file bytes transfer; null once they're sent and the server is
+  // decoding (indeterminate). Undefined/not-uploading between sessions.
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const astrodexContext = useMemo(() => {
@@ -60,13 +65,18 @@ export default function App() {
 
   async function handleUpload(file: File): Promise<void> {
     setIsUploading(true);
+    setUploadProgress(null);
     setError(null);
     try {
-      setSession(await apiClient.uploadImage(file));
+      const uploaded = await apiClient.uploadImage(file, (fraction) => {
+        setUploadProgress(fraction < 1 ? fraction : null);
+      });
+      setSession(uploaded);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
       setIsUploading(false);
+      setUploadProgress(null);
     }
   }
 
@@ -136,7 +146,12 @@ export default function App() {
                 onExit={handleExitEditor}
               />
             ) : (
-              <ImageUpload onUpload={handleUpload} isLoading={isUploading} />
+              <ImageUpload
+                onUpload={handleUpload}
+                isLoading={isUploading}
+                progress={uploadProgress}
+                maxSizeMb={serverConfig.maxImageSizeMb}
+              />
             )}
           </main>
         )}

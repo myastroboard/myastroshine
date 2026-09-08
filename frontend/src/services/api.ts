@@ -16,6 +16,7 @@ import type {
   Preset,
   ProcessResponse,
   ProcessingParameters,
+  PublicConfig,
   StackResult,
   StackSession,
   StackSettings,
@@ -57,6 +58,50 @@ interface RequestOptions {
   bearer?: string;
 }
 
+/**
+ * POST a `FormData` body with upload-progress reporting. `fetch` cannot report
+ * request-body progress, so uploads that can be large (a full-res FITS / RAW)
+ * go through `XMLHttpRequest` instead. `onProgress` receives a 0-1 fraction and
+ * only fires while the browser can measure the transfer (`lengthComputable`).
+ */
+function uploadWithProgress<T>(
+  path: string,
+  form: FormData,
+  onProgress?: (fraction: number) => void,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API_URL}${path}`);
+    if (onProgress) {
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) {
+          onProgress(event.loaded / event.total);
+        }
+      });
+    }
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve(keysToCamelCase<T>(JSON.parse(xhr.responseText)));
+        } catch {
+          reject(new ApiError(xhr.status, 'Malformed server response'));
+        }
+        return;
+      }
+      let message = xhr.responseText || xhr.statusText;
+      try {
+        message = (JSON.parse(xhr.responseText) as { error?: string }).error ?? message;
+      } catch {
+        /* not JSON - keep the raw text */
+      }
+      reject(new ApiError(xhr.status, message));
+    });
+    xhr.addEventListener('error', () => reject(new ApiError(0, 'Network error during upload')));
+    xhr.addEventListener('abort', () => reject(new ApiError(0, 'Upload cancelled')));
+    xhr.send(form);
+  });
+}
+
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = {};
   const init: RequestInit = { method: options.method ?? 'GET', headers };
@@ -92,14 +137,15 @@ interface SavePresetResult {
 }
 
 export const apiClient = {
-  async uploadImage(file: File): Promise<UploadResponse> {
+  /** `onProgress` reports the byte-transfer fraction (0-1); the server then
+   * decodes the image before responding, which this cannot measure. */
+  uploadImage(
+    file: File,
+    onProgress?: (fraction: number) => void,
+  ): Promise<UploadResponse> {
     const form = new FormData();
     form.append('file', file);
-    const response = await fetch(`${API_URL}/upload`, { method: 'POST', body: form });
-    if (!response.ok) {
-      throw await readError(response);
-    }
-    return keysToCamelCase<UploadResponse>(await response.json());
+    return uploadWithProgress<UploadResponse>('/upload', form, onProgress);
   },
 
   processImage(sessionId: string, parameters: ProcessingParameters): Promise<ProcessResponse> {
@@ -290,6 +336,11 @@ export const apiClient = {
   // --- Update check ---
   checkForUpdates(): Promise<VersionCheckResult> {
     return request<VersionCheckResult>('/version/check-updates');
+  },
+
+  /** Public runtime limits (upload size cap, stacking limits). */
+  getConfig(): Promise<PublicConfig> {
+    return request<PublicConfig>('/config');
   },
 };
 

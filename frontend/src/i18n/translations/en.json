@@ -55,12 +55,14 @@
   },
   "image_upload": {
     "format_not_supported": "Format {ext} not supported",
-    "file_too_large": "File size exceeds 100MB limit",
+    "file_too_large": "File is larger than the {mb} MB limit",
     "drop_hint": "Drop an astronomical image here",
     "choose_file_hint": "or choose a file to begin",
     "choose_file_button": "Choose a file",
-    "uploading_button": "Uploading...",
-    "accepted_formats": "JPEG, PNG, TIFF, FITS or camera RAW, up to 100 MB"
+    "uploading_percent": "Uploading… {percent}%",
+    "processing": "Preparing your image…",
+    "accepted_formats": "JPEG, PNG, TIFF, FITS or camera RAW",
+    "max_size": "up to {mb} MB"
   },
   "editor": {
     "depth_shift_failed": "Depth shift failed: {error}",

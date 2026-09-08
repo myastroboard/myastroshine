@@ -54,6 +54,7 @@ Celery job queue (`PROCESSING_MODE=queue`), and the progress WebSockets.
 | Method | Path | Purpose | Sprint |
 |--------|------|---------|--------|
 | GET | `/health` | System health | 1 |
+| GET | `/config` | Public runtime limits (upload cap, stacking limits) - no admin gate | v0.3 |
 | GET | `/admin/app-settings` | Current runtime settings (`app_settings.json`) | 1 |
 | POST | `/admin/app-settings` | Replace runtime settings (gated by `ADMIN_ENABLED`) | 1 |
 | GET | `/admin/logs` | Tail the log file, newest first (`limit`, `offset`, `level`) | 1 |
@@ -311,6 +312,20 @@ Scope is deliberately limited to what histogram/black-point/star-density can
 drive with confidence: `contrast`, `exposure`, `highlights`, `shadows`, and
 `star_reduction`. Everything else stays at its `ProcessingParameters` default.
 See `docs/ALGORITHMS.md` "Auto Astro" for the heuristic.
+
+## Client config
+
+`GET /config` returns the non-sensitive runtime limits the web UI needs before a
+session exists - the upload size cap it pre-checks against and shows, and the
+stacking limits. No `ADMIN_ENABLED` gate (unlike `GET /admin/app-settings`,
+which returns the full settings object):
+
+```json
+{ "max_image_size_mb": 100, "stacking_enabled": true, "stacking_max_frames": 100 }
+```
+
+Values track `app_settings.json` - change `max_image_size_mb` in Settings and
+the upload screen's hint and pre-flight check follow.
 
 ## Update check
 

@@ -405,6 +405,14 @@ export interface AppSettings {
   consoleLogLevel: LogLevel;
 }
 
+/** Non-sensitive runtime limits the UI needs before a session exists
+ * (`GET /api/config`). Mirror of `app/routes/config.py::PublicConfig`. */
+export interface PublicConfig {
+  maxImageSizeMb: number;
+  stackingEnabled: boolean;
+  stackingMaxFrames: number;
+}
+
 export type LogLevel = 'debug' | 'info' | 'warning' | 'error' | 'critical';
 
 export interface LogLevels {

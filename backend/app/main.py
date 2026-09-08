@@ -31,6 +31,7 @@ from app.routes import (
     admin,
     astrodex,
     auto_astro,
+    config,
     depth_shift,
     download,
     health,
@@ -124,6 +125,7 @@ def create_app() -> FastAPI:
 
     for router in (
         health.router,
+        config.router,
         upload.router,
         processing.router,
         depth_shift.router,
