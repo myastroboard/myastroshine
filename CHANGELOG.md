@@ -49,11 +49,24 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Seestar set. This release lays the foundation: a unified linear ingest (FITS
   Bayer mosaics kept intact and debayered in-pipeline, camera RAW demosaiced
   linearly, 8-bit previews sRGB-linearised), a `.zip` archive upload so a
-  thousand-frame session is one request, per-frame thumbnails, and a
+  thousand-frame session is a handful of requests, per-frame thumbnails, and a
   frame-by-frame include/exclude toggle (`POST /api/stack/{id}/frame/{i}/exclude`)
-  for dropping a sub with a trail or cloud. Integration is currently a
-  memory-bounded running mean; star-based alignment, pixel rejection, frame
-  weighting and calibration frames follow. See `initial_plan/12_STACKING_REBUILD.md`.
+  for dropping a sub with a trail or cloud. Frames now upload in batches
+  (`POST /api/stack/{id}/upload-frames`) or as a `.zip`
+  (`POST /api/stack/{id}/upload-archive`) instead of one request per frame, and
+  the frontend checks the frame count against the instance limit before starting
+  so you get a clear message, not a raw error. The stacking screen is reworked
+  into a collect -> upload -> review -> stack flow: a drag-and-drop zone matching
+  the single-image one (accepted formats, size limit), then frames upload as a
+  batch and a thumbnail grid lets you click any frame to preview it large and
+  tick a box to drop a trailed or clouded sub. After stacking you can still tweak
+  a setting or exclude another frame and hit **Re-stack**
+  (`POST /api/stack/{id}/process` now takes an optional settings body) with no
+  re-upload, or inspect a frame and go "Back to composite". A `beforeunload`
+  guard stops a mis-swipe or a mouse "back" from losing an in-progress stack.
+  Integration is currently a memory-bounded running mean; star-based alignment,
+  pixel rejection, frame weighting and calibration frames follow. See
+  `initial_plan/12_STACKING_REBUILD.md`.
 
 ### Changed
 
@@ -65,6 +78,10 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Built-in deep-sky presets were rebalanced to darken shadows instead of
   lifting them (Galaxy `shadows: -0.25`, Deep Field `shadows: -0.35`) for
   better object-vs-background separation, matching the Auto Astro strategy.
+- The per-IP request rate limit now defaults to 600/min (was 120) and can be
+  set as high as 6000 - it is an abuse guard for a public instance, not a
+  fairness knob, and a single user editing plus running a stacking session
+  should never hit it.
 - Consistent card surfaces across the editor, Settings, and stacking: the
   editor's three columns (workflow rail, inspector, preview), the Settings nav
   and content panes, and the stacking result blocks now use one framing system
@@ -83,7 +100,15 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (`translation`/`similarity`/`affine`), `average`/`median` combination, a pixel
   rejection algorithm and a frame-weighting mode. The `stacking_detector`,
   `stacking_combination_default` and `stacking_cosmic_ray_threshold` settings are
-  gone; `stacking_max_frames` now defaults to 500.
+  gone; `stacking_max_frames` now defaults to 2000 (a real imaging night at 10 s
+  subs), up from 100.
+
+### Fixed
+
+- Stacking in the default sync processing mode left its job record stuck at
+  "queued" forever - a few stacks (or re-stacks) in a session would trip "Too
+  many concurrent processing jobs" and stay tripped. Sync-mode stacks now mark
+  the job completed/failed the same way the queue path does.
 
 ## [0.2.0] - 2026-09-06
 

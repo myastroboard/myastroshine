@@ -326,6 +326,26 @@ export const apiClient = {
     return keysToCamelCase<UploadFrameResult>(await response.json());
   },
 
+  async uploadStackFrames(
+    stackId: string,
+    startIndex: number,
+    files: File[],
+  ): Promise<StackSession> {
+    const form = new FormData();
+    form.append('start_index', String(startIndex));
+    for (const file of files) {
+      form.append('files', file);
+    }
+    const response = await fetch(`${API_URL}/stack/${stackId}/upload-frames`, {
+      method: 'POST',
+      body: form,
+    });
+    if (!response.ok) {
+      throw await readError(response);
+    }
+    return keysToCamelCase<StackSession>(await response.json());
+  },
+
   async uploadStackArchive(stackId: string, file: File): Promise<StackSession> {
     const form = new FormData();
     form.append('file', file);
@@ -346,8 +366,11 @@ export const apiClient = {
     });
   },
 
-  processStack(stackId: string): Promise<StackResult> {
-    return request<StackResult>(`/stack/${stackId}/process`, { method: 'POST' });
+  processStack(stackId: string, overrides?: StackSettings): Promise<StackResult> {
+    return request<StackResult>(`/stack/${stackId}/process`, {
+      method: 'POST',
+      json: overrides,
+    });
   },
 
   getStack(stackId: string): Promise<StackResult> {

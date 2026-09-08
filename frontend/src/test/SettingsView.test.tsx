@@ -33,7 +33,7 @@ const SETTINGS: AppSettings = {
   astrodexMaxRetries: 3,
   astrodexRetryDelaySeconds: 5,
   stackingEnabled: true,
-  stackingMaxFrames: 500,
+  stackingMaxFrames: 2000,
   logLevel: 'info',
   consoleLogLevel: 'warning',
 };
@@ -77,7 +77,7 @@ describe('SettingsView', () => {
 
     await waitFor(() => expect(mocked.saveAppSettings).toHaveBeenCalledTimes(1));
     expect(mocked.saveAppSettings).toHaveBeenCalledWith(
-      expect.objectContaining({ maxImageSizeMb: 250, stackingMaxFrames: 500 }),
+      expect.objectContaining({ maxImageSizeMb: 250, stackingMaxFrames: 2000 }),
     );
   });
 

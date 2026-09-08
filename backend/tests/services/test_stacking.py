@@ -10,6 +10,7 @@ import pytest
 from app.db.models import StackRecord
 from app.exceptions import InvalidParameterError, ResourceNotFoundError
 from app.models import InitiateStackRequest
+from app.services.job import JobService
 from app.services.session import SessionService
 from app.services.stacking import StackingService
 from app.services.storage import StorageService
@@ -115,12 +116,26 @@ def test_excluding_an_unknown_frame_raises(stacking: StackingService) -> None:
         stacking.set_frame_excluded(record.stack_id, 0, excluded=True)
 
 
-def test_upload_rejects_out_of_range_index(
+def test_upload_rejects_an_index_past_the_instance_cap(
     stacking: StackingService, star_field: np.ndarray
 ) -> None:
+    from app.utils import app_settings
+
+    app_settings.save_app_settings({"stacking_max_frames": 3})
     record = stacking.initiate(InitiateStackRequest(frame_count=2))
     with pytest.raises(InvalidParameterError):
         stacking.add_frame(record.stack_id, 5, _frame(star_field))
+
+
+def test_adding_frames_past_the_initial_count_grows_the_stack(
+    stacking: StackingService, star_field: np.ndarray
+) -> None:
+    """Uploading more frames than `initiate` estimated just grows `frame_count`."""
+    record = stacking.initiate(InitiateStackRequest(frame_count=2))
+    for i in range(4):
+        record = stacking.add_frame(record.stack_id, i, _frame(star_field))
+    assert record.received_frames == 4
+    assert record.frame_count == 4
 
 
 def test_process_needs_two_frames(stacking: StackingService, star_field: np.ndarray) -> None:
@@ -143,3 +158,19 @@ def test_process_rejects_mismatched_dimensions(
 def test_unknown_stack_raises(stacking: StackingService) -> None:
     with pytest.raises(ResourceNotFoundError):
         stacking.process("no-such-stack")
+
+
+def test_dispatch_drives_the_job_to_a_terminal_state_in_sync_mode(
+    stacking: StackingService, star_field: np.ndarray
+) -> None:
+    """A sync-mode stack must mark its JobRecord completed, or it counts against
+    the per-IP concurrency limit forever."""
+    jobs = JobService(stacking.db)
+    record = stacking.initiate(InitiateStackRequest(frame_count=3))
+    for i, frame in enumerate(_shifted_frames(star_field, 3)):
+        stacking.add_frame(record.stack_id, i, frame)
+
+    _done, job_id = stacking.dispatch(record.stack_id, jobs, client_ip="1.2.3.4")
+
+    assert jobs.get(job_id).status == "completed"
+    assert jobs.count_active_for_ip("1.2.3.4") == 0

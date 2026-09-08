@@ -45,6 +45,31 @@ def test_full_stack_workflow(client, star_field: np.ndarray) -> None:
     assert fetched.json()["status"] == "completed"
 
 
+def test_upload_frames_batch_indexes_from_start_index(client, star_field: np.ndarray) -> None:
+    """A batch of frames goes in one request, indexed start_index upward."""
+    init = client.post("/api/stack/initiate", json={"frame_count": 4})
+    stack_id = init.json()["stack_id"]
+
+    files = [
+        ("files", (f"f{i}.png", png_bytes(translate(star_field, i, -i)), "image/png"))
+        for i in range(4)
+    ]
+    r1 = client.post(
+        f"/api/stack/{stack_id}/upload-frames", data={"start_index": "0"}, files=files[:2]
+    )
+    assert r1.status_code == 202
+    assert r1.json()["received_frames"] == 2
+
+    r2 = client.post(
+        f"/api/stack/{stack_id}/upload-frames", data={"start_index": "2"}, files=files[2:]
+    )
+    assert r2.json()["received_frames"] == 4
+    assert r2.json()["status"] == "ready"
+
+    processed = client.post(f"/api/stack/{stack_id}/process").json()
+    assert processed["statistics"]["frames_stacked"] == 4
+
+
 def test_upload_archive_ingests_every_image_member(client, star_field: np.ndarray) -> None:
     """A .zip of frames is one request; members are assigned indices in filename order."""
     init = client.post("/api/stack/initiate", json={"frame_count": 3})
@@ -108,6 +133,29 @@ def test_frame_thumbnail_is_served(client, star_field: np.ndarray) -> None:
     assert thumb.status_code == 200
     assert thumb.headers["content-type"] == "image/jpeg"
     assert client.get(f"/api/stack/{stack_id}/frame/9/thumb").status_code == 404
+
+
+def test_process_can_re_stack_with_a_changed_setting(client, star_field: np.ndarray) -> None:
+    """A body on /process re-stacks with a new combination method, no re-upload."""
+    init = client.post(
+        "/api/stack/initiate", json={"frame_count": 3, "combination_method": "average"}
+    )
+    stack_id = init.json()["stack_id"]
+    for i in range(3):
+        client.post(
+            f"/api/stack/{stack_id}/upload-frame",
+            data={"frame_index": str(i)},
+            files={"file": (f"f{i}.png", png_bytes(translate(star_field, i, -i)), "image/png")},
+        )
+
+    first = client.post(f"/api/stack/{stack_id}/process").json()
+    assert first["statistics"]["combination_method"] == "average"
+
+    second = client.post(
+        f"/api/stack/{stack_id}/process", json={"combination_method": "median"}
+    ).json()
+    assert second["status"] == "completed"
+    assert second["statistics"]["combination_method"] == "median"
 
 
 def test_initiate_rejects_too_few_frames(client) -> None:

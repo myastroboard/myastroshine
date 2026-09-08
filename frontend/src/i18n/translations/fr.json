@@ -435,7 +435,8 @@
     "steps": {
       "registration": "Alignement",
       "normalization": "Normalisation",
-      "integration": "Intégration"
+      "integration": "Intégration",
+      "upload": "Envoi des images"
     },
     "results": {
       "failed": "Échec de l'empilement : {error}",
@@ -481,13 +482,34 @@
         "uploading": "envoi en cours",
         "done": "terminé",
         "error": "erreur"
-      }
+      },
+      "drop_hint": "Déposez vos images ici",
+      "choose_files_button": "Choisir des fichiers",
+      "accepted_formats": "JPEG, PNG, TIFF, FITS ou RAW appareil photo",
+      "max_size": "jusqu'à {mb} Mo chacune"
     },
     "view": {
       "settings_heading": "Paramètres d'empilement",
       "stacking_button": "Empilement en cours...",
       "stack_n_frames": "Empiler {count} images",
-      "hint": "Téléversez au moins 2 images similaires (JPEG, PNG, TIFF ou FITS). Plus il y a d'images, plus le rapport signal/bruit augmente, environ selon la racine carrée du nombre d'images."
+      "hint": "Téléversez au moins 2 images similaires (JPEG, PNG, TIFF ou FITS). Plus il y a d'images, plus le rapport signal/bruit augmente, environ selon la racine carrée du nombre d'images.",
+      "preview_placeholder": "Sélectionnez une image pour la prévisualiser.",
+      "uploading_button": "Envoi en cours...",
+      "upload_n_frames": "Envoyer {count} images",
+      "review_hint": "{total} images envoyées, {excluded} exclues. Cliquez une vignette pour la prévisualiser ; la case à cocher retire une pose avec trainée ou nuage.",
+      "new_stack": "Nouvel empilement",
+      "back_to_composite": "Retour au composite",
+      "restack_n_frames": "Réempiler {count} images"
+    },
+    "errors": {
+      "too_few": "Ajoutez au moins {min} images pour empiler.",
+      "too_many": "{count} images sélectionnées - cette instance en autorise au plus {max} par empilement (à augmenter dans les Réglages).",
+      "failed": "Échec de l'empilement."
+    },
+    "grid": {
+      "frame_aria": "Image {n}",
+      "exclude": "Exclure cette image de l'empilement",
+      "remove": "Retirer {name}"
     }
   }
 }

@@ -47,10 +47,12 @@ class AppSettings(BaseModel):
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
 
     # Rate limiting (per IP, across upload/process/stack - API spec "Rate Limiting").
-    # 120/min, not the spec's original 10: the editor re-processes on every slider
-    # change (500ms debounce - see docs/API.md "Rate Limiting" for the numbers).
+    # 600/min, well above a busy session: the editor re-processes on every slider
+    # change (500ms debounce, ~120/min alone) and a stacking upload adds a burst on
+    # top. It is an abuse guard for a public instance, not a fairness knob - a
+    # single user doing real work should never hit it. See docs/API.md.
     rate_limit_enabled: bool = True
-    rate_limit_per_minute: int = Field(default=120, ge=1, le=1000)
+    rate_limit_per_minute: int = Field(default=600, ge=1, le=6000)
     max_concurrent_jobs_per_ip: int = Field(default=5, ge=1, le=100)
 
     # Uploads and sessions
@@ -63,9 +65,11 @@ class AppSettings(BaseModel):
     astrodex_max_retries: int = Field(default=3, ge=1, le=10)
     astrodex_retry_delay_seconds: float = Field(default=5.0, ge=0, le=60)
 
-    # Stacking (linear rebuild - see initial_plan/12_STACKING_REBUILD.md)
+    # Stacking (linear rebuild - see initial_plan/12_STACKING_REBUILD.md).
+    # Default sized for a real imaging night: a smart telescope at 10 s subs over
+    # ~5-6 h of darkness produces ~2000 frames.
     stacking_enabled: bool = True
-    stacking_max_frames: int = Field(default=500, ge=2, le=5000)
+    stacking_max_frames: int = Field(default=2000, ge=2, le=5000)
 
     # Logging - file level and console level (changeable at runtime, see #4)
     log_level: str = "info"

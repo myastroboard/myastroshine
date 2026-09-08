@@ -8,7 +8,7 @@ import type { PublicConfig } from '@/types';
 const DEFAULTS: PublicConfig = {
   maxImageSizeMb: 100,
   stackingEnabled: true,
-  stackingMaxFrames: 100,
+  stackingMaxFrames: 2000,
 };
 
 /**
