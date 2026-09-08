@@ -409,15 +409,34 @@ retries `ASTRODEX_MAX_RETRIES` times with exponential backoff; the
 `astrodex_callback_url` must match `ASTRODEX_CALLBACK_URLS` when that allowlist
 is set (else `403`).
 
-## Stacking (v1.1)
+## Stacking (linear rebuild)
 
-1. `POST /stack/initiate` `{ frame_count, registration_method?, combination_method?,
-   cosmic_ray_rejection?, background_normalization? }` -> `202 { stack_id, status:
-   "waiting_for_frames", frame_count, received_frames }`.
+Being rebuilt - see `initial_plan/12_STACKING_REBUILD.md`. Frames are ingested as
+linear `float32` (FITS CFA mosaics kept intact, camera RAW demosaiced linearly,
+8-bit previews sRGB-linearised) and integrated in a memory-bounded pass. **Phase 0
+status:** the integration is a naive running mean with no registration or pixel
+rejection yet.
+
+1. `POST /stack/initiate` `{ frame_count, registration_transform?, combination_method?,
+   rejection_algo?, weighting? }` -> `202 { stack_id, status: "waiting_for_frames",
+   frame_count, received_frames }`.
+   - `registration_transform`: `translation` / `similarity` (default) / `affine`
+   - `combination_method`: `average` (default) / `median`
+   - `rejection_algo`: `none` / `sigma` / `winsorized_sigma` (default)
+   - `weighting`: `none` / `noise` (default) / `quality`
 2. `POST /stack/{stack_id}/upload-frame` (multipart: `frame_index`, `file`) ->
    `202 { frame_index, received_frames, frame_count, status }`. `status` becomes
    `"ready"` once every frame is in.
-3. `POST /stack/{stack_id}/process` runs the pipeline synchronously and returns
+3. `POST /stack/{stack_id}/upload-archive` (multipart: `file` = a `.zip`) ->
+   `202 { stack_id, status, frame_count, received_frames }`. Image members are
+   ingested in filename order and assigned indices from `received_frames` upward,
+   up to `frame_count` - one HTTP request for a whole session.
+4. `POST /stack/{stack_id}/frame/{index}/exclude` `{ excluded: bool }` ->
+   `200 { index, thumb_url, excluded }`. Toggles a frame in or out of the stack
+   (a trail, a cloud). Excluded frames are skipped by `process`.
+5. `GET /stack/{stack_id}/frame/{index}/thumb` -> a ~256 px auto-stretched JPEG
+   for the frame grid. Not rate-limited.
+6. `POST /stack/{stack_id}/process` runs the pipeline synchronously and returns
    `200`:
 
 ```json
@@ -427,15 +446,15 @@ is set (else `403`).
   "session_id": "<composite session>",
   "stacked_image_url": "/api/preview/<session_id>?full=true",
   "statistics": {
-    "frames_stacked": 15, "frames_rejected": 0, "combination_method": "median",
-    "cosmic_rays_removed": 42, "registration_success_rate": 100.0,
-    "snr_improvement": 3.87
-  }
+    "frames_stacked": 48, "frames_excluded": 2, "combination_method": "average",
+    "registration_transform": "similarity", "snr_improvement": 6.93,
+    "measured_noise_reduction": 5.1
+  },
+  "frames": [{ "index": 0, "thumb_url": "/api/stack/.../frame/0/thumb", "excluded": false }]
 }
 ```
 
 The composite is a normal session: enhance it with `POST /process`, fetch it with
 `GET /preview`, download it with `POST /download`. `GET /stack/{stack_id}` returns
-the same body at any time (`error` is set when `status` is `"failed"`).
-`registration_method` is `sift` / `orb`; `combination_method` is `median` / `mean`
-/ `sigma_clip`. See docs/ALGORITHMS.md for the pipeline.
+the same body at any time, always with the current `frames` list (`error` is set
+when `status` is `"failed"`). See docs/ALGORITHMS.md for the pipeline.

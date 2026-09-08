@@ -1,0 +1,304 @@
+"""Linear frame ingest for the stacking pipeline."""
+
+from __future__ import annotations
+
+import io
+
+import cv2
+import numpy as np
+import pytest
+import rawpy
+
+from app.exceptions import UnsupportedImageError
+from app.utils import linear_ingest
+from app.utils.linear_ingest import LinearFrame, ingest_frame, to_display_bgr
+
+
+def _fits_bytes(data: np.ndarray, **header: object) -> bytes:
+    from astropy.io import fits
+
+    hdu = fits.PrimaryHDU(data=data)
+    for key, value in header.items():
+        hdu.header[key] = value
+    buffer = io.BytesIO()
+    hdu.writeto(buffer)
+    return buffer.getvalue()
+
+
+def test_fits_mono_16bit_becomes_linear_unit_float() -> None:
+    """A 16-bit mono FITS plane maps to float32 in [0, 1], staying linear (no stretch)."""
+    data = np.full((20, 30), 12000, dtype=np.uint16)
+    data[5, 5] = 60000
+
+    frame = ingest_frame(_fits_bytes(data), "light.fit")
+
+    assert frame.data.dtype == np.float32
+    assert frame.data.shape == (20, 30)
+    assert not frame.is_color
+    assert not frame.is_cfa
+    assert frame.source_bit_depth == 16
+    assert not frame.already_stretched
+    # linear: 12000/65535 ~= 0.183, not pushed toward a 0.25 background target
+    assert frame.data[0, 0] == pytest.approx(12000 / 65535, abs=1e-4)
+    assert frame.data[5, 5] == pytest.approx(60000 / 65535, abs=1e-4)
+
+
+def test_fits_bayer_pattern_is_recorded_and_mosaic_kept() -> None:
+    """A CFA FITS (BAYERPAT header) stays a 2D mosaic, flagged for downstream debayer."""
+    data = np.full((16, 16), 8000, dtype=np.uint16)
+
+    frame = ingest_frame(_fits_bytes(data, BAYERPAT="GRBG"), "light.fit")
+
+    assert frame.is_cfa
+    assert frame.bayer_pattern == "GRBG"
+    assert frame.data.ndim == 2
+
+
+def test_fits_rgb_cube_reads_as_rgb_channel_order() -> None:
+    """A (3, H, W) FITS cube becomes (H, W, 3) in R, G, B order."""
+    base = np.full((10, 10), 5000.0, dtype=np.float32)
+    red, green, blue = base.copy(), base.copy(), base.copy()
+    red[1, 1] = 50000
+    green[5, 5] = 50000
+    blue[8, 8] = 50000
+
+    frame = ingest_frame(_fits_bytes(np.stack([red, green, blue])), "rgb.fit")
+
+    assert frame.data.shape == (10, 10, 3)
+    assert frame.data[1, 1, 0] > frame.data[1, 1, 2]  # red spot brightest in channel 0
+    assert frame.data[5, 5, 1] > frame.data[5, 5, 0]  # green spot in channel 1
+    assert frame.data[8, 8, 2] > frame.data[8, 8, 0]  # blue spot in channel 2
+
+
+def test_fits_metadata_is_extracted() -> None:
+    """Acquisition keywords are copied into LinearFrame.metadata under stable names."""
+    data = np.zeros((8, 8), dtype=np.uint16)
+
+    frame = ingest_frame(
+        _fits_bytes(
+            data,
+            EXPTIME=10.0,
+            GAIN=80,
+            **{"CCD-TEMP": 25.3},
+            **{"DATE-OBS": "2026-09-07T18:43:33"},
+            OBJECT="C 11",
+            FILTER="IRCUT",
+            INSTRUME="Seestar S50",
+        ),
+        "light.fit",
+    )
+
+    assert frame.metadata["exposure_s"] == "10.0"
+    assert frame.metadata["gain"] == "80"
+    assert frame.metadata["sensor_temp_c"] == "25.3"
+    assert frame.metadata["object"] == "C 11"
+    assert frame.metadata["filter"] == "IRCUT"
+    assert frame.metadata["instrument"] == "Seestar S50"
+
+
+def test_fits_bottom_up_row_order_is_flipped() -> None:
+    """ROWORDER = BOTTOM-UP is flipped to top-down so frames align consistently."""
+    data = np.zeros((20, 10), dtype=np.uint16)
+    data[0, :] = 40000  # bright top row in file order
+
+    top_down = ingest_frame(_fits_bytes(data), "a.fit")
+    bottom_up = ingest_frame(_fits_bytes(data, ROWORDER="BOTTOM-UP"), "b.fit")
+
+    assert top_down.data[0, 0] > top_down.data[-1, 0]
+    assert bottom_up.data[-1, 0] > bottom_up.data[0, 0]  # flipped
+
+
+def test_fits_float_already_normalized_is_left_as_is() -> None:
+    """A 32-bit float FITS already in [0, 1] (a Siril stack export) is not rescaled."""
+    data = np.full((10, 10), 0.4, dtype=np.float32)
+    data[2, 2] = 0.95
+
+    frame = ingest_frame(_fits_bytes(data), "stack.fits")
+
+    assert frame.data[0, 0] == pytest.approx(0.4, abs=1e-5)
+    assert frame.data[2, 2] == pytest.approx(0.95, abs=1e-5)
+    assert frame.source_bit_depth == 32
+
+
+def test_fits_float_adu_counts_are_normalized_by_peak() -> None:
+    """A float FITS holding raw ADU counts (peak well above 1) is scaled to [0, 1]."""
+    data = np.full((10, 10), 300.0, dtype=np.float32)
+    data[2, 2] = 30000.0
+
+    frame = ingest_frame(_fits_bytes(data), "raw.fits")
+
+    assert frame.data.max() == pytest.approx(1.0, abs=1e-5)
+    assert frame.data[0, 0] == pytest.approx(300.0 / 30000.0, abs=1e-4)
+
+
+def test_fits_nan_pixels_do_not_poison_the_frame() -> None:
+    """NaN/blank pixels map to 0, they don't blank the whole plane."""
+    data = np.full((12, 12), 5000.0, dtype=np.float32)
+    data[0:2, 0:2] = np.nan
+
+    frame = ingest_frame(_fits_bytes(data), "blank.fits")
+
+    assert frame.data[0, 0] == 0.0
+    assert frame.data[6, 6] > 0.0
+
+
+def test_fits_without_image_data_is_rejected() -> None:
+    from astropy.io import fits
+
+    buffer = io.BytesIO()
+    fits.HDUList([fits.PrimaryHDU()]).writeto(buffer)
+
+    with pytest.raises(UnsupportedImageError, match="no image data"):
+        ingest_frame(buffer.getvalue(), "empty.fits")
+
+
+def test_fits_garbage_is_rejected() -> None:
+    with pytest.raises(UnsupportedImageError):
+        ingest_frame(b"not a fits file", "broken.fit")
+
+
+def test_fits_header_declared_oversized_shape_is_rejected_before_allocation() -> None:
+    from astropy.io import fits
+
+    header = fits.Header(
+        [
+            ("SIMPLE", True),
+            ("BITPIX", -32),
+            ("NAXIS", 2),
+            ("NAXIS1", 50000),
+            ("NAXIS2", 50000),
+            ("EXTEND", True),
+        ]
+    )
+    with pytest.raises(UnsupportedImageError, match="exceeding"):
+        ingest_frame(header.tostring(padding=True).encode("ascii"), "huge.fits")
+
+
+def test_fits_unsupported_cube_shape_is_rejected() -> None:
+    data = np.zeros((2, 4, 5), dtype=np.float32)
+    with pytest.raises(UnsupportedImageError, match="shape"):
+        ingest_frame(_fits_bytes(data), "cube.fits")
+
+
+def test_8bit_jpeg_is_flagged_stretched_and_linearised_in_rgb_order() -> None:
+    """A Seestar-style 8-bit preview: already_stretched, sRGB-linearised, R-G-B order."""
+    bgr = np.zeros((16, 24, 3), dtype=np.uint8)
+    bgr[:, :, 2] = 200  # strong red in a BGR array
+    ok, buffer = cv2.imencode(".jpg", bgr)
+    assert ok
+
+    frame = ingest_frame(buffer.tobytes(), "Light_C 11_10.0s.jpg")
+
+    assert frame.already_stretched
+    assert frame.source_bit_depth == 8
+    assert frame.data.shape == (16, 24, 3)
+    # red lives in channel 0 (RGB), and sRGB EOTF pulls 200/255 down below linear 0.784
+    assert frame.data[0, 0, 0] > frame.data[0, 0, 2]
+    assert frame.data[0, 0, 0] < 200 / 255
+
+
+def test_16bit_png_is_linear_not_stretched() -> None:
+    """A 16-bit PNG (a linear stack export) scales to [0, 1] and is not flagged stretched."""
+    rng = np.random.default_rng(3)
+    data = np.clip(rng.normal(3000, 200, size=(20, 20, 3)), 0, 65535).astype(np.uint16)
+    ok, buffer = cv2.imencode(".png", data)
+    assert ok
+
+    frame = ingest_frame(buffer.tobytes(), "stack.png")
+
+    assert not frame.already_stretched
+    assert frame.source_bit_depth == 16
+    assert float(np.median(frame.data)) == pytest.approx(3000 / 65535, abs=0.02)
+
+
+def test_grayscale_png_stays_mono() -> None:
+    gray = np.full((12, 18), 120, dtype=np.uint8)
+    ok, buffer = cv2.imencode(".png", gray)
+    assert ok
+
+    frame = ingest_frame(buffer.tobytes(), "gray.png")
+
+    assert frame.data.ndim == 2
+    assert not frame.is_color
+
+
+def test_rgba_png_drops_alpha() -> None:
+    rgba = np.zeros((10, 10, 4), dtype=np.uint8)
+    rgba[:, :, 3] = 255
+    ok, buffer = cv2.imencode(".png", rgba)
+    assert ok
+
+    frame = ingest_frame(buffer.tobytes(), "rgba.png")
+
+    assert frame.data.shape == (10, 10, 3)
+
+
+def test_garbage_bytes_are_rejected() -> None:
+    with pytest.raises(UnsupportedImageError):
+        ingest_frame(b"not an image", "x.png")
+
+
+def test_frame_over_the_pixel_cap_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    data = np.zeros((40, 40), dtype=np.uint16)
+    monkeypatch.setattr(linear_ingest, "MAX_IMAGE_PIXELS", 100)
+    with pytest.raises(UnsupportedImageError, match="exceeding"):
+        ingest_frame(_fits_bytes(data), "big.fit")
+
+
+def test_raw_dispatches_through_rawpy_to_linear_rgb(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _FakeRaw:
+        def __enter__(self) -> _FakeRaw:
+            return self
+
+        def __exit__(self, *exc_info: object) -> None:
+            return None
+
+        def postprocess(self, **kwargs: object) -> np.ndarray:
+            assert kwargs["gamma"] == (1, 1)
+            assert kwargs["no_auto_bright"] is True
+            assert kwargs["output_bps"] == 16
+            return np.full((4, 6, 3), 32768, dtype=np.uint16)
+
+    monkeypatch.setattr(rawpy, "imread", lambda _file: _FakeRaw())
+
+    frame = ingest_frame(b"fake raw", "photo.CR2")
+
+    assert frame.data.shape == (4, 6, 3)
+    assert frame.data[0, 0, 0] == pytest.approx(0.5, abs=1e-3)
+    assert not frame.is_cfa
+
+
+def test_raw_garbage_is_rejected() -> None:
+    with pytest.raises(UnsupportedImageError):
+        ingest_frame(b"not a raw file", "photo.nef")
+
+
+def test_to_display_bgr_stretches_a_mono_frame_to_a_visible_thumbnail() -> None:
+    """A dark linear mono frame becomes a stretched, non-black BGR thumbnail."""
+    rng = np.random.default_rng(11)
+    data = np.clip(rng.normal(0.03, 0.006, size=(200, 300)), 0, 1).astype(np.float32)
+    data[50:60, 50:60] = 0.8  # a bright star
+
+    thumb = to_display_bgr(LinearFrame(data=data, source_bit_depth=16), max_size=128)
+
+    assert thumb.shape == (85, 128, 3)  # aspect kept, longest edge capped
+    assert thumb.dtype == np.uint8
+    assert int(np.median(thumb)) > 5  # background lifted off pure black by the stretch
+
+
+def test_to_display_bgr_superpixel_debayers_a_cfa_frame_to_half_resolution() -> None:
+    """A CFA frame is 2x2-superpixel de-mosaiced (half-res, 3-channel) for the thumbnail.
+
+    Channels are stretched independently (same accepted tradeoff as the FITS
+    single-image ingest), so this asserts structure survives, not colour balance.
+    """
+    rng = np.random.default_rng(5)
+    cfa = np.clip(rng.normal(0.1, 0.01, size=(160, 160)), 0, 1).astype(np.float32)
+    cfa[:80, :] += 0.5  # a bright band across the top half - a "trail" proxy
+
+    thumb = to_display_bgr(LinearFrame(data=cfa, is_cfa=True, bayer_pattern="GRBG"), max_size=64)
+
+    assert thumb.ndim == 3
+    assert thumb.shape[2] == 3
+    top, bottom = thumb[: thumb.shape[0] // 2], thumb[thumb.shape[0] // 2 :]
+    assert int(top.mean()) > int(bottom.mean())  # the bright band is visible

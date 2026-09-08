@@ -325,10 +325,22 @@
     "save_changes": "Save changes",
     "sections_aria_label": "Settings sections",
     "sections": {
-      "general": { "label": "General", "blurb": "Uploads and stacking defaults." },
-      "webhooks": { "label": "Webhooks", "blurb": "AstroDex tokens and callback delivery." },
-      "advanced": { "label": "Advanced", "blurb": "Networking and log levels." },
-      "logs": { "label": "Logs", "blurb": "Tail, clear, and export the application log." }
+      "general": {
+        "label": "General",
+        "blurb": "Uploads and stacking defaults."
+      },
+      "webhooks": {
+        "label": "Webhooks",
+        "blurb": "AstroDex tokens and callback delivery."
+      },
+      "advanced": {
+        "label": "Advanced",
+        "blurb": "Networking and log levels."
+      },
+      "logs": {
+        "label": "Logs",
+        "blurb": "Tail, clear, and export the application log."
+      }
     },
     "groups": {
       "uploads_and_sessions": "Uploads and sessions",
@@ -339,27 +351,66 @@
       "logging": "Logging"
     },
     "general": {
-      "max_upload": { "label": "Maximum upload size", "hint": "Uploads larger than this are rejected. Megabytes." },
-      "session_ttl": { "label": "Session lifetime", "hint": "How long a session and its working files are kept. Hours." },
-      "preview_size": { "label": "Preview size", "hint": "Longest edge of the fast-display preview image. Pixels." },
-      "stacking_enabled": { "label": "Stacking enabled", "hint": "Show the multi-frame stacking mode." },
-      "stacking_max": { "label": "Maximum frames", "hint": "Upper bound on frames accepted for one stack." },
-      "stacking_aligner": { "label": "Aligner", "hint": "Feature detector used to register frames." },
-      "stacking_combine": { "label": "Combination", "hint": "Default method for combining aligned frames." },
-      "stacking_sigma": { "label": "Cosmic-ray sigma", "hint": "Rejection threshold in robust standard deviations." }
+      "max_upload": {
+        "label": "Maximum upload size",
+        "hint": "Uploads larger than this are rejected. Megabytes."
+      },
+      "session_ttl": {
+        "label": "Session lifetime",
+        "hint": "How long a session and its working files are kept. Hours."
+      },
+      "preview_size": {
+        "label": "Preview size",
+        "hint": "Longest edge of the fast-display preview image. Pixels."
+      },
+      "stacking_enabled": {
+        "label": "Stacking enabled",
+        "hint": "Show the multi-frame stacking mode."
+      },
+      "stacking_max": {
+        "label": "Maximum frames",
+        "hint": "Upper bound on frames accepted for one stack."
+      }
     },
     "webhooks": {
-      "allowlist": { "label": "Callback URL allowlist", "hint": "One URL prefix per line. An empty list allows any host (development only)." },
-      "max_retries": { "label": "Maximum retries", "hint": "Delivery attempts before a webhook is marked failed." },
-      "retry_delay": { "label": "Retry delay", "hint": "Base backoff between attempts. Seconds." }
+      "allowlist": {
+        "label": "Callback URL allowlist",
+        "hint": "One URL prefix per line. An empty list allows any host (development only)."
+      },
+      "max_retries": {
+        "label": "Maximum retries",
+        "hint": "Delivery attempts before a webhook is marked failed."
+      },
+      "retry_delay": {
+        "label": "Retry delay",
+        "hint": "Base backoff between attempts. Seconds."
+      }
     },
     "advanced": {
-      "cors_origins": { "label": "CORS origins", "hint": "One origin per line. Takes effect after the api service restarts." },
-      "rate_limit_enabled": { "label": "Rate limiting", "hint": "Caps how often one IP can upload, process, or stack images." },
-      "rate_limit_per_minute": { "label": "Requests per minute", "hint": "Per IP, shared across upload/process/stack endpoints." },
-      "max_concurrent_jobs": { "label": "Concurrent jobs", "hint": "Maximum enhance/stack jobs running at once, per IP." },
-      "log_file_level": { "label": "File log level", "hint": "Level written to the rotating log file." },
-      "log_console_level": { "label": "Console log level", "hint": "Level echoed to the container logs." }
+      "cors_origins": {
+        "label": "CORS origins",
+        "hint": "One origin per line. Takes effect after the api service restarts."
+      },
+      "rate_limit_enabled": {
+        "label": "Rate limiting",
+        "hint": "Caps how often one IP can upload, process, or stack images."
+      },
+      "rate_limit_per_minute": {
+        "label": "Requests per minute",
+        "hint": "Per IP, shared across upload/process/stack endpoints."
+      },
+      "max_concurrent_jobs": {
+        "label": "Concurrent jobs",
+        "hint": "Maximum enhance/stack jobs running at once, per IP."
+      },
+      "log_file_level": {
+        "label": "File log level",
+        "hint": "Level written to the rotating log file."
+      },
+      "log_console_level": {
+        "label": "Console log level",
+        "hint": "Level echoed to the container logs."
+      }
     },
     "logs": {
       "level_label": "Level",
@@ -373,9 +424,6 @@
     }
   },
   "stacking": {
-    "registration_label": "Registration",
-    "background_normalization_label": "Background normalization",
-    "cosmic_ray_rejection_label": "Cosmic ray rejection",
     "combination_label": "Combination",
     "mode": {
       "single": "Single Image",
@@ -384,25 +432,45 @@
     "progress": {
       "heading": "Stacking"
     },
+    "steps": {
+      "registration": "Alignment",
+      "normalization": "Normalization",
+      "integration": "Integration"
+    },
     "results": {
       "failed": "Stacking failed: {error}",
       "status_ellipsis": "Stack {status}...",
       "composite_alt": "Stacked composite",
       "frames_stacked": "Frames stacked",
-      "frames_rejected": "Frames rejected",
-      "cosmic_rays_removed": "Cosmic rays removed",
-      "registration_success": "Registration success",
+      "frames_excluded": "Frames excluded",
       "snr_improvement": "SNR improvement",
+      "measured_noise_reduction": "Measured noise reduction",
       "enhance_composite": "Enhance composite",
       "download_composite": "Download composite"
     },
     "settings": {
-      "alignment_label": "Alignment",
-      "orb_option": "ORB (fast)",
-      "sift_option": "SIFT (accurate)",
-      "median_option": "Median",
-      "mean_option": "Mean",
-      "sigma_clip_option": "Sigma-clip"
+      "transform_label": "Alignment",
+      "transform": {
+        "translation": "Shift only",
+        "similarity": "Shift + rotate + scale",
+        "affine": "Affine"
+      },
+      "combination": {
+        "average": "Average",
+        "median": "Median"
+      },
+      "rejection_label": "Pixel rejection",
+      "rejection": {
+        "none": "None",
+        "sigma": "Sigma clip",
+        "winsorized_sigma": "Winsorized sigma"
+      },
+      "weighting_label": "Frame weighting",
+      "weighting": {
+        "none": "Equal",
+        "noise": "By noise",
+        "quality": "By quality"
+      }
     },
     "upload_zone": {
       "add_frames": "Add frames",
@@ -419,7 +487,7 @@
       "settings_heading": "Stack settings",
       "stacking_button": "Stacking...",
       "stack_n_frames": "Stack {count} frames",
-      "hint": "Upload at least 2 similar frames (JPEG, PNG or TIFF). More frames raise the signal-to-noise ratio by roughly the square root of the frame count."
+      "hint": "Upload at least 2 similar frames (JPEG, PNG, TIFF or FITS). More frames raise the signal-to-noise ratio by roughly the square root of the frame count."
     }
   }
 }

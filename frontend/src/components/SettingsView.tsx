@@ -167,34 +167,8 @@ function GeneralSection({ draft, patch }: SectionProps) {
         hint={t('settings.general.stacking_max.hint')}
         value={draft.stackingMaxFrames}
         min={2}
-        max={1000}
+        max={5000}
         onChange={(stackingMaxFrames) => patch({ stackingMaxFrames })}
-      />
-      <SelectRow
-        id="stacking-aligner"
-        label={t('settings.general.stacking_aligner.label')}
-        hint={t('settings.general.stacking_aligner.hint')}
-        value={draft.stackingDetector}
-        options={['orb', 'sift']}
-        onChange={(stackingDetector) => patch({ stackingDetector })}
-      />
-      <SelectRow
-        id="stacking-combine"
-        label={t('settings.general.stacking_combine.label')}
-        hint={t('settings.general.stacking_combine.hint')}
-        value={draft.stackingCombinationDefault}
-        options={['median', 'mean', 'sigma_clip']}
-        onChange={(stackingCombinationDefault) => patch({ stackingCombinationDefault })}
-      />
-      <NumberRow
-        id="stacking-sigma"
-        label={t('settings.general.stacking_sigma.label')}
-        hint={t('settings.general.stacking_sigma.hint')}
-        value={draft.stackingCosmicRayThreshold}
-        min={0.5}
-        max={10}
-        step={0.1}
-        onChange={(stackingCosmicRayThreshold) => patch({ stackingCosmicRayThreshold })}
       />
     </div>
   );

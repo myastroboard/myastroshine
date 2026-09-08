@@ -24,11 +24,18 @@ export function StackResults({ result, onEnhance, onDownload }: StackResultsProp
 
   const rows: [string, string][] = [
     [t('stacking.results.frames_stacked'), String(stats.framesStacked)],
-    [t('stacking.results.frames_rejected'), String(stats.framesRejected)],
+    [t('stacking.results.frames_excluded'), String(stats.framesExcluded)],
     [t('stacking.combination_label'), stats.combinationMethod],
-    [t('stacking.results.cosmic_rays_removed'), String(stats.cosmicRaysRemoved)],
-    [t('stacking.results.registration_success'), `${stats.registrationSuccessRate}%`],
+    [t('stacking.settings.transform_label'), stats.registrationTransform],
     [t('stacking.results.snr_improvement'), `${stats.snrImprovement.toFixed(2)}x`],
+    ...(stats.measuredNoiseReduction != null
+      ? ([
+          [
+            t('stacking.results.measured_noise_reduction'),
+            `${stats.measuredNoiseReduction.toFixed(2)}x`,
+          ],
+        ] as [string, string][])
+      : []),
   ];
 
   return (
