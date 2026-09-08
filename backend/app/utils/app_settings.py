@@ -70,6 +70,11 @@ class AppSettings(BaseModel):
     # ~5-6 h of darkness produces ~2000 frames.
     stacking_enabled: bool = True
     stacking_max_frames: int = Field(default=2000, ge=2, le=5000)
+    # How long a stack's uploaded frames + working files are kept. They are much
+    # heavier than a normal session (thousands of full-res frames) and are only
+    # needed to review and re-stack; the composite a run produces is a normal
+    # session and lives session_expiry_hours. Default 12 h.
+    stacking_retention_hours: int = Field(default=12, ge=1, le=168)
 
     # Logging - file level and console level (changeable at runtime, see #4)
     log_level: str = "info"

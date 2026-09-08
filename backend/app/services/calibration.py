@@ -33,7 +33,7 @@ import numpy as np
 
 from app.exceptions import InvalidParameterError
 from app.logging_config import get_logger
-from app.services.storage import StorageService
+from app.services.storage import StorageService, _unpack_frame
 
 logger = get_logger(__name__)
 
@@ -240,13 +240,18 @@ class CalibrationService:
 
 
 def _reduce_stack(paths: list[Path], method: str) -> np.ndarray:
-    """Combine ``.npy`` calibration frames into one master, tiled over rows."""
+    """Combine ``.npy`` calibration frames into one master, tiled over rows.
+
+    Frames are stored at their source bit depth (see ``storage._pack_frame``);
+    each tile is unpacked back to the ingest's nominal ``[0, 1]`` float range
+    before combining.
+    """
     maps = [np.load(p, mmap_mode="r") for p in paths]
     shape = maps[0].shape
     out = np.empty(shape, dtype=np.float32)
     for y0 in range(0, shape[0], _ROW_TILE):
         y1 = min(y0 + _ROW_TILE, shape[0])
-        block = np.stack([np.asarray(m[y0:y1], dtype=np.float32) for m in maps])
+        block = np.stack([_unpack_frame(np.asarray(m[y0:y1])) for m in maps])
         out[y0:y1] = _combine_block(block, method)
     return out
 

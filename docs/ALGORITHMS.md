@@ -452,6 +452,12 @@ OpenCV does not demosaic float) - for the align/combine passes. A
 `ROWORDER = BOTTOM-UP` flip on an even-height mosaic also swaps the Bayer rows so
 the pattern stays correct.
 
+Uploaded frames are stored at their **source bit depth** - a 16-bit camera frame
+round-trips through `uint16` (`round(x * 65535)`) losslessly at half the size of
+a float32 `.npy`; a float FITS keeps float32. They are kept `stacking_retention_hours`
+(default 12) - long enough to re-stack; the composite a run produces is a normal
+session and lives the full session lifetime.
+
 ### Calibration (`app/services/calibration.py`)
 
 Master dark / flat / bias / dark-flat frames, when uploaded, are stacked into

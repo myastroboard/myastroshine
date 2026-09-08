@@ -370,6 +370,10 @@
       "stacking_max": {
         "label": "Nombre maximal d'images",
         "hint": "Limite supérieure d'images acceptées pour un empilement."
+      },
+      "stacking_retention": {
+        "label": "Rétention des empilements",
+        "hint": "Durée de conservation des brutes d'un empilement pour le ré-empiler. Le composite garde la durée de vie de session. Heures."
       }
     },
     "webhooks": {
@@ -489,7 +493,6 @@
     "upload_zone": {
       "add_frames": "Ajouter des images",
       "select_multiple_hint": "Sélectionnez plusieurs fichiers à la fois",
-      "frame_label": "Image {n} :",
       "status": {
         "queued": "en attente",
         "uploading": "envoi en cours",
@@ -502,17 +505,16 @@
       "max_size": "jusqu'à {mb} Mo chacune"
     },
     "view": {
-      "settings_heading": "Paramètres d'empilement",
       "stacking_button": "Empilement en cours...",
       "stack_n_frames": "Empiler {count} images",
-      "hint": "Téléversez au moins 2 images similaires (JPEG, PNG, TIFF ou FITS). Plus il y a d'images, plus le rapport signal/bruit augmente, environ selon la racine carrée du nombre d'images.",
-      "preview_placeholder": "Sélectionnez une image pour la prévisualiser.",
-      "uploading_button": "Envoi en cours...",
       "upload_n_frames": "Envoyer {count} images",
       "review_hint": "{total} images envoyées, {excluded} exclues. Cliquez une vignette pour la prévisualiser ; la case à cocher retire une pose avec trainée ou nuage.",
       "new_stack": "Nouvel empilement",
       "back_to_composite": "Retour au composite",
-      "restack_n_frames": "Réempiler {count} images"
+      "restack_n_frames": "Réempiler {count} images",
+      "upload_more": "Envoyer {count} de plus",
+      "frames_summary": "{total} images · {excluded} exclues",
+      "result_pending": "Lancez l'empilement pour voir le résultat."
     },
     "errors": {
       "too_few": "Ajoutez au moins {min} images pour empiler.",
@@ -546,6 +548,13 @@
         "bias": "Offsets",
         "dark_flat": "Dark-flats"
       }
+    },
+    "rail": {
+      "aria_label": "Étapes de l'empilement",
+      "frames": "Images",
+      "calibration": "Calibration",
+      "settings": "Réglages",
+      "result": "Résultat"
     }
   }
 }

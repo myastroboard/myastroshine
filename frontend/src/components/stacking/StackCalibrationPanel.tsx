@@ -22,8 +22,7 @@ const KINDS: { kind: CalibrationKind; count: keyof CalibrationSummary['frames'] 
 
 const CAL_ACCEPT = '.png,.tiff,.tif,.fits,.fit,.fts,.cr2,.cr3,.nef,.arw,.dng,.orf,.rw2,.pef,.raf';
 
-/** Optional master dark / flat / bias frames for a stack (Phase 2). Collapsed by
- * default - most quick stacks of smart-telescope subs have no calibration set. */
+/** Optional master dark / flat / bias frames for a stack (Phase 2). */
 export function StackCalibrationPanel({
   calibration,
   cosmeticCorrection,
@@ -33,16 +32,11 @@ export function StackCalibrationPanel({
   onToggleCosmetic,
 }: StackCalibrationPanelProps) {
   const { t } = useTranslation();
-  const total = Object.values(calibration.frames).reduce((sum, n) => sum + n, 0);
   const hasDefectSource = calibration.frames.dark > 0 || calibration.frames.flat > 0;
 
   return (
-    <details className="panel flex flex-col gap-3" open={total > 0}>
-      <summary className="flex cursor-pointer items-center justify-between text-sm text-ink">
-        <span>{t('stacking.calibration.title')}</span>
-        {total > 0 && <span className="chip">{t('stacking.calibration.count', { n: total })}</span>}
-      </summary>
-
+    <div className="panel flex flex-col gap-3">
+      <h3 className="text-sm font-medium text-ink">{t('stacking.calibration.title')}</h3>
       <p className="text-xs text-faint">{t('stacking.calibration.hint')}</p>
 
       <ul className="flex flex-col divide-y divide-hairline">
@@ -72,7 +66,7 @@ export function StackCalibrationPanel({
         {t('stacking.calibration.cosmetic_label')}
       </label>
       <p className="text-[11px] text-ghost">{t('stacking.calibration.masters_note')}</p>
-    </details>
+    </div>
   );
 }
 

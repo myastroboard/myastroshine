@@ -29,6 +29,30 @@ logger = get_logger(__name__)
 _STACK_THUMB_MAX_SIZE = 256
 _FRAME_INDEX_WIDTH = 5  # frames/00000.npy .. supports 99999 frames
 _CALIBRATION_KINDS = ("dark", "flat", "bias", "dark_flat")
+#: Stack frames are stored at their source bit depth, not float32 - a 16-bit
+#: camera frame round-trips through uint16 losslessly at half the size (an
+#: uncompressed float32 .npy of a 2 MP CFA frame is 8 MB; uint16 is 4 MB). A
+#: float FITS (bit depth >= 32) keeps float32.
+_FRAME_STORE_SCALE = 65535.0
+_FLOAT_STORE_BIT_DEPTH = 32
+_UINT8_MAX = 255.0
+
+
+def _pack_frame(data: np.ndarray, source_bit_depth: int) -> np.ndarray:
+    """Frame data (nominal ``[0, 1]`` float) -> the compact on-disk dtype."""
+    if source_bit_depth >= _FLOAT_STORE_BIT_DEPTH:
+        return data.astype(np.float32)
+    packed: np.ndarray = np.rint(np.clip(data, 0.0, 1.0) * _FRAME_STORE_SCALE).astype(np.uint16)
+    return packed
+
+
+def _unpack_frame(stored: np.ndarray) -> np.ndarray:
+    """On-disk array -> ``float32`` in the ingest's nominal ``[0, 1]`` range."""
+    scale = {np.dtype(np.uint16): _FRAME_STORE_SCALE, np.dtype(np.uint8): _UINT8_MAX}.get(
+        stored.dtype, 1.0
+    )
+    out: np.ndarray = stored.astype(np.float32) / scale
+    return out
 
 
 class StorageService:
@@ -177,14 +201,18 @@ class StorageService:
         return self.stack_cal_root(stack_id) / "bad_pixels.npy"
 
     def save_cal_frame(self, stack_id: str, kind: str, index: int, frame: LinearFrame) -> None:
-        """Persist one calibration sub as float32 ``.npy`` + a small metadata sidecar."""
+        """Persist one calibration sub as a compact ``.npy`` + a small metadata sidecar."""
         self.stack_cal_dir(stack_id, kind, create=True)
-        np.save(self.cal_frame_path(stack_id, kind, index), frame.data.astype(np.float32))
+        np.save(
+            self.cal_frame_path(stack_id, kind, index),
+            _pack_frame(frame.data, frame.source_bit_depth),
+        )
         self._cal_meta_path(stack_id, kind, index).write_text(
             json.dumps(
                 {
                     "is_cfa": frame.is_cfa,
                     "bayer_pattern": frame.bayer_pattern,
+                    "source_bit_depth": frame.source_bit_depth,
                     "acquisition": frame.metadata,
                 }
             ),
@@ -194,9 +222,10 @@ class StorageService:
     def load_cal_frame(self, stack_id: str, kind: str, index: int) -> LinearFrame:
         meta = json.loads(self._cal_meta_path(stack_id, kind, index).read_text(encoding="utf-8"))
         return LinearFrame(
-            data=np.load(self.cal_frame_path(stack_id, kind, index)),
+            data=_unpack_frame(np.load(self.cal_frame_path(stack_id, kind, index))),
             is_cfa=bool(meta.get("is_cfa", False)),
             bayer_pattern=meta.get("bayer_pattern"),
+            source_bit_depth=int(meta.get("source_bit_depth", 16)),
             metadata=dict(meta.get("acquisition", {})),
         )
 
@@ -231,9 +260,12 @@ class StorageService:
     # -- stacking: linear frame store ------------------------------------
 
     def save_linear_frame(self, stack_id: str, index: int, frame: LinearFrame) -> None:
-        """Persist one ingested frame: float32 ``.npy`` + a metadata sidecar + a thumbnail."""
+        """Persist one ingested frame: a compact ``.npy`` + a metadata sidecar + a thumbnail."""
         self.stack_frames_dir(stack_id, create=True)
-        np.save(self.linear_frame_path(stack_id, index), frame.data.astype(np.float32))
+        np.save(
+            self.linear_frame_path(stack_id, index),
+            _pack_frame(frame.data, frame.source_bit_depth),
+        )
         meta: dict[str, Any] = {
             "is_cfa": frame.is_cfa,
             "bayer_pattern": frame.bayer_pattern,
@@ -250,7 +282,7 @@ class StorageService:
 
     def load_linear_frame(self, stack_id: str, index: int) -> LinearFrame:
         meta = json.loads(self._frame_meta_path(stack_id, index).read_text(encoding="utf-8"))
-        data = np.load(self.linear_frame_path(stack_id, index))
+        data = _unpack_frame(np.load(self.linear_frame_path(stack_id, index)))
         return LinearFrame(
             data=data,
             is_cfa=bool(meta["is_cfa"]),
@@ -286,6 +318,30 @@ class StorageService:
         path = self.stack_dir(stack_id)
         if path.exists():
             shutil.rmtree(path, ignore_errors=True)
+
+    def stack_ids_on_disk(self) -> list[str]:
+        """Every stack directory under ``stacks/`` - to find dirs with no DB row."""
+        root = self.root / "stacks"
+        if not root.exists():
+            return []
+        return [p.name for p in root.iterdir() if p.is_dir()]
+
+    def stack_accum_mtime(self, stack_id: str) -> float | None:
+        """Newest mtime of anything in the stack's ``accum/`` dir, or ``None``.
+
+        A live integration writes the align-memmap in one streaming pass and
+        deletes it in a ``finally``; a stale mtime means the run died.
+        """
+        accum = self.stack_accum_dir(stack_id)
+        if not accum.exists():
+            return None
+        mtimes = [child.stat().st_mtime for child in accum.iterdir()]
+        return max(mtimes) if mtimes else accum.stat().st_mtime
+
+    def delete_stack_accum(self, stack_id: str) -> None:
+        accum = self.stack_accum_dir(stack_id)
+        if accum.exists():
+            shutil.rmtree(accum, ignore_errors=True)
 
     # -- lifecycle -------------------------------------------------------
 
