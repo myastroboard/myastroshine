@@ -209,19 +209,21 @@ describe('StackView', () => {
     expect(onEnhance).toHaveBeenCalledWith('composite-session');
   });
 
-  it('uploads calibration frames against a freshly opened stack', async () => {
+  it('uploads calibration frames from the Calibration step', async () => {
     const { container } = render(<StackView onEnhanceComposite={vi.fn()} />);
+    await pickFramesAndUpload(container);
 
-    const fileInputs = container.querySelectorAll<HTMLInputElement>('input[type="file"]');
-    // [0] is the light-frame dropzone; [1] is the "Darks" calibration row
-    fireEvent.change(fileInputs[1], { target: { files: [frameFile('dark.png')] } });
+    fireEvent.click(screen.getByRole('button', { name: /calibration/i }));
+
+    // one hidden file input per calibration kind; [0] is Darks
+    const calInputs = container.querySelectorAll<HTMLInputElement>('input[type="file"]');
+    fireEvent.change(calInputs[0], { target: { files: [frameFile('dark.png')] } });
 
     await waitFor(() =>
       expect(mocked.uploadCalibrationFrames).toHaveBeenCalledWith('stack-1', 'dark', [
         expect.any(File),
       ]),
     );
-    expect(mocked.initiateStack).toHaveBeenCalled();
     await waitFor(() => expect(screen.getAllByText(/3 frames/i).length).toBeGreaterThan(0));
   });
 

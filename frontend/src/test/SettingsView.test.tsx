@@ -34,6 +34,7 @@ const SETTINGS: AppSettings = {
   astrodexRetryDelaySeconds: 5,
   stackingEnabled: true,
   stackingMaxFrames: 2000,
+  stackingRetentionHours: 12,
   logLevel: 'info',
   consoleLogLevel: 'warning',
 };

@@ -43,6 +43,7 @@ export default function App() {
   const route = useRoute();
   const serverConfig = useServerConfig();
   const [mode, setMode] = useState<EditorMode>('single');
+  const [stackWorking, setStackWorking] = useState(false);
   const [session, setSession] = useState<EditorSession | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   // 0-1 while the file bytes transfer; null once they're sent and the server is
@@ -83,6 +84,7 @@ export default function App() {
   function handleEnhanceComposite(sessionId: string): void {
     setSession({ sessionId });
     setMode('single');
+    setStackWorking(false);
   }
 
   function handleExitEditor(): void {
@@ -133,12 +135,15 @@ export default function App() {
               </p>
             )}
 
-            {(mode === 'stack' || !session) && (
+            {(mode === 'stack' ? !stackWorking : !session) && (
               <StackMode mode={mode} onModeChange={setMode} />
             )}
 
             {mode === 'stack' ? (
-              <StackView onEnhanceComposite={handleEnhanceComposite} />
+              <StackView
+                onEnhanceComposite={handleEnhanceComposite}
+                onWorkingChange={setStackWorking}
+              />
             ) : session ? (
               <EditorView
                 session={session}

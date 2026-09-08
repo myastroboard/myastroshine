@@ -170,6 +170,15 @@ function GeneralSection({ draft, patch }: SectionProps) {
         max={5000}
         onChange={(stackingMaxFrames) => patch({ stackingMaxFrames })}
       />
+      <NumberRow
+        id="stacking-retention"
+        label={t('settings.general.stacking_retention.label')}
+        hint={t('settings.general.stacking_retention.hint')}
+        value={draft.stackingRetentionHours}
+        min={1}
+        max={168}
+        onChange={(stackingRetentionHours) => patch({ stackingRetentionHours })}
+      />
     </div>
   );
 }

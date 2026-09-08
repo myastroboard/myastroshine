@@ -76,6 +76,67 @@ def test_cleanup_removes_expired_stacks_and_their_frames(
     assert not stacking.storage.stack_dir(dead.stack_id).exists()
 
 
+def test_cleanup_removes_abandoned_uploads(
+    stacking: StackingService, star_field: np.ndarray
+) -> None:
+    """A stack with frames uploaded but never processed is swept early (a night
+    of frames is many GB - it must not wait for the full retention window)."""
+    from app.constants import ABANDONED_STACK_SECONDS
+
+    stale = stacking.initiate(InitiateStackRequest(frame_count=2))
+    stacking.add_frame(stale.stack_id, 0, _frame(star_field))
+    stacking.add_frame(stale.stack_id, 1, _frame(star_field))
+    assert stale.status == "ready"
+    stale.created_at = datetime.now(UTC) - timedelta(seconds=ABANDONED_STACK_SECONDS + 60)
+    fresh = stacking.initiate(InitiateStackRequest(frame_count=2))
+    stacking.add_frame(fresh.stack_id, 0, _frame(star_field))
+    stacking.db.commit()
+
+    removed = stacking.cleanup_old_stacks()
+
+    assert removed == 1
+    assert stacking.db.get(StackRecord, stale.stack_id) is None
+    assert not stacking.storage.stack_dir(stale.stack_id).exists()
+    assert stacking.db.get(StackRecord, fresh.stack_id) is not None
+
+
+def test_cleanup_sweeps_a_stale_align_memmap(
+    stacking: StackingService, star_field: np.ndarray
+) -> None:
+    """A dead 'processing' run leaves a multi-GB align-memmap; cleanup nukes it
+    and marks the stack failed."""
+    import os
+
+    from app.constants import STALE_STACK_WORK_SECONDS
+
+    record = stacking.initiate(InitiateStackRequest(frame_count=2))
+    stacking.add_frame(record.stack_id, 0, _frame(star_field))
+    record.status = "processing"
+    stacking.db.commit()
+    accum = stacking.storage.stack_accum_dir(record.stack_id, create=True)
+    memmap = accum / "aligned.npy"
+    memmap.write_bytes(b"x" * 1024)
+    old = datetime.now().timestamp() - STALE_STACK_WORK_SECONDS - 60
+    os.utime(memmap, (old, old))
+
+    removed = stacking.cleanup_old_stacks()
+
+    assert removed == 1
+    assert not accum.exists()
+    assert stacking.storage.stack_frames_dir(record.stack_id).exists()  # frames kept
+    refreshed = stacking.db.get(StackRecord, record.stack_id)
+    assert refreshed is not None and refreshed.status == "failed"
+
+
+def test_cleanup_removes_a_directory_with_no_record(stacking: StackingService) -> None:
+    orphan = stacking.storage.stack_frames_dir("ghost-stack", create=True)
+    assert orphan.exists()
+
+    stacking.cleanup_old_stacks()
+
+    assert not stacking.storage.stack_dir("ghost-stack").exists()
+
+
 def test_process_produces_an_enhanceable_session(
     stacking: StackingService, star_field: np.ndarray
 ) -> None:

@@ -29,6 +29,18 @@ SESSION_CLEANUP_INTERVAL_SECONDS = 60 * 60  # hourly
 # real operation (a large multi-frame stack finishes in minutes).
 STALE_JOB_SECONDS = 15 * 60
 
+# A stack "processing" whose on-disk align-memmap (stacks/{id}/accum/) has not been
+# touched for this long has a dead worker. The hourly cleanup deletes the memmap - a
+# thousand-frame run leaves a ~10 GB float16 file - and marks the stack failed. The
+# integration keeps the mtime fresh through every pass, so this only needs headroom
+# over the gap between two progress ticks, not over a whole run.
+STALE_STACK_WORK_SECONDS = 30 * 60
+
+# An un-processed stack upload (waiting_for_frames / ready) older than this is
+# abandoned. A smart-telescope night is thousands of full-res frames (8+ GB), so it is
+# swept well before the normal 24 h session expiry.
+ABANDONED_STACK_SECONDS = 4 * 60 * 60
+
 # Decoded-pixel-count cap (app/utils/image_utils.py:decode_image), independent of the
 # compressed upload byte-size limit (max_image_size_mb) - guards against a small file
 # that decompresses into a huge array (decompression bomb). 8000x8000, comfortably above

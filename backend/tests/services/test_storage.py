@@ -54,3 +54,23 @@ def test_preview_is_downscaled_processed_is_full_res(tmp_path: Path) -> None:
     preview_img = image_utils.load_image(storage.preview_path("sess-4"))
     assert max(preview_img.shape[:2]) <= 512
     assert storage.load_processed("sess-4").shape[0] == 1200
+
+
+def test_linear_frame_is_stored_compact_and_round_trips(tmp_path: Path) -> None:
+    """A 16-bit source frame is stored as uint16 (half the size of float32) and
+    reloads bit-exactly; a float source keeps float32."""
+    from app.utils.linear_ingest import LinearFrame
+
+    storage = StorageService(root=tmp_path)
+    rng = np.random.default_rng(3)
+    data = rng.random((64, 96), dtype=np.float32)
+
+    storage.save_linear_frame("s", 0, LinearFrame(data=data, source_bit_depth=16))
+    stored = np.load(storage.linear_frame_path("s", 0))
+    assert stored.dtype == np.uint16
+    back = storage.load_linear_frame("s", 0)
+    assert back.data.dtype == np.float32
+    np.testing.assert_allclose(back.data, data, atol=1.0 / 65535)
+
+    storage.save_linear_frame("s", 1, LinearFrame(data=data, source_bit_depth=32))
+    assert np.load(storage.linear_frame_path("s", 1)).dtype == np.float32

@@ -22,6 +22,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
+from app.constants import ABANDONED_STACK_SECONDS, STALE_STACK_WORK_SECONDS
 from app.db.models import StackRecord
 from app.exceptions import InvalidParameterError, ResourceNotFoundError
 from app.logging_config import get_logger
@@ -75,7 +76,8 @@ class StackingService:
             quality_filter=config.quality_filter,
             excluded_frames=[],
             included_frames=[],
-            expires_at=datetime.now(UTC) + timedelta(hours=app_settings.session_expiry_hours),
+            expires_at=datetime.now(UTC)
+            + timedelta(hours=app_settings.stacking_retention_hours),
         )
         self.db.add(record)
         self.db.commit()
@@ -346,21 +348,58 @@ class StackingService:
         return self._get(stack_id)
 
     def cleanup_old_stacks(self) -> int:
-        """Delete expired stack rows and their uploaded frames. Returns the count.
+        """Reclaim stack storage. Returns the number of stacks removed / repaired.
 
-        The composite a stack produces becomes its own ``SessionRecord`` and is
-        expired by ``SessionService.cleanup_old_sessions``; this only clears the
-        ``StackRecord`` and the frame files under ``DATA_DIR/stacks/``.
+        The composite a stack produces becomes its own ``SessionRecord`` (expired
+        by ``SessionService``); this only touches ``StackRecord`` rows and the
+        frame / working files under ``DATA_DIR/images/stacks/``:
+
+        1. expired rows and their directories;
+        2. abandoned uploads (``waiting_for_frames`` / ``ready`` and older than
+           ``ABANDONED_STACK_SECONDS``) - a night of frames is 8+ GB, so it does
+           not wait for the full retention window;
+        3. directories with no matching row (a half-deleted stack);
+        4. an orphaned align-memmap (``accum/``) left by a dead ``processing``
+           run - the stack is marked ``failed``.
         """
         now = datetime.now(UTC)
-        expired = self.db.scalars(select(StackRecord).where(StackRecord.expires_at < now)).all()
-        for record in expired:
+        removed = 0
+
+        stale_upload_cutoff = now - timedelta(seconds=ABANDONED_STACK_SECONDS)
+        doomed = self.db.scalars(
+            select(StackRecord).where(
+                (StackRecord.expires_at < now)
+                | (
+                    StackRecord.status.in_(("waiting_for_frames", "ready"))
+                    & (StackRecord.created_at < stale_upload_cutoff)
+                )
+            )
+        ).all()
+        for record in doomed:
             self.storage.delete_stack(record.stack_id)
             self.db.delete(record)
+            removed += 1
         self.db.commit()
-        if expired:
-            logger.info("expired stacks cleaned", count=len(expired))
-        return len(expired)
+
+        live_ids = set(self.db.scalars(select(StackRecord.stack_id)).all())
+        accum_stale_before = now.timestamp() - STALE_STACK_WORK_SECONDS
+        for stack_id in self.storage.stack_ids_on_disk():
+            if stack_id not in live_ids:
+                self.storage.delete_stack(stack_id)
+                removed += 1
+                continue
+            mtime = self.storage.stack_accum_mtime(stack_id)
+            if mtime is not None and mtime < accum_stale_before:
+                self.storage.delete_stack_accum(stack_id)
+                stuck = self.db.get(StackRecord, stack_id)
+                if stuck is not None and stuck.status == "processing":
+                    stuck.status, stuck.error = "failed", "processing was interrupted"
+                removed += 1
+        self.db.commit()
+
+        if removed:
+            logger.info("stacks cleaned", count=removed)
+        return removed
 
 
 def _background_noise(pixels: np.ndarray) -> float:

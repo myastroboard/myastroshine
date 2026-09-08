@@ -107,6 +107,24 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and content panes, and the stacking result blocks now use one framing system
   instead of three ad-hoc ones. The preview image is matted with its histogram
   in a single card.
+- The stacking screen now uses the same shape as the single-image editor: a
+  clean centered upload block first, then - once frames are in - a left workflow
+  rail (Frames / Calibration / Settings / Result), the active step's controls in
+  the inspector, and a persistent preview with the frame grid. Previously the
+  settings and calibration panels sat in a right-hand sidebar shown from the
+  start.
+- Stack storage is much lighter: uploaded frames are now kept at their source
+  bit depth (a 16-bit camera frame as uint16, not float32) - **half the disk**,
+  bit-exact. A new **Stack retention** setting (default 12 h, separate from the
+  session lifetime) bounds how long a stack's frames are kept for re-stacking;
+  the composite it produces still lives the full session lifetime. The hourly
+  cleanup now also sweeps abandoned uploads (frames in, never stacked) after
+  4 h, orphaned align buffers left by a killed run (a thousand-frame run leaves
+  ~10 GB), and stack directories with no database row.
+- The database schema is now brought to head automatically on API and worker
+  startup (`alembic upgrade head`); a fresh database is built from the
+  migrations. Previously a schema change needed a manual `alembic upgrade` and a
+  lagging dev database silently broke the cleanup task.
 - New application logo: the header now shows the MyAstroShine icon, and the
   browser-tab favicon is a matching amber-star-and-orbit mark.
 

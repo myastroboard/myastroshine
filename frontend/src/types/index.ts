@@ -398,6 +398,7 @@ export interface AppSettings {
   astrodexRetryDelaySeconds: number;
   stackingEnabled: boolean;
   stackingMaxFrames: number;
+  stackingRetentionHours: number;
   logLevel: LogLevel;
   consoleLogLevel: LogLevel;
 }

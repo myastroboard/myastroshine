@@ -370,6 +370,10 @@
       "stacking_max": {
         "label": "Maximum frames",
         "hint": "Upper bound on frames accepted for one stack."
+      },
+      "stacking_retention": {
+        "label": "Stack retention",
+        "hint": "How long a stack's uploaded frames are kept for re-stacking. The composite keeps the session lifetime. Hours."
       }
     },
     "webhooks": {
@@ -489,7 +493,6 @@
     "upload_zone": {
       "add_frames": "Add frames",
       "select_multiple_hint": "Select multiple files at once",
-      "frame_label": "Frame {n}:",
       "status": {
         "queued": "queued",
         "uploading": "uploading",
@@ -502,17 +505,16 @@
       "max_size": "up to {mb} MB each"
     },
     "view": {
-      "settings_heading": "Stack settings",
       "stacking_button": "Stacking...",
       "stack_n_frames": "Stack {count} frames",
-      "hint": "Upload at least 2 similar frames (JPEG, PNG, TIFF or FITS). More frames raise the signal-to-noise ratio by roughly the square root of the frame count.",
-      "preview_placeholder": "Select a frame to preview it.",
-      "uploading_button": "Uploading...",
       "upload_n_frames": "Upload {count} frames",
       "review_hint": "{total} frames uploaded, {excluded} excluded. Click a thumbnail to preview it; use the checkbox to drop a trailed or clouded sub.",
       "new_stack": "New stack",
       "back_to_composite": "Back to composite",
-      "restack_n_frames": "Re-stack {count} frames"
+      "restack_n_frames": "Re-stack {count} frames",
+      "upload_more": "Upload {count} more",
+      "frames_summary": "{total} frames · {excluded} excluded",
+      "result_pending": "Run the stack to see the result."
     },
     "errors": {
       "too_few": "Add at least {min} frames to stack.",
@@ -546,6 +548,13 @@
         "bias": "Bias / offset",
         "dark_flat": "Dark-flats"
       }
+    },
+    "rail": {
+      "aria_label": "Stacking workflow",
+      "frames": "Frames",
+      "calibration": "Calibration",
+      "settings": "Settings",
+      "result": "Result"
     }
   }
 }

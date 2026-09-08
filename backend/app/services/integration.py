@@ -331,8 +331,11 @@ class IntegrationService:
 
         row_bytes = len(weights) * width * channels * 4
         tile_rows = int(np.clip(_TILE_BUDGET_BYTES // max(1, row_bytes), _MIN_ROW_TILE, _ROW_TILE))
+        aligned = Path(aligned_path)
         for y0 in range(0, height, tile_rows):
             y1 = min(y0 + tile_rows, height)
+            with contextlib.suppress(OSError):
+                aligned.touch()  # fresh mtime: the stale-work sweep must leave a live run alone
             block = np.asarray(memmap[:, y0:y1], dtype=np.float32)  # (K, th, W, C)
             tile, cut = _reduce_tile(block, w, combination, rejection, min_cover)
             composite[y0:y1] = tile

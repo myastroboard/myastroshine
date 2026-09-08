@@ -18,7 +18,7 @@ from datetime import timedelta
 from typing import Any
 
 from celery import Celery
-from celery.signals import setup_logging
+from celery.signals import setup_logging, worker_init
 
 from app.config import get_settings
 from app.constants import SESSION_CLEANUP_INTERVAL_SECONDS
@@ -33,6 +33,15 @@ def _configure_worker_logging(**_kwargs: Any) -> None:
     """Use the app's logging (rotating worker.log + console), not Celery's."""
     configure_logging(role="worker", force=True)
     apply_runtime_log_levels()
+
+
+@worker_init.connect
+def _migrate_on_worker_start(**_kwargs: Any) -> None:
+    """Bring the schema to head before the worker touches the DB (it starts in
+    parallel with the API, which also migrates - ``init_db`` is idempotent)."""
+    from app.db.database import init_db  # noqa: PLC0415 - avoid import at module load
+
+    init_db()
 
 
 celery_app = Celery(
