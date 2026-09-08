@@ -11,6 +11,10 @@ describe('hasEdits', () => {
     expect(hasEdits({ ...DEFAULT_PARAMETERS, contrast: 1.4 })).toBe(true);
   });
 
+  it('is true when star removal is engaged', () => {
+    expect(hasEdits({ ...DEFAULT_PARAMETERS, starRemoval: 80 })).toBe(true);
+  });
+
   it('is true when the framing changed', () => {
     expect(
       hasEdits({ ...DEFAULT_PARAMETERS, geometry: { ...DEFAULT_GEOMETRY, rotateQuarters: 1 } }),

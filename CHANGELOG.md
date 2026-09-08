@@ -8,6 +8,17 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Star removal (starless): a new **Star removal** step in the editor separates
+  the stars from the nebulosity. Raise **Remove stars** and the pipeline splits
+  - the stars are pulled out right after the background corrections, every
+  creative adjustment (tone, curves, colour, detail) then works on the nebula
+  alone, and **Bring stars back** screen-blends the stars in at the end (0 keeps
+  the image starless, 100 restores them full strength). Detection reuses the
+  Stars step's sensitivity / max-size. The reconstruction is classical
+  (`cv2.inpaint` near the mask edges, a smooth background estimate inside large
+  footprints) - no ML model or new dependency; an ONNX StarNet-style quality
+  path was evaluated and deferred (weights licensing / unproven models - see
+  `docs/ALGORITHMS.md` "Star removal (starless)").
 - Edit milestones: a timeline under the preview where you can save the current
   adjustments (sliders, curves, framing, and the Depth Shift focal point) as a
   checkpoint and click back to it if you push an edit too far. The first

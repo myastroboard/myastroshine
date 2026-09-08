@@ -11,6 +11,15 @@ describe('parametersEqual', () => {
     expect(parametersEqual(DEFAULT_PARAMETERS, { ...DEFAULT_PARAMETERS, contrast: 1.5 })).toBe(false);
   });
 
+  it('is false when the star removal / recombine amounts differ', () => {
+    expect(
+      parametersEqual(
+        { ...DEFAULT_PARAMETERS, starRemoval: 100, starRecombine: 40 },
+        { ...DEFAULT_PARAMETERS, starRemoval: 100, starRecombine: 70 },
+      ),
+    ).toBe(false);
+  });
+
   it('is false when the framing differs', () => {
     expect(
       parametersEqual(DEFAULT_PARAMETERS, {

@@ -288,6 +288,69 @@ def test_star_reduction_fades_into_background_not_black(
     assert np.abs(center - background).max() < 30, f"star center faded to {center}, not background"
 
 
+def _nebula_star_field() -> tuple[np.ndarray, list[tuple[int, int]]]:
+    image = np.zeros((200, 200, 3), dtype=np.uint8)
+    cv2.circle(image, (100, 100), 50, (60, 55, 80), -1)
+    image = cv2.GaussianBlur(image, (0, 0), sigmaX=18).astype(np.uint8)
+    stars = [(30, 30), (170, 30), (30, 170), (170, 170), (100, 35)]
+    for x, y in stars:
+        cv2.circle(image, (x, y), 2, (255, 255, 255), -1)
+    return image, stars
+
+
+def _star_flux(image: np.ndarray, points: list[tuple[int, int]]) -> float:
+    return float(np.mean([image[y, x].astype(int).sum() for x, y in points]))
+
+
+def test_apply_parameters_star_removal_off_takes_the_flat_pipeline(
+    service: ImageProcessingService,
+) -> None:
+    """star_removal=0 runs the background + creative stages back to back, with
+    no split - a value edit is byte-identical whether the (default-0) starless
+    fields are named explicitly or not."""
+    image, _ = _nebula_star_field()
+    a = ProcessingParameters(contrast=1.3, exposure=0.1, star_reduction=25)
+    b = a.model_copy(update={"star_removal": 0, "star_recombine": 0})
+    assert np.array_equal(service.apply_parameters(image, a), service.apply_parameters(image, b))
+
+
+def test_apply_parameters_star_removal_strips_stars_before_the_creative_stages(
+    service: ImageProcessingService,
+) -> None:
+    image, stars = _nebula_star_field()
+    keep = ProcessingParameters(contrast=1.4, star_sensitivity=70)
+    strip = keep.model_copy(update={"star_removal": 100, "star_recombine": 0})
+
+    kept = service.apply_parameters(image, keep)
+    stripped = service.apply_parameters(image, strip)
+
+    assert _star_flux(stripped, stars) < _star_flux(kept, stars) * 0.5
+
+
+def test_apply_parameters_star_recombine_brings_stars_back(
+    service: ImageProcessingService,
+) -> None:
+    image, stars = _nebula_star_field()
+    base = ProcessingParameters(contrast=1.4, star_removal=100, star_sensitivity=70)
+
+    starless = service.apply_parameters(image, base.model_copy(update={"star_recombine": 0}))
+    restored = service.apply_parameters(image, base.model_copy(update={"star_recombine": 100}))
+
+    assert _star_flux(restored, stars) > _star_flux(starless, stars)
+
+
+def test_apply_parameters_star_removal_reports_split_and_recombine_steps(
+    service: ImageProcessingService,
+) -> None:
+    image, _ = _nebula_star_field()
+    steps: list[str] = []
+    params = ProcessingParameters(contrast=1.2, star_removal=80, star_sensitivity=70)
+
+    service.apply_parameters(image, params, lambda name, _pct: steps.append(name))
+
+    assert steps.index("star_removal") < steps.index("contrast") < steps.index("star_recombine")
+
+
 def test_geometry_default_is_identity(
     service: ImageProcessingService, sample_image: np.ndarray
 ) -> None:

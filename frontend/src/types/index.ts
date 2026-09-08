@@ -92,6 +92,8 @@ export interface ProcessingParameters {
   starReduction: number;
   starSensitivity: number;
   starMaxSize: number;
+  starRemoval: number;
+  starRecombine: number;
   sharpness: number;
   temperature: number;
   tint: number;
@@ -120,6 +122,8 @@ export const DEFAULT_PARAMETERS: ProcessingParameters = {
   starReduction: 0,
   starSensitivity: 50,
   starMaxSize: 30,
+  starRemoval: 0,
+  starRecombine: 0,
   sharpness: 1.0,
   temperature: 6500,
   tint: 0,
@@ -226,6 +230,8 @@ const PARAMETER_BOUNDS: ParameterBound[] = [
   { key: 'starReduction', min: 0, max: 100, step: 1 },
   { key: 'starSensitivity', min: 0, max: 100, step: 1 },
   { key: 'starMaxSize', min: 0, max: 100, step: 1 },
+  { key: 'starRemoval', min: 0, max: 100, step: 1 },
+  { key: 'starRecombine', min: 0, max: 100, step: 1 },
   { key: 'sharpness', min: 0.0, max: 2.0, step: 0.01 },
   { key: 'vibrance', min: 0.0, max: 2.0, step: 0.01 },
   { key: 'saturation', min: 0.0, max: 2.0, step: 0.01 },
@@ -240,8 +246,9 @@ export const PARAMETER_BOUND_BY_KEY: Partial<Record<SliderParameterKey, Paramete
  * The editor workflow, in retouching order. This mirrors the backend pipeline
  * order in `app/services/image_processing.py::apply_parameters`: geometry first,
  * then white balance and background corrections, then tone, curves, colour,
- * detail, stars. The rail, the inspector panel switch, and the "modified" dots
- * all derive from this one list.
+ * detail, star reduction, then star removal (which actually splits the pipeline
+ * back-end - see that method). The rail, the inspector panel switch, and the
+ * "modified" dots all derive from this one list.
  *
  * `start` and `export` are workflow brackets (no step number): a one-click
  * starting point, and getting the result out.
@@ -255,12 +262,13 @@ export type EditorStepId =
   | 'colour'
   | 'detail'
   | 'stars'
+  | 'starless'
   | 'depth'
   | 'export';
 
 export interface EditorStep {
   id: EditorStepId;
-  /** Position in the workflow (1-8), or null for the start/export brackets. */
+  /** Position in the workflow (1-9), or null for the start/export brackets. */
   number: number | null;
   /** Slider parameters shown in this step's panel, in display order. */
   params: SliderParameterKey[];
@@ -283,7 +291,8 @@ export const EDITOR_STEPS: EditorStep[] = [
   { id: 'colour', number: 5, params: ['saturation', 'vibrance'] },
   { id: 'detail', number: 6, params: ['clarity', 'denoise', 'chromaDenoise', 'sharpness'] },
   { id: 'stars', number: 7, params: ['starReduction', 'starSensitivity', 'starMaxSize'] },
-  { id: 'depth', number: 8, params: [] },
+  { id: 'starless', number: 8, params: ['starRemoval', 'starRecombine'] },
+  { id: 'depth', number: 9, params: [] },
   { id: 'export', number: null, params: [] },
 ];
 

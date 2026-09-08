@@ -130,6 +130,8 @@ guard, independent of `max_image_size_mb`'s compressed-byte-size check).
 | star_reduction | 0 | 100 | 0 | int |
 | star_sensitivity | 0 | 100 | 50 | int |
 | star_max_size | 0 | 100 | 30 | int |
+| star_removal | 0 | 100 | 0 | int |
+| star_recombine | 0 | 100 | 0 | int |
 | sharpness | 0.0 | 2.0 | 1.0 | float |
 | temperature | 2000 | 8000 | 6500 | int (Kelvin) |
 | tint | -50 | 50 | 0 | int |
@@ -164,6 +166,14 @@ send the points the user actually dragged, not a full 256-entry table:
 { "curve_points": [{ "x": 0, "y": 0 }, { "x": 128, "y": 150 }, { "x": 255, "y": 255 }] }
 ```
 
+`star_removal` (v0.3) turns star removal on: when it is above 0 the pipeline
+splits after the background corrections - the stars are pulled out, every
+creative stage runs on the starless image, and `star_recombine` screen-blends
+the removed star flux back at the end (0 = fully starless output, 100 = stars at
+full strength). Detection reuses `star_sensitivity` / `star_max_size`. `0` (the
+default) is byte-identical to the flat pipeline. See `docs/ALGORITHMS.md`
+"Star removal (starless)".
+
 The canonical model is `app/models/processing.py`; keep this table in sync with it.
 
 ## WebSocket messages
@@ -188,9 +198,11 @@ relays live events from Redis until a terminal status arrives, then closes.
 `status`: `queued`, `processing`, `completed`, `failed` (or `unknown` if the
 `job_id` is not found). Image steps: `geometry`, `color_correction`,
 `vignette_correction`, `gradient_reduction`, `dehaze`, `contrast`, `exposure`,
-`highlights_shadows`, `whites_blacks`, `tone_curve`, `saturation`, `vibrance`,
-`clarity`, `denoise`, `chroma_denoise`, `star_reduction`, `sharpness`,
-`rendering`, `done`. Stack steps: `registration`, `background_normalization`,
+`highlights_shadows`, `whites_blacks`, `tone_curve`, `channel_curves`,
+`saturation`, `vibrance`, `clarity`, `denoise`, `chroma_denoise`,
+`star_reduction`, `sharpness`, `rendering`, `done`. With `star_removal` set, the
+extra steps `star_removal` (after `dehaze`) and `star_recombine` (last) bracket
+the creative stages. Stack steps: `registration`, `background_normalization`,
 `cosmic_ray_rejection`, `combination`, `done`.
 
 In the default `PROCESSING_MODE=sync`, the job is already `completed` when

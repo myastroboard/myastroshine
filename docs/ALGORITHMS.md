@@ -221,6 +221,91 @@ Applied in this order to minimize artifacts (`apply_parameters`):
 Preview path downscales to 512 px (`preview_max_size`) for instant feedback; the
 full-resolution result is computed on demand or via the job queue.
 
+**Star removal splits this list.** When `star_removal > 0` (see "Star removal
+(starless)" below), stages 0-4 (geometry + the sky/optics corrections) run on
+the whole frame, then the stars are pulled out, stages 5-17 run on the
+*starless* image, and a final `star_recombine` step screen-blends the stars
+back. `star_removal = 0` (the default) runs the flat list above unchanged.
+
+## Star removal (starless)
+
+`StarlessService` (`app/services/starless.py`) - the classic deep-sky workflow:
+separate the stars from the nebulosity so the starless image can be stretched /
+sharpened / denoised hard without bloating the stars, then blend the stars back.
+Driven by two parameters, `star_removal` and `star_recombine` (0-100 each, both
+default 0 = off); detection reuses `star_sensitivity` / `star_max_size`.
+
+**Split** (`StarlessService.split`):
+1. Detect stars with `StarDetectionService.detect` (the same per-star detector
+   star reduction and the mask-preview endpoint use), at native resolution.
+2. Build the starless *estimate* - what the nebulosity looks like with the stars
+   gone - by **opening by reconstruction**: erode each channel, then geodesic-
+   dilate the result back under the original (`skimage.morphology.reconstruction`).
+   This removes every bright feature smaller than the erosion element while
+   keeping the exact level and shape of everything larger, so it follows the
+   nebula's own gradient inward with no plateau or ring - unlike a plain opening
+   (flat plateaus) or an inpaint fill (which fills from the mask boundary and,
+   on a real photo, left dark halo rings around the brighter stars). Runs per
+   channel on a 640 px downscaled copy then resized up: the nebula under a star
+   is low-frequency (same reasoning as gradient reduction's estimate), and a
+   full-res geodesic reconstruction at 24 MP would cost seconds. The erosion
+   element scales with `star_max_size`, so features larger than the biggest
+   allowed star - a galaxy core, a bright nebula knot - are preserved intact.
+3. Draw each detected star into a mask as a circle `3x` its measured radius
+   (min 4 px) - generous, because the estimate under the mask *is* the
+   surrounding nebula continued inward, so an oversized mask only softens the
+   nebula slightly there, whereas an undersized one leaves a bright core and a
+   dark ring. Then grow the mask wherever the image still sits well above the
+   estimate *right next to* an already-masked star (a bright star bloated past
+   its detected radius, or its glow) - bounded to a ~10 px neighbourhood of the
+   detected stars, so an undetected faint star or a small nebula knot elsewhere
+   is left to the sensitivity control. Gaussian-feather (`sigma=2.5`).
+4. `starless = lerp(image, estimate, star_removal/100)` within the feathered
+   mask - a lower value thins the field rather than clearing it.
+5. `stars_layer = clip(image - starless, 0, 255)` - the removed star flux, on
+   black.
+
+**Recombine** (`StarlessService.recombine`): screen-blend
+`stars_layer * (star_recombine/100)` onto the processed starless image
+(`255 - (255-base)(255-stars)/255`). Screen, not a plain add, because starlight
+is additive but must not clip the nebulosity it lands on. The stars were pulled
+*before* the contrast/curve stretch, so they come back tighter and a touch
+dimmer than a normal edit leaves them - that is the point of working starless;
+`star_recombine = 100` is a straight restore.
+
+**Split point** (after `dehaze`, before `contrast`): geometry, white balance,
+vignette correction, gradient reduction and dehaze are corrections to the sky
+and the optics - they belong on the whole frame, stars included - so they run
+before the split. Everything creative runs on the starless image. `star_reduction`
+keeps its slot in the creative stages and is a natural no-op once the stars are
+gone.
+
+**Known ceiling** (confirmed on real photos - NGC 281, the Pelican, M31): small
+and medium stars clear cleanly with no ring, and galaxy/nebula cores are
+preserved. A frame's few brightest, near-saturated stars survive as a small
+core or leave a faint coloured halo where the white centre was removed but the
+outer glow was not - classical reconstruction fills from the neighbourhood and
+has no model of what a star sits on top of. Faint stars below the sensitivity
+threshold also remain. Good enough to work starless; this gap is exactly where
+a trained model wins, and why the ONNX path (below) stays on the list.
+
+**ONNX quality path - evaluated, deferred (2026-09-07).** The roadmap paired the
+classical path with "an ONNX StarNet-style model (quality path)". Findings:
+- The canonical StarNet (`nekitmm/starnet`) is MIT for code but its **weights
+  are CC BY-NC-SA 4.0 - non-commercial** - so they cannot ship in an AGPL
+  project distributed as a public Docker image, and the official
+  `starnetastro.com` CLI publishes no separately-licensed model.
+- The MIT-licensed alternatives - `code2k13/starrem2k13` (U2NET-P, weights MIT
+  but trained on 3 base images, no published `.onnx`) and `charvey2718/nox`
+  (MIT incl. weights, TensorFlow `.pb`, needs conversion) - are unproven on real
+  astrophotos and would need the same real-image test rounds the star-reduction
+  rebuild took.
+- Adopting any of them means a new `onnxruntime` dependency (~20-40 MB per arch,
+  multi-arch OK) plus a bundled model file.
+This is the same call v0.2 made for ML denoise and ML depth (see "Depth map" and
+"ML denoising" here): evaluate, adopt only if genuinely viable. No dependency or
+model added; revisit as a dedicated spike against a real photo.
+
 ## Auto Astro (one-click adaptive enhancement)
 
 `AutoAstroService.suggest_parameters(image)` (`app/services/auto_astro.py`)
@@ -281,8 +366,8 @@ left for erosion to shrink into. This reads as a small round white disc even
 after reduction - expected for a frame's few brightest "anchor" stars (real
 astro-processing tools leave these visible after reduction too), not a defect
 in the shrink algorithm itself. Actually removing a star regardless of
-brightness is a different, more aggressive operation ("starless", v0.3 on the
-roadmap) than reduction.
+brightness is the separate, more aggressive "Star removal (starless)" operation
+above (`star_removal` / `star_recombine`), not reduction.
 
 ## Depth map (v1, gradient-based)
 

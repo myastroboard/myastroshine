@@ -124,6 +124,21 @@ describe('EditorInspector', () => {
     expect(onToggle).toHaveBeenCalledWith(true);
   });
 
+  it('shows the star removal sliders on the starless step', () => {
+    render(<EditorInspector {...makeProps({ activeStep: 'starless' })} />);
+
+    expect(screen.getByLabelText('Remove stars')).toBeInTheDocument();
+    expect(screen.getByLabelText('Bring stars back')).toBeInTheDocument();
+  });
+
+  it('routes the header Reset on the starless step to its own params', () => {
+    const onResetSection = vi.fn();
+    render(<EditorInspector {...makeProps({ activeStep: 'starless', onResetSection })} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
+    expect(onResetSection).toHaveBeenCalledWith(['starRemoval', 'starRecombine']);
+  });
+
   it('opens the Depth Shift viewer from the depth step', () => {
     const onOpenViewer = vi.fn();
     render(
