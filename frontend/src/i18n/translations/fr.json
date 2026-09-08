@@ -55,12 +55,14 @@
   },
   "image_upload": {
     "format_not_supported": "Format {ext} non pris en charge",
-    "file_too_large": "La taille du fichier dépasse la limite de 100 Mo",
+    "file_too_large": "Le fichier dépasse la limite de {mb} Mo",
     "drop_hint": "Déposez une image astronomique ici",
     "choose_file_hint": "ou choisissez un fichier pour commencer",
     "choose_file_button": "Choisir un fichier",
-    "uploading_button": "Téléversement...",
-    "accepted_formats": "JPEG, PNG, TIFF, FITS ou RAW appareil photo, jusqu'à 100 Mo"
+    "uploading_percent": "Téléversement… {percent} %",
+    "processing": "Préparation de votre image…",
+    "accepted_formats": "JPEG, PNG, TIFF, FITS ou RAW appareil photo",
+    "max_size": "jusqu'à {mb} Mo"
   },
   "editor": {
     "depth_shift_failed": "Échec du décalage de profondeur : {error}",

@@ -8,17 +8,35 @@ function fileInput(): HTMLInputElement {
 }
 
 describe('ImageUpload', () => {
-  it('renders the file picker and accepted formats hint', () => {
-    render(<ImageUpload onUpload={vi.fn()} />);
+  it('renders the file picker and the configured size limit', () => {
+    render(<ImageUpload onUpload={vi.fn()} maxSizeMb={250} />);
 
     expect(screen.getByRole('button', { name: /choose a file/i })).toBeInTheDocument();
-    expect(screen.getByText(/up to 100 MB/i)).toBeInTheDocument();
+    expect(screen.getByText(/up to 250 MB/i)).toBeInTheDocument();
   });
 
-  it('shows a loading label while uploading', () => {
-    render(<ImageUpload onUpload={vi.fn()} isLoading />);
+  it('rejects a file over the configured size limit with that number', () => {
+    const onUpload = vi.fn();
+    render(<ImageUpload onUpload={onUpload} maxSizeMb={10} />);
+    const big = new File([new Uint8Array(11 * 1024 * 1024)], 'huge.fits');
 
-    expect(screen.getByRole('button', { name: /uploading/i })).toBeDisabled();
+    fireEvent.change(fileInput(), { target: { files: [big] } });
+
+    expect(onUpload).not.toHaveBeenCalled();
+    expect(screen.getByText(/larger than the 10 MB limit/i)).toBeInTheDocument();
+  });
+
+  it('shows an indeterminate status while the server prepares the image', () => {
+    render(<ImageUpload onUpload={vi.fn()} isLoading progress={null} />);
+
+    expect(screen.getByRole('status')).toHaveTextContent(/preparing/i);
+    expect(screen.queryByRole('button', { name: /choose a file/i })).not.toBeInTheDocument();
+  });
+
+  it('shows a percentage while the file transfers', () => {
+    render(<ImageUpload onUpload={vi.fn()} isLoading progress={0.42} />);
+
+    expect(screen.getByRole('status')).toHaveTextContent('42%');
   });
 
   it.each(['frame.fits', 'photo.CR2', 'photo.nef', 'stack.tif'])(
