@@ -27,6 +27,11 @@ export function StackResults({ result, onEnhance, onDownload }: StackResultsProp
     [t('stacking.results.frames_excluded'), String(stats.framesExcluded)],
     [t('stacking.combination_label'), stats.combinationMethod],
     [t('stacking.settings.transform_label'), stats.registrationTransform],
+    ...(stats.registrationRmsPx != null
+      ? ([
+          [t('stacking.results.alignment_rms'), `${stats.registrationRmsPx.toFixed(2)} px`],
+        ] as [string, string][])
+      : []),
     [t('stacking.results.snr_improvement'), `${stats.snrImprovement.toFixed(2)}x`],
     ...(stats.measuredNoiseReduction != null
       ? ([

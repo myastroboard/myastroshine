@@ -4,10 +4,10 @@ initiate -> upload frames (each ingested to a linear ``LinearFrame``) -> process
 -> the composite becomes a normal session so the single-image enhancement routes
 work on it unchanged.
 
-**Phase 0 status**: ``process`` currently does a naive memory-bounded running
-mean (CFA frames superpixel-debayered first), *no registration and no pixel
-rejection yet*. Star-based alignment, Winsorized-sigma rejection and frame
-weighting arrive in Phase 1. See ``initial_plan/12_STACKING_REBUILD.md``.
+``process`` delegates the register -> normalise -> reject -> combine work to
+:class:`app.services.integration.IntegrationService`. Calibration frames and a
+post-stack colour/stretch step are still to come - see
+``initial_plan/12_STACKING_REBUILD.md``.
 """
 
 from __future__ import annotations
@@ -26,16 +26,17 @@ from app.exceptions import InvalidParameterError, ResourceNotFoundError
 from app.logging_config import get_logger
 from app.models import InitiateStackRequest, ProcessStackRequest, StackStatistics
 from app.services import progress
+from app.services.integration import IntegrationService, highpass_noise
 from app.services.job import JobService
 from app.services.session import SessionService
 from app.services.storage import StorageService
 from app.utils.app_settings import get_app_settings
-from app.utils.linear_ingest import LinearFrame, superpixel_rgb, to_display_bgr
+from app.utils.linear_ingest import LinearFrame, to_display_bgr
 
 logger = get_logger(__name__)
 
 _MIN_FRAMES = 2
-_MONO_NDIM = 2
+_COLOR_NDIM = 3
 _FULL_RES = 1_000_000  # to_display_bgr max_size: large enough to never downscale the composite
 
 
@@ -46,6 +47,7 @@ class StackingService:
         self.db = db
         self.sessions = sessions
         self.storage = storage
+        self._integration = IntegrationService(storage)
 
     def _get(self, stack_id: str) -> StackRecord:
         record = self.db.get(StackRecord, stack_id)
@@ -159,50 +161,45 @@ class StackingService:
         excluded_count: int,
         job_id: str | None,
     ) -> tuple[np.ndarray, StackStatistics]:
-        """Naive memory-bounded running mean (Phase 0). One accumulator, one IO pass."""
-        accumulator: np.ndarray | None = None
-        reference_shape: tuple[int, ...] | None = None
-        first_frame_noise: float | None = None
+        """Register -> normalise -> Winsorized-sigma weighted combine (Phase 1)."""
 
-        for step, index in enumerate(indices):
-            pixels = self._prepared_pixels(stack_id, index)
-            if accumulator is None:
-                accumulator = np.zeros(pixels.shape, dtype=np.float64)
-                reference_shape = pixels.shape
-                first_frame_noise = _background_noise(pixels)
-            elif pixels.shape != reference_shape:
-                raise InvalidParameterError(
-                    "All frames must share dimensions and colour layout after debayering"
-                )
-            accumulator += pixels
-            if step % 25 == 0:
-                self._emit(
-                    job_id, stack_id, "integration", 20 + int(60 * step / max(1, len(indices)))
-                )
+        def on_progress(step: str, percent: int) -> None:
+            self._emit(job_id, stack_id, step, 15 + int(percent * 0.8))
 
-        assert accumulator is not None  # noqa: S101 - len(indices) >= 2 guaranteed by the caller
-        composite = (accumulator / len(indices)).astype(np.float32)
+        result = self._integration.integrate(
+            stack_id,
+            indices,
+            transform=record.registration_transform,
+            combination=record.combination_method,
+            rejection=record.rejection_algo,
+            weighting=record.weighting,
+            on_progress=on_progress,
+        )
 
         measured = None
-        if first_frame_noise:
-            composite_noise = _background_noise(composite)
+        if result.reference_noise > 0:
+            composite_noise = _background_noise(result.composite)
             if composite_noise > 0:
-                measured = round(first_frame_noise / composite_noise, 2)
+                measured = round(result.reference_noise / composite_noise, 2)
 
+        record.quality_report = {
+            "reference_index": result.reference_index,
+            "registration_rms_px": result.registration_rms,
+            "registration_failures": result.registration_failures,
+            "rejected_samples": result.rejected_samples,
+            "aligned": result.aligned,
+        }
         stats = StackStatistics(
-            frames_stacked=len(indices),
-            frames_excluded=excluded_count,
+            frames_stacked=result.frames_stacked,
+            frames_excluded=excluded_count + result.registration_failures,
             combination_method=record.combination_method,
-            registration_transform=record.registration_transform,
-            snr_improvement=round(math.sqrt(len(indices)), 2),
+            registration_transform=record.registration_transform if result.aligned else "none",
+            registration_rms_px=result.registration_rms if result.aligned else None,
+            reference_frame=result.reference_index if result.aligned else None,
+            snr_improvement=round(math.sqrt(result.effective_frames), 2),
             measured_noise_reduction=measured,
         )
-        return composite, stats
-
-    def _prepared_pixels(self, stack_id: str, index: int) -> np.ndarray:
-        frame = superpixel_rgb(self.storage.load_linear_frame(stack_id, index))
-        pixels = frame.data.astype(np.float64)
-        return pixels[..., np.newaxis] if pixels.ndim == _MONO_NDIM else pixels
+        return result.composite, stats
 
     def _emit(
         self,
@@ -290,7 +287,6 @@ class StackingService:
 
 
 def _background_noise(pixels: np.ndarray) -> float:
-    """Robust std of a corner patch - a rough per-frame read-noise proxy."""
-    patch = pixels[: max(8, pixels.shape[0] // 8), : max(8, pixels.shape[1] // 8)]
-    median = float(np.median(patch))
-    return float(1.4826 * np.median(np.abs(patch - median)))
+    """Robust high-pass noise of the composite (central crop, gradient removed)."""
+    gray = pixels.mean(axis=2) if pixels.ndim == _COLOR_NDIM else pixels
+    return highpass_noise(gray.astype(np.float32))

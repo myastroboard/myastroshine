@@ -81,6 +81,8 @@ class StackStatistics(BaseModel):
     frames_excluded: int
     combination_method: str
     registration_transform: str
+    registration_rms_px: float | None = None
+    reference_frame: int | None = None
     snr_improvement: float
     measured_noise_reduction: float | None = None
 

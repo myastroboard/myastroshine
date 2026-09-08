@@ -40,6 +40,8 @@ const RESULT: StackResult = {
     framesExcluded: 0,
     combinationMethod: 'average',
     registrationTransform: 'similarity',
+    registrationRmsPx: 0.4,
+    referenceFrame: 0,
     snrImprovement: 1.41,
     measuredNoiseReduction: null,
   },

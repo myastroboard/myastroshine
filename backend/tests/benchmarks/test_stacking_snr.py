@@ -1,19 +1,12 @@
-"""SNR-improvement acceptance criterion (release-hardening backlog #4): stacking
-should improve SNR by ~sqrt(N).
+"""SNR-improvement acceptance criterion: stacking should reduce noise by ~sqrt(N).
 
-``CombinationService.estimate_snr_improvement`` is literally ``sqrt(N)`` (see
-app/services/combination.py) - the existing unit test for it
-(tests/services/test_combination.py) only confirms that formula matches its
-own definition, which is a tautology. This test instead measures the *actual*
-noise reduction ``combine(..., method="mean")`` produces on synthetic frames
-with known, controlled noise, and checks it against the theoretical claim -
-"mean" is the method the docs (docs/ALGORITHMS.md) call optimal at exactly
-sqrt(N); median/sigma_clip trade a bit of that for robustness and are out of
-scope here since ``estimate_snr_improvement`` doesn't vary by method either.
+Runs the real ``IntegrationService`` pipeline (register -> normalise -> reject ->
+weighted combine) on synthetic star fields with a known signal and known,
+controlled Gaussian noise, and checks the measured noise reduction against the
+theoretical ``sqrt(effective N)``.
 
-Opt-in and excluded from the default run - see test_processing_speed.py's
-module docstring for why (same reasoning: a wall-clock/statistical check like
-this doesn't belong in the suite gating every push):
+Opt-in and excluded from the default run - a wall-clock / statistical check like
+this doesn't belong in the suite gating every push:
 
     RUN_BENCHMARKS=1 pytest tests/benchmarks --no-cov -v
 """
@@ -21,11 +14,16 @@ this doesn't belong in the suite gating every push):
 from __future__ import annotations
 
 import os
+import tempfile
+from pathlib import Path
 
+import cv2
 import numpy as np
 import pytest
 
-from app.services.combination import CombinationService
+from app.services.integration import IntegrationService
+from app.services.storage import StorageService
+from app.utils.linear_ingest import LinearFrame
 
 pytestmark = pytest.mark.skipif(
     os.environ.get("RUN_BENCHMARKS") != "1",
@@ -33,47 +31,52 @@ pytestmark = pytest.mark.skipif(
 )
 
 FRAME_COUNT = 16
-NOISE_STD = 20.0
-TOLERANCE = 0.15  # vs the theoretical sqrt(N) - quantization + finite-sample noise
+NOISE_STD = 0.02
+TOLERANCE = 0.20  # vs the theoretical sqrt(N) - float16 store + finite-sample noise
 
 
-def _smooth_signal(height: int, width: int) -> np.ndarray:
-    """A noise-free "true" frame: smooth gradients only, no point sources -
-    stars would occasionally clip at 255 under added noise and bias a
-    residual-std measurement, which isn't what this test is checking."""
-    x = np.linspace(90, 150, width)
-    y = np.linspace(100, 160, height)
-    base = (x[np.newaxis, :] + y[:, np.newaxis]) / 2
-    return np.stack([base, base * 0.9 + 10, base * 0.8 + 20], axis=-1)
-
-
-def _noisy_frames(signal: np.ndarray, count: int, *, seed: int) -> list[np.ndarray]:
+def _truth(height: int, width: int, seed: int) -> np.ndarray:
+    """A noise-free frame: a smooth sky plus ~60 stars for the matcher to lock onto."""
     rng = np.random.default_rng(seed)
-    frames = []
-    for _ in range(count):
-        noisy = signal + rng.normal(0.0, NOISE_STD, signal.shape)
-        frames.append(np.clip(noisy, 0, 255).astype(np.uint8))
-    return frames
+    y, x = np.mgrid[0:height, 0:width]
+    sky = 0.15 + 0.05 * (x / width + y / height)
+    signal = np.stack([sky, sky * 0.95, sky * 0.9], axis=-1).astype(np.float32)
+    for _ in range(60):
+        cy, cx = int(rng.integers(20, height - 20)), int(rng.integers(20, width - 20))
+        cv2.circle(signal, (cx, cy), int(rng.integers(1, 3)), (0.8, 0.8, 0.8), -1)
+    return signal
 
 
-def _residual_std(observed: np.ndarray, signal: np.ndarray) -> float:
-    """Std of (observed - ground truth) - our noise proxy, since we control
-    the "true" signal exactly (real frames never let you measure this)."""
-    return float(np.std(observed.astype(np.float64) - signal))
+def _residual_std(observed: np.ndarray, truth: np.ndarray) -> float:
+    inner = (slice(20, -20), slice(20, -20))
+    return float(np.std(observed[inner].astype(np.float64) - truth[inner]))
 
 
-def test_mean_combination_reduces_noise_by_sqrt_n() -> None:
-    signal = _smooth_signal(96, 128)
-    frames = _noisy_frames(signal, FRAME_COUNT, seed=7)
+def test_integration_reduces_noise_by_sqrt_n() -> None:
+    truth = _truth(140, 180, seed=1)
+    rng = np.random.default_rng(7)
+    root = Path(tempfile.mkdtemp())
+    storage = StorageService(root=root)
 
-    single_frame_noise = float(np.mean([_residual_std(f, signal) for f in frames]))
-    stacked = CombinationService().combine(frames, method="mean")
-    stacked_noise = _residual_std(stacked, signal)
+    single_noise = []
+    for i in range(FRAME_COUNT):
+        noisy = np.clip(truth + rng.normal(0, NOISE_STD, truth.shape), 0, 1).astype(np.float32)
+        single_noise.append(_residual_std(noisy, truth))
+        storage.save_linear_frame("snr", i, LinearFrame(data=noisy, source_bit_depth=16))
 
-    empirical_improvement = single_frame_noise / stacked_noise
-    theoretical_improvement = CombinationService().estimate_snr_improvement(FRAME_COUNT)
+    result = IntegrationService(storage).integrate(
+        "snr",
+        list(range(FRAME_COUNT)),
+        transform="similarity",
+        combination="average",
+        rejection="winsorized_sigma",
+        weighting="none",
+    )
 
-    assert empirical_improvement == pytest.approx(theoretical_improvement, rel=TOLERANCE), (
-        f"stacking {FRAME_COUNT} frames reduced noise {empirical_improvement:.2f}x, "
-        f"theory predicts {theoretical_improvement:.2f}x (sqrt({FRAME_COUNT}))"
+    empirical = float(np.mean(single_noise)) / _residual_std(result.composite, truth)
+    theoretical = result.effective_frames**0.5
+
+    assert empirical == pytest.approx(theoretical, rel=TOLERANCE), (
+        f"stacking {FRAME_COUNT} frames reduced noise {empirical:.2f}x, "
+        f"theory predicts {theoretical:.2f}x"
     )

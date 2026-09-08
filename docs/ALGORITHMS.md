@@ -445,22 +445,62 @@ nominal `[0, 1]` range, linear (no screen stretch), CFA mosaic kept intact.
 
 `to_display_bgr(frame)` auto-stretches a frame to a BGR thumbnail (CFA gets a
 2x2 superpixel de-mosaic); `superpixel_rgb(frame)` is the placeholder debayer
-for the Phase 0 pipeline (half-res, no interpolation).
+(half-res, no interpolation) used until the interpolating debayer lands with the
+calibration path.
 
-### Integration (`StackingService`, Phase 0)
+### Registration (`app/services/star_match.py`)
 
-`process` loads each kept frame (superpixel-debayering CFA), accumulates a
-**running mean** in one float64 accumulator (one IO pass, memory-bounded to a
-single frame), and saves a 32-bit `composite.npy` plus an 8-bit auto-stretched
-session for the editor. Manually excluded frames (`excluded_frames`) are
-skipped. `snr_improvement` is `sqrt(N_kept)`; `measured_noise_reduction` is the
-single-frame vs composite background-noise ratio.
+`StarMatchService.align(source_centroids, target_centroids, transform)` aligns
+two star fields by **asterism (triangle) matching**, vendored in the style of
+`astroalign` (no scipy / `sep` / `scikit-image`):
 
-**Not yet implemented (Phase 1+):** star-based registration, additive +
-multiplicative normalization, Winsorized-sigma pixel rejection, frame weighting,
-calibration frames, per-frame quality scoring. The v1.1 `RegistrationService` /
-`NormalizationService` / `CosmicRayService` / `CombinationService` modules are
-unused by `process` and are removed when Phase 1 lands.
+1. For each of the ~60 brightest stars in each frame, build triangles from its
+   nearest neighbours and describe each by `(mid_side / long_side,
+   short_side / long_side)` - invariant to translation, rotation and scale.
+2. Match each source triangle to its closest target descriptor; the ordered
+   vertices give candidate point correspondences.
+3. `cv2.estimateAffinePartial2D` (`similarity`) or `cv2.estimateAffine2D`
+   (`affine`) with RANSAC fits the transform; it is rejected if there are too
+   few inliers, the inlier RMS is over 2 px, or the scale is not within 0.5-2x.
+   `translation` keeps only the median inlier shift.
+
+### Integration (`app/services/integration.py`)
+
+`IntegrationService.integrate` runs three memory-bounded passes so a
+thousand-frame stack fits in bounded RAM (only a few frames and one row-tile
+ever resident):
+
+1. **Register** - superpixel-debayer each frame, detect stars
+   (`StarDetectionService`), and measure background / 95th-percentile scale /
+   high-pass noise. The frame with the most stars is the **reference**; every
+   other frame is asterism-matched to it. Frames that fail to match are dropped
+   and counted in `frames_excluded`.
+2. **Align** - reload each kept frame, warp it into the reference frame
+   (`cv2.INTER_LANCZOS4`, NaN outside the frame footprint), normalise it
+   (`x' = m*x + a` where `m = scale_ref / scale_frame` clamped to 0.2-5x and
+   `a` matches the backgrounds), and stream it to a `float16` memmap on disk.
+3. **Combine** - tile over the memmap rows. Per pixel across the stack:
+   **iterative sigma-clip around the mean** (2 iterations, k=3 - fast, sum-based;
+   `np.nanmedian` on the stack axis is ~100x slower), then `winsorized_sigma`
+   clamps the outliers (count preserved) or `sigma` drops them, then a
+   **weighted mean** (`none` / `noise` = `1/noise^2` / `quality` =
+   `stars/noise^2`, per-frame weight clamped to 0.25-4x the median). Rejection is
+   skipped where fewer than 30% of frames cover a pixel (the field-rotation
+   wedge - the per-pixel sigma there is unreliable). `median` combination uses a
+   true `nanmedian` (slower, opt-in).
+
+The composite is saved as 32-bit `composite.npy` plus an auto-stretched 8-bit
+session for the editor. `quality_report` records the reference frame, the mean
+registration RMS, and the rejected-sample count. `snr_improvement` is
+`sqrt(effective N)` where effective N = `(sum w)^2 / sum(w^2)`;
+`measured_noise_reduction` is the reference-frame vs composite high-pass noise
+ratio. On a real 150-frame Seestar set: 0 registration failures, 0.32 px RMS,
+~8.7x noise reduction (85% of the sqrt(105) theoretical for the clamped
+weights).
+
+**Still to come:** calibration frames (dark / flat / bias, an interpolating
+debayer), a post-stack stretch / background-extraction / colour-calibration
+step, and an auto-crop to the common frame footprint.
 
 ## Performance notes
 
@@ -476,8 +516,7 @@ unused by `process` and are removed when Phase 1 lands.
 | Denoise (bilateral) | 100-300 ms |
 | Chroma denoise (bilateral, Cr/Cb only) | ~100 ms |
 | Depth map (Sobel) | 50-100 ms |
-| Registration per frame (ORB) | ~0.6 s |
-| Registration per frame (SIFT) | ~1.8 s |
+| Stacking, per frame (register + align + combine, ~1MP superpixel) | ~1 s (3 IO passes; Phase 5 to optimise) |
 
 Whites/blacks and highlights/shadows cost the same shape of work (a full-res
 grayscale conversion + masked blend) but were measured at different times -
