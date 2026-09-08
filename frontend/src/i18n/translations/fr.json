@@ -82,6 +82,7 @@
       "aria_label": "Étapes de retouche",
       "modified": "modifié par rapport au défaut",
       "start": "Départ",
+      "stack": "Empilement",
       "frame": "Cadrage",
       "sky": "Fond de ciel",
       "light": "Lumière",
@@ -95,6 +96,9 @@
     "steps": {
       "start": {
         "help": "Commencez ici : un point de départ en un clic avec Auto Astro, ou appliquez un préréglage enregistré. Puis descendez les étapes."
+      },
+      "stack": {
+        "help": "Le composite empilé linéaire, avant tout travail créatif : étirer le signal faible, soustraire le dégradé de ciel, neutraliser la couleur. Non destructif - tout se recalcule depuis les données 32 bits."
       },
       "frame": {
         "help": "Cadrez d'abord - recadrage, redressement de l'horizon, rotation ou miroir. Tout ce qui suit travaille sur l'image cadrée.",
@@ -298,6 +302,20 @@
         "label": "Teinte",
         "hint": "Balance des blancs : décale la dominante colorée entre vert et magenta."
       }
+    }
+  },
+  "stack_panel": {
+    "stretch": {
+      "label": "Étirement",
+      "hint": "L'intensité avec laquelle sortir le signal faible du fond. Bas garde un ciel sombre et discret ; haut fait ressortir la nébulosité ténue au prix d'un fond plus clair et plus bruité."
+    },
+    "background_extraction": {
+      "label": "Extraction du fond",
+      "hint": "Retire un dégradé lisse de pollution lumineuse en ajustant une surface d'ordre faible au ciel entre les objets. 0 laisse le dégradé ; 100 le soustrait entièrement."
+    },
+    "color_calibration": {
+      "label": "Calibration des couleurs",
+      "hint": "Neutralise le fond de ciel vers le gris et équilibre les canaux pour que le champ d'étoiles paraisse à peu près blanc."
     }
   },
   "stars_panel": {

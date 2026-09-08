@@ -43,6 +43,23 @@ describe('ImagePreview', () => {
     expect(reset).toHaveTextContent('100%');
   });
 
+  it('keeps the before/after divider under the pointer when zoomed', () => {
+    mockContainerRect();
+    const { container } = render(<ImagePreview originalUrl="/a" processedUrl="/b" />);
+
+    // Zoom to 200%, then drag the split to 75% of the container width.
+    fireEvent.click(screen.getByRole('button', { name: /zoom in/i }));
+    fireEvent.click(screen.getByRole('button', { name: /zoom in/i }));
+
+    const stage = container.querySelector('.cursor-ew-resize')!;
+    fireEvent.pointerDown(stage, { clientX: 150, clientY: 50, pointerId: 1 });
+
+    // The images are scaled about the centre, so the divider element sits back
+    // at the container fraction the pointer was actually over (75%).
+    const divider = container.querySelector('.bg-white\\/70') as HTMLElement;
+    expect(divider.style.left).toBe('75%');
+  });
+
   it('draws one circle per detected star when a mask overlay is given', () => {
     const { container } = render(
       <ImagePreview

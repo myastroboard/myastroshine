@@ -23,6 +23,7 @@ from app.models.processing import (
     ProcessingParameters,
     ProcessRequest,
     ProcessResponse,
+    StackParameters,
 )
 from app.models.session import SessionInfo
 from app.models.settings import AppSettingsResponse, AppSettingsUpdate
@@ -81,6 +82,7 @@ __all__ = [
     "SavePresetResponse",
     "SessionInfo",
     "StackFrameInfo",
+    "StackParameters",
     "StackResultResponse",
     "StackSessionResponse",
     "StackStatistics",

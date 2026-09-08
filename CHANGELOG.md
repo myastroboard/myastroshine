@@ -92,8 +92,16 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   neutralised and balanced. Combined with a better reference-frame choice (the
   middle of the session, not the frame with the most stars) a real 100-sub set
   now comes out framed on the target with a flat neutral background instead of
-  noisy rainbow speckle. Still to come: the creative pipeline on 32-bit data so
-  the stretch / background / colour steps are non-destructive in the editor. See
+  noisy rainbow speckle. Finally, a stacked composite now opens the editor on
+  its **32-bit linear data**, with a new **Stack** step (composite sessions
+  only): a **Stretch** control that sets the auto-stretch strength, a
+  **Background extraction** slider, and a **Colour calibration** toggle - all
+  non-destructive, recomputed from the linear composite so nothing is lost to an
+  early 8-bit quantisation. The whole creative pipeline (`ImageProcessingService`)
+  now runs in float32 internally and quantises only at the encode boundary, which
+  also benefits single-image FITS/RAW edits. Only the field-rotation crop is
+  baked into the saved composite; background extraction and colour calibration
+  moved out of the one-shot cleanup and into the Stack step. See
   `initial_plan/12_STACKING_REBUILD.md`.
 
 ### Changed
@@ -177,6 +185,18 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   "queued" forever - a few stacks (or re-stacks) in a session would trip "Too
   many concurrent processing jobs" and stay tripped. Sync-mode stacks now mark
   the job completed/failed the same way the queue path does.
+- The editor no longer 429s itself ("Too many concurrent processing jobs") when
+  you move several sliders quickly: a new `/process` for a session now retires
+  any still-pending job for that same session (status `superseded`) before it
+  starts, instead of letting a queue of obsolete jobs pile up against the per-IP
+  concurrency budget. The frontend also drops the previous job's WebSocket
+  rather than leaving it to reconnect in the background.
+- A stacked composite that is portrait (or any non-16:9 shape) no longer opens
+  in the editor as a thin strip in a black frame - the preview reads the real
+  aspect ratio off the image when the caller doesn't provide dimensions.
+- The before/after divider now tracks the pointer (and the actual split of the
+  image) while the preview is zoomed in; it was computed in unscaled container
+  coordinates and drifted from the visible seam at any zoom above 100%.
 
 ## [0.2.0] - 2026-09-06
 

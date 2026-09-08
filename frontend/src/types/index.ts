@@ -73,8 +73,37 @@ export const DEFAULT_CURVE_POINTS: CurvePoint[] = [
   { x: 255, y: 255 },
 ];
 
+/**
+ * Linear post-stack controls, shown only for a stacked-composite session (the
+ * "Stack" step). They run as a non-destructive pre-stage on the 32-bit linear
+ * composite, ahead of every other stage. Ignored for an ordinary image.
+ */
+export interface StackParameters {
+  /** Auto-stretch intensity: 0 = subtle (dark sky), 1 = aggressive. */
+  stretch: number;
+  /** How much of the fitted low-order sky gradient to remove (0 = off, 100 = full). */
+  backgroundExtraction: number;
+  /** Neutralise the sky background and balance the channels toward grey. */
+  colorCalibration: boolean;
+}
+
+export const DEFAULT_STACK_PARAMETERS: StackParameters = {
+  stretch: 0.5,
+  backgroundExtraction: 100,
+  colorCalibration: true,
+};
+
+export function stackParametersEqual(a: StackParameters, b: StackParameters): boolean {
+  return (
+    a.stretch === b.stretch &&
+    a.backgroundExtraction === b.backgroundExtraction &&
+    a.colorCalibration === b.colorCalibration
+  );
+}
+
 export interface ProcessingParameters {
   geometry: GeometryParameters;
+  stack: StackParameters;
   contrast: number;
   exposure: number;
   saturation: number;
@@ -105,6 +134,7 @@ export interface ProcessingParameters {
 
 export const DEFAULT_PARAMETERS: ProcessingParameters = {
   geometry: DEFAULT_GEOMETRY,
+  stack: DEFAULT_STACK_PARAMETERS,
   contrast: 1.0,
   exposure: 0.0,
   saturation: 1.0,
@@ -139,8 +169,11 @@ export function hasEdits(p: ProcessingParameters): boolean {
   if (!isDefaultGeometry(p.geometry)) {
     return true;
   }
+  if (!stackParametersEqual(p.stack, DEFAULT_STACK_PARAMETERS)) {
+    return true;
+  }
   for (const key of Object.keys(DEFAULT_PARAMETERS) as (keyof ProcessingParameters)[]) {
-    if (key === 'geometry') {
+    if (key === 'geometry' || key === 'stack') {
       continue;
     }
     const value = p[key];
@@ -167,8 +200,11 @@ export function parametersEqual(a: ProcessingParameters, b: ProcessingParameters
   if (!geometryEquals(a.geometry, b.geometry)) {
     return false;
   }
+  if (!stackParametersEqual(a.stack, b.stack)) {
+    return false;
+  }
   for (const key of Object.keys(DEFAULT_PARAMETERS) as (keyof ProcessingParameters)[]) {
-    if (key === 'geometry') {
+    if (key === 'geometry' || key === 'stack') {
       continue;
     }
     const av = a[key];
@@ -195,10 +231,10 @@ export const CURVE_CHANNEL_FIELD: Record<CurveChannel, keyof ProcessingParameter
   blue: 'blueCurvePoints',
 };
 
-/** Numeric parameters driven by the slider panel (everything but geometry / curve fields). */
+/** Numeric parameters driven by the slider panel (everything but geometry / stack / curve fields). */
 export type SliderParameterKey = Exclude<
   keyof ProcessingParameters,
-  'geometry' | 'curvePoints' | 'redCurvePoints' | 'greenCurvePoints' | 'blueCurvePoints'
+  'geometry' | 'stack' | 'curvePoints' | 'redCurvePoints' | 'greenCurvePoints' | 'blueCurvePoints'
 >;
 
 interface ParameterBound {
@@ -255,6 +291,7 @@ export const PARAMETER_BOUND_BY_KEY: Partial<Record<SliderParameterKey, Paramete
  */
 export type EditorStepId =
   | 'start'
+  | 'stack'
   | 'frame'
   | 'sky'
   | 'light'
@@ -267,14 +304,17 @@ export type EditorStepId =
 
 export interface EditorStep {
   id: EditorStepId;
-  /** Position in the workflow (1-8), or null for the start/export brackets. */
+  /** Position in the workflow (1-8), or null for the start/stack/export brackets. */
   number: number | null;
   /** Slider parameters shown in this step's panel, in display order. */
   params: SliderParameterKey[];
+  /** Only shown for a stacked-composite session. */
+  stackOnly?: boolean;
 }
 
 export const EDITOR_STEPS: EditorStep[] = [
   { id: 'start', number: null, params: [] },
+  { id: 'stack', number: null, params: [], stackOnly: true },
   { id: 'frame', number: 1, params: [] },
   {
     id: 'sky',
@@ -300,6 +340,11 @@ export const EDITOR_STEPS: EditorStep[] = [
   { id: 'depth', number: 8, params: [] },
   { id: 'export', number: null, params: [] },
 ];
+
+/** The workflow steps visible for this session - the "Stack" step only for a composite. */
+export function editorStepsFor(isStack: boolean): EditorStep[] {
+  return isStack ? EDITOR_STEPS : EDITOR_STEPS.filter((step) => !step.stackOnly);
+}
 
 export interface UploadResponse {
   sessionId: string;
@@ -333,9 +378,11 @@ export interface EditorSession {
   sessionId: string;
   histogram?: HistogramData;
   dimensions?: Dimensions;
+  /** True when the session is a stacked composite - unlocks the "Stack" step. */
+  isStack?: boolean;
 }
 
-export type JobStatus = 'queued' | 'processing' | 'completed' | 'failed';
+export type JobStatus = 'queued' | 'processing' | 'completed' | 'failed' | 'superseded';
 
 export interface ProcessingStatus {
   jobId: string;

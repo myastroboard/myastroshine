@@ -23,7 +23,7 @@ from app.utils.app_settings import get_app_settings
 
 logger = get_logger(__name__)
 
-TERMINAL_STATUSES = ("completed", "failed")
+TERMINAL_STATUSES = ("completed", "failed", "superseded")
 
 
 class JobService:
@@ -67,6 +67,26 @@ class JobService:
             .scalar()
             or 0
         )
+
+    def supersede_pending_for_session(self, session_id: str) -> int:
+        """Retire this session's not-yet-finished jobs - a newer edit is on the way.
+
+        The editor re-processes on every settled slider move; without this, a
+        burst of edits leaves a queue of stale jobs that each still count against
+        the per-IP concurrency budget (429) and each still run to completion on
+        the worker for a result nobody will look at. ``EnhancementService.run``
+        skips a job it finds already superseded.
+        """
+        pending = self.db.scalars(
+            select(JobRecord).where(
+                JobRecord.session_id == session_id,
+                JobRecord.status.notin_(TERMINAL_STATUSES),
+            )
+        ).all()
+        for record in pending:
+            record.status = "superseded"
+        self.db.commit()
+        return len(pending)
 
     def cleanup_stale_jobs(self) -> int:
         """Mark long-abandoned non-terminal jobs failed. Returns the count."""

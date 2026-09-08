@@ -63,9 +63,11 @@ export function EditorView({ session, astrodexContext, onExit }: EditorViewProps
     status,
     previewVersion,
     updateParameter,
+    updateStackParameter,
     updateChannelCurve,
     applyGeometry,
     resetParameters,
+    resetStack,
     resetCurves,
     resetKeys,
     syncParameters,
@@ -79,7 +81,7 @@ export function EditorView({ session, astrodexContext, onExit }: EditorViewProps
   const astrodex = useAstroDexIntegration();
   const { detect: detectStars } = starMask;
 
-  const [activeStep, setActiveStep] = useState<EditorStepId>('start');
+  const [activeStep, setActiveStep] = useState<EditorStepId>(session.isStack ? 'stack' : 'start');
   const [showDepthViewer, setShowDepthViewer] = useState(false);
   const [showSavePreset, setShowSavePreset] = useState(false);
   const [presetVersion, setPresetVersion] = useState(0);
@@ -154,6 +156,9 @@ export function EditorView({ session, astrodexContext, onExit }: EditorViewProps
 
   const geometryChanged = !isDefaultGeometry(parameters.geometry);
   const aspectRatio = displayedAspect(session.dimensions, parameters.geometry);
+  // A stacked composite arrives without known dimensions - let ImagePreview read
+  // the real aspect ratio off the loaded image instead of forcing 16:9.
+  const previewAspectRatio = session.dimensions ? aspectRatio : undefined;
   const version = previewVersion + presetVersion;
   const originalUrl = geometryChanged
     ? apiClient.previewUrl(session.sessionId, { original: true, geometry: true, v: version })
@@ -318,6 +323,7 @@ export function EditorView({ session, astrodexContext, onExit }: EditorViewProps
           onStepChange={handleStepChange}
           parameters={parameters}
           focalPoint={focalPoint}
+          isStack={Boolean(session.isStack)}
         />
       </div>
 
@@ -339,6 +345,17 @@ export function EditorView({ session, astrodexContext, onExit }: EditorViewProps
           onPresetApply: (id) => void handlePresetApply(id),
           onPresetDelete: (id) => void deletePreset(id).catch(() => undefined),
           onResetAll: handleResetAll,
+        }}
+        stack={{
+          available: Boolean(session.isStack),
+          onParameterChange: (key, value) => {
+            clearActivePreset();
+            updateStackParameter(key, value);
+          },
+          onReset: () => {
+            clearActivePreset();
+            resetStack();
+          },
         }}
         framing={{
           available: framingAvailable,
@@ -381,7 +398,7 @@ export function EditorView({ session, astrodexContext, onExit }: EditorViewProps
           originalUrl={originalUrl}
           processedUrl={processedUrl}
           histogram={session.histogram}
-          aspectRatio={aspectRatio}
+          aspectRatio={previewAspectRatio}
           isLoading={isProcessing}
           framing={
             framingActive && session.dimensions

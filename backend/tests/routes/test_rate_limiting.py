@@ -68,14 +68,37 @@ def test_process_429s_once_the_concurrency_limit_is_already_reached(
 ) -> None:
     """Simulates an in-flight job by inserting one directly, since a sync-mode
     dispatch always finishes within the same request - two sequential HTTP
-    calls can never observe each other as "concurrent" through the API alone."""
+    calls can never observe each other as "concurrent" through the API alone.
+
+    The in-flight job is for a *different* session: a new edit supersedes any
+    still-pending job for its own session (so a slider drag can't 429 itself),
+    but the per-IP budget still counts unrelated work."""
+    other_session = _upload(client, sample_jpeg).json()["session_id"]
     session_id = _upload(client, sample_jpeg).json()["session_id"]
     app_settings.save_app_settings({"max_concurrent_jobs_per_ip": 1})
 
     jobs = JobService(db_session)
-    in_flight = jobs.create(session_id, client_ip="testclient")
+    in_flight = jobs.create(other_session, client_ip="testclient")
     assert in_flight.status == "queued"  # non-terminal - counts against the limit
 
     response = client.post(f"/api/process/{session_id}", json={"parameters": {"contrast": 1.5}})
     assert response.status_code == 429
     assert response.json()["error_code"] == "RATE_LIMITED"
+
+
+def test_process_supersedes_its_own_pending_job_instead_of_429ing(
+    client, sample_jpeg: bytes, db_session, _enforced
+) -> None:
+    """A burst of edits for one session must not exhaust the concurrency budget:
+    the older pending job is retired, not counted."""
+    session_id = _upload(client, sample_jpeg).json()["session_id"]
+    app_settings.save_app_settings({"max_concurrent_jobs_per_ip": 1})
+
+    jobs = JobService(db_session)
+    stale = jobs.create(session_id, client_ip="testclient")
+
+    response = client.post(f"/api/process/{session_id}", json={"parameters": {"contrast": 1.5}})
+    assert response.status_code == 200
+
+    db_session.refresh(stale)
+    assert stale.status == "superseded"

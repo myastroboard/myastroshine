@@ -82,6 +82,7 @@
       "aria_label": "Editing workflow",
       "modified": "changed from default",
       "start": "Start",
+      "stack": "Stack",
       "frame": "Framing",
       "sky": "Background",
       "light": "Light",
@@ -95,6 +96,9 @@
     "steps": {
       "start": {
         "help": "Begin here: a one-click starting point with Auto Astro, or apply a saved preset. Then work down the steps."
+      },
+      "stack": {
+        "help": "The linear stacked composite, before any creative work: stretch the faint signal, subtract the sky gradient, neutralise the colour. Non-destructive - it all recomputes from the 32-bit data."
       },
       "frame": {
         "help": "Set the frame first - crop, level the horizon, rotate or flip. Everything after this works on the framed image.",
@@ -298,6 +302,20 @@
         "label": "Tint",
         "hint": "White balance: shifts the colour cast between green and magenta."
       }
+    }
+  },
+  "stack_panel": {
+    "stretch": {
+      "label": "Stretch",
+      "hint": "How hard to lift the faint signal out of the background. Low keeps the sky dark and subtle; high pulls up dim nebulosity at the cost of a brighter, noisier background."
+    },
+    "background_extraction": {
+      "label": "Background extraction",
+      "hint": "Removes a smooth light-pollution / sky-glow gradient by fitting a low-order surface to the sky between the objects. 0 leaves the gradient in; 100 subtracts all of it."
+    },
+    "color_calibration": {
+      "label": "Colour calibration",
+      "hint": "Neutralises the sky background to grey and balances the channels so the star field reads roughly white."
     }
   },
   "stars_panel": {

@@ -47,6 +47,25 @@ class CurvePoint(BaseModel):
     y: int = Field(ge=_LEVEL_MIN, le=_LEVEL_MAX)
 
 
+class StackParameters(BaseModel):
+    """The linear post-stack controls for a stacked-composite session.
+
+    A stacked composite opens the editor on its 32-bit linear data; these run as
+    a non-destructive pre-stage (``post_stack.render_stack_base``) ahead of the
+    normal pipeline. ``stretch`` (0 = subtle .. 1 = aggressive) sets the
+    auto-stretch target background; ``background_extraction`` (0 = off .. 100)
+    is how much of the fitted low-order sky gradient to subtract;
+    ``color_calibration`` neutralises the sky and balances the channels. All at
+    their default on a fresh composite. Ignored for an ordinary single image.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    stretch: float = Field(default=0.5, ge=0.0, le=1.0)
+    background_extraction: int = Field(default=100, ge=0, le=100)
+    color_calibration: bool = True
+
+
 #: Fields removed from ``ProcessingParameters`` over time. Dropped on the way in
 #: (see ``_drop_retired_keys``) so a stored preset / session parameter set from
 #: an older version still loads instead of failing ``extra="forbid"``.
@@ -72,6 +91,7 @@ class ProcessingParameters(BaseModel):
         return data
 
     geometry: GeometryParameters = Field(default_factory=GeometryParameters)
+    stack: StackParameters = Field(default_factory=StackParameters)
     contrast: float = Field(default=1.0, ge=0.5, le=3.0)
     exposure: float = Field(default=0.0, ge=-1.0, le=1.0)
     saturation: float = Field(default=1.0, ge=0.0, le=2.0)
