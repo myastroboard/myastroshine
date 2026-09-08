@@ -3,11 +3,22 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { apiClient } from '@/services/api';
 import { type WebSocketClient, stackStatusClient } from '@/services/ws';
-import type { StackFrameInfo, StackResult, StackSettings } from '@/types';
+import type {
+  CalibrationKind,
+  CalibrationSummary,
+  StackFrameInfo,
+  StackResult,
+  StackSettings,
+} from '@/types';
 
 const TERMINAL = new Set(['completed', 'failed']);
 const MIN_FRAMES = 2;
 const UPLOAD_BATCH_SIZE = 20; // frames per request - keeps a 1000-frame night to ~50 requests
+
+const EMPTY_CALIBRATION: CalibrationSummary = {
+  frames: { dark: 0, flat: 0, bias: 0, darkFlat: 0 },
+  cosmeticCorrection: true,
+};
 
 export type StackPhase = 'collecting' | 'uploading' | 'reviewing' | 'processing' | 'done';
 
@@ -50,12 +61,49 @@ export function useStackProcessing(settings: StackSettings, maxFrames: number) {
   const [result, setResult] = useState<StackResult | null>(null);
   const [progress, setProgress] = useState<StackProgressState>({ percent: 0, step: '' });
   const [error, setError] = useState<string | null>(null);
+  const [calibration, setCalibration] = useState<CalibrationSummary>(EMPTY_CALIBRATION);
   const stackIdRef = useRef<string | null>(null);
   const wsRef = useRef<WebSocketClient | null>(null);
 
   useEffect(() => () => wsRef.current?.disconnect(), []);
 
   const activeCount = uploaded.filter((frame) => !frame.excluded).length;
+
+  const ensureStack = useCallback(async (): Promise<string> => {
+    if (stackIdRef.current !== null) {
+      return stackIdRef.current;
+    }
+    const session = await apiClient.initiateStack(Math.max(pending.length, MIN_FRAMES), settings);
+    stackIdRef.current = session.stackId;
+    return session.stackId;
+  }, [pending.length, settings]);
+
+  const addCalibrationFiles = useCallback(
+    async (kind: CalibrationKind, files: File[]) => {
+      if (files.length === 0) {
+        return;
+      }
+      setError(null);
+      try {
+        setCalibration(await apiClient.uploadCalibrationFrames(await ensureStack(), kind, files));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : t('stacking.errors.failed'));
+      }
+    },
+    [ensureStack, t],
+  );
+
+  const clearCalibrationKind = useCallback(async (kind: CalibrationKind) => {
+    const stackId = stackIdRef.current;
+    if (stackId === null) {
+      return;
+    }
+    try {
+      setCalibration(await apiClient.clearCalibration(stackId, kind));
+    } catch {
+      /* leave the count as-is; the next stack response will reconcile it */
+    }
+  }, []);
 
   const addFiles = useCallback(
     (files: File[]) => {
@@ -105,12 +153,7 @@ export function useStackProcessing(settings: StackSettings, maxFrames: number) {
     setPhase('uploading');
     setProgress({ percent: 0, step: 'upload' });
     try {
-      let stackId = stackIdRef.current;
-      if (stackId === null) {
-        const session = await apiClient.initiateStack(pending.length, settings);
-        stackId = session.stackId;
-        stackIdRef.current = stackId;
-      }
+      const stackId = await ensureStack();
       await uploadBatches(
         stackId,
         pending.map((frame) => frame.file),
@@ -118,6 +161,9 @@ export function useStackProcessing(settings: StackSettings, maxFrames: number) {
       );
       const stack = await apiClient.getStack(stackId);
       setUploaded(stack.frames);
+      if (stack.calibration) {
+        setCalibration(stack.calibration);
+      }
       setPending([]);
       setSelected(stack.frames.length ? stack.frames[0].index : null);
       setPhase('reviewing');
@@ -125,7 +171,7 @@ export function useStackProcessing(settings: StackSettings, maxFrames: number) {
       setError(err instanceof Error ? err.message : t('stacking.errors.failed'));
       setPhase(uploaded.length ? 'reviewing' : 'collecting');
     }
-  }, [pending, uploaded.length, settings, uploadBatches, t]);
+  }, [pending, uploaded.length, ensureStack, uploadBatches, t]);
 
   const toggleExclude = useCallback(async (index: number, excluded: boolean) => {
     const stackId = stackIdRef.current;
@@ -158,6 +204,9 @@ export function useStackProcessing(settings: StackSettings, maxFrames: number) {
           .then((final) => {
             setResult(final);
             setUploaded(final.frames);
+            if (final.calibration) {
+              setCalibration(final.calibration);
+            }
             setPhase('done');
           })
           .catch(() => setPhase('done'));
@@ -208,6 +257,7 @@ export function useStackProcessing(settings: StackSettings, maxFrames: number) {
     setResult(null);
     setProgress({ percent: 0, step: '' });
     setError(null);
+    setCalibration(EMPTY_CALIBRATION);
   }, []);
 
   return {
@@ -216,6 +266,7 @@ export function useStackProcessing(settings: StackSettings, maxFrames: number) {
     uploaded,
     selected,
     activeCount,
+    calibration,
     result,
     progress,
     error,
@@ -223,6 +274,8 @@ export function useStackProcessing(settings: StackSettings, maxFrames: number) {
     removePending,
     uploadFrames,
     toggleExclude,
+    addCalibrationFiles,
+    clearCalibrationKind,
     select: selectFrame,
     stack,
     reset,

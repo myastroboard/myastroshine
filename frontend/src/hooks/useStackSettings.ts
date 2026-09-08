@@ -7,6 +7,7 @@ export const DEFAULT_STACK_SETTINGS: StackSettings = {
   combinationMethod: 'average',
   rejectionAlgo: 'winsorized_sigma',
   weighting: 'noise',
+  cosmeticCorrection: true,
 };
 
 /** Local state for the stacking configuration panel. */

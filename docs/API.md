@@ -415,17 +415,20 @@ is set (else `403`).
 
 Being rebuilt - see `initial_plan/12_STACKING_REBUILD.md`. Frames are ingested as
 linear `float32` (FITS CFA mosaics kept intact, camera RAW demosaiced linearly,
-8-bit previews sRGB-linearised) and integrated in a memory-bounded pass. **Phase 0
-status:** the integration is a naive running mean with no registration or pixel
-rejection yet.
+8-bit previews sRGB-linearised). The pipeline calibrates each frame (master
+dark/flat/bias when uploaded), registers by asterism matching, normalises to the
+reference, and combines with sigma rejection and noise weighting, all in bounded
+memory. See docs/ALGORITHMS.md.
 
 1. `POST /stack/initiate` `{ frame_count, registration_transform?, combination_method?,
-   rejection_algo?, weighting? }` -> `202 { stack_id, status: "waiting_for_frames",
-   frame_count, received_frames }`.
+   rejection_algo?, weighting?, cosmetic_correction? }` -> `202 { stack_id, status:
+   "waiting_for_frames", frame_count, received_frames }`.
    - `registration_transform`: `translation` / `similarity` (default) / `affine`
    - `combination_method`: `average` (default) / `median`
    - `rejection_algo`: `none` / `sigma` / `winsorized_sigma` (default)
    - `weighting`: `none` / `noise` (default) / `quality`
+   - `cosmetic_correction`: bool (default `true`) - replace hot/dead pixels
+     (from the master dark/flat) with a neighbour median
 2. `POST /stack/{stack_id}/upload-frame` (multipart: `frame_index`, `file`) ->
    `202 { frame_index, received_frames, frame_count, status }`. `status` becomes
    `"ready"` once every frame is in.
@@ -441,10 +444,17 @@ rejection yet.
    (a trail, a cloud). Excluded frames are skipped by `process`.
 6. `GET /stack/{stack_id}/frame/{index}/thumb` -> a ~256 px auto-stretched JPEG
    for the frame grid. Not rate-limited.
-7. `POST /stack/{stack_id}/process` runs the pipeline synchronously and returns
+7. `POST /stack/{stack_id}/calibration/{kind}/frames` (multipart: `files` = many
+   files), `kind` = `dark` / `flat` / `bias` / `dark_flat` -> `202
+   { frames: { dark, flat, bias, dark_flat }, cosmetic_correction }`. Appends
+   calibration subs; masters (per-pixel median) are built and cached at `process`,
+   and rebuilt when more subs arrive.
+8. `DELETE /stack/{stack_id}/calibration/{kind}` -> the same body. Drops every
+   sub of that kind and any master derived from it.
+9. `POST /stack/{stack_id}/process` runs the pipeline synchronously and returns
    `200`. An optional body `{ registration_transform?, combination_method?,
-   rejection_algo?, weighting? }` re-stacks with a changed setting - no re-upload,
-   each run makes a fresh composite session:
+   rejection_algo?, weighting?, cosmetic_correction? }` re-stacks with a changed
+   setting - no re-upload, each run makes a fresh composite session:
 
 ```json
 {
@@ -455,9 +465,11 @@ rejection yet.
   "statistics": {
     "frames_stacked": 48, "frames_excluded": 2, "combination_method": "average",
     "registration_transform": "similarity", "snr_improvement": 6.93,
-    "measured_noise_reduction": 5.1
+    "measured_noise_reduction": 5.1, "calibrated": true
   },
-  "frames": [{ "index": 0, "thumb_url": "/api/stack/.../frame/0/thumb", "excluded": false }]
+  "frames": [{ "index": 0, "thumb_url": "/api/stack/.../frame/0/thumb", "excluded": false }],
+  "calibration": { "frames": { "dark": 20, "flat": 15, "bias": 0, "dark_flat": 0 },
+    "cosmetic_correction": true }
 }
 ```
 

@@ -28,6 +28,7 @@ logger = get_logger(__name__)
 
 _STACK_THUMB_MAX_SIZE = 256
 _FRAME_INDEX_WIDTH = 5  # frames/00000.npy .. supports 99999 frames
+_CALIBRATION_KINDS = ("dark", "flat", "bias", "dark_flat")
 
 
 class StorageService:
@@ -144,6 +145,88 @@ class StorageService:
     def stack_composite_path(self, stack_id: str) -> Path:
         """The 32-bit linear composite (``.npy``), before any stretch/enhancement."""
         return self.stack_dir(stack_id) / "composite.npy"
+
+    # -- stacking: calibration frames (Phase 2) --------------------------
+
+    def stack_cal_root(self, stack_id: str, *, create: bool = False) -> Path:
+        """Where master calibration frames and the bad-pixel map live."""
+        path = self.stack_dir(stack_id) / "cal"
+        if create:
+            path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    def stack_cal_dir(self, stack_id: str, kind: str, *, create: bool = False) -> Path:
+        path = self.stack_cal_root(stack_id) / kind
+        if create:
+            path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    def cal_frame_path(self, stack_id: str, kind: str, index: int) -> Path:
+        return self.stack_cal_dir(stack_id, kind) / f"{index:0{_FRAME_INDEX_WIDTH}d}.npy"
+
+    def _cal_meta_path(self, stack_id: str, kind: str, index: int) -> Path:
+        return self.stack_cal_dir(stack_id, kind) / f"{index:0{_FRAME_INDEX_WIDTH}d}.json"
+
+    def master_path(self, stack_id: str, kind: str) -> Path:
+        return self.stack_cal_root(stack_id) / f"master_{kind}.npy"
+
+    def master_meta_path(self, stack_id: str, kind: str) -> Path:
+        return self.stack_cal_root(stack_id) / f"master_{kind}.json"
+
+    def bad_pixel_map_path(self, stack_id: str) -> Path:
+        return self.stack_cal_root(stack_id) / "bad_pixels.npy"
+
+    def save_cal_frame(self, stack_id: str, kind: str, index: int, frame: LinearFrame) -> None:
+        """Persist one calibration sub as float32 ``.npy`` + a small metadata sidecar."""
+        self.stack_cal_dir(stack_id, kind, create=True)
+        np.save(self.cal_frame_path(stack_id, kind, index), frame.data.astype(np.float32))
+        self._cal_meta_path(stack_id, kind, index).write_text(
+            json.dumps(
+                {
+                    "is_cfa": frame.is_cfa,
+                    "bayer_pattern": frame.bayer_pattern,
+                    "acquisition": frame.metadata,
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    def load_cal_frame(self, stack_id: str, kind: str, index: int) -> LinearFrame:
+        meta = json.loads(self._cal_meta_path(stack_id, kind, index).read_text(encoding="utf-8"))
+        return LinearFrame(
+            data=np.load(self.cal_frame_path(stack_id, kind, index)),
+            is_cfa=bool(meta.get("is_cfa", False)),
+            bayer_pattern=meta.get("bayer_pattern"),
+            metadata=dict(meta.get("acquisition", {})),
+        )
+
+    def load_cal_acquisition(self, stack_id: str, kind: str, index: int) -> dict[str, Any]:
+        meta = json.loads(self._cal_meta_path(stack_id, kind, index).read_text(encoding="utf-8"))
+        return dict(meta.get("acquisition", {}))
+
+    def cal_frame_indices(self, stack_id: str, kind: str) -> list[int]:
+        directory = self.stack_cal_dir(stack_id, kind)
+        if not directory.exists():
+            return []
+        return sorted(
+            int(p.stem) for p in directory.glob("[0-9]" * _FRAME_INDEX_WIDTH + ".npy")
+        )
+
+    def cal_frame_counts(self, stack_id: str) -> dict[str, int]:
+        return {kind: len(self.cal_frame_indices(stack_id, kind)) for kind in _CALIBRATION_KINDS}
+
+    def clear_cal_kind(self, stack_id: str, kind: str) -> None:
+        """Drop every sub of one kind and any master / bad-pixel map derived from it."""
+        directory = self.stack_cal_dir(stack_id, kind)
+        if directory.exists():
+            shutil.rmtree(directory, ignore_errors=True)
+        for stale in (
+            self.master_path(stack_id, kind),
+            self.master_meta_path(stack_id, kind),
+            self.bad_pixel_map_path(stack_id),
+            self.bad_pixel_map_path(stack_id).with_suffix(".json"),
+        ):
+            stale.unlink(missing_ok=True)
 
     # -- stacking: linear frame store ------------------------------------
 

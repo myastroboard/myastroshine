@@ -444,9 +444,33 @@ nominal `[0, 1]` range, linear (no screen stretch), CFA mosaic kept intact.
   and passed through an approximate sRGB EOTF.
 
 `to_display_bgr(frame)` auto-stretches a frame to a BGR thumbnail (CFA gets a
-2x2 superpixel de-mosaic); `superpixel_rgb(frame)` is the placeholder debayer
-(half-res, no interpolation) used until the interpolating debayer lands with the
-calibration path.
+2x2 superpixel de-mosaic). Two debayer paths feed the pipeline:
+`superpixel_rgb(frame)` (2x2 superpixel, half-res, no colour fringing) for the
+registration measurement pass, and `debayer_rgb(frame)` - OpenCV's **edge-aware**
+demosaic (`COLOR_BayerXX2RGB_EA`, full resolution, mapped through 16-bit since
+OpenCV does not demosaic float) - for the align/combine passes. A
+`ROWORDER = BOTTOM-UP` flip on an even-height mosaic also swaps the Bayer rows so
+the pattern stays correct.
+
+### Calibration (`app/services/calibration.py`)
+
+Master dark / flat / bias / dark-flat frames, when uploaded, are stacked into
+masters (**per-pixel median** - standard for calibration, robust to a transient
+in one sub) and cached on disk keyed on the source frame count. Each light frame
+is calibrated **on the CFA mosaic, before debayer**:
+
+    calibrated = (light - bias - dark) / flat_field
+
+- the dark is scaled by the exposure ratio when a separate bias master isolates
+  its thermal component (`dark_current = dark - bias`);
+- `flat_field` is the master flat with its own dark (or the bias) removed,
+  normalised to a mean of 1, and floored at 0.05 so a dead corner cannot blow a
+  pixel up;
+- a **bad-pixel map** flags hot pixels (master dark, > 8 robust sigma above the
+  per-Bayer-phase median) and dead/occluded pixels (master flat, > 8 sigma
+  below); with `cosmetic_correction` each flagged pixel is replaced by the 3x3
+  median of its own Bayer phase. This is the honest replacement for the removed
+  "cosmic ray" MAD mask.
 
 ### Registration (`app/services/star_match.py`)
 
@@ -470,15 +494,18 @@ two star fields by **asterism (triangle) matching**, vendored in the style of
 thousand-frame stack fits in bounded RAM (only a few frames and one row-tile
 ever resident):
 
-1. **Register** - superpixel-debayer each frame, detect stars
-   (`StarDetectionService`), and measure background / 95th-percentile scale /
-   high-pass noise. The frame with the most stars is the **reference**; every
-   other frame is asterism-matched to it. Frames that fail to match are dropped
-   and counted in `frames_excluded`.
-2. **Align** - reload each kept frame, warp it into the reference frame
-   (`cv2.INTER_LANCZOS4`, NaN outside the frame footprint), normalise it
-   (`x' = m*x + a` where `m = scale_ref / scale_frame` clamped to 0.2-5x and
-   `a` matches the backgrounds), and stream it to a `float16` memmap on disk.
+1. **Register** - calibrate then superpixel-debayer each frame (half resolution
+   is plenty for centroids), detect stars (`StarDetectionService`), and measure
+   background / 95th-percentile scale / high-pass noise. The frame with the most
+   stars is the **reference**; every other frame is asterism-matched to it.
+   Frames that fail to match are dropped and counted in `frames_excluded`.
+2. **Align** - reload each kept frame, calibrate it and **interpolating**-debayer
+   it at full resolution, warp it into the reference frame (`cv2.INTER_LANCZOS4`,
+   NaN outside the frame footprint - the transform's translation scaled up from
+   the half-res registration), normalise it (`x' = m*x + a` where
+   `m = scale_ref / scale_frame` clamped to 0.2-5x and `a` matches the
+   backgrounds), and stream it to a `float16` memmap on disk. The combine tile
+   size adapts to the frame count to keep the working set bounded.
 3. **Combine** - tile over the memmap rows. Per pixel across the stack:
    **iterative sigma-clip around the mean** (2 iterations, k=3 - fast, sum-based;
    `np.nanmedian` on the stack axis is ~100x slower), then `winsorized_sigma`
@@ -491,16 +518,15 @@ ever resident):
 
 The composite is saved as 32-bit `composite.npy` plus an auto-stretched 8-bit
 session for the editor. `quality_report` records the reference frame, the mean
-registration RMS, and the rejected-sample count. `snr_improvement` is
-`sqrt(effective N)` where effective N = `(sum w)^2 / sum(w^2)`;
-`measured_noise_reduction` is the reference-frame vs composite high-pass noise
-ratio. On a real 150-frame Seestar set: 0 registration failures, 0.32 px RMS,
-~8.7x noise reduction (85% of the sqrt(105) theoretical for the clamped
-weights).
+registration RMS, the rejected-sample count, and whether calibration ran.
+`snr_improvement` is `sqrt(effective N)` where effective N = `(sum w)^2 /
+sum(w^2)`; `measured_noise_reduction` is the reference-frame vs composite
+high-pass noise ratio. On a real Seestar set the composite is full-resolution,
+sub-pixel aligned, ~8x lower noise than a single sub.
 
-**Still to come:** calibration frames (dark / flat / bias, an interpolating
-debayer), a post-stack stretch / background-extraction / colour-calibration
-step, and an auto-crop to the common frame footprint.
+**Still to come:** per-frame quality scores and auto-reject (Phase 3), then a
+post-stack stretch / background-extraction / colour-calibration step and an
+auto-crop to the common frame footprint (Phase 4).
 
 ## Performance notes
 
@@ -516,7 +542,7 @@ step, and an auto-crop to the common frame footprint.
 | Denoise (bilateral) | 100-300 ms |
 | Chroma denoise (bilateral, Cr/Cb only) | ~100 ms |
 | Depth map (Sobel) | 50-100 ms |
-| Stacking, per frame (register + align + combine, ~1MP superpixel) | ~1 s (3 IO passes; Phase 5 to optimise) |
+| Stacking, per frame (calibrate + register at half-res + align at full-res debayer + combine) | ~0.4-1 s (3 IO passes; Phase 5 to optimise) |
 
 Whites/blacks and highlights/shadows cost the same shape of work (a full-res
 grayscale conversion + masked blend) but were measured at different times -

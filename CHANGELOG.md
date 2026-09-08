@@ -70,9 +70,18 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   normalises each to the reference, and combines with iterative sigma rejection
   and noise weighting, all in bounded memory (a `float16` memmap + row tiling,
   so a thousand-frame stack does not need a thousand frames of RAM). On a real
-  150-frame Seestar set: sub-pixel alignment, ~8.7x noise reduction. Still to
-  come: calibration frames, an interpolating debayer, and a post-stack
-  stretch / colour-calibration step. See `initial_plan/12_STACKING_REBUILD.md`.
+  150-frame Seestar set: sub-pixel alignment, ~8.7x noise reduction. It now also
+  **calibrates** each frame: upload master **darks, flats, bias and dark-flats**
+  (`POST /api/stack/{id}/calibration/{kind}/frames`) and the pipeline builds a
+  median master of each, applies `(light - bias - dark) / flat` on the Bayer
+  mosaic before debayer, and repairs hot / dead pixels from the master
+  dark/flat with a neighbour median (the honest replacement for the removed
+  "cosmic ray" step; toggle with **Repair hot & dead pixels**). The Bayer
+  mosaic is now debayered with an **edge-aware interpolating** demosaic at full
+  resolution for the align/combine passes (registration still measures on the
+  cheap half-res superpixel). Still to come: per-frame quality scores with
+  auto-reject, then a post-stack stretch / colour-calibration step. See
+  `initial_plan/12_STACKING_REBUILD.md`.
 
 ### Changed
 

@@ -488,12 +488,26 @@ export type CombinationMethod = 'average' | 'median';
 export type RegistrationTransform = 'translation' | 'similarity' | 'affine';
 export type RejectionAlgo = 'none' | 'sigma' | 'winsorized_sigma';
 export type StackWeighting = 'none' | 'noise' | 'quality';
+export type CalibrationKind = 'dark' | 'flat' | 'bias' | 'dark_flat';
 
 export interface StackSettings {
   registrationTransform: RegistrationTransform;
   combinationMethod: CombinationMethod;
   rejectionAlgo: RejectionAlgo;
   weighting: StackWeighting;
+  cosmeticCorrection: boolean;
+}
+
+export interface CalibrationFrameCounts {
+  dark: number;
+  flat: number;
+  bias: number;
+  darkFlat: number;
+}
+
+export interface CalibrationSummary {
+  frames: CalibrationFrameCounts;
+  cosmeticCorrection: boolean;
 }
 
 export interface StackSession {
@@ -526,6 +540,7 @@ export interface StackStatistics {
   referenceFrame: number | null;
   snrImprovement: number;
   measuredNoiseReduction: number | null;
+  calibrated: boolean;
 }
 
 export interface StackResult {
@@ -537,5 +552,6 @@ export interface StackResult {
   stackedImageUrl: string | null;
   statistics: StackStatistics | null;
   frames: StackFrameInfo[];
+  calibration: CalibrationSummary | null;
   error: string | null;
 }

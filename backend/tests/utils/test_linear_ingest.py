@@ -11,7 +11,7 @@ import rawpy
 
 from app.exceptions import UnsupportedImageError
 from app.utils import linear_ingest
-from app.utils.linear_ingest import LinearFrame, ingest_frame, to_display_bgr
+from app.utils.linear_ingest import LinearFrame, debayer_rgb, ingest_frame, to_display_bgr
 
 
 def _fits_bytes(data: np.ndarray, **header: object) -> bytes:
@@ -52,6 +52,16 @@ def test_fits_bayer_pattern_is_recorded_and_mosaic_kept() -> None:
     assert frame.is_cfa
     assert frame.bayer_pattern == "GRBG"
     assert frame.data.ndim == 2
+
+
+def test_fits_bottom_up_cfa_swaps_the_bayer_rows() -> None:
+    """Flipping a mosaic for ROWORDER = BOTTOM-UP (even height) also swaps its Bayer rows."""
+    data = np.full((16, 16), 8000, dtype=np.uint16)
+
+    frame = ingest_frame(_fits_bytes(data, BAYERPAT="GRBG", ROWORDER="BOTTOM-UP"), "b.fit")
+
+    assert frame.is_cfa
+    assert frame.bayer_pattern == "BGGR"  # GRBG rows swapped
 
 
 def test_fits_rgb_cube_reads_as_rgb_channel_order() -> None:
@@ -302,3 +312,40 @@ def test_to_display_bgr_superpixel_debayers_a_cfa_frame_to_half_resolution() -> 
     assert thumb.shape[2] == 3
     top, bottom = thumb[: thumb.shape[0] // 2], thumb[thumb.shape[0] // 2 :]
     assert int(top.mean()) > int(bottom.mean())  # the bright band is visible
+
+
+def test_debayer_rgb_keeps_full_resolution_and_recovers_colour() -> None:
+    """The edge-aware debayer is full-res and maps each Bayer site to its channel."""
+    red, green, blue = 0.30, 0.50, 0.70
+    mosaic = np.zeros((32, 40), dtype=np.float32)
+    for i, channel in enumerate("GRBG"):
+        row, col = i // 2, i % 2
+        mosaic[row::2, col::2] = {"R": red, "G": green, "B": blue}[channel]
+
+    out = debayer_rgb(LinearFrame(data=mosaic, is_cfa=True, bayer_pattern="GRBG"))
+
+    assert out.data.shape == (32, 40, 3)  # full resolution, not halved
+    centre = out.data[8:24, 8:32].reshape(-1, 3).mean(axis=0)
+    assert centre == pytest.approx([red, green, blue], abs=0.02)
+
+
+def test_debayer_rgb_preserves_a_negative_calibration_pedestal() -> None:
+    """Calibration can push pixels below zero; the 16-bit round-trip must keep them."""
+    mosaic = np.full((16, 16), 0.2, dtype=np.float32) - 0.1  # uniform -0.1 ... 0.1 after phases
+    mosaic[0::2, 0::2] = -0.05
+
+    out = debayer_rgb(LinearFrame(data=mosaic, is_cfa=True, bayer_pattern="RGGB"))
+
+    assert float(out.data.min()) < 0.0
+
+
+def test_debayer_rgb_passes_non_cfa_frames_through() -> None:
+    rgb = np.zeros((8, 8, 3), dtype=np.float32)
+    frame = LinearFrame(data=rgb)
+    assert debayer_rgb(frame) is frame
+
+
+def test_debayer_rgb_leaves_an_unrecognised_pattern_alone() -> None:
+    mosaic = np.full((16, 16), 0.2, dtype=np.float32)
+    frame = LinearFrame(data=mosaic, is_cfa=True, bayer_pattern="XYZW")
+    assert debayer_rgb(frame) is frame

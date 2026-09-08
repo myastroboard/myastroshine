@@ -78,6 +78,21 @@ _FITS_META_KEYS = {
 
 _FLOAT_ALREADY_NORMALIZED_MAX = 2.0  # a float FITS above this is treated as raw ADU counts
 
+#: CFA pattern -> OpenCV edge-aware demosaic code. OpenCV 5's named aliases put
+#: the pattern's top-left element at pixel (0, 0), matching the FITS BAYERPAT
+#: convention (verified: a synthetic ``RGGB`` mosaic round-trips to R/G/B).
+_BAYER_EA_CODES = {
+    "RGGB": cv2.COLOR_BayerRGGB2RGB_EA,
+    "GRBG": cv2.COLOR_BayerGRBG2RGB_EA,
+    "GBRG": cv2.COLOR_BayerGBRG2RGB_EA,
+    "BGGR": cv2.COLOR_BayerBGGR2RGB_EA,
+}
+#: Flipping a mosaic vertically (ROWORDER = BOTTOM-UP, even height) swaps the two
+#: Bayer rows, turning each pattern into its row-swapped partner.
+_BAYER_ROW_SWAP = {"RGGB": "GBRG", "GBRG": "RGGB", "GRBG": "BGGR", "BGGR": "GRBG"}
+_DEBAYER_LEVELS = 65535.0
+_DEBAYER_MIN_SPAN = 1e-4  # floor for a (near-)flat frame's value range before scaling to 16-bit
+
 # sRGB EOTF (IEC 61966-2-1) constants - used to approximately linearise an 8-bit
 # already-stretched preview so the integration maths has something closer to linear.
 _SRGB_LINEAR_CUTOFF = 0.04045
@@ -172,6 +187,8 @@ def _ingest_fits(data: bytes) -> LinearFrame:
         pixels = _to_unit_float(array)
         if bottom_up:
             pixels = np.flipud(pixels)
+            if bayer_pattern and array.shape[0] % 2 == 0:
+                bayer_pattern = _BAYER_ROW_SWAP.get(bayer_pattern, bayer_pattern)
         return LinearFrame(
             data=np.ascontiguousarray(pixels),
             is_cfa=bayer_pattern is not None,
@@ -283,16 +300,53 @@ def to_display_bgr(frame: LinearFrame, max_size: int = 256) -> np.ndarray:
 def superpixel_rgb(frame: LinearFrame) -> LinearFrame:
     """2x2 superpixel de-mosaic of a CFA frame into half-resolution linear RGB.
 
-    A placeholder debayer for the Phase 0 pipeline - no interpolation, so it
-    halves resolution but has zero colour-fringing. A real interpolating debayer
-    (VNG/RCD) comes with the calibration path in Phase 1. A non-CFA frame is
-    returned unchanged.
+    No interpolation, so it halves resolution but has zero colour-fringing and
+    costs almost nothing - the stacking pipeline uses it for the registration
+    measurement pass (star centroids, background), where half resolution is
+    plenty, and falls back to it for a Bayer pattern :func:`debayer_rgb` does not
+    recognise. A non-CFA frame is returned unchanged.
     """
     if not frame.is_cfa or not frame.bayer_pattern:
         return frame
     red, green, blue = _cfa_superpixel(frame.data, frame.bayer_pattern)
     return LinearFrame(
         data=np.ascontiguousarray(np.stack([red, green, blue], axis=-1)),
+        source_bit_depth=frame.source_bit_depth,
+        already_stretched=frame.already_stretched,
+        metadata=frame.metadata,
+    )
+
+
+def debayer_rgb(frame: LinearFrame) -> LinearFrame:
+    """Full-resolution interpolating debayer of a CFA frame into linear RGB.
+
+    Uses OpenCV's **edge-aware** demosaic (``COLOR_BayerXX2RGB_EA``), which keeps
+    full resolution and suppresses the zipper artefacts a bilinear debayer
+    leaves on the high-contrast edges of a star field. The stacking pipeline
+    uses this for the align/combine passes (after calibration, on the CFA
+    mosaic). A non-CFA frame is returned unchanged; an unrecognised Bayer
+    pattern falls back to :func:`superpixel_rgb`.
+
+    OpenCV only demosaics integer data, so the linear float frame is mapped onto
+    16-bit by ``offset + scale`` - preserving the full value range including any
+    negative pedestal calibration left behind - then mapped back.
+    """
+    if not frame.is_cfa or not frame.bayer_pattern:
+        return frame
+    code = _BAYER_EA_CODES.get(frame.bayer_pattern)
+    if code is None:
+        logger.warning("unrecognised Bayer pattern, skipping debayer", pattern=frame.bayer_pattern)
+        return frame
+
+    data = frame.data.astype(np.float32)
+    offset = min(float(data.min()), 0.0)
+    scale = max(float(data.max()) - offset, _DEBAYER_MIN_SPAN)
+    quantised = np.clip((data - offset) / scale * _DEBAYER_LEVELS, 0, _DEBAYER_LEVELS).astype(
+        np.uint16
+    )
+    rgb = cv2.cvtColor(quantised, code).astype(np.float32) / _DEBAYER_LEVELS * scale + offset
+    return LinearFrame(
+        data=np.ascontiguousarray(rgb),
         source_bit_depth=frame.source_bit_depth,
         already_stretched=frame.already_stretched,
         metadata=frame.metadata,

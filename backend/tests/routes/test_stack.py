@@ -158,6 +158,60 @@ def test_process_can_re_stack_with_a_changed_setting(client, star_field: np.ndar
     assert second["statistics"]["combination_method"] == "median"
 
 
+def test_calibration_frames_upload_clear_and_report(client, star_field: np.ndarray) -> None:
+    """Dark/flat subs upload in a batch, show in the stack, and clear on request."""
+    init = client.post("/api/stack/initiate", json={"frame_count": 3})
+    stack_id = init.json()["stack_id"]
+
+    upload = client.post(
+        f"/api/stack/{stack_id}/calibration/dark/frames",
+        files=[
+            ("files", (f"d{i}.png", png_bytes(star_field), "image/png")) for i in range(3)
+        ],
+    )
+    assert upload.status_code == 202
+    assert upload.json()["frames"]["dark"] == 3
+
+    listing = client.get(f"/api/stack/{stack_id}").json()
+    assert listing["calibration"]["frames"] == {"dark": 3, "flat": 0, "bias": 0, "dark_flat": 0}
+    assert listing["calibration"]["cosmetic_correction"] is True
+
+    cleared = client.delete(f"/api/stack/{stack_id}/calibration/dark")
+    assert cleared.status_code == 200
+    assert cleared.json()["frames"]["dark"] == 0
+
+
+def test_calibration_unknown_kind_is_rejected(client) -> None:
+    init = client.post("/api/stack/initiate", json={"frame_count": 2})
+    stack_id = init.json()["stack_id"]
+    response = client.post(
+        f"/api/stack/{stack_id}/calibration/sky/frames",
+        files=[("files", ("s.png", b"x", "image/png"))],
+    )
+    assert response.status_code == 400
+
+
+def test_process_with_calibration_marks_the_result_calibrated(
+    client, star_field: np.ndarray
+) -> None:
+    init = client.post("/api/stack/initiate", json={"frame_count": 3})
+    stack_id = init.json()["stack_id"]
+    for i in range(3):
+        client.post(
+            f"/api/stack/{stack_id}/upload-frame",
+            data={"frame_index": str(i)},
+            files={"file": (f"f{i}.png", png_bytes(translate(star_field, i, -i)), "image/png")},
+        )
+    client.post(
+        f"/api/stack/{stack_id}/calibration/bias/frames",
+        files=[("files", (f"b{i}.png", png_bytes(star_field // 8), "image/png")) for i in range(3)],
+    )
+
+    processed = client.post(f"/api/stack/{stack_id}/process").json()
+    assert processed["status"] == "completed"
+    assert processed["statistics"]["calibrated"] is True
+
+
 def test_initiate_rejects_too_few_frames(client) -> None:
     assert client.post("/api/stack/initiate", json={"frame_count": 1}).status_code == 400
 

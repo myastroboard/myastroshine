@@ -27,6 +27,7 @@ class InitiateStackRequest(BaseModel):
     combination_method: CombinationMethod = "average"
     rejection_algo: RejectionAlgo = "winsorized_sigma"
     weighting: Weighting = "noise"
+    cosmetic_correction: bool = True
 
 
 class ProcessStackRequest(BaseModel):
@@ -40,6 +41,7 @@ class ProcessStackRequest(BaseModel):
     combination_method: CombinationMethod | None = None
     rejection_algo: RejectionAlgo | None = None
     weighting: Weighting | None = None
+    cosmetic_correction: bool | None = None
 
 
 class StackSessionResponse(BaseModel):
@@ -74,6 +76,22 @@ class ExcludeFrameRequest(BaseModel):
     excluded: bool
 
 
+class CalibrationFrameCounts(BaseModel):
+    """How many subs of each calibration kind the stack holds."""
+
+    dark: int = 0
+    flat: int = 0
+    bias: int = 0
+    dark_flat: int = 0
+
+
+class CalibrationSummary(BaseModel):
+    """Calibration state, returned with the stack and after a calibration upload."""
+
+    frames: CalibrationFrameCounts
+    cosmetic_correction: bool
+
+
 class StackStatistics(BaseModel):
     """Summary of a completed stack."""
 
@@ -85,6 +103,7 @@ class StackStatistics(BaseModel):
     reference_frame: int | None = None
     snr_improvement: float
     measured_noise_reduction: float | None = None
+    calibrated: bool = False
 
 
 class StackResultResponse(BaseModel):
@@ -98,4 +117,5 @@ class StackResultResponse(BaseModel):
     stacked_image_url: str | None = None
     statistics: StackStatistics | None = None
     frames: list[StackFrameInfo] = Field(default_factory=list)
+    calibration: CalibrationSummary | None = None
     error: str | None = None

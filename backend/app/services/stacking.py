@@ -26,6 +26,7 @@ from app.exceptions import InvalidParameterError, ResourceNotFoundError
 from app.logging_config import get_logger
 from app.models import InitiateStackRequest, ProcessStackRequest, StackStatistics
 from app.services import progress
+from app.services.calibration import CALIBRATION_KINDS, CalibrationMasters, CalibrationService
 from app.services.integration import IntegrationService, highpass_noise
 from app.services.job import JobService
 from app.services.session import SessionService
@@ -38,6 +39,7 @@ logger = get_logger(__name__)
 _MIN_FRAMES = 2
 _COLOR_NDIM = 3
 _FULL_RES = 1_000_000  # to_display_bgr max_size: large enough to never downscale the composite
+_MAX_CALIBRATION_FRAMES = 256  # per kind - well above any real dark/flat/bias run
 
 
 class StackingService:
@@ -48,6 +50,7 @@ class StackingService:
         self.sessions = sessions
         self.storage = storage
         self._integration = IntegrationService(storage)
+        self._calibration = CalibrationService(storage)
 
     def _get(self, stack_id: str) -> StackRecord:
         record = self.db.get(StackRecord, stack_id)
@@ -66,6 +69,7 @@ class StackingService:
             combination_method=config.combination_method,
             rejection_algo=config.rejection_algo,
             weighting=config.weighting,
+            cosmetic_correction=config.cosmetic_correction,
             excluded_frames=[],
             expires_at=datetime.now(UTC) + timedelta(hours=app_settings.session_expiry_hours),
         )
@@ -109,6 +113,33 @@ class StackingService:
         self.db.refresh(record)
         return record
 
+    # -- calibration frames (Phase 2) -----------------------------------
+
+    def add_calibration_frames(
+        self, stack_id: str, kind: str, frames: list[LinearFrame]
+    ) -> StackRecord:
+        """Append dark / flat / bias / dark_flat subs; masters are built at ``process``."""
+        record = self._get(stack_id)
+        if kind not in CALIBRATION_KINDS:
+            raise InvalidParameterError(f"Unknown calibration frame kind {kind!r}")
+        existing = self.storage.cal_frame_indices(stack_id, kind)
+        if len(existing) + len(frames) > _MAX_CALIBRATION_FRAMES:
+            raise InvalidParameterError(
+                f"Too many {kind} frames (max {_MAX_CALIBRATION_FRAMES})"
+            )
+        start = existing[-1] + 1 if existing else 0
+        for offset, frame in enumerate(frames):
+            self.storage.save_cal_frame(stack_id, kind, start + offset, frame)
+        logger.info("calibration frames added", stack_id=stack_id, kind=kind, added=len(frames))
+        return record
+
+    def clear_calibration(self, stack_id: str, kind: str) -> StackRecord:
+        record = self._get(stack_id)
+        if kind not in CALIBRATION_KINDS:
+            raise InvalidParameterError(f"Unknown calibration frame kind {kind!r}")
+        self.storage.clear_cal_kind(stack_id, kind)
+        return record
+
     def process(self, stack_id: str, job_id: str | None = None) -> StackRecord:
         record = self._get(stack_id)
         indices = self.storage.stack_frame_indices(stack_id)
@@ -119,10 +150,14 @@ class StackingService:
 
         record.status = "processing"
         self.db.commit()
-        self._emit(job_id, stack_id, "integration", 20)
+        self._emit(job_id, stack_id, "calibration", 8)
 
         try:
-            composite, stats = self._integrate(record, stack_id, kept, len(excluded), job_id)
+            masters = self._build_masters(stack_id, kept, job_id)
+            self._emit(job_id, stack_id, "integration", 20)
+            composite, stats = self._integrate(
+                record, stack_id, kept, len(excluded), masters, job_id
+            )
         except Exception as exc:
             record.status = "failed"
             record.error = str(exc)
@@ -153,15 +188,34 @@ class StackingService:
         )
         return record
 
+    def _build_masters(
+        self, stack_id: str, kept: list[int], job_id: str | None
+    ) -> CalibrationMasters | None:
+        """Build (or load cached) master dark/flat/bias for the stack, if any exist."""
+        if not self._calibration.has_frames(stack_id):
+            return None
+        sample = self.storage.load_linear_frame(stack_id, kept[0])
+        masters = self._calibration.build_masters(
+            stack_id,
+            sample.data.shape,
+            is_cfa=sample.is_cfa,
+            on_progress=lambda pct: self._emit(
+                job_id, stack_id, "calibration", 8 + int(pct * 0.1)
+            ),
+        )
+        logger.info("calibration masters ready", stack_id=stack_id)
+        return masters
+
     def _integrate(
         self,
         record: StackRecord,
         stack_id: str,
         indices: list[int],
         excluded_count: int,
+        masters: CalibrationMasters | None,
         job_id: str | None,
     ) -> tuple[np.ndarray, StackStatistics]:
-        """Register -> normalise -> Winsorized-sigma weighted combine (Phase 1)."""
+        """Calibrate -> register -> normalise -> Winsorized-sigma weighted combine."""
 
         def on_progress(step: str, percent: int) -> None:
             self._emit(job_id, stack_id, step, 15 + int(percent * 0.8))
@@ -173,6 +227,8 @@ class StackingService:
             combination=record.combination_method,
             rejection=record.rejection_algo,
             weighting=record.weighting,
+            calibration=masters,
+            cosmetic=record.cosmetic_correction,
             on_progress=on_progress,
         )
 
@@ -182,12 +238,14 @@ class StackingService:
             if composite_noise > 0:
                 measured = round(result.reference_noise / composite_noise, 2)
 
+        calibrated = masters is not None and not masters.is_empty
         record.quality_report = {
             "reference_index": result.reference_index,
             "registration_rms_px": result.registration_rms,
             "registration_failures": result.registration_failures,
             "rejected_samples": result.rejected_samples,
             "aligned": result.aligned,
+            "calibrated": calibrated,
         }
         stats = StackStatistics(
             frames_stacked=result.frames_stacked,
@@ -198,6 +256,7 @@ class StackingService:
             reference_frame=result.reference_index if result.aligned else None,
             snr_improvement=round(math.sqrt(result.effective_frames), 2),
             measured_noise_reduction=measured,
+            calibrated=calibrated,
         )
         return result.composite, stats
 

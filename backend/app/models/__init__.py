@@ -27,6 +27,8 @@ from app.models.processing import (
 from app.models.session import SessionInfo
 from app.models.settings import AppSettingsResponse, AppSettingsUpdate
 from app.models.stack import (
+    CalibrationFrameCounts,
+    CalibrationSummary,
     ExcludeFrameRequest,
     InitiateStackRequest,
     ProcessStackRequest,
@@ -48,6 +50,8 @@ __all__ = [
     "AppSettingsResponse",
     "AppSettingsUpdate",
     "AutoAstroResponse",
+    "CalibrationFrameCounts",
+    "CalibrationSummary",
     "CreateTokenRequest",
     "CreatedTokenResponse",
     "CurvePoint",

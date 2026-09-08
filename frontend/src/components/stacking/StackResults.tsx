@@ -32,6 +32,12 @@ export function StackResults({ result, onEnhance, onDownload }: StackResultsProp
           [t('stacking.results.alignment_rms'), `${stats.registrationRmsPx.toFixed(2)} px`],
         ] as [string, string][])
       : []),
+    ...(stats.calibrated
+      ? ([[t('stacking.results.calibrated'), t('stacking.results.calibrated_yes')]] as [
+          string,
+          string,
+        ][])
+      : []),
     [t('stacking.results.snr_improvement'), `${stats.snrImprovement.toFixed(2)}x`],
     ...(stats.measuredNoiseReduction != null
       ? ([

@@ -9,6 +9,7 @@ export interface StackProgressProps {
 
 const PIPELINE: { key: string; translationKey: string }[] = [
   { key: 'upload', translationKey: 'stacking.steps.upload' },
+  { key: 'calibration', translationKey: 'stacking.steps.calibration' },
   { key: 'registration', translationKey: 'stacking.steps.registration' },
   { key: 'normalization', translationKey: 'stacking.steps.normalization' },
   { key: 'integration', translationKey: 'stacking.steps.integration' },

@@ -1,13 +1,15 @@
 """Stacking routes (linear rebuild).
 
-POST /api/stack/initiate                         - open a stack session
-POST /api/stack/{id}/upload-frame                - upload one frame
-POST /api/stack/{id}/upload-frames               - upload a batch of frames in one request
-POST /api/stack/{id}/upload-archive              - upload a .zip of frames in one request
-POST /api/stack/{id}/frame/{index}/exclude       - include/exclude a frame
-GET  /api/stack/{id}/frame/{index}/thumb         - a frame's thumbnail
-POST /api/stack/{id}/process                     - integrate the frames
-GET  /api/stack/{id}                             - stack result, statistics, frame list
+POST   /api/stack/initiate                       - open a stack session
+POST   /api/stack/{id}/upload-frame              - upload one frame
+POST   /api/stack/{id}/upload-frames             - upload a batch of frames in one request
+POST   /api/stack/{id}/upload-archive            - upload a .zip of frames in one request
+POST   /api/stack/{id}/frame/{index}/exclude     - include/exclude a frame
+GET    /api/stack/{id}/frame/{index}/thumb       - a frame's thumbnail
+POST   /api/stack/{id}/calibration/{kind}/frames - upload dark/flat/bias/dark_flat subs
+DELETE /api/stack/{id}/calibration/{kind}        - drop every sub of one kind
+POST   /api/stack/{id}/process                   - integrate the frames
+GET    /api/stack/{id}                           - stack result, statistics, frame list
 
 Processing runs inline (``PROCESSING_MODE=sync``) or on the Celery queue
 (``PROCESSING_MODE=queue``); progress streams over ``/ws/stack-status/{job_id}``.
@@ -26,6 +28,8 @@ from app.dependencies import JobServiceDep, RequireRateLimit, StackingServiceDep
 from app.exceptions import InvalidParameterError, ResourceNotFoundError, UnsupportedImageError
 from app.logging_config import get_logger
 from app.models import (
+    CalibrationFrameCounts,
+    CalibrationSummary,
     ExcludeFrameRequest,
     InitiateStackRequest,
     ProcessStackRequest,
@@ -35,6 +39,7 @@ from app.models import (
     StackStatistics,
     UploadFrameResponse,
 )
+from app.services.calibration import CALIBRATION_KINDS
 from app.services.storage import StorageService
 from app.utils.app_settings import get_app_settings
 from app.utils.linear_ingest import ingest_frame
@@ -60,6 +65,13 @@ def _frame_infos(record: StackRecord, storage: StorageService) -> list[StackFram
     ]
 
 
+def _calibration_summary(record: StackRecord, storage: StorageService) -> CalibrationSummary:
+    return CalibrationSummary(
+        frames=CalibrationFrameCounts(**storage.cal_frame_counts(record.stack_id)),
+        cosmetic_correction=record.cosmetic_correction,
+    )
+
+
 def _result(
     record: StackRecord, storage: StorageService, job_id: str | None = None
 ) -> StackResultResponse:
@@ -73,6 +85,7 @@ def _result(
         stacked_image_url=f"/api/preview/{session_id}?full=true" if session_id else None,
         statistics=StackStatistics(**record.result) if record.result else None,
         frames=_frame_infos(record, storage),
+        calibration=_calibration_summary(record, storage),
         error=record.error,
     )
 
@@ -242,6 +255,51 @@ async def get_frame_thumb(
     if not path.exists():
         raise ResourceNotFoundError(f"Frame {index} not found for stack {stack_id}")
     return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "no-cache"})
+
+
+@router.post(
+    "/{stack_id}/calibration/{kind}/frames",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=CalibrationSummary,
+)
+async def upload_calibration_frames(
+    stack_id: str,
+    kind: str,
+    stacking: StackingServiceDep,
+    storage: StorageDep,
+    _rate_limit: RequireRateLimit,
+    files: list[UploadFile] = File(...),
+) -> CalibrationSummary:
+    """Upload a batch of ``dark`` / ``flat`` / ``bias`` / ``dark_flat`` subs.
+
+    Masters are built (per-pixel median) and cached when the stack runs; adding
+    more subs later rebuilds them.
+    """
+    if kind not in CALIBRATION_KINDS:
+        raise InvalidParameterError(f"Unknown calibration frame kind {kind!r}")
+    frames = []
+    for upload in files:
+        data = await upload.read()
+        validate_upload_size(len(data))
+        if upload.filename:
+            validate_image_extension(upload.filename)
+        frames.append(ingest_frame(data, upload.filename))
+
+    record = stacking.add_calibration_frames(stack_id, kind, frames)
+    return _calibration_summary(record, storage)
+
+
+@router.delete("/{stack_id}/calibration/{kind}", response_model=CalibrationSummary)
+async def clear_calibration(
+    stack_id: str,
+    kind: str,
+    stacking: StackingServiceDep,
+    storage: StorageDep,
+    _rate_limit: RequireRateLimit,
+) -> CalibrationSummary:
+    """Drop every sub of one calibration kind and any master derived from it."""
+    record = stacking.clear_calibration(stack_id, kind)
+    return _calibration_summary(record, storage)
 
 
 @router.post("/{stack_id}/process", response_model=StackResultResponse)
