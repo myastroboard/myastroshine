@@ -70,11 +70,21 @@ class AppSettings(BaseModel):
     # ~5-6 h of darkness produces ~2000 frames.
     stacking_enabled: bool = True
     stacking_max_frames: int = Field(default=2000, ge=2, le=5000)
+    #: Threads for the per-frame register / align passes. 0 = auto (CPU count,
+    #: capped at 4); 1 = sequential. The Celery worker itself runs 1-2 stacks.
+    stacking_workers: int = Field(default=0, ge=0, le=16)
     # How long a stack's uploaded frames + working files are kept. They are much
     # heavier than a normal session (thousands of full-res frames) and are only
     # needed to review and re-stack; the composite a run produces is a normal
     # session and lives session_expiry_hours. Default 12 h.
     stacking_retention_hours: int = Field(default=12, ge=1, le=168)
+    #: Watch-folder ingest: a directory the worker polls (empty = off). New image
+    #: files are ingested into a rolling "watch" stack; once the folder is quiet
+    #: for stacking_watch_idle_minutes the stack is processed (if auto-process is
+    #: on) and the next file starts a fresh one.
+    stacking_watch_dir: str = ""
+    stacking_watch_idle_minutes: int = Field(default=10, ge=1, le=1440)
+    stacking_watch_auto_process: bool = True
 
     # Logging - file level and console level (changeable at runtime, see #4)
     log_level: str = "info"

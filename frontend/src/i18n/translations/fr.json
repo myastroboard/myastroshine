@@ -392,6 +392,22 @@
       "stacking_retention": {
         "label": "Rétention des empilements",
         "hint": "Durée de conservation des brutes d'un empilement pour le ré-empiler. Le composite garde la durée de vie de session. Heures."
+      },
+      "stacking_workers": {
+        "label": "Threads d'empilement",
+        "hint": "Threads parallèles pour les passes d'alignement/combinaison. 0 = auto (nombre de cœurs, plafonné à 4) ; 1 = séquentiel. À augmenter sur une machine multicœur."
+      },
+      "stacking_watch_dir": {
+        "label": "Dossier surveillé",
+        "hint": "Un chemin serveur que le worker scrute pour de nouvelles brutes (vide = désactivé). Les nouvelles images sont ingérées dans un empilement à ouvrir depuis l'écran d'empilement."
+      },
+      "stacking_watch_idle": {
+        "label": "Empiler automatiquement après",
+        "hint": "Empile le dossier surveillé quand aucune nouvelle brute n'est arrivée depuis ce nombre de minutes."
+      },
+      "stacking_watch_auto": {
+        "label": "Empiler automatiquement le dossier surveillé",
+        "hint": "Désactivé, les brutes surveillées sont seulement ingérées - lancez l'empilement vous-même depuis l'écran d'empilement."
       }
     },
     "webhooks": {
@@ -454,6 +470,17 @@
     "progress": {
       "heading": "Empilement"
     },
+    "watch": {
+      "title": "Dossier surveillé",
+      "open": "Ouvrir",
+      "status": {
+        "waiting_for_frames": "{count} brutes ingérées, en attente d'autres",
+        "ready": "{count} brutes ingérées, en attente d'autres",
+        "processing": "Empilement de {count} brutes…",
+        "completed": "Terminé - {count} brutes empilées",
+        "failed": "Échec de l'empilement"
+      }
+    },
     "steps": {
       "registration": "Alignement",
       "normalization": "Normalisation",
@@ -475,7 +502,8 @@
       "calibrated": "Calibration",
       "calibrated_yes": "Appliquée",
       "frames_auto_rejected": "Rejetées auto",
-      "post_processed": "Nettoyé"
+      "post_processed": "Nettoyé",
+      "drizzle": "Drizzle"
     },
     "settings": {
       "transform_label": "Alignement",
@@ -509,7 +537,14 @@
         "strict": "Strict"
       },
       "post_process_label": "Nettoyer le composite",
-      "post_process_hint": "Rogne les bords de rotation de champ, aplanit le gradient de ciel et neutralise la couleur avant l'éditeur."
+      "post_process_hint": "Rogne les bords de rotation de champ, aplanit le gradient de ciel et neutralise la couleur avant l'éditeur.",
+      "drizzle_label": "Drizzle",
+      "drizzle_hint": "Reconstruit sur une grille plus fine pour un vrai gain de résolution à partir d'un stack bien dithered. Plus lent, corrèle le bruit - à laisser désactivé sauf avec des centaines de brutes.",
+      "drizzle": {
+        "1": "Désactivé",
+        "2": "2x",
+        "3": "3x"
+      }
     },
     "upload_zone": {
       "add_frames": "Ajouter des images",

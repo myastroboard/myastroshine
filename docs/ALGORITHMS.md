@@ -552,6 +552,34 @@ to it shrinks the common footprint and off-centres the target. `_pick_reference`
 picks the frame nearest the **session's temporal middle** (which halves the
 field rotation to either end) with a typical star count and good sharpness.
 
+Each pass runs on a **thread pool** (`_map_frames`, auto-sized to the CPU count
+and capped at 4, `stacking_workers` to tune). Threads not processes - a Celery
+prefork worker is daemonic - which is fine because the per-frame hot path
+(decode, calibrate, `warpAffine`, connected components) and the combine's
+`partition` / `clip` / reduce are all GIL-releasing C. Progress carries a
+`"340/1066"` frame counter.
+
+After the align pass a **checkpoint** (`accum/plan.json` + the aligned memmap)
+is written and dropped only on success, so a run killed during the combine - or
+a re-stack that changes only the combination / rejection / weighting / drizzle
+(the checkpoint signature ignores those) - resumes from the aligned frames. The
+stale-work sweep reclaims an abandoned checkpoint's ~13 GB memmap after 30 min.
+
+### Drizzle (`app/services/drizzle.py`, opt-in `drizzle_factor` 2-3)
+
+Variable-pixel linear reconstruction (Fruchter & Hook 2002), run as a fourth
+pass **after** the normal align + combine. `_reference_stats` gives a 1x
+per-pixel median + robust sigma from the aligned memmap; `_drizzle` then decodes
+each kept frame again, normalises it, masks pixels that deviate more than
+`_KAPPA` sigma from that median (cosmics / hot pixels / a satellite streak), and
+"drops" each surviving input pixel - a square of side `_PIXFRAC` (0.7, < 1
+sharpens) mapped through the frame's registration transform - onto the `scale`x
+output grid, its flux area-distributed over the nearest 2x2 output cells. The
+drop can spill past that 2x2, but the missing area is lost from `flux` *and*
+`weight`, so `flux / weight` (the final composite) stays unbiased. It correlates
+neighbouring-pixel noise and adds ~1 s/frame, so it is off by default; the
+Seestar's alt-az field rotation supplies the sub-pixel dither it needs.
+
 ### Post-stack: wedge crop, then the non-destructive editor pre-stage (`app/services/post_stack.py`)
 
 The post-stack work splits by *when* it runs.

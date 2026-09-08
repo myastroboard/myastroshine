@@ -110,7 +110,9 @@ after changing it).
 | General | `max_image_size_mb` | 100 |
 | General | `session_expiry_hours` | 24 |
 | General | `preview_max_size` | 512 |
-| General | `stacking_enabled` / `stacking_max_frames` / `stacking_detector` / `stacking_combination_default` / `stacking_cosmic_ray_threshold` | see `app/utils/app_settings.py` |
+| General | `stacking_enabled` / `stacking_max_frames` / `stacking_retention_hours` | true / 2000 / 12 |
+| General | `stacking_workers` (register/align/combine threads; 0 = auto, cap 4) | 0 |
+| General | `stacking_watch_dir` / `stacking_watch_idle_minutes` / `stacking_watch_auto_process` (folder-watch ingest; empty dir = off) | "" / 10 / true |
 | Webhooks | AstroDex bearer tokens (create / revoke) | - |
 | Webhooks | `astrodex_callback_urls` (allowlist) | empty |
 | Webhooks | `astrodex_max_retries` / `astrodex_retry_delay_seconds` | 3 / 5s |

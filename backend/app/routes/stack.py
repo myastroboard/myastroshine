@@ -358,6 +358,18 @@ def process_stack(
     return _result(record, storage, job_id)
 
 
+@router.get("/latest", response_model=StackResultResponse | None)
+async def latest_watch_stack(
+    stacking: StackingServiceDep, storage: StorageDep
+) -> StackResultResponse | None:
+    """The current folder-watch stack (ingesting, ready, or done), or ``null``.
+
+    Polled by the UI so a watch-folder session can be opened without a URL. Not
+    rate-limited (a small read, like ``GET /api/config``)."""
+    record = stacking.latest_watch_stack()
+    return _result(record, storage) if record is not None else None
+
+
 @router.get("/{stack_id}", response_model=StackResultResponse)
 async def get_stack(
     stack_id: str, stacking: StackingServiceDep, storage: StorageDep

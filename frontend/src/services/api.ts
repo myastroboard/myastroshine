@@ -404,6 +404,11 @@ export const apiClient = {
     return request<StackResult>(`/stack/${stackId}`);
   },
 
+  /** The current folder-watch stack, or null when watch ingest is off / empty. */
+  getLatestWatchStack(): Promise<StackResult | null> {
+    return request<StackResult | null>('/stack/latest');
+  },
+
   // --- Update check ---
   checkForUpdates(): Promise<VersionCheckResult> {
     return request<VersionCheckResult>('/version/check-updates');

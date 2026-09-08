@@ -50,6 +50,9 @@ export function StackResults({ result, onEnhance, onDownload }: StackResultsProp
           string,
         ][])
       : []),
+    ...(stats.drizzleFactor > 1
+      ? ([[t('stacking.results.drizzle'), `${stats.drizzleFactor}x`]] as [string, string][])
+      : []),
     [t('stacking.results.snr_improvement'), `${stats.snrImprovement.toFixed(2)}x`],
     ...(stats.measuredNoiseReduction != null
       ? ([

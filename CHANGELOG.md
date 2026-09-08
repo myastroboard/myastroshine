@@ -103,6 +103,24 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   baked into the saved composite; background extraction and colour calibration
   moved out of the one-shot cleanup and into the Stack step. See
   `initial_plan/12_STACKING_REBUILD.md`.
+- Stacking scale & UX: the progress bar now shows which frame each step is on
+  ("Aligning 340 / 1066"), not just a percentage. The register / align / combine
+  passes run on a **thread pool** (auto-sized to the CPU count, capped at 4,
+  tunable in Settings) - roughly 2x faster on a real multi-frame stack, and
+  parallelising the combine step is what moved the needle. An interrupted run now
+  **resumes**: the aligned frames and a small plan file survive a crash, so a
+  retry - or a re-stack that only changes the combination / rejection / weighting
+  - skips straight to the combine step instead of re-registering everything. And
+  a **watch folder**: point the worker at a directory (Settings) and frames
+  dropped there are ingested into a rolling stack that auto-processes once the
+  folder goes quiet; the stacking screen shows a banner to open it.
+- **Drizzle** (Fruchter & Hook) as an opt-in stacking option (2x / 3x). Each
+  input pixel is a shrunken "drop" mapped through its registration transform and
+  area-distributed onto a finer output grid, so a large, well-dithered stack
+  (the Seestar's alt-az field rotation supplies the dither) yields real
+  resolution gain a plain resample cannot. It runs as an extra pass after the
+  normal stack (which stays the fallback and the outlier reference), is slower
+  and correlates neighbouring-pixel noise, and is off by default.
 
 ### Changed
 
@@ -197,6 +215,8 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The before/after divider now tracks the pointer (and the actual split of the
   image) while the preview is zoomed in; it was computed in unscaled container
   coordinates and drifted from the visible seam at any zoom above 100%.
+- The stacking progress-event stream no longer opens a fresh Redis connection
+  per event (a thousand-frame stack emits hundreds).
 
 ## [0.2.0] - 2026-09-06
 
