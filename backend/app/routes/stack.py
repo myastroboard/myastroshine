@@ -17,10 +17,12 @@ Processing runs inline (``PROCESSING_MODE=sync``) or on the Celery queue
 
 from __future__ import annotations
 
+import asyncio
 import io
 import zipfile
 
 from fastapi import APIRouter, File, Form, Request, UploadFile, status
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 
 from app.db.models import StackRecord
@@ -173,17 +175,25 @@ async def upload_frames(
     """Upload a batch of frames in one request, indexed ``start_index`` upward.
 
     The frontend sends frames in batches of a few dozen so a thousand-frame
-    session is tens of requests, not a thousand.
+    session is tens of requests, not a thousand. Decoding + thumbnailing the
+    batch (the slow part - a FITS thumbnail is ~30 ms) runs across the
+    threadpool; the disk writes and the single DB commit are serial.
     """
-    record = stacking.get_result(stack_id)  # 404 before any work
-    for offset, upload in enumerate(files):
+    stacking.get_result(stack_id)  # 404 before any work
+    payloads: list[tuple[bytes, str | None]] = []
+    for upload in files:
         data = await upload.read()
         validate_upload_size(len(data))
         if upload.filename:
             validate_image_extension(upload.filename)
-        record = stacking.add_frame(
-            stack_id, start_index + offset, ingest_frame(data, upload.filename)
-        )
+        payloads.append((data, upload.filename))
+
+    prepared = await asyncio.gather(
+        *(run_in_threadpool(stacking.prepare_frame, data, name) for data, name in payloads)
+    )
+    record = await run_in_threadpool(
+        stacking.add_frames, stack_id, start_index, list(prepared)
+    )
     return StackSessionResponse(
         stack_id=record.stack_id,
         status=record.status,
@@ -329,7 +339,7 @@ async def clear_calibration(
 
 
 @router.post("/{stack_id}/process", response_model=StackResultResponse)
-async def process_stack(
+def process_stack(
     stack_id: str,
     stacking: StackingServiceDep,
     storage: StorageDep,
@@ -340,7 +350,9 @@ async def process_stack(
 ) -> StackResultResponse:
     """Integrate the frames into a composite.
 
-    An optional body re-stacks with a changed setting (no re-upload).
+    An optional body re-stacks with a changed setting (no re-upload). Defined
+    ``def`` (not ``async``) so ``PROCESSING_MODE=sync`` runs the integration in a
+    worker thread rather than blocking the event loop for the whole stack.
     """
     record, job_id = stacking.dispatch(stack_id, jobs, get_client_ip(http_request), overrides)
     return _result(record, storage, job_id)

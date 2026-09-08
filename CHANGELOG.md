@@ -125,6 +125,15 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   startup (`alembic upgrade head`); a fresh database is built from the
   migrations. Previously a schema change needed a manual `alembic upgrade` and a
   lagging dev database silently broke the cleanup task.
+- The development stack now defaults to `PROCESSING_MODE=queue` - a long job (a
+  thousand-frame stack) runs on the Celery worker instead of blocking the single
+  API process for its whole duration - and `POST /api/stack/{id}/process` no
+  longer holds the event loop even under `sync`.
+- Multi-frame upload is **~4x faster** and no longer freezes the API while it
+  runs: each batch is decoded and thumbnailed across a threadpool (the per-frame
+  thumbnail is built from a downscaled copy - the auto-stretch over a few
+  thousand pixels looks the same as over two megapixels and is ~9x cheaper), and
+  a batch is one database commit instead of one per frame.
 - New application logo: the header now shows the MyAstroShine icon, and the
   browser-tab favicon is a matching amber-star-and-orbit mark.
 

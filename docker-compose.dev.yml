@@ -14,7 +14,10 @@ x-backend-env: &backend-env
   DATA_DIR: /data
   REDIS_URL: redis://redis:6379/0
   CELERY_BROKER_URL: redis://redis:6379/1
-  PROCESSING_MODE: ${PROCESSING_MODE:-sync}
+  # queue: the Celery worker runs image / stack processing so a long job (a
+  # thousand-frame stack) never blocks the API. Override to `sync` for a
+  # worker-free run.
+  PROCESSING_MODE: ${PROCESSING_MODE:-queue}
 
 services:
   api:
