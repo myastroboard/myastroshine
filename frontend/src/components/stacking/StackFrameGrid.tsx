@@ -35,6 +35,8 @@ export function StackFrameGrid({
         <div className="grid grid-cols-[repeat(auto-fill,minmax(84px,1fr))] gap-2">
           {uploaded.map((frame) => {
             const isSelected = frame.index === selected;
+            const q = frame.quality;
+            const autoRejected = q != null && !q.accepted;
             return (
               <div key={frame.index} className="relative">
                 <button
@@ -43,7 +45,11 @@ export function StackFrameGrid({
                   aria-pressed={isSelected}
                   aria-label={t('stacking.grid.frame_aria', { n: frame.index + 1 })}
                   className={`block w-full overflow-hidden rounded-md border ${
-                    isSelected ? 'border-accent ring-1 ring-accent' : 'border-hairline'
+                    isSelected
+                      ? 'border-accent ring-1 ring-accent'
+                      : autoRejected
+                        ? 'border-danger/60'
+                        : 'border-hairline'
                   }`}
                 >
                   <img
@@ -55,6 +61,27 @@ export function StackFrameGrid({
                     }`}
                   />
                 </button>
+
+                {q != null && (
+                  <span
+                    className={`pointer-events-none absolute bottom-1 left-1 rounded px-1 text-[10px] font-medium tabular-nums ${
+                      autoRejected ? 'bg-danger/80 text-white' : 'bg-black/60 text-white/90'
+                    }`}
+                    title={
+                      autoRejected
+                        ? t(`stacking.grid.reject.${q.rejectReason ?? 'other'}`)
+                        : t('stacking.grid.quality_title', {
+                            stars: q.starCount,
+                            fwhm: q.fwhm.toFixed(1),
+                          })
+                    }
+                  >
+                    {autoRejected
+                      ? t(`stacking.grid.reject.${q.rejectReason ?? 'other'}`)
+                      : Math.round(q.score)}
+                  </span>
+                )}
+
                 <label
                   className="absolute right-1 top-1 flex cursor-pointer items-center rounded bg-black/60 p-0.5"
                   title={t('stacking.grid.exclude')}

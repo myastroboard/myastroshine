@@ -114,9 +114,13 @@ class StackRecord(Base):
     weighting: Mapped[str] = mapped_column(String(12), default="noise")
     #: replace hot/dead pixels (from the master dark/flat) with a neighbour median.
     cosmetic_correction: Mapped[bool] = mapped_column(default=True)
+    #: auto-reject strength for per-frame quality (off/lenient/moderate/strict).
+    quality_filter: Mapped[str] = mapped_column(String(12), default="moderate")
     #: frame indices the user has manually excluded (a trail, a cloud, ...).
     excluded_frames: Mapped[list[int]] = mapped_column(JSON, default=list)
-    #: reference frame, per-frame metrics, registration residuals.
+    #: frame indices the user has manually rescued from the quality auto-reject.
+    included_frames: Mapped[list[int]] = mapped_column(JSON, default=list)
+    #: reference frame, per-frame quality metrics, registration residuals.
     quality_report: Mapped[JsonDict | None] = mapped_column(JSON)
 
 

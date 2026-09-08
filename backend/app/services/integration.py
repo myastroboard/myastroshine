@@ -1,13 +1,15 @@
 """IntegrationService - register, normalise and combine a frame stack.
 
 Three memory-bounded passes over the frames (see
-``initial_plan/12_STACKING_REBUILD.md`` Phase 1):
+``initial_plan/12_STACKING_REBUILD.md`` Phases 1-3):
 
 1. **Register** - calibrate (Phase 2) then superpixel-debayer every frame (half
-   resolution is plenty for star centroids), pick the best-quality frame as the
-   reference, match each other frame's asterisms to it (:class:`StarMatchService`)
-   for a transform, and measure each frame's background / scale / noise. Frames
-   that fail to match are rejected.
+   resolution is plenty for star centroids), measure each frame's star count /
+   FWHM / roundness / background / noise, **score** them and drop the ones the
+   ``quality_filter`` rejects (Phase 3), pick the best remaining frame as the
+   reference, and match each other frame's asterisms to it
+   (:class:`StarMatchService`) for a transform. Frames that fail to match are
+   rejected too.
 2. **Align** - load each kept frame again, calibrate it and **interpolating**-
    debayer it at full resolution, warp it into the reference frame (Lanczos,
    the registration transform's translation scaled up from half to full res),
@@ -35,6 +37,7 @@ from numpy.lib.format import open_memmap
 from app.exceptions import InvalidParameterError
 from app.logging_config import get_logger
 from app.services.calibration import CalibrationMasters, CalibrationService
+from app.services.frame_quality import FrameMeasure, FrameQuality, score_frames
 from app.services.star_detection import StarDetectionService
 from app.services.star_match import StarMatchService
 from app.services.storage import StorageService
@@ -48,6 +51,7 @@ ProgressFn = Callable[[str, int], None]
 _DETECT_SENSITIVITY = 60
 _DETECT_MAX_SIZE = 22
 _MIN_REFERENCE_STARS = 8  # below this, registration is hopeless - fall back to no alignment
+_MIN_FRAMES_KEPT = 2  # the quality filter never drops below this many frames
 _SCALE_CLIP = (0.2, 5.0)
 _KAPPA = 3.0  # sigma rejection threshold
 _REJECT_ITERATIONS = 2
@@ -72,9 +76,19 @@ class _FramePlan:
     background: float
     scale: float
     noise: float
+    fwhm: float = 0.0  # px, median star FWHM proxy
+    roundness: float = 1.0  # 0..1, 1 = round
     matrix: np.ndarray | None = None  # frame -> reference; set in pass 1
     rms: float = 0.0
     registered: bool = False
+    #: dropped by the frame-quality filter (kept separate from a registration failure).
+    quality_rejected: bool = False
+
+    def measure(self) -> FrameMeasure:
+        return FrameMeasure(
+            self.index, self.star_count, self.fwhm, self.roundness,
+            self.background, self.noise, self.scale,
+        )
 
 
 @dataclass
@@ -87,6 +101,8 @@ class IntegrationResult:
     registration_rms: float  # mean inlier RMS over the registered frames
     reference_noise: float  # background noise of the reference frame (same units as the composite)
     aligned: bool  # False when the stack was integrated without registration
+    quality_rejected: int = 0  # frames dropped by the frame-quality filter
+    frame_quality: list[FrameQuality] = field(default_factory=list)
     weights: list[float] = field(default_factory=list)
 
     @property
@@ -114,17 +130,22 @@ class IntegrationService:
         combination: str,
         rejection: str,
         weighting: str,
+        quality_filter: str = "off",
+        protected: set[int] | None = None,
         calibration: CalibrationMasters | None = None,
         cosmetic: bool = True,
         on_progress: ProgressFn | None = None,
     ) -> IntegrationResult:
         cal = calibration if calibration is not None and not calibration.is_empty else None
-        plans, reference, half_shape = self._register(
-            stack_id, indices, transform, cal, cosmetic, on_progress
+        plans, reference, half_shape, qualities = self._register(
+            stack_id, indices, transform, quality_filter, protected or set(), cal, cosmetic,
+            on_progress,
         )
         aligned = reference.star_count >= _MIN_REFERENCE_STARS
-        kept = [p for p in plans if p.registered] if aligned else plans
-        weights = _frame_weights(kept, weighting)
+        registrable = [p for p in plans if not p.quality_rejected]
+        kept = [p for p in registrable if p.registered] if aligned else registrable
+        quality_by_index = {q.index: q for q in qualities}
+        weights = _frame_weights(kept, quality_by_index, weighting)
 
         aligned_path, full_shape, reference_noise = self._align_to_memmap(
             stack_id, kept, reference, half_shape, aligned, cal, cosmetic, on_progress
@@ -141,7 +162,7 @@ class IntegrationService:
         return IntegrationResult(
             composite=composite,
             frames_stacked=len(kept),
-            registration_failures=(len(plans) - len(kept)) if aligned else 0,
+            registration_failures=(len(registrable) - len(kept)) if aligned else 0,
             reference_index=reference.index,
             rejected_samples=rejected,
             registration_rms=round(float(np.mean([p.rms for p in registered])), 2)
@@ -149,6 +170,8 @@ class IntegrationService:
             else 0.0,
             reference_noise=reference_noise,
             aligned=aligned,
+            quality_rejected=sum(1 for p in plans if p.quality_rejected),
+            frame_quality=qualities,
             weights=list(weights),
         )
 
@@ -159,10 +182,12 @@ class IntegrationService:
         stack_id: str,
         indices: list[int],
         transform: str,
+        quality_filter: str,
+        protected: set[int],
         calibration: CalibrationMasters | None,
         cosmetic: bool,
         on_progress: ProgressFn | None,
-    ) -> tuple[list[_FramePlan], _FramePlan, tuple[int, int, int]]:
+    ) -> tuple[list[_FramePlan], _FramePlan, tuple[int, int, int], list[FrameQuality]]:
         plans: list[_FramePlan] = []
         shape: tuple[int, int, int] | None = None
         for step, index in enumerate(indices):
@@ -177,7 +202,20 @@ class IntegrationService:
                 on_progress("registration", int(30 * step / max(1, len(indices))))
         assert shape is not None  # noqa: S101 - indices is non-empty (caller guarantees >= 2)
 
-        reference = max(plans, key=lambda p: p.star_count)
+        qualities = score_frames([p.measure() for p in plans], quality_filter)
+        rejected = {q.index for q in qualities if not q.accepted} - protected
+        if len(plans) - len(rejected) >= _MIN_FRAMES_KEPT:
+            for plan in plans:
+                plan.quality_rejected = plan.index in rejected
+        elif rejected:
+            logger.warning(
+                "frame-quality filter would drop too many frames - keeping all",
+                stack_id=stack_id,
+                would_reject=len(rejected),
+            )
+
+        pool = [p for p in plans if not p.quality_rejected]
+        reference = max(pool, key=lambda p: p.star_count)
         reference.registered = True
         reference.matrix = np.eye(2, 3, dtype=np.float64)
 
@@ -187,17 +225,17 @@ class IntegrationService:
                 stack_id=stack_id,
                 stars=reference.star_count,
             )
-            return plans, reference, shape
+            return plans, reference, shape, qualities
 
         for step, plan in enumerate(plans):
-            if plan is reference:
+            if plan is reference or plan.quality_rejected:
                 continue
             result = self._matcher.align(plan.centroids, reference.centroids, transform)
             if result.ok and result.matrix is not None:
                 plan.matrix, plan.rms, plan.registered = result.matrix, result.rms, True
             if on_progress and step % 20 == 0:
                 on_progress("registration", 30 + int(20 * step / max(1, len(plans))))
-        return plans, reference, shape
+        return plans, reference, shape, qualities
 
     def _measure(self, index: int, data: np.ndarray) -> _FramePlan:
         luma = data @ _RGB_LUMA
@@ -210,7 +248,12 @@ class IntegrationService:
         background = float(np.median(data))
         scale = max(float(np.percentile(data, _SCALE_PERCENTILE)) - background, _NOISE_FLOOR)
         noise = max(highpass_noise(luma), _NOISE_FLOOR)
-        return _FramePlan(index, centroids, len(stars), background, scale, noise)
+        radii = np.array([s.radius for s in stars], dtype=np.float64)
+        fwhm = float(2.0 * np.median(radii)) if radii.size else 0.0
+        roundness = float(np.median([s.roundness for s in stars])) if stars else 1.0
+        return _FramePlan(
+            index, centroids, len(stars), background, scale, noise, fwhm=fwhm, roundness=roundness
+        )
 
     # -- pass 2: align to a memmap -----------------------------------------
 
@@ -355,17 +398,24 @@ def highpass_noise(gray: np.ndarray) -> float:
     return _MAD_TO_SIGMA * float(np.median(np.abs(residual - np.median(residual))))
 
 
-def _frame_weights(plans: list[_FramePlan], weighting: str) -> np.ndarray:
+def _frame_weights(
+    plans: list[_FramePlan], quality_by_index: dict[int, FrameQuality], weighting: str
+) -> np.ndarray:
     """Per-frame integration weights, clamped so a bad noise estimate on one
-    frame cannot swamp the stack (a raw ``1/noise^2`` spread of 5x becomes 25x)."""
+    frame cannot swamp the stack (a raw ``1/noise^2`` spread of 5x becomes 25x).
+
+    - ``none``: equal. ``noise``: ``1/noise^2``. ``quality``: the frame-quality
+      scorer's combined weight (SNR + star count + sharpness, already clamped
+      and normalised to a median of 1).
+    """
     if weighting == "none" or not plans:
         return np.ones(len(plans), dtype=np.float64)
-    noise = np.array([p.noise for p in plans], dtype=np.float64)
-    relative = np.clip((np.median(noise) / noise) ** 2, *_WEIGHT_CLIP)
     if weighting == "quality":
-        stars = np.array([max(p.star_count, 1) for p in plans], dtype=np.float64)
-        relative = relative * np.clip(stars / np.median(stars), *_WEIGHT_CLIP)
-    return relative
+        return np.array(
+            [quality_by_index[p.index].weight for p in plans], dtype=np.float64
+        )
+    noise = np.array([p.noise for p in plans], dtype=np.float64)
+    return np.clip((np.median(noise) / noise) ** 2, *_WEIGHT_CLIP)
 
 
 def _reduce_tile(

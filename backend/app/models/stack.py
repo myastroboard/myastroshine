@@ -15,6 +15,7 @@ RegistrationTransform = Literal["translation", "similarity", "affine"]
 CombinationMethod = Literal["average", "median"]
 RejectionAlgo = Literal["none", "sigma", "winsorized_sigma"]
 Weighting = Literal["none", "noise", "quality"]
+QualityFilter = Literal["off", "lenient", "moderate", "strict"]
 
 _MAX_FRAMES = 5000  # hard ceiling; the operator's stacking_max_frames is the real gate
 
@@ -28,6 +29,7 @@ class InitiateStackRequest(BaseModel):
     rejection_algo: RejectionAlgo = "winsorized_sigma"
     weighting: Weighting = "noise"
     cosmetic_correction: bool = True
+    quality_filter: QualityFilter = "moderate"
 
 
 class ProcessStackRequest(BaseModel):
@@ -42,6 +44,7 @@ class ProcessStackRequest(BaseModel):
     rejection_algo: RejectionAlgo | None = None
     weighting: Weighting | None = None
     cosmetic_correction: bool | None = None
+    quality_filter: QualityFilter | None = None
 
 
 class StackSessionResponse(BaseModel):
@@ -62,12 +65,27 @@ class UploadFrameResponse(BaseModel):
     status: str
 
 
+class FrameQualityInfo(BaseModel):
+    """Per-frame quality metrics and the auto-reject verdict (Phase 3)."""
+
+    star_count: int
+    fwhm: float
+    roundness: float
+    background: float
+    snr: float
+    score: float  # 0..100
+    weight: float  # relative integration weight, median frame ~= 1.0
+    accepted: bool
+    reject_reason: str | None = None  # "clouds" | "soft" | "trailed" | "bright_sky"
+
+
 class StackFrameInfo(BaseModel):
     """One uploaded frame, for the frame grid in the UI."""
 
     index: int
     thumb_url: str
     excluded: bool
+    quality: FrameQualityInfo | None = None
 
 
 class ExcludeFrameRequest(BaseModel):
@@ -97,6 +115,7 @@ class StackStatistics(BaseModel):
 
     frames_stacked: int
     frames_excluded: int
+    frames_auto_rejected: int = 0
     combination_method: str
     registration_transform: str
     registration_rms_px: float | None = None

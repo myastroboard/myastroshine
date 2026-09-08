@@ -31,8 +31,8 @@ function frameFile(name: string): File {
 }
 
 const FRAMES = [
-  { index: 0, thumbUrl: '/api/stack/stack-1/frame/0/thumb', excluded: false },
-  { index: 1, thumbUrl: '/api/stack/stack-1/frame/1/thumb', excluded: false },
+  { index: 0, thumbUrl: '/api/stack/stack-1/frame/0/thumb', excluded: false, quality: null },
+  { index: 1, thumbUrl: '/api/stack/stack-1/frame/1/thumb', excluded: false, quality: null },
 ];
 
 const RESULT: StackResult = {
@@ -45,6 +45,7 @@ const RESULT: StackResult = {
   statistics: {
     framesStacked: 2,
     framesExcluded: 0,
+    framesAutoRejected: 0,
     combinationMethod: 'average',
     registrationTransform: 'similarity',
     registrationRmsPx: 0.4,
@@ -132,6 +133,53 @@ describe('StackView', () => {
     fireEvent.click(checkboxes[1]);
 
     await waitFor(() => expect(mocked.excludeStackFrame).toHaveBeenCalledWith('stack-1', 1, true));
+  });
+
+  it('shows per-frame quality badges and flags an auto-rejected frame', async () => {
+    mocked.processStack.mockResolvedValueOnce({
+      ...RESULT,
+      statistics: { ...RESULT.statistics!, framesStacked: 1, framesAutoRejected: 1 },
+      frames: [
+        {
+          ...FRAMES[0],
+          quality: {
+            starCount: 200,
+            fwhm: 3.1,
+            roundness: 0.9,
+            background: 0.05,
+            snr: 40,
+            score: 88,
+            weight: 1.1,
+            accepted: true,
+            rejectReason: null,
+          },
+        },
+        {
+          ...FRAMES[1],
+          excluded: true,
+          quality: {
+            starCount: 20,
+            fwhm: 6,
+            roundness: 0.8,
+            background: 0.06,
+            snr: 12,
+            score: 30,
+            weight: 0.3,
+            accepted: false,
+            rejectReason: 'clouds',
+          },
+        },
+      ],
+    });
+
+    const { container } = render(<StackView onEnhanceComposite={vi.fn()} />);
+    await pickFramesAndUpload(container);
+    fireEvent.click(screen.getByRole('button', { name: /stack 2 frames/i }));
+
+    await screen.findByRole('button', { name: /enhance composite/i });
+    expect(screen.getByText('88')).toBeInTheDocument(); // score badge
+    expect(screen.getByText('clouds')).toBeInTheDocument(); // reject reason
+    expect(screen.getByText('Auto-rejected')).toBeInTheDocument(); // results row
   });
 
   it('re-stacks with the current settings after a first result', async () => {

@@ -25,6 +25,12 @@ export function StackResults({ result, onEnhance, onDownload }: StackResultsProp
   const rows: [string, string][] = [
     [t('stacking.results.frames_stacked'), String(stats.framesStacked)],
     [t('stacking.results.frames_excluded'), String(stats.framesExcluded)],
+    ...(stats.framesAutoRejected > 0
+      ? ([[t('stacking.results.frames_auto_rejected'), String(stats.framesAutoRejected)]] as [
+          string,
+          string,
+        ][])
+      : []),
     [t('stacking.combination_label'), stats.combinationMethod],
     [t('stacking.settings.transform_label'), stats.registrationTransform],
     ...(stats.registrationRmsPx != null

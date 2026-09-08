@@ -106,11 +106,10 @@ def test_exclude_frame_drops_it_from_the_composite(client, star_field: np.ndarra
 
     excluded = client.post(f"/api/stack/{stack_id}/frame/1/exclude", json={"excluded": True})
     assert excluded.status_code == 200
-    assert excluded.json() == {
-        "index": 1,
-        "thumb_url": f"/api/stack/{stack_id}/frame/1/thumb",
-        "excluded": True,
-    }
+    body = excluded.json()
+    assert body["index"] == 1
+    assert body["thumb_url"] == f"/api/stack/{stack_id}/frame/1/thumb"
+    assert body["excluded"] is True
 
     listing = client.get(f"/api/stack/{stack_id}").json()
     assert [f["excluded"] for f in listing["frames"]] == [False, True, False]
@@ -210,6 +209,36 @@ def test_process_with_calibration_marks_the_result_calibrated(
     processed = client.post(f"/api/stack/{stack_id}/process").json()
     assert processed["status"] == "completed"
     assert processed["statistics"]["calibrated"] is True
+
+
+def test_process_reports_per_frame_quality(client, star_field: np.ndarray) -> None:
+    """Every frame in the result carries its quality metrics; a soft sub is flagged."""
+    import cv2
+
+    init = client.post("/api/stack/initiate", json={"frame_count": 5, "quality_filter": "moderate"})
+    stack_id = init.json()["stack_id"]
+    for i in range(5):
+        client.post(
+            f"/api/stack/{stack_id}/upload-frame",
+            data={"frame_index": str(i)},
+            files={"file": (f"f{i}.png", png_bytes(translate(star_field, i, -i)), "image/png")},
+        )
+    blurred = cv2.GaussianBlur(star_field, (0, 0), 3)
+    client.post(
+        f"/api/stack/{stack_id}/upload-frame",
+        data={"frame_index": "5"},
+        files={"file": ("bad.png", png_bytes(blurred), "image/png")},
+    )
+
+    body = client.post(f"/api/stack/{stack_id}/process").json()
+    assert body["statistics"]["frames_auto_rejected"] == 1
+
+    frames = {f["index"]: f for f in body["frames"]}
+    assert frames[0]["quality"]["accepted"] is True
+    assert frames[0]["quality"]["score"] > 0
+    assert frames[5]["quality"]["accepted"] is False
+    assert frames[5]["quality"]["reject_reason"]
+    assert frames[5]["excluded"] is True  # auto-rejected frames read as excluded in the grid
 
 
 def test_initiate_rejects_too_few_frames(client) -> None:

@@ -4,10 +4,10 @@ initiate -> upload frames (each ingested to a linear ``LinearFrame``) -> process
 -> the composite becomes a normal session so the single-image enhancement routes
 work on it unchanged.
 
-``process`` delegates the register -> normalise -> reject -> combine work to
-:class:`app.services.integration.IntegrationService`. Calibration frames and a
-post-stack colour/stretch step are still to come - see
-``initial_plan/12_STACKING_REBUILD.md``.
+``process`` builds master calibration frames (Phase 2) then delegates the
+score -> register -> normalise -> reject -> combine work to
+:class:`app.services.integration.IntegrationService`. A post-stack colour/stretch
+step is still to come - see ``initial_plan/12_STACKING_REBUILD.md``.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ from __future__ import annotations
 import math
 import uuid
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import numpy as np
 from sqlalchemy import select
@@ -27,6 +28,7 @@ from app.logging_config import get_logger
 from app.models import InitiateStackRequest, ProcessStackRequest, StackStatistics
 from app.services import progress
 from app.services.calibration import CALIBRATION_KINDS, CalibrationMasters, CalibrationService
+from app.services.frame_quality import FrameQuality
 from app.services.integration import IntegrationService, highpass_noise
 from app.services.job import JobService
 from app.services.session import SessionService
@@ -70,7 +72,9 @@ class StackingService:
             rejection_algo=config.rejection_algo,
             weighting=config.weighting,
             cosmetic_correction=config.cosmetic_correction,
+            quality_filter=config.quality_filter,
             excluded_frames=[],
+            included_frames=[],
             expires_at=datetime.now(UTC) + timedelta(hours=app_settings.session_expiry_hours),
         )
         self.db.add(record)
@@ -99,16 +103,25 @@ class StackingService:
         return record
 
     def set_frame_excluded(self, stack_id: str, index: int, excluded: bool) -> StackRecord:
-        """Toggle a frame in/out of the stack (a trail, a cloud, a bad sub)."""
+        """Toggle a frame in/out of the stack.
+
+        Also maintains the ``included_frames`` rescue list: unchecking a frame
+        (``excluded=False``) protects it from the quality auto-reject on the next
+        run; checking it drops that protection.
+        """
         record = self._get(stack_id)
         if not self.storage.has_linear_frame(stack_id, index):
             raise ResourceNotFoundError(f"Frame {index} not uploaded for stack {stack_id}")
-        current = set(record.excluded_frames or [])
+        dropped = set(record.excluded_frames or [])
+        rescued = set(record.included_frames or [])
         if excluded:
-            current.add(index)
+            dropped.add(index)
+            rescued.discard(index)
         else:
-            current.discard(index)
-        record.excluded_frames = sorted(current)
+            dropped.discard(index)
+            rescued.add(index)
+        record.excluded_frames = sorted(dropped)
+        record.included_frames = sorted(rescued)
         self.db.commit()
         self.db.refresh(record)
         return record
@@ -227,6 +240,8 @@ class StackingService:
             combination=record.combination_method,
             rejection=record.rejection_algo,
             weighting=record.weighting,
+            quality_filter=record.quality_filter,
+            protected=set(record.included_frames or []),
             calibration=masters,
             cosmetic=record.cosmetic_correction,
             on_progress=on_progress,
@@ -246,10 +261,13 @@ class StackingService:
             "rejected_samples": result.rejected_samples,
             "aligned": result.aligned,
             "calibrated": calibrated,
+            "quality_filter": record.quality_filter,
+            "frames": [_quality_dict(q) for q in result.frame_quality],
         }
         stats = StackStatistics(
             frames_stacked=result.frames_stacked,
-            frames_excluded=excluded_count + result.registration_failures,
+            frames_excluded=excluded_count + result.registration_failures + result.quality_rejected,
+            frames_auto_rejected=result.quality_rejected,
             combination_method=record.combination_method,
             registration_transform=record.registration_transform if result.aligned else "none",
             registration_rms_px=result.registration_rms if result.aligned else None,
@@ -349,3 +367,19 @@ def _background_noise(pixels: np.ndarray) -> float:
     """Robust high-pass noise of the composite (central crop, gradient removed)."""
     gray = pixels.mean(axis=2) if pixels.ndim == _COLOR_NDIM else pixels
     return highpass_noise(gray.astype(np.float32))
+
+
+def _quality_dict(quality: FrameQuality) -> dict[str, Any]:
+    """One scored frame as a JSON-safe dict for ``quality_report["frames"]``."""
+    return {
+        "index": quality.index,
+        "star_count": quality.star_count,
+        "fwhm": quality.fwhm,
+        "roundness": quality.roundness,
+        "background": quality.background,
+        "snr": quality.snr,
+        "score": quality.score,
+        "weight": quality.weight,
+        "accepted": quality.accepted,
+        "reject_reason": quality.reject_reason,
+    }

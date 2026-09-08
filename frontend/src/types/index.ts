@@ -489,6 +489,7 @@ export type RegistrationTransform = 'translation' | 'similarity' | 'affine';
 export type RejectionAlgo = 'none' | 'sigma' | 'winsorized_sigma';
 export type StackWeighting = 'none' | 'noise' | 'quality';
 export type CalibrationKind = 'dark' | 'flat' | 'bias' | 'dark_flat';
+export type QualityFilter = 'off' | 'lenient' | 'moderate' | 'strict';
 
 export interface StackSettings {
   registrationTransform: RegistrationTransform;
@@ -496,6 +497,19 @@ export interface StackSettings {
   rejectionAlgo: RejectionAlgo;
   weighting: StackWeighting;
   cosmeticCorrection: boolean;
+  qualityFilter: QualityFilter;
+}
+
+export interface FrameQuality {
+  starCount: number;
+  fwhm: number;
+  roundness: number;
+  background: number;
+  snr: number;
+  score: number; // 0..100
+  weight: number;
+  accepted: boolean;
+  rejectReason: string | null; // "clouds" | "soft" | "trailed" | "bright_sky"
 }
 
 export interface CalibrationFrameCounts {
@@ -529,11 +543,13 @@ export interface StackFrameInfo {
   index: number;
   thumbUrl: string;
   excluded: boolean;
+  quality: FrameQuality | null;
 }
 
 export interface StackStatistics {
   framesStacked: number;
   framesExcluded: number;
+  framesAutoRejected: number;
   combinationMethod: string;
   registrationTransform: string;
   registrationRmsPx: number | null;

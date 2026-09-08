@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
+import cv2
 import numpy as np
 import pytest
 
@@ -158,6 +159,66 @@ def test_process_rejects_mismatched_dimensions(
 def test_unknown_stack_raises(stacking: StackingService) -> None:
     with pytest.raises(ResourceNotFoundError):
         stacking.process("no-such-stack")
+
+
+def test_quality_filter_auto_rejects_a_cloudy_frame(
+    stacking: StackingService, star_field: np.ndarray
+) -> None:
+    """A dim, star-poor sub is dropped by the moderate quality filter and the
+    per-frame report explains why."""
+    record = stacking.initiate(
+        InitiateStackRequest(frame_count=5, quality_filter="moderate")
+    )
+    for i, frame in enumerate(_shifted_frames(star_field, 5)):
+        stacking.add_frame(record.stack_id, i, frame)
+    stacking.add_frame(record.stack_id, 5, _frame(cv2.GaussianBlur(star_field, (0, 0), 3)))
+
+    done = stacking.process(record.stack_id)
+
+    assert done.result is not None
+    assert done.result["frames_auto_rejected"] == 1
+    assert done.result["frames_stacked"] == 5
+    report = done.quality_report["frames"]
+    rejected = [f for f in report if not f["accepted"]]
+    assert [f["index"] for f in rejected] == [5]
+    assert rejected[0]["reject_reason"] in {"clouds", "soft", "bright_sky"}
+
+
+def test_rescued_frame_survives_the_next_run(
+    stacking: StackingService, star_field: np.ndarray
+) -> None:
+    record = stacking.initiate(
+        InitiateStackRequest(frame_count=5, quality_filter="moderate")
+    )
+    for i, frame in enumerate(_shifted_frames(star_field, 5)):
+        stacking.add_frame(record.stack_id, i, frame)
+    # a hazy sub: bright sky, but the stars are still sharp enough to register
+    hazy = cv2.addWeighted(star_field, 0.6, np.full_like(star_field, 90), 0.4, 0)
+    stacking.add_frame(record.stack_id, 5, _frame(hazy))
+    first = stacking.process(record.stack_id)
+    assert first.result["frames_auto_rejected"] == 1
+
+    stacking.set_frame_excluded(record.stack_id, 5, excluded=False)  # rescue it
+    assert stacking._get(record.stack_id).included_frames == [5]
+
+    done = stacking.process(record.stack_id)
+    assert done.result is not None
+    assert done.result["frames_auto_rejected"] == 0
+    assert done.result["frames_stacked"] == 6
+
+
+def test_quality_filter_off_keeps_every_frame(
+    stacking: StackingService, star_field: np.ndarray
+) -> None:
+    record = stacking.initiate(InitiateStackRequest(frame_count=5, quality_filter="off"))
+    for i, frame in enumerate(_shifted_frames(star_field, 5)):
+        stacking.add_frame(record.stack_id, i, frame)
+    stacking.add_frame(record.stack_id, 5, _frame(cv2.GaussianBlur(star_field, (0, 0), 3)))
+
+    done = stacking.process(record.stack_id)
+    assert done.result is not None
+    assert done.result["frames_auto_rejected"] == 0
+    assert all("score" in f for f in done.quality_report["frames"])  # still scored
 
 
 def test_process_calibrates_when_darks_and_flats_are_present(
