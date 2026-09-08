@@ -109,7 +109,7 @@ describe('EditorInspector', () => {
     expect(screen.getByText(/stacked composite/i)).toBeInTheDocument();
   });
 
-  it('toggles the star mask from the stars step', () => {
+  it('groups reduce, remove and detection on the stars step', () => {
     const onToggle = vi.fn();
     render(
       <EditorInspector
@@ -120,23 +120,28 @@ describe('EditorInspector', () => {
       />,
     );
 
+    // reduce + remove + detection sliders all live in the one step
+    expect(screen.getByLabelText('Star reduction')).toBeInTheDocument();
+    expect(screen.getByLabelText('Remove stars')).toBeInTheDocument();
+    expect(screen.getByLabelText('Bring stars back')).toBeInTheDocument();
+    expect(screen.getByLabelText('Star sensitivity')).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole('checkbox', { name: /show star mask/i }));
     expect(onToggle).toHaveBeenCalledWith(true);
   });
 
-  it('shows the star removal sliders on the starless step', () => {
-    render(<EditorInspector {...makeProps({ activeStep: 'starless' })} />);
-
-    expect(screen.getByLabelText('Remove stars')).toBeInTheDocument();
-    expect(screen.getByLabelText('Bring stars back')).toBeInTheDocument();
-  });
-
-  it('routes the header Reset on the starless step to its own params', () => {
+  it('routes the header Reset on the stars step across all of its params', () => {
     const onResetSection = vi.fn();
-    render(<EditorInspector {...makeProps({ activeStep: 'starless', onResetSection })} />);
+    render(<EditorInspector {...makeProps({ activeStep: 'stars', onResetSection })} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
-    expect(onResetSection).toHaveBeenCalledWith(['starRemoval', 'starRecombine']);
+    expect(onResetSection).toHaveBeenCalledWith([
+      'starReduction',
+      'starRemoval',
+      'starRecombine',
+      'starSensitivity',
+      'starMaxSize',
+    ]);
   });
 
   it('opens the Depth Shift viewer from the depth step', () => {

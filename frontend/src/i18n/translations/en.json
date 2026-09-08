@@ -87,7 +87,6 @@
       "colour": "Colour",
       "detail": "Detail",
       "stars": "Stars",
-      "starless": "Star removal",
       "depth": "Depth",
       "export": "Export"
     },
@@ -115,10 +114,7 @@
         "help": "Local texture: micro-contrast, noise reduction, and sharpening. Do this after tone and colour are settled."
       },
       "stars": {
-        "help": "Detect individual stars and shrink them so faint nebulosity stands out. Use the mask to check detection first."
-      },
-      "starless": {
-        "help": "Separate the stars from the nebula. Raise Remove to pull them out, then the sliders in every step act on the nebula alone; Bring stars back screen-blends them in at the end. Drag Bring stars back to 0 to see the pure starless image."
+        "help": "Two ways to handle stars: shrink them where they are, or lift them out entirely so the rest of your edit only touches the nebula."
       },
       "depth": {
         "help": "Pick the focal point, then open the Depth Shift viewer for an interactive parallax preview."
@@ -274,7 +270,7 @@
       },
       "starRemoval": {
         "label": "Remove stars",
-        "hint": "Pulls the stars out so every other adjustment works on the nebula alone. Detection uses the sensitivity and max size from the Stars step."
+        "hint": "Pulls the stars out so every other adjustment works on the nebula alone."
       },
       "starRecombine": {
         "label": "Bring stars back",
@@ -300,6 +296,20 @@
         "label": "Tint",
         "hint": "White balance: shifts the colour cast between green and magenta."
       }
+    }
+  },
+  "stars_panel": {
+    "reduce": {
+      "heading": "Reduce",
+      "help": "Shrinks each star where it is. Fast, every star kept - reach for this when you just want a tighter field."
+    },
+    "remove": {
+      "heading": "Remove (starless)",
+      "help": "Lifts the stars out so every other step only touches the nebula, then Bring stars back fades them in at the end (0 = keep the image starless). Slower, but lets you stretch and sharpen the nebula without bloating stars."
+    },
+    "detection": {
+      "heading": "Detection",
+      "help": "What counts as a star. Both Reduce and Remove use these. Turn on the mask to check before committing."
     }
   },
   "histogram": {

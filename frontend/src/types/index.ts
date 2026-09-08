@@ -246,9 +246,9 @@ export const PARAMETER_BOUND_BY_KEY: Partial<Record<SliderParameterKey, Paramete
  * The editor workflow, in retouching order. This mirrors the backend pipeline
  * order in `app/services/image_processing.py::apply_parameters`: geometry first,
  * then white balance and background corrections, then tone, curves, colour,
- * detail, star reduction, then star removal (which actually splits the pipeline
- * back-end - see that method). The rail, the inspector panel switch, and the
- * "modified" dots all derive from this one list.
+ * detail, then stars (reduce in place, or remove entirely - `star_removal`
+ * splits the backend pipeline; see that method). The rail, the inspector panel
+ * switch, and the "modified" dots all derive from this one list.
  *
  * `start` and `export` are workflow brackets (no step number): a one-click
  * starting point, and getting the result out.
@@ -262,13 +262,12 @@ export type EditorStepId =
   | 'colour'
   | 'detail'
   | 'stars'
-  | 'starless'
   | 'depth'
   | 'export';
 
 export interface EditorStep {
   id: EditorStepId;
-  /** Position in the workflow (1-9), or null for the start/export brackets. */
+  /** Position in the workflow (1-8), or null for the start/export brackets. */
   number: number | null;
   /** Slider parameters shown in this step's panel, in display order. */
   params: SliderParameterKey[];
@@ -290,9 +289,15 @@ export const EDITOR_STEPS: EditorStep[] = [
   { id: 'curves', number: 4, params: [] },
   { id: 'colour', number: 5, params: ['saturation', 'vibrance'] },
   { id: 'detail', number: 6, params: ['clarity', 'denoise', 'chromaDenoise', 'sharpness'] },
-  { id: 'stars', number: 7, params: ['starReduction', 'starSensitivity', 'starMaxSize'] },
-  { id: 'starless', number: 8, params: ['starRemoval', 'starRecombine'] },
-  { id: 'depth', number: 9, params: [] },
+  {
+    id: 'stars',
+    number: 7,
+    // Reduce (shrink in place), remove (starless split + recombine), and the
+    // shared detection controls - all rendered as one grouped panel, see
+    // EditorInspector's StarsPanel.
+    params: ['starReduction', 'starRemoval', 'starRecombine', 'starSensitivity', 'starMaxSize'],
+  },
+  { id: 'depth', number: 8, params: [] },
   { id: 'export', number: null, params: [] },
 ];
 

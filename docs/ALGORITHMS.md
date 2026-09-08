@@ -239,18 +239,17 @@ default 0 = off); detection reuses `star_sensitivity` / `star_max_size`.
 1. Detect stars with `StarDetectionService.detect` (the same per-star detector
    star reduction and the mask-preview endpoint use), at native resolution.
 2. Build the starless *estimate* - what the nebulosity looks like with the stars
-   gone - by **opening by reconstruction**: erode each channel, then geodesic-
-   dilate the result back under the original (`skimage.morphology.reconstruction`).
-   This removes every bright feature smaller than the erosion element while
-   keeping the exact level and shape of everything larger, so it follows the
-   nebula's own gradient inward with no plateau or ring - unlike a plain opening
-   (flat plateaus) or an inpaint fill (which fills from the mask boundary and,
-   on a real photo, left dark halo rings around the brighter stars). Runs per
-   channel on a 640 px downscaled copy then resized up: the nebula under a star
-   is low-frequency (same reasoning as gradient reduction's estimate), and a
-   full-res geodesic reconstruction at 24 MP would cost seconds. The erosion
-   element scales with `star_max_size`, so features larger than the biggest
-   allowed star - a galaxy core, a bright nebula knot - are preserved intact.
+   gone - with **two passes of a median blur** on a downscaled copy (~520 px),
+   the window sized past `star_max_size` (so features larger than the biggest
+   allowed star - a galaxy core, a bright nebula knot - survive as they should).
+   A median window rejects a star as an outlier even where stars crowd a big
+   fraction of it, so it holds up on a dense Milky Way field; a morphological
+   opening / geodesic reconstruction was tried first and left a blotchy mesh of
+   star-blob remnants there, and a `cv2.inpaint` fill (tried before that) left
+   dark halo rings around the brighter stars because it fills from the mask
+   boundary. The estimate is deliberately smooth and low-frequency - it only
+   ever fills the feathered star mask, where there is no real signal to
+   preserve.
 3. Draw each detected star into a mask as a circle `3x` its measured radius
    (min 4 px) - generous, because the estimate under the mask *is* the
    surrounding nebula continued inward, so an oversized mask only softens the
@@ -280,14 +279,18 @@ before the split. Everything creative runs on the starless image. `star_reductio
 keeps its slot in the creative stages and is a natural no-op once the stars are
 gone.
 
-**Known ceiling** (confirmed on real photos - NGC 281, the Pelican, M31): small
-and medium stars clear cleanly with no ring, and galaxy/nebula cores are
-preserved. A frame's few brightest, near-saturated stars survive as a small
-core or leave a faint coloured halo where the white centre was removed but the
-outer glow was not - classical reconstruction fills from the neighbourhood and
-has no model of what a star sits on top of. Faint stars below the sensitivity
-threshold also remain. Good enough to work starless; this gap is exactly where
-a trained model wins, and why the ONNX path (below) stays on the list.
+**Known ceiling** (confirmed on real photos - NGC 281, the Pelican, M31, M74,
+IC 342, NGC 7000, the Bubble): a nebula or galaxy over a normal star field comes
+out clean - structure and cores preserved, small/medium stars gone with no ring.
+The limits: (a) a frame's few brightest, near-saturated stars survive as a small
+core or a faint coloured halo (the white centre goes, the outer glow doesn't);
+(b) faint stars below the sensitivity threshold stay; (c) a **dense Milky Way
+star field** (thousands of overlapping faint stars, e.g. the Cassiopeia region
+around the Bubble) leaves a soft mottled texture where it was - there is no real
+"between the stars" for the estimate to reconstruct. Classical removal fills
+from the neighbourhood and has no model of what a star sits on top of; this is
+exactly where a trained model wins, and why the ONNX path (below) stays on the
+list.
 
 **ONNX quality path - evaluated, deferred (2026-09-07).** The roadmap paired the
 classical path with "an ONNX StarNet-style model (quality path)". Findings:

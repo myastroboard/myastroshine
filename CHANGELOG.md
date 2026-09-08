@@ -8,17 +8,21 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Star removal (starless): a new **Star removal** step in the editor separates
-  the stars from the nebulosity. Raise **Remove stars** and the pipeline splits
-  - the stars are pulled out right after the background corrections, every
-  creative adjustment (tone, curves, colour, detail) then works on the nebula
-  alone, and **Bring stars back** screen-blends the stars in at the end (0 keeps
-  the image starless, 100 restores them full strength). Detection reuses the
-  Stars step's sensitivity / max-size. The reconstruction is classical
-  (`cv2.inpaint` near the mask edges, a smooth background estimate inside large
-  footprints) - no ML model or new dependency; an ONNX StarNet-style quality
-  path was evaluated and deferred (weights licensing / unproven models - see
-  `docs/ALGORITHMS.md` "Star removal (starless)").
+- Star removal (starless): the editor's **Stars** step now offers two ways to
+  handle stars, grouped and explained side by side - **Reduce** (shrink each
+  star in place, the existing control) and **Remove**. Raise **Remove stars**
+  and the pipeline splits: the stars are pulled out right after the background
+  corrections, every creative adjustment (tone, curves, colour, detail) then
+  works on the nebula alone, and **Bring stars back** screen-blends them in at
+  the end (0 keeps the image starless, 100 restores them full strength).
+  Detection (sensitivity / max size, mask preview) is shared by both. The
+  reconstruction is classical - a median-blur estimate on a downscaled copy,
+  sized so galaxy and nebula cores are preserved - with no ML model and no new
+  dependency (it also let `scikit-image`, unused since the v0.2 star-detection
+  rebuild, be dropped). An ONNX StarNet-style quality path was evaluated and
+  deferred (weights licensing / unproven models - see `docs/ALGORITHMS.md`
+  "Star removal (starless)"); a very dense Milky Way star field is the known
+  limit of the classical method.
 - Edit milestones: a timeline under the preview where you can save the current
   adjustments (sliders, curves, framing, and the Depth Shift focal point) as a
   checkpoint and click back to it if you push an edit too far. The first
@@ -49,6 +53,12 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   in a single card.
 - New application logo: the header now shows the MyAstroShine icon, and the
   browser-tab favicon is a matching amber-star-and-orbit mark.
+
+### Removed
+
+- `scikit-image` is no longer a dependency - it had been unused since the v0.2
+  star-detection rebuild switched off `skimage.feature.blob_dog`, and the new
+  star-removal estimate is pure OpenCV.
 
 ## [0.2.0] - 2026-09-06
 
