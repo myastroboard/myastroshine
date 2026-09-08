@@ -11,7 +11,13 @@ import rawpy
 
 from app.exceptions import UnsupportedImageError
 from app.utils import linear_ingest
-from app.utils.linear_ingest import LinearFrame, debayer_rgb, ingest_frame, to_display_bgr
+from app.utils.linear_ingest import (
+    LinearFrame,
+    debayer_rgb,
+    ingest_frame,
+    stretch_composite_bgr,
+    to_display_bgr,
+)
 
 
 def _fits_bytes(data: np.ndarray, **header: object) -> bytes:
@@ -349,3 +355,33 @@ def test_debayer_rgb_leaves_an_unrecognised_pattern_alone() -> None:
     mosaic = np.full((16, 16), 0.2, dtype=np.float32)
     frame = LinearFrame(data=mosaic, is_cfa=True, bayer_pattern="XYZW")
     assert debayer_rgb(frame) is frame
+
+
+def test_stretch_composite_bgr_lifts_faint_signal_and_keeps_colour() -> None:
+    """A linear composite (signal ~1% of the range) becomes a visible, neutral
+    BGR frame - one shared stretch, not a per-channel one."""
+    rng = np.random.default_rng(4)
+    h, w = 200, 160
+    sky = 0.008 + rng.normal(0, 0.0004, (h, w, 3)).astype(np.float32)
+    sky[80:120, 60:100] += 0.01  # a faint "nebula" patch
+    sky[:, :, 0] += 0.002  # a red cast the neutralisation should remove
+
+    bgr = stretch_composite_bgr(sky, max_size=4096)
+
+    assert bgr.shape == (h, w, 3)
+    assert bgr.dtype == np.uint8
+    assert int(np.median(bgr)) < 90  # background stays dark, not lifted to mid-grey
+    patch = bgr[80:120, 60:100].mean()
+    background = bgr[:40, :40].mean()
+    assert patch > background + 15  # the faint patch is now clearly brighter
+    # background neutral: channel means within a tight spread despite the red cast
+    ch = bgr[:40, :40].reshape(-1, 3).mean(axis=0)
+    assert float(ch.max() - ch.min()) < 12
+
+
+def test_stretch_composite_bgr_handles_a_nan_rotation_wedge() -> None:
+    data = np.full((60, 60, 3), 0.01, dtype=np.float32)
+    data[:, :20] = np.nan  # unregistered edge
+    out = stretch_composite_bgr(data)
+    assert out.shape == (60, 60, 3)
+    assert np.isfinite(out).all()

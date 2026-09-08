@@ -211,6 +211,23 @@ def test_process_with_calibration_marks_the_result_calibrated(
     assert processed["statistics"]["calibrated"] is True
 
 
+def test_process_post_processes_the_composite_by_default(client, star_field: np.ndarray) -> None:
+    init = client.post("/api/stack/initiate", json={"frame_count": 3})
+    stack_id = init.json()["stack_id"]
+    for i in range(3):
+        client.post(
+            f"/api/stack/{stack_id}/upload-frame",
+            data={"frame_index": str(i)},
+            files={"file": (f"f{i}.png", png_bytes(translate(star_field, i, -i)), "image/png")},
+        )
+
+    done = client.post(f"/api/stack/{stack_id}/process").json()
+    assert done["statistics"]["post_processed"] is True
+
+    off = client.post(f"/api/stack/{stack_id}/process", json={"post_process": False}).json()
+    assert off["statistics"]["post_processed"] is False
+
+
 def test_process_reports_per_frame_quality(client, star_field: np.ndarray) -> None:
     """Every frame in the result carries its quality metrics; a soft sub is flagged."""
     import cv2

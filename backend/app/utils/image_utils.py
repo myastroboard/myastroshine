@@ -66,33 +66,57 @@ def _solve_midtone_balance(background: float, target: float) -> float:
     return float(np.clip((background * (target - 1.0)) / denom, *_MTF_BALANCE_RANGE))
 
 
-def _auto_stretch_to_uint8(data: np.ndarray) -> np.ndarray:
-    """Map one plane of linear scientific/sensor data (any numeric dtype) to uint8."""
-    finite = data[np.isfinite(data)]
+def _stretch_params(
+    plane: np.ndarray,
+    target_background: float = _STRETCH_TARGET_BACKGROUND,
+    shadow_clip: float = _STRETCH_SHADOW_CLIP_SIGMA,
+) -> tuple[float, float, float, float] | None:
+    """The (low, high, black_point, midtone) an auto-stretch of ``plane`` would use.
+
+    Returned separately from :func:`_apply_stretch` so a colour image can derive
+    one transform from its luminance and apply it to every channel (keeping the
+    colour balance) instead of stretching each channel on its own. A deep stack
+    passes a lower ``target_background`` / harder ``shadow_clip`` so its read
+    noise is not lifted out of the shadows.
+    """
+    finite = plane[np.isfinite(plane)]
     if finite.size == 0:
-        return np.zeros(data.shape, dtype=np.uint8)
+        return None
     low, high = np.percentile(finite, [_STRETCH_PERCENTILE_LOW, _STRETCH_PERCENTILE_HIGH])
     if high <= low:
-        return np.zeros(data.shape, dtype=np.uint8)
-
-    # nan_to_num after the clip: blank/masked pixels (FITS BLANK, the NaN edges
-    # of a registered stack, dead pixels) map to black rather than poisoning the
-    # median / MAD / background below - a single NaN there is NaN, which would
-    # otherwise cascade and blank the whole plane. (clip already bounds +/-inf.)
-    normalized = np.nan_to_num(np.clip((data.astype(np.float64) - low) / (high - low), 0, 1))
+        return None
+    normalized = np.nan_to_num(np.clip((plane.astype(np.float64) - low) / (high - low), 0, 1))
     median = float(np.median(normalized))
     sigma = float(np.median(np.abs(normalized - median))) * _MAD_TO_SIGMA
-    black_point = max(0.0, median - _STRETCH_SHADOW_CLIP_SIGMA * sigma)
+    black_point = max(0.0, median - shadow_clip * sigma)
     clipped = np.clip((normalized - black_point) / max(1e-6, 1.0 - black_point), 0, 1)
-
     background = float(np.median(clipped))
-    stretched: np.ndarray
-    if background <= 0:
-        stretched = clipped
-    else:
-        balance = _solve_midtone_balance(background, _STRETCH_TARGET_BACKGROUND)
-        stretched = _midtone_transfer(clipped, balance)
+    balance = (
+        _solve_midtone_balance(background, target_background)
+        if background > 0
+        else _MTF_NEUTRAL_MIDTONE
+    )
+    return float(low), float(high), black_point, balance
+
+
+def _apply_stretch(data: np.ndarray, params: tuple[float, float, float, float]) -> np.ndarray:
+    """Apply a :func:`_stretch_params` result to a plane -> uint8."""
+    low, high, black_point, balance = params
+    # nan_to_num after the clip: blank/masked pixels (FITS BLANK, the NaN edges
+    # of a registered stack, dead pixels) map to black rather than poisoning the
+    # result. (clip already bounds +/-inf.)
+    normalized = np.nan_to_num(np.clip((data.astype(np.float64) - low) / (high - low), 0, 1))
+    clipped = np.clip((normalized - black_point) / max(1e-6, 1.0 - black_point), 0, 1)
+    stretched = _midtone_transfer(clipped, balance)
     return np.clip(stretched * 255.0, 0, 255).astype(np.uint8)
+
+
+def _auto_stretch_to_uint8(data: np.ndarray) -> np.ndarray:
+    """Map one plane of linear scientific/sensor data (any numeric dtype) to uint8."""
+    params = _stretch_params(data)
+    if params is None:
+        return np.zeros(data.shape, dtype=np.uint8)
+    return _apply_stretch(data, params)
 
 
 def _decode_fits(data: bytes) -> np.ndarray:

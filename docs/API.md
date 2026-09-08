@@ -421,8 +421,8 @@ registers by asterism matching, normalises to the reference, and combines with
 sigma rejection and weighting, all in bounded memory. See docs/ALGORITHMS.md.
 
 1. `POST /stack/initiate` `{ frame_count, registration_transform?, combination_method?,
-   rejection_algo?, weighting?, cosmetic_correction?, quality_filter? }` -> `202
-   { stack_id, status: "waiting_for_frames", frame_count, received_frames }`.
+   rejection_algo?, weighting?, cosmetic_correction?, quality_filter?, post_process? }`
+   -> `202 { stack_id, status: "waiting_for_frames", frame_count, received_frames }`.
    - `registration_transform`: `translation` / `similarity` (default) / `affine`
    - `combination_method`: `average` (default) / `median`
    - `rejection_algo`: `none` / `sigma` / `winsorized_sigma` (default)
@@ -431,6 +431,9 @@ sigma rejection and weighting, all in bounded memory. See docs/ALGORITHMS.md.
      (from the master dark/flat) with a neighbour median
    - `quality_filter`: `off` / `lenient` / `moderate` (default) / `strict` -
      auto-reject strength for the per-frame quality scorer
+   - `post_process`: bool (default `true`) - crop the field-rotation wedge,
+     subtract a low-order background gradient, and neutralise / balance the
+     colour of the composite before it opens in the editor
 2. `POST /stack/{stack_id}/upload-frame` (multipart: `frame_index`, `file`) ->
    `202 { frame_index, received_frames, frame_count, status }`. `status` becomes
    `"ready"` once every frame is in.
@@ -456,7 +459,7 @@ sigma rejection and weighting, all in bounded memory. See docs/ALGORITHMS.md.
    sub of that kind and any master derived from it.
 9. `POST /stack/{stack_id}/process` runs the pipeline synchronously and returns
    `200`. An optional body `{ registration_transform?, combination_method?,
-   rejection_algo?, weighting?, cosmetic_correction?, quality_filter? }` re-stacks
+   rejection_algo?, weighting?, cosmetic_correction?, quality_filter?, post_process? }` re-stacks
    with a changed setting - no re-upload, each run makes a fresh composite session:
 
 ```json
@@ -468,7 +471,8 @@ sigma rejection and weighting, all in bounded memory. See docs/ALGORITHMS.md.
   "statistics": {
     "frames_stacked": 46, "frames_excluded": 4, "frames_auto_rejected": 2,
     "combination_method": "average", "registration_transform": "similarity",
-    "snr_improvement": 6.78, "measured_noise_reduction": 5.1, "calibrated": true
+    "snr_improvement": 6.78, "measured_noise_reduction": 5.1, "calibrated": true,
+    "post_processed": true
   },
   "frames": [{ "index": 0, "thumb_url": "/api/stack/.../frame/0/thumb", "excluded": false,
     "quality": { "star_count": 1180, "fwhm": 2.8, "roundness": 0.86, "background": 0.008,

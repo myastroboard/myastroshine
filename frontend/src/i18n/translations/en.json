@@ -456,7 +456,8 @@
       "alignment_rms": "Alignment residual",
       "calibrated": "Calibration",
       "calibrated_yes": "Applied",
-      "frames_auto_rejected": "Auto-rejected"
+      "frames_auto_rejected": "Auto-rejected",
+      "post_processed": "Cleaned up"
     },
     "settings": {
       "transform_label": "Alignment",
@@ -488,7 +489,9 @@
         "lenient": "Lenient",
         "moderate": "Moderate",
         "strict": "Strict"
-      }
+      },
+      "post_process_label": "Clean up the composite",
+      "post_process_hint": "Crop the field-rotation edges, flatten the sky gradient and neutralise the colour before the editor."
     },
     "upload_zone": {
       "add_frames": "Add frames",

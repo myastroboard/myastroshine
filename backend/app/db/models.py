@@ -116,6 +116,9 @@ class StackRecord(Base):
     cosmetic_correction: Mapped[bool] = mapped_column(default=True)
     #: auto-reject strength for per-frame quality (off/lenient/moderate/strict).
     quality_filter: Mapped[str] = mapped_column(String(12), default="moderate")
+    #: post-stack cleanup on the composite (crop the rotation wedge, remove the
+    #: background gradient, neutralise + balance the colour) before the editor.
+    post_process: Mapped[bool] = mapped_column(default=True)
     #: frame indices the user has manually excluded (a trail, a cloud, ...).
     excluded_frames: Mapped[list[int]] = mapped_column(JSON, default=list)
     #: frame indices the user has manually rescued from the quality auto-reject.

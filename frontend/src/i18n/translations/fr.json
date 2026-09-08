@@ -456,7 +456,8 @@
       "alignment_rms": "Résidu d'alignement",
       "calibrated": "Calibration",
       "calibrated_yes": "Appliquée",
-      "frames_auto_rejected": "Rejetées auto"
+      "frames_auto_rejected": "Rejetées auto",
+      "post_processed": "Nettoyé"
     },
     "settings": {
       "transform_label": "Alignement",
@@ -488,7 +489,9 @@
         "lenient": "Souple",
         "moderate": "Modéré",
         "strict": "Strict"
-      }
+      },
+      "post_process_label": "Nettoyer le composite",
+      "post_process_hint": "Rogne les bords de rotation de champ, aplanit le gradient de ciel et neutralise la couleur avant l'éditeur."
     },
     "upload_zone": {
       "add_frames": "Ajouter des images",

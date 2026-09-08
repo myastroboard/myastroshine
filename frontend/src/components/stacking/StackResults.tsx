@@ -44,6 +44,12 @@ export function StackResults({ result, onEnhance, onDownload }: StackResultsProp
           string,
         ][])
       : []),
+    ...(stats.postProcessed
+      ? ([[t('stacking.results.post_processed'), t('stacking.results.calibrated_yes')]] as [
+          string,
+          string,
+        ][])
+      : []),
     [t('stacking.results.snr_improvement'), `${stats.snrImprovement.toFixed(2)}x`],
     ...(stats.measuredNoiseReduction != null
       ? ([
