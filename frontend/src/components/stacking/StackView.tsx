@@ -4,6 +4,7 @@ import { useServerConfig } from '@/hooks/useServerConfig';
 import { useStackProcessing } from '@/hooks/useStackProcessing';
 import { useStackSettings } from '@/hooks/useStackSettings';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useWatchStack } from '@/hooks/useWatchStack';
 import { apiClient } from '@/services/api';
 
 import { StackCalibrationPanel } from './StackCalibrationPanel';
@@ -52,6 +53,7 @@ export function StackView({ onEnhanceComposite, onWorkingChange }: StackViewProp
     clearCalibrationKind,
     select,
     stack,
+    attachToStack,
     reset,
   } = useStackProcessing(settings, stackingMaxFrames);
 
@@ -60,6 +62,7 @@ export function StackView({ onEnhanceComposite, onWorkingChange }: StackViewProp
   const inEditor = phase === 'reviewing' || phase === 'processing' || phase === 'done';
   const busy = phase === 'processing';
   const hasWork = phase !== 'collecting' || pending.length > 0;
+  const watchStack = useWatchStack(!inEditor && pending.length === 0);
   const selectedFrame = uploaded.find((frame) => frame.index === selected) ?? null;
   const excludedCount = uploaded.filter((frame) => frame.excluded).length;
   const calibrationCount = Object.values(calibration.frames).reduce((sum, n) => sum + n, 0);
@@ -111,6 +114,25 @@ export function StackView({ onEnhanceComposite, onWorkingChange }: StackViewProp
   if (!inEditor && phase !== 'uploading') {
     return (
       <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
+        {watchStack && (
+          <button
+            type="button"
+            onClick={() => attachToStack(watchStack)}
+            className="panel flex items-center justify-between gap-3 text-left transition-colors hover:border-accent/40"
+          >
+            <span className="flex flex-col gap-0.5">
+              <span className="text-sm font-medium text-ink">
+                {t('stacking.watch.title')}
+              </span>
+              <span className="text-xs text-muted">
+                {t(`stacking.watch.status.${watchStack.status}`, {
+                  count: watchStack.frames.length,
+                })}
+              </span>
+            </span>
+            <span className="btn btn-outline btn-sm shrink-0">{t('stacking.watch.open')}</span>
+          </button>
+        )}
         <StackUploadZone
           compact={pending.length > 0}
           maxSizeMb={maxImageSizeMb}
@@ -234,6 +256,14 @@ export function StackView({ onEnhanceComposite, onWorkingChange }: StackViewProp
       </div>
 
       <div className="flex flex-col gap-4">
+        {busy && (
+          <StackProgress
+            percent={progress.percent}
+            currentStep={progress.step}
+            detail={progress.detail}
+          />
+        )}
+
         {step === 'frames' && (
           <div className="panel flex flex-col gap-3">
             <p className="text-xs text-muted">
@@ -298,6 +328,7 @@ export function StackView({ onEnhanceComposite, onWorkingChange }: StackViewProp
           {busy && (
             <p className="absolute inset-x-0 bottom-3 text-center text-xs text-white/80">
               {t('stacking.view.stacking_button')} {progress.percent}%
+              {progress.detail ? ` · ${progress.detail}` : ''}
             </p>
           )}
         </div>

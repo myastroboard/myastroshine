@@ -21,7 +21,7 @@ from celery import Celery
 from celery.signals import setup_logging, worker_init
 
 from app.config import get_settings
-from app.constants import SESSION_CLEANUP_INTERVAL_SECONDS
+from app.constants import SESSION_CLEANUP_INTERVAL_SECONDS, STACK_WATCH_INTERVAL_SECONDS
 from app.logging_config import apply_runtime_log_levels, configure_logging
 
 _settings = get_settings()
@@ -62,6 +62,10 @@ celery_app.conf.update(
         "cleanup-expired-sessions": {
             "task": "myastroshine.cleanup_sessions",
             "schedule": timedelta(seconds=SESSION_CLEANUP_INTERVAL_SECONDS),
+        },
+        "watch-stacking-folder": {
+            "task": "myastroshine.watch_stacking_folder",
+            "schedule": timedelta(seconds=STACK_WATCH_INTERVAL_SECONDS),
         },
     },
 )

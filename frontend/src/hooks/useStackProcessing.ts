@@ -33,6 +33,8 @@ export interface PendingFrame {
 export interface StackProgressState {
   percent: number;
   step: string;
+  /** e.g. "340/1066" - which frame the current step is on. */
+  detail?: string;
 }
 
 function chunk<T>(items: T[], size: number): T[][] {
@@ -64,8 +66,17 @@ export function useStackProcessing(settings: StackSettings, maxFrames: number) {
   const [calibration, setCalibration] = useState<CalibrationSummary>(EMPTY_CALIBRATION);
   const stackIdRef = useRef<string | null>(null);
   const wsRef = useRef<WebSocketClient | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => () => wsRef.current?.disconnect(), []);
+  useEffect(
+    () => () => {
+      wsRef.current?.disconnect();
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+      }
+    },
+    [],
+  );
 
   const activeCount = uploaded.filter((frame) => !frame.excluded).length;
 
@@ -195,7 +206,11 @@ export function useStackProcessing(settings: StackSettings, maxFrames: number) {
     const ws = stackStatusClient(jobId);
     wsRef.current = ws;
     ws.onStatusUpdate((status) => {
-      setProgress({ percent: status.progressPercent, step: status.currentStep });
+      setProgress({
+        percent: status.progressPercent,
+        step: status.currentStep,
+        detail: status.detail,
+      });
       if (TERMINAL.has(status.status)) {
         ws.disconnect();
         wsRef.current = null;
@@ -214,6 +229,66 @@ export function useStackProcessing(settings: StackSettings, maxFrames: number) {
     });
     ws.connect();
   }, []);
+
+  /** Poll a running stack that we have no job id for (a folder-watch auto-run). */
+  const pollUntilDone = useCallback((stackId: string) => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+    }
+    pollRef.current = setInterval(() => {
+      void apiClient
+        .getStack(stackId)
+        .then((snapshot) => {
+          if (!TERMINAL.has(snapshot.status)) {
+            return;
+          }
+          if (pollRef.current) {
+            clearInterval(pollRef.current);
+            pollRef.current = null;
+          }
+          setResult(snapshot);
+          setUploaded(snapshot.frames);
+          if (snapshot.calibration) {
+            setCalibration(snapshot.calibration);
+          }
+          setProgress({ percent: 100, step: 'done' });
+          setPhase(snapshot.status === 'completed' ? 'done' : 'reviewing');
+        })
+        .catch(() => undefined);
+    }, 3000);
+  }, []);
+
+  /** Open an existing stack (a folder-watch session) instead of collecting new frames. */
+  const attachToStack = useCallback(
+    (snapshot: StackResult) => {
+      wsRef.current?.disconnect();
+      wsRef.current = null;
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+      stackIdRef.current = snapshot.stackId;
+      setError(null);
+      setPending([]);
+      setUploaded(snapshot.frames);
+      setSelected(null);
+      setResult(snapshot);
+      if (snapshot.calibration) {
+        setCalibration(snapshot.calibration);
+      }
+      if (snapshot.status === 'completed') {
+        setProgress({ percent: 100, step: 'done' });
+        setPhase('done');
+      } else if (snapshot.status === 'processing') {
+        setProgress({ percent: 0, step: 'registration' });
+        setPhase('processing');
+        pollUntilDone(snapshot.stackId);
+      } else {
+        setPhase('reviewing');
+      }
+    },
+    [pollUntilDone],
+  );
 
   const stack = useCallback(async () => {
     const stackId = stackIdRef.current;
@@ -249,6 +324,10 @@ export function useStackProcessing(settings: StackSettings, maxFrames: number) {
   const reset = useCallback(() => {
     wsRef.current?.disconnect();
     wsRef.current = null;
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
     stackIdRef.current = null;
     setPhase('collecting');
     setPending([]);
@@ -278,6 +357,7 @@ export function useStackProcessing(settings: StackSettings, maxFrames: number) {
     clearCalibrationKind,
     select: selectFrame,
     stack,
+    attachToStack,
     reset,
   };
 }

@@ -7,6 +7,7 @@ state. Subscribing (from the async WebSocket handler) uses ``redis.asyncio``.
 
 from __future__ import annotations
 
+import contextlib
 import json
 from collections.abc import AsyncIterator
 
@@ -27,12 +28,22 @@ def channel(job_id: str) -> str:
     return f"{_CHANNEL_PREFIX}{job_id}"
 
 
-# set once Redis proves unreachable, so we stop retrying it every step
-_state = {"publish_disabled": False}
+class _Publisher:
+    """Module-wide state on an instance, so helpers never need ``global``.
+
+    ``disabled`` is set once Redis proves unreachable (stop retrying every step);
+    ``client`` is a reused connection - a 1000-frame stack emits hundreds of events.
+    """
+
+    disabled: bool = False
+    client: redis.Redis | None = None
+
+
+_pub = _Publisher()
 
 
 def _enabled() -> bool:
-    return get_settings().processing_mode == "queue" and not _state["publish_disabled"]
+    return get_settings().processing_mode == "queue" and not _pub.disabled
 
 
 def publish(job_id: str, event: JsonDict) -> None:
@@ -40,15 +51,19 @@ def publish(job_id: str, event: JsonDict) -> None:
     if not _enabled():
         return
     try:
-        client = redis.Redis.from_url(
-            get_settings().redis_url,
-            socket_connect_timeout=_CONNECT_TIMEOUT,
-            socket_timeout=_CONNECT_TIMEOUT,
-        )
-        client.publish(channel(job_id), json.dumps(event))
-        client.close()
+        if _pub.client is None:
+            _pub.client = redis.Redis.from_url(
+                get_settings().redis_url,
+                socket_connect_timeout=_CONNECT_TIMEOUT,
+                socket_timeout=_CONNECT_TIMEOUT,
+            )
+        _pub.client.publish(channel(job_id), json.dumps(event))
     except Exception as exc:
-        _state["publish_disabled"] = True
+        _pub.disabled = True
+        if _pub.client is not None:
+            with contextlib.suppress(Exception):
+                _pub.client.close()
+            _pub.client = None
         logger.warning("progress publishing disabled (Redis unreachable)", error=str(exc))
 
 

@@ -392,6 +392,22 @@
       "stacking_retention": {
         "label": "Stack retention",
         "hint": "How long a stack's uploaded frames are kept for re-stacking. The composite keeps the session lifetime. Hours."
+      },
+      "stacking_workers": {
+        "label": "Stacking threads",
+        "hint": "Parallel threads for the align/combine passes. 0 = auto (CPU count, capped at 4); 1 = sequential. Raise on a many-core machine."
+      },
+      "stacking_watch_dir": {
+        "label": "Watch folder",
+        "hint": "A server path the worker polls for new frames (empty = off). New images are ingested into a rolling stack you can open from the stacking screen."
+      },
+      "stacking_watch_idle": {
+        "label": "Watch auto-stack after",
+        "hint": "Process the watch stack once no new frame has arrived for this many minutes."
+      },
+      "stacking_watch_auto": {
+        "label": "Auto-stack the watch folder",
+        "hint": "When off, watched frames are only ingested - start the stack yourself from the stacking screen."
       }
     },
     "webhooks": {
@@ -454,6 +470,17 @@
     "progress": {
       "heading": "Stacking"
     },
+    "watch": {
+      "title": "Watch folder",
+      "open": "Open",
+      "status": {
+        "waiting_for_frames": "{count} frames ingested, waiting for more",
+        "ready": "{count} frames ingested, waiting for more",
+        "processing": "Stacking {count} frames…",
+        "completed": "Done - {count} frames stacked",
+        "failed": "Stacking failed"
+      }
+    },
     "steps": {
       "registration": "Alignment",
       "normalization": "Normalization",
@@ -475,7 +502,8 @@
       "calibrated": "Calibration",
       "calibrated_yes": "Applied",
       "frames_auto_rejected": "Auto-rejected",
-      "post_processed": "Cleaned up"
+      "post_processed": "Cleaned up",
+      "drizzle": "Drizzle"
     },
     "settings": {
       "transform_label": "Alignment",
@@ -509,7 +537,14 @@
         "strict": "Strict"
       },
       "post_process_label": "Clean up the composite",
-      "post_process_hint": "Crop the field-rotation edges, flatten the sky gradient and neutralise the colour before the editor."
+      "post_process_hint": "Crop the field-rotation edges, flatten the sky gradient and neutralise the colour before the editor.",
+      "drizzle_label": "Drizzle",
+      "drizzle_hint": "Reconstruct onto a finer grid for real resolution gain from a well-dithered stack. Slower, correlates noise - leave off unless you have hundreds of subs.",
+      "drizzle": {
+        "1": "Off",
+        "2": "2x",
+        "3": "3x"
+      }
     },
     "upload_zone": {
       "add_frames": "Add frames",

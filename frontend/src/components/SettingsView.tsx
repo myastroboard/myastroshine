@@ -179,6 +179,39 @@ function GeneralSection({ draft, patch }: SectionProps) {
         max={168}
         onChange={(stackingRetentionHours) => patch({ stackingRetentionHours })}
       />
+      <NumberRow
+        id="stacking-workers"
+        label={t('settings.general.stacking_workers.label')}
+        hint={t('settings.general.stacking_workers.hint')}
+        value={draft.stackingWorkers}
+        min={0}
+        max={16}
+        onChange={(stackingWorkers) => patch({ stackingWorkers })}
+      />
+      <TextRow
+        id="stacking-watch-dir"
+        label={t('settings.general.stacking_watch_dir.label')}
+        hint={t('settings.general.stacking_watch_dir.hint')}
+        value={draft.stackingWatchDir}
+        placeholder="/data/incoming"
+        onChange={(stackingWatchDir) => patch({ stackingWatchDir })}
+      />
+      <NumberRow
+        id="stacking-watch-idle"
+        label={t('settings.general.stacking_watch_idle.label')}
+        hint={t('settings.general.stacking_watch_idle.hint')}
+        value={draft.stackingWatchIdleMinutes}
+        min={1}
+        max={1440}
+        onChange={(stackingWatchIdleMinutes) => patch({ stackingWatchIdleMinutes })}
+      />
+      <ToggleRow
+        id="stacking-watch-auto"
+        label={t('settings.general.stacking_watch_auto.label')}
+        hint={t('settings.general.stacking_watch_auto.hint')}
+        checked={draft.stackingWatchAutoProcess}
+        onChange={(stackingWatchAutoProcess) => patch({ stackingWatchAutoProcess })}
+      />
     </div>
   );
 }
@@ -427,6 +460,35 @@ function NumberRow({
         max={max}
         step={step}
         onChange={(event) => onChange(Number(event.target.value))}
+      />
+    </SettingsRow>
+  );
+}
+
+function TextRow({
+  id,
+  label,
+  hint,
+  value,
+  onChange,
+  placeholder,
+}: {
+  id: string;
+  label: string;
+  hint?: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <SettingsRow id={id} label={label} hint={hint} stacked>
+      <input
+        id={id}
+        type="text"
+        className="field mt-1 w-full font-mono text-xs"
+        value={value}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
       />
     </SettingsRow>
   );

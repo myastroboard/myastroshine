@@ -25,10 +25,15 @@ runs in bounded RAM.
 from __future__ import annotations
 
 import contextlib
+import hashlib
+import json
 import math
+import os
 from collections.abc import Callable
-from dataclasses import dataclass, field, replace
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
+from typing import Any, TypeVar
 
 import cv2
 import numpy as np
@@ -37,6 +42,7 @@ from numpy.lib.format import open_memmap
 from app.exceptions import InvalidParameterError
 from app.logging_config import get_logger
 from app.services.calibration import CalibrationMasters, CalibrationService
+from app.services.drizzle import drizzle_accumulate, drizzle_finalise
 from app.services.frame_quality import FrameMeasure, FrameQuality, score_frames
 from app.services.star_detection import StarDetectionService
 from app.services.star_match import StarMatchService
@@ -46,7 +52,9 @@ from app.utils.linear_ingest import LinearFrame, debayer_rgb, superpixel_rgb
 
 logger = get_logger(__name__)
 
-ProgressFn = Callable[[str, int], None]
+#: ``on_progress(step, percent, detail)`` - ``detail`` is an optional short,
+#: language-neutral string such as ``"340/1066"`` (frame counter) for the UI.
+ProgressFn = Callable[[str, int, str | None], None]
 
 _DETECT_SENSITIVITY = 60
 _DETECT_MAX_SIZE = 22
@@ -66,6 +74,11 @@ _MONO_NDIM = 2
 _RGB_LUMA = np.array([0.299, 0.587, 0.114], dtype=np.float32)  # data is R, G, B
 _NOISE_FLOOR = 1e-6
 _SCALE_PERCENTILE = 95
+_MAX_AUTO_WORKERS = 4  # cap the per-stack thread pool; the Celery worker itself is concurrency 1-2
+_CHECKPOINT_NAME = "plan.json"  # sidecar next to accum/aligned.npy for resume / instant re-combine
+
+_T = TypeVar("_T")
+_R = TypeVar("_R")
 
 
 @dataclass
@@ -113,14 +126,66 @@ class IntegrationResult:
         return float(w.sum() ** 2 / np.square(w).sum()) if w.size else 0.0
 
 
+def _report(on_progress: ProgressFn | None, step: str, percent: int, i: int, n: int) -> None:
+    """Throttled progress emit with an ``i/n`` frame counter (~50 updates per pass)."""
+    if on_progress is None:
+        return
+    if i % max(1, n // 50) == 0 or i >= n - 1:
+        on_progress(step, percent, f"{min(i + 1, n)}/{n}")
+
+
 class IntegrationService:
     """Owns the register -> align -> combine pipeline for one stack."""
 
-    def __init__(self, storage: StorageService) -> None:
+    def __init__(self, storage: StorageService, *, workers: int = 0) -> None:
         self.storage = storage
         self._detector = StarDetectionService()
         self._matcher = StarMatchService()
         self._calibration = CalibrationService(storage)
+        #: 0 = auto (min(cpu, cap)); 1 = sequential; N = that many threads.
+        self._workers = workers
+
+    def _worker_count(self, n: int) -> int:
+        if self._workers == 1 or n <= 1:
+            return 1
+        configured = self._workers or (os.cpu_count() or 1)
+        return max(1, min(configured, _MAX_AUTO_WORKERS, n))
+
+    def _map_frames(
+        self,
+        items: list[_T],
+        work: Callable[[_T], _R],
+        on_progress: ProgressFn | None,
+        step: str,
+        pct_lo: int,
+        pct_hi: int,
+    ) -> list[_R]:
+        """Ordered map over frames, on a thread pool, with throttled progress.
+
+        Threads not processes: a Celery prefork worker is daemonic and cannot
+        spawn child processes, and the per-frame hot path (decode, calibrate,
+        debayer, ``warpAffine``, connected-components) is all GIL-releasing C.
+        The pool is capped (``_MAX_AUTO_WORKERS``) since the Celery worker itself
+        already runs 1-2 stacks in parallel.
+        """
+        n = len(items)
+        count = self._worker_count(n)
+        if count == 1:
+            out: list[_R] = []
+            for i, item in enumerate(items):
+                out.append(work(item))
+                _report(on_progress, step, pct_lo + (pct_hi - pct_lo) * i // max(1, n), i, n)
+            return out
+
+        results: dict[int, _R] = {}
+        done = 0
+        with ThreadPoolExecutor(max_workers=count) as pool:
+            futures = {pool.submit(work, item): i for i, item in enumerate(items)}
+            for future in as_completed(futures):
+                results[futures[future]] = future.result()
+                _report(on_progress, step, pct_lo + (pct_hi - pct_lo) * done // max(1, n), done, n)
+                done += 1
+        return [results[i] for i in range(n)]
 
     def integrate(
         self,
@@ -135,47 +200,159 @@ class IntegrationService:
         protected: set[int] | None = None,
         calibration: CalibrationMasters | None = None,
         cosmetic: bool = True,
+        drizzle: int = 1,
         on_progress: ProgressFn | None = None,
     ) -> IntegrationResult:
-        cal = calibration if calibration is not None and not calibration.is_empty else None
-        plans, reference, half_shape, qualities = self._register(
-            stack_id, indices, transform, quality_filter, protected or set(), cal, cosmetic,
-            on_progress,
-        )
-        aligned = reference.star_count >= _MIN_REFERENCE_STARS
-        registrable = [p for p in plans if not p.quality_rejected]
-        kept = [p for p in registrable if p.registered] if aligned else registrable
-        quality_by_index = {q.index: q for q in qualities}
-        weights = _frame_weights(kept, quality_by_index, weighting)
+        """Register, align and combine ``indices`` into a composite.
 
-        aligned_path, full_shape, reference_noise = self._align_to_memmap(
-            stack_id, kept, reference, half_shape, aligned, cal, cosmetic, on_progress
-        )
-        try:
-            composite, rejected, coverage = self._combine(
-                aligned_path, weights, combination, rejection, full_shape, on_progress
+        A checkpoint (``accum/plan.json`` + the aligned memmap) is written once
+        the align pass finishes and dropped only on success, so a run killed
+        during ``_combine`` - or a re-stack that only changes the combination /
+        rejection / weighting - skips straight to the combine step.
+        """
+        cal = calibration if calibration is not None and not calibration.is_empty else None
+        protected = protected or set()
+        signature = _signature(indices, transform, quality_filter, protected, cal, cosmetic)
+        aligned_path = str(self.storage.stack_accum_dir(stack_id) / "aligned.npy")
+
+        resume = self._load_checkpoint(stack_id, signature)
+        if resume is not None:
+            kept = [_plan_from_json(d) for d in resume["kept"]]
+            qualities = [FrameQuality(**q) for q in resume["qualities"]]
+            aligned, full_shape = resume["aligned"], tuple(resume["full_shape"])
+            half_shape = tuple(resume["half_shape"])
+            reference_index = resume["reference_index"]
+            reference_noise = resume["reference_noise"]
+            registrable_count = resume["registrable_count"]
+            quality_rejected = resume["quality_rejected"]
+            ref_scale, ref_background = resume["reference_scale"], resume["reference_background"]
+        else:
+            plans, reference, half_shape, qualities = self._register(
+                stack_id, indices, transform, quality_filter, protected, cal, cosmetic, on_progress
             )
-        finally:
-            with contextlib.suppress(OSError):
-                Path(aligned_path).unlink()
+            aligned = reference.star_count >= _MIN_REFERENCE_STARS
+            registrable = [p for p in plans if not p.quality_rejected]
+            kept = [p for p in registrable if p.registered] if aligned else registrable
+            aligned_path, full_shape, reference_noise = self._align_to_memmap(
+                stack_id, kept, reference, half_shape, aligned, cal, cosmetic, on_progress
+            )
+            reference_index = reference.index
+            ref_scale, ref_background = reference.scale, reference.background
+            registrable_count, quality_rejected = len(registrable), sum(
+                1 for p in plans if p.quality_rejected
+            )
+            self._write_checkpoint(
+                stack_id, signature, aligned=aligned, reference_index=reference_index,
+                full_shape=full_shape, half_shape=half_shape, reference_noise=reference_noise,
+                reference_scale=ref_scale, reference_background=ref_background, kept=kept,
+                qualities=qualities, registrable_count=registrable_count,
+                quality_rejected=quality_rejected,
+            )
+
+        weights = _frame_weights(kept, {q.index: q for q in qualities}, weighting)
+        composite, rejected, coverage = self._combine(
+            aligned_path, weights, combination, rejection, full_shape, on_progress
+        )
+        if drizzle > 1 and aligned:
+            median, sigma = self._reference_stats(aligned_path, full_shape)
+            composite, coverage = self._drizzle(
+                stack_id, kept, half_shape, full_shape, drizzle, cal, cosmetic,
+                ref_scale, ref_background, weights, median, sigma, on_progress,
+            )
+        self._clear_checkpoint(stack_id)  # only on success - a failure above keeps it for resume
 
         registered = [p for p in kept if p.rms > 0]
         return IntegrationResult(
             composite=composite,
             coverage=coverage,
             frames_stacked=len(kept),
-            registration_failures=(len(registrable) - len(kept)) if aligned else 0,
-            reference_index=reference.index,
+            registration_failures=(registrable_count - len(kept)) if aligned else 0,
+            reference_index=reference_index,
             rejected_samples=rejected,
             registration_rms=round(float(np.mean([p.rms for p in registered])), 2)
             if registered
             else 0.0,
             reference_noise=reference_noise,
             aligned=aligned,
-            quality_rejected=sum(1 for p in plans if p.quality_rejected),
+            quality_rejected=quality_rejected,
             frame_quality=qualities,
             weights=list(weights),
         )
+
+    # -- resume checkpoint -------------------------------------------------
+
+    def _checkpoint_path(self, stack_id: str) -> Path:
+        return self.storage.stack_accum_dir(stack_id) / _CHECKPOINT_NAME
+
+    def _write_checkpoint(
+        self,
+        stack_id: str,
+        signature: str,
+        *,
+        aligned: bool,
+        reference_index: int,
+        full_shape: tuple[int, int, int],
+        half_shape: tuple[int, int, int],
+        reference_noise: float,
+        reference_scale: float,
+        reference_background: float,
+        kept: list[_FramePlan],
+        qualities: list[FrameQuality],
+        registrable_count: int,
+        quality_rejected: int,
+    ) -> None:
+        payload = {
+            "signature": signature,
+            "aligned": aligned,
+            "reference_index": reference_index,
+            "full_shape": list(full_shape),
+            "half_shape": list(half_shape),
+            "reference_noise": reference_noise,
+            "reference_scale": reference_scale,
+            "reference_background": reference_background,
+            "registrable_count": registrable_count,
+            "quality_rejected": quality_rejected,
+            "kept": [
+                {
+                    "index": p.index,
+                    "star_count": p.star_count,
+                    "background": p.background,
+                    "scale": p.scale,
+                    "noise": p.noise,
+                    "fwhm": p.fwhm,
+                    "roundness": p.roundness,
+                    "rms": p.rms,
+                    "matrix": p.matrix.tolist() if p.matrix is not None else None,
+                }
+                for p in kept
+            ],
+            "qualities": [asdict(q) for q in qualities],
+        }
+        with contextlib.suppress(OSError):
+            self._checkpoint_path(stack_id).write_text(json.dumps(payload), encoding="utf-8")
+
+    def _load_checkpoint(self, stack_id: str, signature: str) -> dict[str, Any] | None:
+        path = self._checkpoint_path(stack_id)
+        memmap_path = self.storage.stack_accum_dir(stack_id) / "aligned.npy"
+        if not path.exists() or not memmap_path.exists():
+            return None
+        try:
+            data: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+            if data.get("signature") != signature:
+                return None
+            memmap = open_memmap(memmap_path, mode="r")
+            if list(memmap.shape[1:]) != data["full_shape"] or memmap.shape[0] != len(data["kept"]):
+                return None
+        except (OSError, ValueError, json.JSONDecodeError, KeyError):
+            return None
+        logger.info("resuming stack from checkpoint", stack_id=stack_id, frames=len(data["kept"]))
+        return data
+
+    def _clear_checkpoint(self, stack_id: str) -> None:
+        with contextlib.suppress(OSError):
+            self._checkpoint_path(stack_id).unlink()
+        with contextlib.suppress(OSError):
+            (self.storage.stack_accum_dir(stack_id) / "aligned.npy").unlink()
 
     # -- pass 1: registration -------------------------------------------------
 
@@ -190,19 +367,16 @@ class IntegrationService:
         cosmetic: bool,
         on_progress: ProgressFn | None,
     ) -> tuple[list[_FramePlan], _FramePlan, tuple[int, int, int], list[FrameQuality]]:
-        plans: list[_FramePlan] = []
-        shape: tuple[int, int, int] | None = None
-        for step, index in enumerate(indices):
+        def measure(index: int) -> tuple[_FramePlan, tuple[int, int, int]]:
             data = self._prepared(stack_id, index, calibration, cosmetic)
-            frame_shape = (data.shape[0], data.shape[1], data.shape[2])
-            if shape is None:
-                shape = frame_shape
-            elif frame_shape != shape:
-                raise InvalidParameterError("All frames must share dimensions to stack")
-            plans.append(self._measure(index, data))
-            if on_progress and step % 20 == 0:
-                on_progress("registration", int(30 * step / max(1, len(indices))))
-        assert shape is not None  # noqa: S101 - indices is non-empty (caller guarantees >= 2)
+            return self._measure(index, data), (data.shape[0], data.shape[1], data.shape[2])
+
+        measured = self._map_frames(indices, measure, on_progress, "registration", 0, 30)
+        plans = [plan for plan, _ in measured]
+        shapes = {frame_shape for _, frame_shape in measured}
+        if len(shapes) != 1:
+            raise InvalidParameterError("All frames must share dimensions to stack")
+        shape = shapes.pop()
 
         qualities = score_frames([p.measure() for p in plans], quality_filter)
         rejected = {q.index for q in qualities if not q.accepted} - protected
@@ -229,14 +403,14 @@ class IntegrationService:
             )
             return plans, reference, shape, qualities
 
-        for step, plan in enumerate(plans):
+        def match(plan: _FramePlan) -> None:
             if plan is reference or plan.quality_rejected:
-                continue
+                return
             result = self._matcher.align(plan.centroids, reference.centroids, transform)
             if result.ok and result.matrix is not None:
                 plan.matrix, plan.rms, plan.registered = result.matrix, result.rms, True
-            if on_progress and step % 20 == 0:
-                on_progress("registration", 30 + int(20 * step / max(1, len(plans))))
+
+        self._map_frames(plans, match, on_progress, "registration", 30, 50)
         return plans, reference, shape, qualities
 
     def _measure(self, index: int, data: np.ndarray) -> _FramePlan:
@@ -287,7 +461,12 @@ class IntegrationService:
         memmap = open_memmap(
             path, mode="w+", dtype=np.float16, shape=(len(kept), height, width, channels)
         )
-        for slot, plan in enumerate(kept):
+
+        def align_one(item: tuple[int, _FramePlan]) -> None:
+            slot, plan = item
+            if slot % 32 == 0:  # keep the accum mtime fresh - the stale-work sweep must not GC us
+                with contextlib.suppress(OSError):
+                    path.touch()
             if plan is reference:
                 frame = ref_frame
             else:
@@ -306,11 +485,12 @@ class IntegrationService:
                     )
             multiplier = float(np.clip(reference.scale / plan.scale, *_SCALE_CLIP))
             frame = frame * multiplier + (reference.background - multiplier * plan.background)
-            memmap[slot] = frame.astype(np.float16)
-            if on_progress and slot % 20 == 0:
-                on_progress("normalization", 50 + int(25 * slot / max(1, len(kept))))
-        memmap.flush()
-        del memmap
+            memmap[slot] = frame.astype(np.float16)  # disjoint slot per task - safe from threads
+
+        self._map_frames(
+            list(enumerate(kept)), align_one, on_progress, "normalization", 50, 75
+        )
+        memmap.flush()  # returning drops the last ref -> mmap closed before _combine reopens it
         return str(path), (height, width, channels), reference_noise
 
     # -- pass 3: tiled combine ------------------------------------------
@@ -330,25 +510,96 @@ class IntegrationService:
         min_cover = max(2, math.ceil(_MIN_COVERAGE * len(weights)))
         composite = np.zeros(shape, dtype=np.float32)
         coverage = np.zeros((height, width), dtype=np.int32)
-        rejected = 0
 
+        # Shrink the per-tile working set by the pool size so peak RAM stays bounded
+        # even with several tiles resident at once (partition copies the block).
+        pool = self._worker_count(math.ceil(height / _MIN_ROW_TILE))
         row_bytes = len(weights) * width * channels * 4
-        tile_rows = int(np.clip(_TILE_BUDGET_BYTES // max(1, row_bytes), _MIN_ROW_TILE, _ROW_TILE))
+        budget = _TILE_BUDGET_BYTES // max(1, min(pool, 3))
+        tile_rows = int(np.clip(budget // max(1, row_bytes), _MIN_ROW_TILE, _ROW_TILE))
         aligned = Path(aligned_path)
-        for y0 in range(0, height, tile_rows):
+        starts = list(range(0, height, tile_rows))
+
+        def reduce_rows(y0: int) -> int:
             y1 = min(y0 + tile_rows, height)
             with contextlib.suppress(OSError):
                 aligned.touch()  # fresh mtime: the stale-work sweep must leave a live run alone
             block = np.asarray(memmap[:, y0:y1], dtype=np.float32)  # (K, th, W, C)
             tile, cut, cover = _reduce_tile(block, w, combination, rejection, min_cover)
-            composite[y0:y1] = tile
+            composite[y0:y1] = tile  # disjoint row band per task
             coverage[y0:y1] = cover
-            rejected += cut
-            if on_progress:
-                on_progress("integration", 75 + int(25 * y1 / height))
+            return cut
 
-        del memmap
-        return composite, rejected, coverage
+        cuts = self._map_frames(starts, reduce_rows, on_progress, "integration", 75, 100)
+        return composite, sum(cuts), coverage
+
+    # -- pass 4 (opt-in): drizzle ----------------------------------------
+
+    def _reference_stats(
+        self, aligned_path: str, shape: tuple[int, int, int]
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Per-pixel median + robust sigma over the aligned memmap (1x), for
+        rejecting outlier input pixels before they are drizzled."""
+        height, width, channels = shape
+        memmap = open_memmap(aligned_path, mode="r")
+        median = np.zeros(shape, dtype=np.float32)
+        sigma = np.zeros(shape, dtype=np.float32)
+        row_bytes = memmap.shape[0] * width * channels * 4
+        tile_rows = int(np.clip(_TILE_BUDGET_BYTES // max(1, row_bytes), _MIN_ROW_TILE, _ROW_TILE))
+        for y0 in range(0, height, tile_rows):
+            y1 = min(y0 + tile_rows, height)
+            block = np.asarray(memmap[:, y0:y1], dtype=np.float32)
+            med = np.nanmedian(block, axis=0)
+            mad = np.nanmedian(np.abs(block - med), axis=0)
+            median[y0:y1] = np.nan_to_num(med)
+            sigma[y0:y1] = np.nan_to_num(mad) * _MAD_TO_SIGMA + _NOISE_FLOOR
+        return median, sigma
+
+    def _drizzle(
+        self,
+        stack_id: str,
+        kept: list[_FramePlan],
+        half_shape: tuple[int, int, int],
+        full_shape: tuple[int, int, int],
+        scale: int,
+        calibration: CalibrationMasters | None,
+        cosmetic: bool,
+        reference_scale: float,
+        reference_background: float,
+        weights: np.ndarray,
+        median: np.ndarray,
+        sigma: np.ndarray,
+        on_progress: ProgressFn | None,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Drop every kept frame onto a ``scale``x grid (Fruchter & Hook 2002).
+
+        Serial: the ``flux`` / ``weight`` accumulators are shared, so a frame's
+        decode + splat runs one at a time. Outlier input pixels are masked
+        against the 1x median / sigma from :meth:`_reference_stats`.
+        """
+        height, width, channels = full_shape
+        scale_x = width / max(1, half_shape[1])
+        scale_y = height / max(1, half_shape[0])
+        norm = (weights / weights.sum()).astype(np.float64)
+
+        flux = np.zeros((height * scale, width * scale, channels), dtype=np.float32)
+        weight = np.zeros((height * scale, width * scale), dtype=np.float32)
+
+        for slot, plan in enumerate(kept):
+            if plan.matrix is not None:
+                frame = self._prepared_full(stack_id, plan.index, calibration, cosmetic)
+                multiplier = float(np.clip(reference_scale / plan.scale, *_SCALE_CLIP))
+                frame = frame * multiplier + (reference_background - multiplier * plan.background)
+                matrix = plan.matrix.astype(np.float64).copy()
+                matrix[0, 2] *= scale_x
+                matrix[1, 2] *= scale_y
+                keep = _drizzle_keep(frame, matrix, median, sigma, height, width)
+                drizzle_accumulate(frame, matrix, scale, float(norm[slot]), flux, weight, keep)
+            pct = 75 + 25 * slot // max(1, len(kept))
+            _report(on_progress, "integration", pct, slot, len(kept))
+
+        typical = float(np.median(norm)) if norm.size else 1.0
+        return drizzle_finalise(flux, weight, typical)
 
     # -- helpers ------------------------------------------------------------
 
@@ -411,6 +662,36 @@ def _pick_reference(pool: list[_FramePlan], plans: list[_FramePlan]) -> _FramePl
     return min(pool, key=cost)
 
 
+def _drizzle_keep(
+    frame: np.ndarray,
+    matrix: np.ndarray,
+    median: np.ndarray,
+    sigma: np.ndarray,
+    ref_height: int,
+    ref_width: int,
+) -> np.ndarray:
+    """``(h, w)`` bool: input pixels that land in the reference and agree with
+    the 1x median to within ``_KAPPA`` sigma (rejects cosmics / hot pixels /
+    a satellite streak before it is drizzled)."""
+    height, width = frame.shape[:2]
+    ys, xs = np.mgrid[0:height, 0:width]
+    x_ref = matrix[0, 0] * xs + matrix[0, 1] * ys + matrix[0, 2]
+    y_ref = matrix[1, 0] * xs + matrix[1, 1] * ys + matrix[1, 2]
+    row = np.clip(np.rint(y_ref).astype(np.int64), 0, ref_height - 1)
+    col = np.clip(np.rint(x_ref).astype(np.int64), 0, ref_width - 1)
+    deviation = np.abs(frame - median[row, col])
+    agrees = (deviation <= _KAPPA * sigma[row, col] + _NOISE_FLOOR).all(axis=2)
+    edge = 0.5
+    in_bounds = (
+        (x_ref >= -edge)
+        & (x_ref < ref_width - edge)
+        & (y_ref >= -edge)
+        & (y_ref < ref_height - edge)
+    )
+    result: np.ndarray = agrees & in_bounds
+    return result
+
+
 def _as_rgb(frame: LinearFrame) -> np.ndarray:
     """A contiguous ``(H, W, 3)`` float32 view of a debayered / mono frame."""
     data = frame.data.astype(np.float32)
@@ -434,6 +715,60 @@ def highpass_noise(gray: np.ndarray) -> float:
     )
     residual = crop - cv2.medianBlur(crop, 3)
     return _MAD_TO_SIGMA * float(np.median(np.abs(residual - np.median(residual))))
+
+
+def _signature(
+    indices: list[int],
+    transform: str,
+    quality_filter: str,
+    protected: set[int],
+    calibration: CalibrationMasters | None,
+    cosmetic: bool,
+) -> str:
+    """A short hash of everything that decides which frames are kept and how they
+    align - i.e. everything *except* the combination / rejection / weighting, so a
+    re-stack that only tweaks those resumes from the aligned memmap."""
+    cal_parts = ["none"]
+    if calibration is not None:
+        cal_parts = []
+        for name in ("bias", "dark", "flat", "dark_flat", "bad_pixels"):
+            master = getattr(calibration, name)
+            if master is None:
+                cal_parts.append(f"{name}:-")
+            else:
+                mean = float(np.asarray(master, dtype=np.float64).mean())
+                cal_parts.append(f"{name}:{master.shape}:{mean:.6g}")
+    raw = json.dumps(
+        {
+            "indices": sorted(indices),
+            "transform": transform,
+            "quality_filter": quality_filter,
+            "protected": sorted(protected),
+            "cosmetic": cosmetic,
+            "cal": cal_parts,
+        },
+        sort_keys=True,
+    )
+    return hashlib.sha1(raw.encode()).hexdigest()[:16]  # noqa: S324 - a cache key, not a checksum
+
+
+def _plan_from_json(d: dict[str, Any]) -> _FramePlan:
+    """A lightweight ``_FramePlan`` for the combine / drizzle steps (centroids
+    are no longer needed once the aligned memmap exists)."""
+    matrix = d.get("matrix")
+    return _FramePlan(
+        index=int(d["index"]),
+        centroids=np.empty((0, 2), dtype=np.float64),
+        star_count=int(d["star_count"]),
+        background=float(d["background"]),
+        scale=float(d["scale"]),
+        noise=float(d["noise"]),
+        fwhm=float(d["fwhm"]),
+        roundness=float(d["roundness"]),
+        rms=float(d["rms"]),
+        matrix=np.array(matrix, dtype=np.float64) if matrix is not None else None,
+        registered=True,
+    )
 
 
 def _frame_weights(

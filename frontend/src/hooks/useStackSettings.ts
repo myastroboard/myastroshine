@@ -10,6 +10,7 @@ export const DEFAULT_STACK_SETTINGS: StackSettings = {
   cosmeticCorrection: true,
   qualityFilter: 'moderate',
   postProcess: true,
+  drizzleFactor: 1,
 };
 
 /** Local state for the stacking configuration panel. */

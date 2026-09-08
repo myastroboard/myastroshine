@@ -22,6 +22,10 @@ LOG_LEVELS = ("debug", "info", "warning", "error", "critical")
 # due for cleanup, this decides how often we look. Not user-tunable - nobody needs to.
 SESSION_CLEANUP_INTERVAL_SECONDS = 60 * 60  # hourly
 
+# How often the watch-folder poll runs (app/services/stack_watch.py). A no-op
+# unless stacking_watch_dir is set; the idle-to-process delay is user-tunable.
+STACK_WATCH_INTERVAL_SECONDS = 60
+
 # A processing job still non-terminal after this long has been abandoned (a worker died
 # mid-run, or a queued job was never picked up). It stops counting toward the per-IP
 # concurrency limit (app/services/job.py) and the hourly cleanup marks it failed - so a

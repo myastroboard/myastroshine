@@ -69,6 +69,94 @@ def test_cfa_stack_is_debayered_to_full_resolution(storage: StorageService) -> N
     assert result.composite.max() > result.composite.mean()  # stars survived, not washed out
 
 
+def test_thread_pool_matches_the_sequential_result(storage: StorageService) -> None:
+    """workers=4 (parallel register/align/combine) must be bit-identical to workers=1."""
+    height, width = 130, 170
+    for i in range(6):
+        _save_cfa(storage, "s", i, _star_mosaic(height, width, seed=1, shift=i - 3))
+
+    kwargs = {
+        "transform": "similarity",
+        "combination": "average",
+        "rejection": "winsorized_sigma",
+        "weighting": "noise",
+    }
+    seq = IntegrationService(storage, workers=1).integrate("s", list(range(6)), **kwargs)
+    par = IntegrationService(storage, workers=4).integrate("s", list(range(6)), **kwargs)
+
+    assert np.allclose(seq.composite, par.composite, equal_nan=True)
+    assert seq.reference_index == par.reference_index
+    assert seq.frames_stacked == par.frames_stacked
+    assert seq.rejected_samples == par.rejected_samples
+
+
+def _raise_boom(*_args: object, **_kwargs: object) -> None:
+    raise RuntimeError("boom")
+
+
+def test_a_run_killed_in_combine_resumes_from_the_checkpoint(
+    storage: StorageService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The align memmap + plan.json survive a crash; the retry skips register/align."""
+    height, width = 130, 170
+    for i in range(6):
+        _save_cfa(storage, "s", i, _star_mosaic(height, width, seed=1, shift=i - 3))
+    kwargs = {
+        "transform": "similarity",
+        "combination": "average",
+        "rejection": "winsorized_sigma",
+        "weighting": "noise",
+    }
+
+    svc = IntegrationService(storage, workers=1)
+    real_combine = svc._combine
+    monkeypatch.setattr(svc, "_combine", _raise_boom)
+    with pytest.raises(RuntimeError):
+        svc.integrate("s", list(range(6)), **kwargs)
+
+    checkpoint = storage.stack_accum_dir("s") / "plan.json"
+    assert checkpoint.exists()  # kept for the retry
+    assert (storage.stack_accum_dir("s") / "aligned.npy").exists()
+
+    monkeypatch.setattr(svc, "_combine", real_combine)
+    registers: list[int] = []
+    monkeypatch.setattr(svc, "_register", lambda *a, **k: registers.append(1))
+    result = svc.integrate("s", list(range(6)), **kwargs)
+
+    assert not registers  # resumed - the register pass did not run
+    assert result.frames_stacked >= 2
+    assert result.composite.shape == (height, width, 3)
+    assert not checkpoint.exists()  # dropped on success
+
+
+def test_re_combining_with_a_different_rejection_resumes(
+    storage: StorageService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The resume signature ignores rejection/weighting, so changing them on a
+    retry still reuses the aligned memmap instead of re-registering."""
+    height, width = 130, 170
+    for i in range(6):
+        _save_cfa(storage, "s", i, _star_mosaic(height, width, seed=1, shift=i - 3))
+    svc = IntegrationService(storage, workers=1)
+
+    monkeypatch.setattr(svc, "_combine", _raise_boom)
+    with pytest.raises(RuntimeError):
+        svc.integrate(
+            "s", list(range(6)), transform="similarity", combination="average",
+            rejection="none", weighting="none",
+        )
+
+    monkeypatch.undo()
+    registers: list[int] = []
+    monkeypatch.setattr(svc, "_register", lambda *a, **k: registers.append(1))
+    result = svc.integrate(
+        "s", list(range(6)), transform="similarity", combination="median",
+        rejection="winsorized_sigma", weighting="quality",
+    )
+    assert not registers
+    assert result.composite.shape == (height, width, 3)
+
+
 def test_cfa_stack_registers_a_shift(storage: StorageService) -> None:
     height, width = 140, 180
     for i in range(6):

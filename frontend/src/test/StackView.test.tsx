@@ -14,6 +14,7 @@ vi.mock('@/services/api', () => ({
     clearCalibration: vi.fn(),
     processStack: vi.fn(),
     getStack: vi.fn(),
+    getLatestWatchStack: vi.fn(),
     getConfig: vi.fn(),
     downloadImage: vi.fn(),
   },
@@ -54,6 +55,7 @@ const RESULT: StackResult = {
     measuredNoiseReduction: null,
     calibrated: false,
     postProcessed: true,
+    drizzleFactor: 1,
   },
   frames: FRAMES,
   calibration: EMPTY_CALIBRATION,
@@ -95,6 +97,7 @@ describe('StackView', () => {
       receivedFrames: 2,
     });
     mocked.getStack.mockResolvedValue({ ...RESULT, status: 'ready', statistics: null });
+    mocked.getLatestWatchStack.mockResolvedValue(null);
     mocked.excludeStackFrame.mockResolvedValue({ ...FRAMES[1], excluded: true });
     mocked.uploadCalibrationFrames.mockResolvedValue({
       ...EMPTY_CALIBRATION,
@@ -124,6 +127,25 @@ describe('StackView', () => {
       'stack-1',
       expect.objectContaining({ combinationMethod: 'average' }),
     );
+  });
+
+  it('opens a folder-watch stack from the banner', async () => {
+    mocked.getLatestWatchStack.mockResolvedValue({
+      ...RESULT,
+      status: 'ready',
+      sessionId: null,
+      statistics: null,
+    });
+
+    render(<StackView onEnhanceComposite={vi.fn()} />);
+
+    const open = await screen.findByRole('button', { name: /open/i });
+    fireEvent.click(open);
+
+    // Attached: the review shell (rail), no fresh initiateStack.
+    await screen.findByRole('navigation', { name: /stacking workflow/i });
+    expect(mocked.initiateStack).not.toHaveBeenCalled();
+    expect(mocked.getStack).not.toHaveBeenCalled(); // used the snapshot from the poll
   });
 
   it('excludes a frame from the review grid', async () => {

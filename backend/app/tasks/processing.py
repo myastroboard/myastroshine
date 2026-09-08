@@ -60,3 +60,13 @@ def task_cleanup_sessions() -> int:
         removed += StackingService(db, sessions, storage).cleanup_old_stacks()
         removed += JobService(db).cleanup_stale_jobs()
         return removed
+
+
+@celery_app.task(name="myastroshine.watch_stacking_folder")
+def task_watch_stacking_folder() -> str:
+    """Poll ``stacking_watch_dir`` for new frames (no-op unless configured)."""
+    from app.services.stack_watch import run_watch_tick  # noqa: PLC0415
+
+    with database.SessionLocal() as db:
+        result = run_watch_tick(db, StorageService())
+    return str(result.get("status", "?"))

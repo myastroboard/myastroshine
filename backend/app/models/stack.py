@@ -16,6 +16,7 @@ CombinationMethod = Literal["average", "median"]
 RejectionAlgo = Literal["none", "sigma", "winsorized_sigma"]
 Weighting = Literal["none", "noise", "quality"]
 QualityFilter = Literal["off", "lenient", "moderate", "strict"]
+DrizzleFactor = Literal[1, 2, 3]
 
 _MAX_FRAMES = 5000  # hard ceiling; the operator's stacking_max_frames is the real gate
 
@@ -31,6 +32,7 @@ class InitiateStackRequest(BaseModel):
     cosmetic_correction: bool = True
     quality_filter: QualityFilter = "moderate"
     post_process: bool = True
+    drizzle_factor: DrizzleFactor = 1
 
 
 class ProcessStackRequest(BaseModel):
@@ -47,6 +49,7 @@ class ProcessStackRequest(BaseModel):
     cosmetic_correction: bool | None = None
     quality_filter: QualityFilter | None = None
     post_process: bool | None = None
+    drizzle_factor: DrizzleFactor | None = None
 
 
 class StackSessionResponse(BaseModel):
@@ -126,6 +129,7 @@ class StackStatistics(BaseModel):
     measured_noise_reduction: float | None = None
     calibrated: bool = False
     post_processed: bool = False
+    drizzle_factor: int = 1
 
 
 class StackResultResponse(BaseModel):

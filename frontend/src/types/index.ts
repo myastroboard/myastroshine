@@ -389,6 +389,8 @@ export interface ProcessingStatus {
   status: JobStatus;
   progressPercent: number;
   currentStep: string;
+  /** Short language-neutral detail for the current step, e.g. "340/1066" (stacking). */
+  detail?: string;
   message: string;
   error?: string;
 }
@@ -446,6 +448,10 @@ export interface AppSettings {
   stackingEnabled: boolean;
   stackingMaxFrames: number;
   stackingRetentionHours: number;
+  stackingWorkers: number;
+  stackingWatchDir: string;
+  stackingWatchIdleMinutes: number;
+  stackingWatchAutoProcess: boolean;
   logLevel: LogLevel;
   consoleLogLevel: LogLevel;
 }
@@ -538,6 +544,7 @@ export type RejectionAlgo = 'none' | 'sigma' | 'winsorized_sigma';
 export type StackWeighting = 'none' | 'noise' | 'quality';
 export type CalibrationKind = 'dark' | 'flat' | 'bias' | 'dark_flat';
 export type QualityFilter = 'off' | 'lenient' | 'moderate' | 'strict';
+export type DrizzleFactor = 1 | 2 | 3;
 
 export interface StackSettings {
   registrationTransform: RegistrationTransform;
@@ -547,6 +554,7 @@ export interface StackSettings {
   cosmeticCorrection: boolean;
   qualityFilter: QualityFilter;
   postProcess: boolean;
+  drizzleFactor: DrizzleFactor;
 }
 
 export interface FrameQuality {
@@ -607,6 +615,7 @@ export interface StackStatistics {
   measuredNoiseReduction: number | null;
   calibrated: boolean;
   postProcessed: boolean;
+  drizzleFactor: number;
 }
 
 export interface StackResult {

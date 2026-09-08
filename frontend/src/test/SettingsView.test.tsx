@@ -35,6 +35,10 @@ const SETTINGS: AppSettings = {
   stackingEnabled: true,
   stackingMaxFrames: 2000,
   stackingRetentionHours: 12,
+  stackingWorkers: 0,
+  stackingWatchDir: '',
+  stackingWatchIdleMinutes: 10,
+  stackingWatchAutoProcess: true,
   logLevel: 'info',
   consoleLogLevel: 'warning',
 };

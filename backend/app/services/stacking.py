@@ -57,7 +57,9 @@ class StackingService:
         self.db = db
         self.sessions = sessions
         self.storage = storage
-        self._integration = IntegrationService(storage)
+        self._integration = IntegrationService(
+            storage, workers=get_app_settings().stacking_workers
+        )
         self._calibration = CalibrationService(storage)
 
     def _get(self, stack_id: str) -> StackRecord:
@@ -66,13 +68,15 @@ class StackingService:
             raise ResourceNotFoundError(f"Stack {stack_id} not found")
         return record
 
-    def initiate(self, config: InitiateStackRequest) -> StackRecord:
+    def initiate(self, config: InitiateStackRequest, *, source: str = "upload") -> StackRecord:
         app_settings = get_app_settings()
         if config.frame_count > app_settings.stacking_max_frames:
             raise InvalidParameterError(f"Too many frames (max {app_settings.stacking_max_frames})")
         record = StackRecord(
             stack_id=str(uuid.uuid4()),
             frame_count=config.frame_count,
+            source=source,
+            drizzle_factor=config.drizzle_factor,
             registration_transform=config.registration_transform,
             combination_method=config.combination_method,
             rejection_algo=config.rejection_algo,
@@ -270,8 +274,8 @@ class StackingService:
     ) -> tuple[np.ndarray, StackStatistics]:
         """Calibrate -> register -> normalise -> Winsorized-sigma weighted combine."""
 
-        def on_progress(step: str, percent: int) -> None:
-            self._emit(job_id, stack_id, step, 15 + int(percent * 0.8))
+        def on_progress(step: str, percent: int, detail: str | None = None) -> None:
+            self._emit(job_id, stack_id, step, 15 + int(percent * 0.8), detail=detail)
 
         result = self._integration.integrate(
             stack_id,
@@ -284,6 +288,7 @@ class StackingService:
             protected=set(record.included_frames or []),
             calibration=masters,
             cosmetic=record.cosmetic_correction,
+            drizzle=record.drizzle_factor,
             on_progress=on_progress,
         )
 
@@ -326,6 +331,7 @@ class StackingService:
             measured_noise_reduction=measured,
             calibrated=calibrated,
             post_processed=post_stack is not None and post_stack.cropped is not None,
+            drizzle_factor=record.drizzle_factor,
         )
         return composite, stats
 
@@ -338,6 +344,7 @@ class StackingService:
         *,
         status: str = "processing",
         error: str | None = None,
+        detail: str | None = None,
     ) -> None:
         if job_id is None:
             return
@@ -349,6 +356,7 @@ class StackingService:
                 "status": status,
                 "progress_percent": percent,
                 "current_step": step,
+                "detail": detail,
                 "error": error,
             },
         )
@@ -395,6 +403,18 @@ class StackingService:
 
     def get_result(self, stack_id: str) -> StackRecord:
         return self._get(stack_id)
+
+    def latest_watch_stack(self) -> StackRecord | None:
+        """The most recent folder-watch stack that is still live, for the UI."""
+        return self.db.scalars(
+            select(StackRecord)
+            .where(
+                StackRecord.source == "watch",
+                StackRecord.status.notin_(("expired",)),
+                StackRecord.expires_at > datetime.now(UTC),
+            )
+            .order_by(StackRecord.created_at.desc())
+        ).first()
 
     def cleanup_old_stacks(self) -> int:
         """Reclaim stack storage. Returns the number of stacks removed / repaired.

@@ -3,8 +3,10 @@ import { useTranslation } from '@/hooks/useTranslation';
 export interface StackProgressProps {
   /** Overall completion, 0-100. */
   percent: number;
-  /** Backend step key, e.g. `registration`, `combination`, `done`. */
+  /** Backend step key, e.g. `registration`, `integration`, `done`. */
   currentStep: string;
+  /** Short "340/1066"-style counter for the active step, if any. */
+  detail?: string;
 }
 
 const PIPELINE: { key: string; translationKey: string }[] = [
@@ -15,10 +17,16 @@ const PIPELINE: { key: string; translationKey: string }[] = [
   { key: 'integration', translationKey: 'stacking.steps.integration' },
 ];
 
+/** Fold the extra backend step keys onto a pipeline entry. */
+function pipelineKey(step: string): string {
+  return step === 'post-processing' ? 'integration' : step;
+}
+
 /** Step-by-step stacking progress display (v1.1+). */
-export function StackProgress({ percent, currentStep }: StackProgressProps) {
+export function StackProgress({ percent, currentStep, detail }: StackProgressProps) {
   const { t } = useTranslation();
-  const activeIndex = PIPELINE.findIndex((step) => step.key === currentStep);
+  const key = pipelineKey(currentStep);
+  const activeIndex = PIPELINE.findIndex((step) => step.key === key);
   const done = currentStep === 'done';
 
   return (
@@ -55,6 +63,9 @@ export function StackProgress({ percent, currentStep }: StackProgressProps) {
               <span className={state === 'pending' ? 'text-ghost' : 'text-muted'}>
                 {t(step.translationKey)}
               </span>
+              {state === 'active' && detail && (
+                <span className="tabular-nums text-faint">· {detail}</span>
+              )}
             </li>
           );
         })}

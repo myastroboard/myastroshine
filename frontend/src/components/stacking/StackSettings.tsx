@@ -1,6 +1,7 @@
 import { useTranslation } from '@/hooks/useTranslation';
 import type {
   CombinationMethod,
+  DrizzleFactor,
   QualityFilter,
   RegistrationTransform,
   RejectionAlgo,
@@ -18,6 +19,7 @@ const COMBINATIONS: CombinationMethod[] = ['average', 'median'];
 const REJECTIONS: RejectionAlgo[] = ['none', 'sigma', 'winsorized_sigma'];
 const WEIGHTINGS: StackWeighting[] = ['none', 'noise', 'quality'];
 const QUALITY_FILTERS: QualityFilter[] = ['off', 'lenient', 'moderate', 'strict'];
+const DRIZZLE_FACTORS: DrizzleFactor[] = [1, 2, 3];
 
 /** Stacking configuration panel: registration, combination, rejection, weighting. */
 export function StackSettings({ settings, onChange }: StackSettingsProps) {
@@ -112,6 +114,27 @@ export function StackSettings({ settings, onChange }: StackSettingsProps) {
           ))}
         </select>
         <span className="text-[11px] text-ghost">{t('stacking.settings.quality_hint')}</span>
+      </label>
+
+      <label className="flex flex-col gap-1.5">
+        <span className="label">{t('stacking.settings.drizzle_label')}</span>
+        <select
+          className="field"
+          value={settings.drizzleFactor}
+          onChange={(event) =>
+            onChange({
+              ...settings,
+              drizzleFactor: Number(event.target.value) as DrizzleFactor,
+            })
+          }
+        >
+          {DRIZZLE_FACTORS.map((value) => (
+            <option key={value} value={value}>
+              {t(`stacking.settings.drizzle.${value}`)}
+            </option>
+          ))}
+        </select>
+        <span className="text-[11px] text-ghost">{t('stacking.settings.drizzle_hint')}</span>
       </label>
 
       <label className="flex items-start gap-2">

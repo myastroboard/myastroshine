@@ -89,6 +89,7 @@ Celery job queue (`PROCESSING_MODE=queue`), and the progress WebSockets.
 | POST | `/stack/{stack_id}/upload-frame` | Upload one frame | 6 |
 | POST | `/stack/{stack_id}/process` | Align + combine frames | 7 |
 | GET | `/stack/{stack_id}` | Stack result and statistics | 7 |
+| GET | `/stack/latest` | The current folder-watch stack, or `null` | 7 |
 | WS | `/ws/stack-status/{job_id}` | Real-time stacking progress | 6 |
 | GET | `/version` | The version this instance is running | v0.2 |
 | GET | `/version/check-updates` | Latest GitHub release, cached ~4h | v0.2 |
@@ -206,10 +207,14 @@ relays live events from Redis until a terminal status arrives, then closes.
   "status": "processing",
   "progress_percent": 45,
   "current_step": "denoise",
+  "detail": null,
   "error": null,
   "timestamp": "2026-09-03T14:32:15Z"
 }
 ```
+
+`detail` is an optional short string for the current step - for stacking it is a
+`"340/1066"` frame counter.
 
 `status`: `queued`, `processing`, `completed`, `failed`, `superseded` (or
 `unknown` if the `job_id` is not found). `superseded` means a newer `/process`
@@ -221,8 +226,8 @@ and its result should be ignored. Image steps: `geometry`, `color_correction`,
 `star_reduction`, `sharpness`, `rendering`, `done`. With `star_removal` set, the
 extra steps `star_removal` (after `dehaze`) and `star_recombine` (last) bracket
 the creative stages. For a stacked-composite session a `stack_base` step runs
-first (the linear `stack` pre-stage). Stack steps: `registration`,
-`background_normalization`, `cosmic_ray_rejection`, `combination`, `done`.
+first (the linear `stack` pre-stage). Stack steps: `calibration`,
+`registration`, `normalization`, `integration`, `post-processing`, `done`.
 
 In the default `PROCESSING_MODE=sync`, the job is already `completed` when
 `/process` returns; the WebSocket just replays that final state.
@@ -437,7 +442,8 @@ registers by asterism matching, normalises to the reference, and combines with
 sigma rejection and weighting, all in bounded memory. See docs/ALGORITHMS.md.
 
 1. `POST /stack/initiate` `{ frame_count, registration_transform?, combination_method?,
-   rejection_algo?, weighting?, cosmetic_correction?, quality_filter?, post_process? }`
+   rejection_algo?, weighting?, cosmetic_correction?, quality_filter?, post_process?,
+   drizzle_factor? }`
    -> `202 { stack_id, status: "waiting_for_frames", frame_count, received_frames }`.
    - `registration_transform`: `translation` / `similarity` (default) / `affine`
    - `combination_method`: `average` (default) / `median`
@@ -447,9 +453,12 @@ sigma rejection and weighting, all in bounded memory. See docs/ALGORITHMS.md.
      (from the master dark/flat) with a neighbour median
    - `quality_filter`: `off` / `lenient` / `moderate` (default) / `strict` -
      auto-reject strength for the per-frame quality scorer
-   - `post_process`: bool (default `true`) - crop the field-rotation wedge,
-     subtract a low-order background gradient, and neutralise / balance the
-     colour of the composite before it opens in the editor
+   - `post_process`: bool (default `true`) - crop the field-rotation wedge of
+     the composite before it opens in the editor (the stretch / background /
+     colour steps moved into the editor's non-destructive "Stack" step)
+   - `drizzle_factor`: `1` (default, off) / `2` / `3` - variable-pixel
+     reconstruction onto a finer grid, an extra pass after the normal stack.
+     Slower, correlates neighbouring-pixel noise; for a large, well-dithered set
 2. `POST /stack/{stack_id}/upload-frame` (multipart: `frame_index`, `file`) ->
    `202 { frame_index, received_frames, frame_count, status }`. `status` becomes
    `"ready"` once every frame is in.
@@ -475,8 +484,11 @@ sigma rejection and weighting, all in bounded memory. See docs/ALGORITHMS.md.
    sub of that kind and any master derived from it.
 9. `POST /stack/{stack_id}/process` runs the pipeline synchronously and returns
    `200`. An optional body `{ registration_transform?, combination_method?,
-   rejection_algo?, weighting?, cosmetic_correction?, quality_filter?, post_process? }` re-stacks
-   with a changed setting - no re-upload, each run makes a fresh composite session:
+   rejection_algo?, weighting?, cosmetic_correction?, quality_filter?, post_process?,
+   drizzle_factor? }` re-stacks with a changed setting - no re-upload, each run
+   makes a fresh composite session. Changing only the combination / rejection /
+   weighting / drizzle resumes from the aligned frames of the previous run
+   (within ~30 min):
 
 ```json
 {

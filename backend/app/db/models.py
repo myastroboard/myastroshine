@@ -125,6 +125,14 @@ class StackRecord(Base):
     included_frames: Mapped[list[int]] = mapped_column(JSON, default=list)
     #: reference frame, per-frame quality metrics, registration residuals.
     quality_report: Mapped[JsonDict | None] = mapped_column(JSON)
+    #: "upload" (the UI) or "watch" (the folder-watch ingest task).
+    source: Mapped[str] = mapped_column(String(12), default="upload")
+    #: drizzle output scale: 1 = off, 2 or 3 = variable-pixel super-resolution.
+    drizzle_factor: Mapped[int] = mapped_column(Integer, default=1)
+    #: last time a frame was added - drives the watch-folder idle timeout.
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
 
 
 class WebhookToken(Base):
