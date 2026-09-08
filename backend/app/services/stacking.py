@@ -57,9 +57,7 @@ class StackingService:
         self.db = db
         self.sessions = sessions
         self.storage = storage
-        self._integration = IntegrationService(
-            storage, workers=get_app_settings().stacking_workers
-        )
+        self._integration = IntegrationService(storage, workers=get_app_settings().stacking_workers)
         self._calibration = CalibrationService(storage)
 
     def _get(self, stack_id: str) -> StackRecord:
@@ -86,8 +84,7 @@ class StackingService:
             post_process=config.post_process,
             excluded_frames=[],
             included_frames=[],
-            expires_at=datetime.now(UTC)
-            + timedelta(hours=app_settings.stacking_retention_hours),
+            expires_at=datetime.now(UTC) + timedelta(hours=app_settings.stacking_retention_hours),
         )
         self.db.add(record)
         self.db.commit()
@@ -175,9 +172,7 @@ class StackingService:
             raise InvalidParameterError(f"Unknown calibration frame kind {kind!r}")
         existing = self.storage.cal_frame_indices(stack_id, kind)
         if len(existing) + len(frames) > _MAX_CALIBRATION_FRAMES:
-            raise InvalidParameterError(
-                f"Too many {kind} frames (max {_MAX_CALIBRATION_FRAMES})"
-            )
+            raise InvalidParameterError(f"Too many {kind} frames (max {_MAX_CALIBRATION_FRAMES})")
         start = existing[-1] + 1 if existing else 0
         for offset, frame in enumerate(frames):
             self.storage.save_cal_frame(stack_id, kind, start + offset, frame)
@@ -256,9 +251,7 @@ class StackingService:
             stack_id,
             sample.data.shape,
             is_cfa=sample.is_cfa,
-            on_progress=lambda pct: self._emit(
-                job_id, stack_id, "calibration", 8 + int(pct * 0.1)
-            ),
+            on_progress=lambda pct: self._emit(job_id, stack_id, "calibration", 8 + int(pct * 0.1)),
         )
         logger.info("calibration masters ready", stack_id=stack_id)
         return masters

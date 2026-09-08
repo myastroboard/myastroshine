@@ -142,16 +142,24 @@ def test_re_combining_with_a_different_rejection_resumes(
     monkeypatch.setattr(svc, "_combine", _raise_boom)
     with pytest.raises(RuntimeError):
         svc.integrate(
-            "s", list(range(6)), transform="similarity", combination="average",
-            rejection="none", weighting="none",
+            "s",
+            list(range(6)),
+            transform="similarity",
+            combination="average",
+            rejection="none",
+            weighting="none",
         )
 
     monkeypatch.undo()
     registers: list[int] = []
     monkeypatch.setattr(svc, "_register", lambda *a, **k: registers.append(1))
     result = svc.integrate(
-        "s", list(range(6)), transform="similarity", combination="median",
-        rejection="winsorized_sigma", weighting="quality",
+        "s",
+        list(range(6)),
+        transform="similarity",
+        combination="median",
+        rejection="winsorized_sigma",
+        weighting="quality",
     )
     assert not registers
     assert result.composite.shape == (height, width, 3)

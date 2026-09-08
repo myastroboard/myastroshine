@@ -49,7 +49,7 @@ def _load_seen() -> dict[str, str]:
         return {}
     try:
         data: dict[str, str] = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except OSError, json.JSONDecodeError:
         return {}
     return data if isinstance(data, dict) else {}
 
@@ -91,9 +91,7 @@ def run_watch_tick(db: Session, storage: StorageService) -> dict[str, Any]:
 
     seen = _load_seen()
     files = sorted(
-        p
-        for p in watch_dir.iterdir()
-        if p.is_file() and p.suffix.lower() in SUPPORTED_FORMATS
+        p for p in watch_dir.iterdir() if p.is_file() and p.suffix.lower() in SUPPORTED_FORMATS
     )
     new = [p for p in files if seen.get(str(p)) != _fingerprint(p)]
 
@@ -106,9 +104,8 @@ def run_watch_tick(db: Session, storage: StorageService) -> dict[str, Any]:
     if record is None or record.received_frames < _MIN_FRAMES:
         return {"status": "idle"}
     idle_for = datetime.now(UTC) - _aware(record.updated_at)
-    if (
-        settings.stacking_watch_auto_process
-        and idle_for > timedelta(minutes=settings.stacking_watch_idle_minutes)
+    if settings.stacking_watch_auto_process and idle_for > timedelta(
+        minutes=settings.stacking_watch_idle_minutes
     ):
         stacking.dispatch(record.stack_id, JobService(db))
         logger.info("watch stack auto-processing", stack_id=record.stack_id)
@@ -151,5 +148,3 @@ def _ingest(
         overflow=len(overflow),
     )
     return {"status": "ingested", "count": len(prepared), "stack_id": record.stack_id}
-
-

@@ -164,9 +164,7 @@ def test_calibration_frames_upload_clear_and_report(client, star_field: np.ndarr
 
     upload = client.post(
         f"/api/stack/{stack_id}/calibration/dark/frames",
-        files=[
-            ("files", (f"d{i}.png", png_bytes(star_field), "image/png")) for i in range(3)
-        ],
+        files=[("files", (f"d{i}.png", png_bytes(star_field), "image/png")) for i in range(3)],
     )
     assert upload.status_code == 202
     assert upload.json()["frames"]["dark"] == 3

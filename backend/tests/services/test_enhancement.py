@@ -90,7 +90,7 @@ def test_run_on_a_stacked_composite_uses_the_linear_pipeline(
     record = enhancement.sessions.create_session(image_path="")
     enhancement.storage.save_original(record.session_id, sample_image)
     rng = np.random.default_rng(0)
-    composite = (rng.random((64, 96, 3)).astype(np.float32) * 0.03 + 0.02)
+    composite = rng.random((64, 96, 3)).astype(np.float32) * 0.03 + 0.02
     _link_stack(enhancement, record.session_id, composite)
 
     subtle = ProcessingParameters(stack=StackParameters(stretch=0.0))

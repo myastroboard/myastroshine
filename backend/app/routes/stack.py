@@ -72,9 +72,7 @@ _QUALITY_FIELDS = (
 def _frame_infos(record: StackRecord, storage: StorageService) -> list[StackFrameInfo]:
     excluded = set(record.excluded_frames or [])
     rescued = set(record.included_frames or [])
-    quality_by_index = {
-        f["index"]: f for f in (record.quality_report or {}).get("frames", [])
-    }
+    quality_by_index = {f["index"]: f for f in (record.quality_report or {}).get("frames", [])}
     infos: list[StackFrameInfo] = []
     for index in storage.stack_frame_indices(record.stack_id):
         raw = quality_by_index.get(index)
@@ -191,9 +189,7 @@ async def upload_frames(
     prepared = await asyncio.gather(
         *(run_in_threadpool(stacking.prepare_frame, data, name) for data, name in payloads)
     )
-    record = await run_in_threadpool(
-        stacking.add_frames, stack_id, start_index, list(prepared)
-    )
+    record = await run_in_threadpool(stacking.add_frames, stack_id, start_index, list(prepared))
     return StackSessionResponse(
         stack_id=record.stack_id,
         status=record.status,

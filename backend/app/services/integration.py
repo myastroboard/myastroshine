@@ -99,8 +99,13 @@ class _FramePlan:
 
     def measure(self) -> FrameMeasure:
         return FrameMeasure(
-            self.index, self.star_count, self.fwhm, self.roundness,
-            self.background, self.noise, self.scale,
+            self.index,
+            self.star_count,
+            self.fwhm,
+            self.roundness,
+            self.background,
+            self.noise,
+            self.scale,
         )
 
 
@@ -238,14 +243,23 @@ class IntegrationService:
             )
             reference_index = reference.index
             ref_scale, ref_background = reference.scale, reference.background
-            registrable_count, quality_rejected = len(registrable), sum(
-                1 for p in plans if p.quality_rejected
+            registrable_count, quality_rejected = (
+                len(registrable),
+                sum(1 for p in plans if p.quality_rejected),
             )
             self._write_checkpoint(
-                stack_id, signature, aligned=aligned, reference_index=reference_index,
-                full_shape=full_shape, half_shape=half_shape, reference_noise=reference_noise,
-                reference_scale=ref_scale, reference_background=ref_background, kept=kept,
-                qualities=qualities, registrable_count=registrable_count,
+                stack_id,
+                signature,
+                aligned=aligned,
+                reference_index=reference_index,
+                full_shape=full_shape,
+                half_shape=half_shape,
+                reference_noise=reference_noise,
+                reference_scale=ref_scale,
+                reference_background=ref_background,
+                kept=kept,
+                qualities=qualities,
+                registrable_count=registrable_count,
                 quality_rejected=quality_rejected,
             )
 
@@ -256,8 +270,19 @@ class IntegrationService:
         if drizzle > 1 and aligned:
             median, sigma = self._reference_stats(aligned_path, full_shape)
             composite, coverage = self._drizzle(
-                stack_id, kept, half_shape, full_shape, drizzle, cal, cosmetic,
-                ref_scale, ref_background, weights, median, sigma, on_progress,
+                stack_id,
+                kept,
+                half_shape,
+                full_shape,
+                drizzle,
+                cal,
+                cosmetic,
+                ref_scale,
+                ref_background,
+                weights,
+                median,
+                sigma,
+                on_progress,
             )
         self._clear_checkpoint(stack_id)  # only on success - a failure above keeps it for resume
 
@@ -343,7 +368,7 @@ class IntegrationService:
             memmap = open_memmap(memmap_path, mode="r")
             if list(memmap.shape[1:]) != data["full_shape"] or memmap.shape[0] != len(data["kept"]):
                 return None
-        except (OSError, ValueError, json.JSONDecodeError, KeyError):
+        except OSError, ValueError, json.JSONDecodeError, KeyError:
             return None
         logger.info("resuming stack from checkpoint", stack_id=stack_id, frames=len(data["kept"]))
         return data
@@ -487,9 +512,7 @@ class IntegrationService:
             frame = frame * multiplier + (reference.background - multiplier * plan.background)
             memmap[slot] = frame.astype(np.float16)  # disjoint slot per task - safe from threads
 
-        self._map_frames(
-            list(enumerate(kept)), align_one, on_progress, "normalization", 50, 75
-        )
+        self._map_frames(list(enumerate(kept)), align_one, on_progress, "normalization", 50, 75)
         memmap.flush()  # returning drops the last ref -> mmap closed before _combine reopens it
         return str(path), (height, width, channels), reference_noise
 
@@ -703,7 +726,7 @@ def _as_rgb(frame: LinearFrame) -> np.ndarray:
 def _exposure_seconds(metadata: dict[str, str]) -> float | None:
     try:
         return float(metadata["exposure_s"])
-    except (KeyError, TypeError, ValueError):
+    except KeyError, TypeError, ValueError:
         return None
 
 
@@ -784,9 +807,7 @@ def _frame_weights(
     if weighting == "none" or not plans:
         return np.ones(len(plans), dtype=np.float64)
     if weighting == "quality":
-        return np.array(
-            [quality_by_index[p.index].weight for p in plans], dtype=np.float64
-        )
+        return np.array([quality_by_index[p.index].weight for p in plans], dtype=np.float64)
     noise = np.array([p.noise for p in plans], dtype=np.float64)
     return np.clip((np.median(noise) / noise) ** 2, *_WEIGHT_CLIP)
 

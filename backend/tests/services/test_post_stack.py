@@ -136,7 +136,7 @@ def test_render_stack_base_stretch_control_lifts_the_background() -> None:
 
 def test_render_stack_base_handles_a_mono_composite() -> None:
     rng = np.random.default_rng(2)
-    mono = (rng.random((120, 160)).astype(np.float32) * 0.02 + 0.01)
+    mono = rng.random((120, 160)).astype(np.float32) * 0.02 + 0.01
     out = render_stack_base(mono, StackParameters())
     assert out.shape == (120, 160, 3)
     assert np.isfinite(out).all()
