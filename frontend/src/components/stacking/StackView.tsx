@@ -110,7 +110,7 @@ export function StackView({ onEnhanceComposite }: StackViewProps) {
                 <button
                   type="button"
                   onClick={() => select(selectedFrame.index)}
-                  className="btn btn-outline btn-sm absolute left-3 top-3"
+                  className="absolute left-3 top-3 rounded-md border border-white/10 bg-black/60 px-3 py-1.5 text-xs text-white/85 backdrop-blur-sm transition-colors hover:bg-black/80"
                 >
                   {t('stacking.view.back_to_composite')}
                 </button>

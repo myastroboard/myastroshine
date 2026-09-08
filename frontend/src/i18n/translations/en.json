@@ -447,7 +447,8 @@
       "snr_improvement": "SNR improvement",
       "measured_noise_reduction": "Measured noise reduction",
       "enhance_composite": "Enhance composite",
-      "download_composite": "Download composite"
+      "download_composite": "Download composite",
+      "alignment_rms": "Alignment residual"
     },
     "settings": {
       "transform_label": "Alignment",

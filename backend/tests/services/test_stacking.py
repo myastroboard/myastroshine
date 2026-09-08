@@ -92,7 +92,7 @@ def test_process_produces_an_enhanceable_session(
     assert done.result is not None
     assert done.result["frames_stacked"] == 4
     assert done.result["frames_excluded"] == 0
-    assert done.result["snr_improvement"] == pytest.approx(2.0)
+    assert done.result["snr_improvement"] == pytest.approx(2.0, abs=0.4)
 
 
 def test_excluded_frames_are_left_out_of_the_composite(

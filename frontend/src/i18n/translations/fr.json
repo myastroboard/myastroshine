@@ -447,7 +447,8 @@
       "snr_improvement": "Amélioration du RSB",
       "measured_noise_reduction": "Réduction de bruit mesurée",
       "enhance_composite": "Améliorer le composite",
-      "download_composite": "Télécharger le composite"
+      "download_composite": "Télécharger le composite",
+      "alignment_rms": "Résidu d'alignement"
     },
     "settings": {
       "transform_label": "Alignement",

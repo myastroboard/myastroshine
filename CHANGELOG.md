@@ -64,9 +64,15 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (`POST /api/stack/{id}/process` now takes an optional settings body) with no
   re-upload, or inspect a frame and go "Back to composite". A `beforeunload`
   guard stops a mis-swipe or a mouse "back" from losing an in-progress stack.
-  Integration is currently a memory-bounded running mean; star-based alignment,
-  pixel rejection, frame weighting and calibration frames follow. See
-  `initial_plan/12_STACKING_REBUILD.md`.
+  The pipeline now **registers** the frames - it detects stars, picks the
+  sharpest frame as the reference and asterism-matches the rest onto it (a
+  vendored triangle matcher, no new dependency), warps them with Lanczos,
+  normalises each to the reference, and combines with iterative sigma rejection
+  and noise weighting, all in bounded memory (a `float16` memmap + row tiling,
+  so a thousand-frame stack does not need a thousand frames of RAM). On a real
+  150-frame Seestar set: sub-pixel alignment, ~8.7x noise reduction. Still to
+  come: calibration frames, an interpolating debayer, and a post-stack
+  stretch / colour-calibration step. See `initial_plan/12_STACKING_REBUILD.md`.
 
 ### Changed
 

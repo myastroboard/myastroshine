@@ -90,13 +90,9 @@ class AstroDexLink(Base):
 
 
 class StackRecord(Base):
-    """A multi-frame stacking session.
+    """A multi-frame stacking session (linear rebuild).
 
-    The ``registration_method`` / ``cosmic_ray_rejection`` /
-    ``background_normalization`` columns are from the v1.1 pipeline and retired -
-    they are dropped in a later migration once the rebuilt pipeline (linear,
-    star-based registration, Winsorized rejection) fully replaces it. See
-    ``initial_plan/12_STACKING_REBUILD.md``.
+    See ``initial_plan/12_STACKING_REBUILD.md``.
     """
 
     __tablename__ = "stacks"
@@ -112,20 +108,14 @@ class StackRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
-    # -- rebuilt pipeline config -------------------------------------------
     registration_transform: Mapped[str] = mapped_column(String(16), default="similarity")
     rejection_algo: Mapped[str] = mapped_column(String(24), default="winsorized_sigma")
     rejection_params: Mapped[JsonDict | None] = mapped_column(JSON)
     weighting: Mapped[str] = mapped_column(String(12), default="noise")
     #: frame indices the user has manually excluded (a trail, a cloud, ...).
     excluded_frames: Mapped[list[int]] = mapped_column(JSON, default=list)
-    #: per-frame metrics + accept/reject once Phase 3 analysis lands.
+    #: reference frame, per-frame metrics, registration residuals.
     quality_report: Mapped[JsonDict | None] = mapped_column(JSON)
-
-    # -- retired v1.1 columns (dropped in a later migration) --------------
-    registration_method: Mapped[str] = mapped_column(String(8), default="orb")
-    cosmic_ray_rejection: Mapped[bool] = mapped_column(default=True)
-    background_normalization: Mapped[bool] = mapped_column(default=True)
 
 
 class WebhookToken(Base):

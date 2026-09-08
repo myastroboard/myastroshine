@@ -522,6 +522,8 @@ export interface StackStatistics {
   framesExcluded: number;
   combinationMethod: string;
   registrationTransform: string;
+  registrationRmsPx: number | null;
+  referenceFrame: number | null;
   snrImprovement: number;
   measuredNoiseReduction: number | null;
 }
