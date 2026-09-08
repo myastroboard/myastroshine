@@ -242,7 +242,7 @@ function AdvancedSection({ draft, patch }: SectionProps) {
         hint={t('settings.advanced.rate_limit_per_minute.hint')}
         value={draft.rateLimitPerMinute}
         min={1}
-        max={1000}
+        max={6000}
         onChange={(rateLimitPerMinute) => patch({ rateLimitPerMinute })}
       />
       <NumberRow

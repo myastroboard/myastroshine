@@ -29,6 +29,7 @@ from app.models.settings import AppSettingsResponse, AppSettingsUpdate
 from app.models.stack import (
     ExcludeFrameRequest,
     InitiateStackRequest,
+    ProcessStackRequest,
     StackFrameInfo,
     StackResultResponse,
     StackSessionResponse,
@@ -68,6 +69,7 @@ __all__ = [
     "PresetOut",
     "ProcessRequest",
     "ProcessResponse",
+    "ProcessStackRequest",
     "ProcessingParameters",
     "SavePresetRequest",
     "SavePresetResponse",

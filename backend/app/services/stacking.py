@@ -24,7 +24,7 @@ from app.config import get_settings
 from app.db.models import StackRecord
 from app.exceptions import InvalidParameterError, ResourceNotFoundError
 from app.logging_config import get_logger
-from app.models import InitiateStackRequest, StackStatistics
+from app.models import InitiateStackRequest, ProcessStackRequest, StackStatistics
 from app.services import progress
 from app.services.job import JobService
 from app.services.session import SessionService
@@ -77,14 +77,16 @@ class StackingService:
         record = self._get(stack_id)
         if record.status not in ("waiting_for_frames", "ready"):
             raise InvalidParameterError(f"Stack {stack_id} is not accepting frames")
-        if not 0 <= index < record.frame_count:
-            raise InvalidParameterError(f"frame_index must be 0..{record.frame_count - 1}")
+        max_frames = get_app_settings().stacking_max_frames
+        if not 0 <= index < max_frames:
+            raise InvalidParameterError(f"frame_index must be 0..{max_frames - 1}")
 
         already = self.storage.has_linear_frame(stack_id, index)
         self.storage.save_linear_frame(stack_id, index, frame)
         if not already:
             record.received_frames += 1
-        if record.received_frames >= record.frame_count:
+        record.frame_count = max(record.frame_count, index + 1)
+        if record.received_frames >= _MIN_FRAMES:
             record.status = "ready"
         self.db.commit()
         self.db.refresh(record)
@@ -227,10 +229,24 @@ class StackingService:
         )
 
     def dispatch(
-        self, stack_id: str, jobs: JobService, client_ip: str | None = None
+        self,
+        stack_id: str,
+        jobs: JobService,
+        client_ip: str | None = None,
+        overrides: ProcessStackRequest | None = None,
     ) -> tuple[StackRecord, str]:
-        """Create a job and run the stack inline or on the queue."""
-        self._get(stack_id)  # 404 before any work
+        """Create a job and run the stack inline or on the queue.
+
+        ``overrides`` re-stacks with a changed setting (no re-upload); each run
+        produces a fresh composite session.
+        """
+        record = self._get(stack_id)  # 404 before any work
+        if overrides is not None:
+            changes = overrides.model_dump(exclude_none=True)
+            for field, value in changes.items():
+                setattr(record, field, value)
+            if changes:
+                self.db.commit()
         jobs.assert_under_concurrency_limit(client_ip)
         job = jobs.create(None, client_ip=client_ip)
 
@@ -239,7 +255,17 @@ class StackingService:
 
             task_process_stack.delay(stack_id, job.job_id)
         else:
-            self.process(stack_id, job.job_id)
+            # Sync mode: drive the JobRecord to a terminal state ourselves, the
+            # same way task_process_stack does on the queue - otherwise the row
+            # sits at "queued" forever and counts against the per-IP concurrency
+            # limit until the hourly stale-job sweep.
+            jobs.update(job.job_id, status="processing", progress_percent=5)
+            try:
+                self.process(stack_id, job.job_id)
+            except Exception as exc:
+                jobs.update(job.job_id, status="failed", error=str(exc))
+                raise
+            jobs.update(job.job_id, status="completed", progress_percent=100)
         return self._get(stack_id), job.job_id
 
     def get_result(self, stack_id: str) -> StackRecord:

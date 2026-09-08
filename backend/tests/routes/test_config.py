@@ -11,7 +11,7 @@ def test_config_reports_the_upload_and_stacking_limits(client) -> None:
     assert body == {
         "max_image_size_mb": 100,
         "stacking_enabled": True,
-        "stacking_max_frames": 500,
+        "stacking_max_frames": 2000,
     }
 
 

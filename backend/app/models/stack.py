@@ -29,6 +29,19 @@ class InitiateStackRequest(BaseModel):
     weighting: Weighting = "noise"
 
 
+class ProcessStackRequest(BaseModel):
+    """Optional body of ``POST /api/stack/{stack_id}/process``.
+
+    Lets the user re-stack with a changed setting without re-uploading. Any field
+    left out keeps the value chosen at ``initiate`` (or the previous run).
+    """
+
+    registration_transform: RegistrationTransform | None = None
+    combination_method: CombinationMethod | None = None
+    rejection_algo: RejectionAlgo | None = None
+    weighting: Weighting | None = None
+
+
 class StackSessionResponse(BaseModel):
     """Returned by ``POST /api/stack/initiate`` and the upload endpoints."""
 

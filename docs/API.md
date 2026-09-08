@@ -28,11 +28,13 @@ Common codes: `INVALID_PARAMETER` (400), `UNAUTHORIZED` (401), `FORBIDDEN` (403)
 Per IP, on `/upload`, `/process/{id}`, `/presets/{id}/apply/{session_id}`,
 `/star-mask/{id}`, `/auto-astro/{id}`, and `/stack/*`:
 
-- **Requests per minute** (`rate_limit_per_minute`, default **120**, not the
-  API spec's original 10 - the editor re-processes on every slider change,
-  500ms debounced, so a normal editing session alone can approach 120/min):
-  a fixed 60-second window, shared across all of the routes above (not
-  per-route).
+- **Requests per minute** (`rate_limit_per_minute`, default **600**): a fixed
+  60-second window, shared across all of the routes above (not per-route). Sized
+  well above a busy session - the editor re-processes on every slider change
+  (500ms debounced, ~120/min on its own) and a stacking upload burst lands on
+  top. It is an abuse guard for a public instance, not a fairness mechanism; one
+  user doing real work should never hit it (raise it further if a shared
+  household IP does).
 - **Concurrent processing jobs** (`max_concurrent_jobs_per_ip`, default 5):
   checked against non-terminal rows in the `jobs` table, so it holds under
   both `PROCESSING_MODE=sync` and `queue`.
@@ -427,17 +429,22 @@ rejection yet.
 2. `POST /stack/{stack_id}/upload-frame` (multipart: `frame_index`, `file`) ->
    `202 { frame_index, received_frames, frame_count, status }`. `status` becomes
    `"ready"` once every frame is in.
-3. `POST /stack/{stack_id}/upload-archive` (multipart: `file` = a `.zip`) ->
-   `202 { stack_id, status, frame_count, received_frames }`. Image members are
-   ingested in filename order and assigned indices from `received_frames` upward,
-   up to `frame_count` - one HTTP request for a whole session.
-4. `POST /stack/{stack_id}/frame/{index}/exclude` `{ excluded: bool }` ->
+3. `POST /stack/{stack_id}/upload-frames` (multipart: `start_index`, `files` =
+   many files) -> `202 { stack_id, status, frame_count, received_frames }`. The
+   frontend sends frames in batches of a few dozen so a thousand-frame session is
+   tens of requests, not a thousand.
+4. `POST /stack/{stack_id}/upload-archive` (multipart: `file` = a `.zip`) ->
+   the same response. Image members are ingested in filename order and assigned
+   indices from `received_frames` upward, up to `frame_count`.
+5. `POST /stack/{stack_id}/frame/{index}/exclude` `{ excluded: bool }` ->
    `200 { index, thumb_url, excluded }`. Toggles a frame in or out of the stack
    (a trail, a cloud). Excluded frames are skipped by `process`.
-5. `GET /stack/{stack_id}/frame/{index}/thumb` -> a ~256 px auto-stretched JPEG
+6. `GET /stack/{stack_id}/frame/{index}/thumb` -> a ~256 px auto-stretched JPEG
    for the frame grid. Not rate-limited.
-6. `POST /stack/{stack_id}/process` runs the pipeline synchronously and returns
-   `200`:
+7. `POST /stack/{stack_id}/process` runs the pipeline synchronously and returns
+   `200`. An optional body `{ registration_transform?, combination_method?,
+   rejection_algo?, weighting? }` re-stacks with a changed setting - no re-upload,
+   each run makes a fresh composite session:
 
 ```json
 {

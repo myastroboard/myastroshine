@@ -2,6 +2,7 @@
 
 POST /api/stack/initiate                         - open a stack session
 POST /api/stack/{id}/upload-frame                - upload one frame
+POST /api/stack/{id}/upload-frames               - upload a batch of frames in one request
 POST /api/stack/{id}/upload-archive              - upload a .zip of frames in one request
 POST /api/stack/{id}/frame/{index}/exclude       - include/exclude a frame
 GET  /api/stack/{id}/frame/{index}/thumb         - a frame's thumbnail
@@ -27,6 +28,7 @@ from app.logging_config import get_logger
 from app.models import (
     ExcludeFrameRequest,
     InitiateStackRequest,
+    ProcessStackRequest,
     StackFrameInfo,
     StackResultResponse,
     StackSessionResponse,
@@ -34,6 +36,7 @@ from app.models import (
     UploadFrameResponse,
 )
 from app.services.storage import StorageService
+from app.utils.app_settings import get_app_settings
 from app.utils.linear_ingest import ingest_frame
 from app.utils.rate_limit import get_client_ip
 from app.utils.validators import validate_image_extension, validate_upload_size
@@ -117,6 +120,40 @@ async def upload_frame(
 
 
 @router.post(
+    "/{stack_id}/upload-frames",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=StackSessionResponse,
+)
+async def upload_frames(
+    stack_id: str,
+    stacking: StackingServiceDep,
+    _rate_limit: RequireRateLimit,
+    start_index: int = Form(...),
+    files: list[UploadFile] = File(...),
+) -> StackSessionResponse:
+    """Upload a batch of frames in one request, indexed ``start_index`` upward.
+
+    The frontend sends frames in batches of a few dozen so a thousand-frame
+    session is tens of requests, not a thousand.
+    """
+    record = stacking.get_result(stack_id)  # 404 before any work
+    for offset, upload in enumerate(files):
+        data = await upload.read()
+        validate_upload_size(len(data))
+        if upload.filename:
+            validate_image_extension(upload.filename)
+        record = stacking.add_frame(
+            stack_id, start_index + offset, ingest_frame(data, upload.filename)
+        )
+    return StackSessionResponse(
+        stack_id=record.stack_id,
+        status=record.status,
+        frame_count=record.frame_count,
+        received_frames=record.received_frames,
+    )
+
+
+@router.post(
     "/{stack_id}/upload-archive",
     status_code=status.HTTP_202_ACCEPTED,
     response_model=StackSessionResponse,
@@ -151,10 +188,11 @@ async def upload_archive(
         raise UnsupportedImageError("Archive contains no supported image files")
 
     record = stacking.get_result(stack_id)  # 404 before any work
+    ceiling = get_app_settings().stacking_max_frames
     next_index = record.received_frames
     added = 0
     for member in image_members:
-        if next_index >= record.frame_count:
+        if next_index >= ceiling:
             break
         member_bytes = archive.read(member)
         validate_upload_size(len(member_bytes))
@@ -214,9 +252,13 @@ async def process_stack(
     jobs: JobServiceDep,
     http_request: Request,
     _rate_limit: RequireRateLimit,
+    overrides: ProcessStackRequest | None = None,
 ) -> StackResultResponse:
-    """Integrate the frames into a composite."""
-    record, job_id = stacking.dispatch(stack_id, jobs, get_client_ip(http_request))
+    """Integrate the frames into a composite.
+
+    An optional body re-stacks with a changed setting (no re-upload).
+    """
+    record, job_id = stacking.dispatch(stack_id, jobs, get_client_ip(http_request), overrides)
     return _result(record, storage, job_id)
 
 

@@ -435,7 +435,8 @@
     "steps": {
       "registration": "Alignment",
       "normalization": "Normalization",
-      "integration": "Integration"
+      "integration": "Integration",
+      "upload": "Uploading frames"
     },
     "results": {
       "failed": "Stacking failed: {error}",
@@ -481,13 +482,34 @@
         "uploading": "uploading",
         "done": "done",
         "error": "error"
-      }
+      },
+      "drop_hint": "Drop your light frames here",
+      "choose_files_button": "Choose files",
+      "accepted_formats": "JPEG, PNG, TIFF, FITS or camera RAW",
+      "max_size": "up to {mb} MB each"
     },
     "view": {
       "settings_heading": "Stack settings",
       "stacking_button": "Stacking...",
       "stack_n_frames": "Stack {count} frames",
-      "hint": "Upload at least 2 similar frames (JPEG, PNG, TIFF or FITS). More frames raise the signal-to-noise ratio by roughly the square root of the frame count."
+      "hint": "Upload at least 2 similar frames (JPEG, PNG, TIFF or FITS). More frames raise the signal-to-noise ratio by roughly the square root of the frame count.",
+      "preview_placeholder": "Select a frame to preview it.",
+      "uploading_button": "Uploading...",
+      "upload_n_frames": "Upload {count} frames",
+      "review_hint": "{total} frames uploaded, {excluded} excluded. Click a thumbnail to preview it; use the checkbox to drop a trailed or clouded sub.",
+      "new_stack": "New stack",
+      "back_to_composite": "Back to composite",
+      "restack_n_frames": "Re-stack {count} frames"
+    },
+    "errors": {
+      "too_few": "Add at least {min} frames to stack.",
+      "too_many": "{count} frames selected - this instance allows at most {max} per stack (raise it in Settings).",
+      "failed": "Stacking failed."
+    },
+    "grid": {
+      "frame_aria": "Frame {n}",
+      "exclude": "Exclude this frame from the stack",
+      "remove": "Remove {name}"
     }
   }
 }
