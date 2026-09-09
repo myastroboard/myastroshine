@@ -71,6 +71,7 @@ export function EditorView({ session, astrodexContext, onExit }: EditorViewProps
     updateStackParameter,
     updateChannelCurve,
     applyGeometry,
+    trackJob,
     resetParameters,
     resetStack,
     resetCurves,
@@ -198,7 +199,7 @@ export function EditorView({ session, astrodexContext, onExit }: EditorViewProps
   }
 
   async function handlePresetApply(presetId: string): Promise<void> {
-    await applyPreset(presetId);
+    const job = await applyPreset(presetId);
     const preset = presets.find((entry) => entry.presetId === presetId);
     if (preset) {
       // A preset is a look, not a composition - keep the current framing
@@ -209,7 +210,9 @@ export function EditorView({ session, astrodexContext, onExit }: EditorViewProps
         geometry: parameters.geometry,
       });
     }
-    setPresetVersion((v) => v + 1);
+    // Follow the job to completion so the preview refetches when the result is
+    // actually ready - on the queue the job is still running when this returns.
+    trackJob(job);
   }
 
   async function handleAutoAstro(): Promise<void> {
@@ -222,7 +225,7 @@ export function EditorView({ session, astrodexContext, onExit }: EditorViewProps
         ...result.parameters,
         geometry: parameters.geometry,
       });
-      setPresetVersion((v) => v + 1);
+      trackJob(result);
     }
   }
 

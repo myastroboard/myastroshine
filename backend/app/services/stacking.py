@@ -379,6 +379,14 @@ class StackingService:
         if get_settings().processing_mode == "queue":
             from app.tasks.processing import task_process_stack  # noqa: PLC0415
 
+            # The worker sets this a moment from now, but the route builds its
+            # response immediately. Without it, re-stacking an already-"completed"
+            # stack would answer "completed" (pointing at the previous run's
+            # session) and the client would skip straight past the progress
+            # stream - the new run only becomes visible on a second click.
+            record.status = "processing"
+            record.error = None
+            self.db.commit()
             task_process_stack.delay(stack_id, job.job_id)
         else:
             # Sync mode: drive the JobRecord to a terminal state ourselves, the

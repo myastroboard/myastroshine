@@ -157,6 +157,57 @@ def test_process_can_re_stack_with_a_changed_setting(client, star_field: np.ndar
     assert second["statistics"]["combination_method"] == "median"
 
 
+def test_queue_restack_reports_processing_not_the_previous_result(
+    client, star_field: np.ndarray, monkeypatch
+) -> None:
+    """Re-stacking in queue mode must answer "processing", not the finished run.
+
+    The worker flips the record to "processing" a moment later, but the route
+    response is built now: if it echoed the previous run's "completed" (and its
+    stale session), the client would skip the progress stream and only pick the
+    new run up on a second click.
+    """
+    from app.config import get_settings
+
+    init = client.post("/api/stack/initiate", json={"frame_count": 3})
+    stack_id = init.json()["stack_id"]
+    for i in range(3):
+        client.post(
+            f"/api/stack/{stack_id}/upload-frame",
+            data={"frame_index": str(i)},
+            files={"file": (f"f{i}.png", png_bytes(translate(star_field, i, -i)), "image/png")},
+        )
+
+    first = client.post(f"/api/stack/{stack_id}/process").json()
+    assert first["status"] == "completed"
+    first_session = first["session_id"]
+
+    # Switch to queue mode and stub the worker so the new run stays pending.
+    monkeypatch.setenv("PROCESSING_MODE", "queue")
+    get_settings.cache_clear()
+    enqueued: list[tuple] = []
+    monkeypatch.setattr(
+        "app.tasks.processing.task_process_stack.delay",
+        lambda *args: enqueued.append(args),
+    )
+    try:
+        second = client.post(
+            f"/api/stack/{stack_id}/process", json={"combination_method": "median"}
+        ).json()
+    finally:
+        get_settings.cache_clear()
+
+    assert enqueued, "the worker task should have been enqueued"
+    assert second["status"] == "processing"
+    assert second["job_id"]
+    assert second["ws_status_url"] == f"/ws/stack-status/{second['job_id']}"
+    # The composite stays put until the new run finishes.
+    assert second["session_id"] == first_session
+
+    fetched = client.get(f"/api/stack/{stack_id}").json()
+    assert fetched["status"] == "processing"
+
+
 def test_calibration_frames_upload_clear_and_report(client, star_field: np.ndarray) -> None:
     """Dark/flat subs upload in a batch, show in the stack, and clear on request."""
     init = client.post("/api/stack/initiate", json={"frame_count": 3})
