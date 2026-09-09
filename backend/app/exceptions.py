@@ -71,6 +71,13 @@ class ImageProcessingError(AppError):
     error_code = "PROCESSING_FAILED"
 
 
+class UpstreamError(AppError):
+    """A call to an external service this instance depends on failed."""
+
+    status_code = 502
+    error_code = "UPSTREAM_ERROR"
+
+
 class RateLimitedError(AppError):
     status_code = 429
     error_code = "RATE_LIMITED"

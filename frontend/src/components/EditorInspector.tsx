@@ -83,12 +83,13 @@ export interface DepthBundle {
 }
 
 export interface ExportBundle {
-  canSendToAstroDex: boolean;
-  astrodexSending: boolean;
-  astrodexSent: boolean;
+  canReturnToAstroDex: boolean;
+  astrodexObjectName: string | null;
+  astrodexReturning: boolean;
+  astrodexReturned: boolean;
   astrodexError: string | null;
   onDownload: () => void;
-  onSendToAstroDex: () => void;
+  onReturnToAstroDex: () => void;
   onSaveAsPreset: () => void;
 }
 
@@ -221,12 +222,13 @@ export function EditorInspector(props: EditorInspectorProps) {
       {activeStep === 'export' && (
         <ExportPanel
           isProcessing={props.isProcessing}
-          canSendToAstroDex={props.exportActions.canSendToAstroDex}
-          astrodexSending={props.exportActions.astrodexSending}
-          astrodexSent={props.exportActions.astrodexSent}
+          canReturnToAstroDex={props.exportActions.canReturnToAstroDex}
+          astrodexObjectName={props.exportActions.astrodexObjectName}
+          astrodexReturning={props.exportActions.astrodexReturning}
+          astrodexReturned={props.exportActions.astrodexReturned}
           astrodexError={props.exportActions.astrodexError}
           onDownload={props.exportActions.onDownload}
-          onSendToAstroDex={props.exportActions.onSendToAstroDex}
+          onReturnToAstroDex={props.exportActions.onReturnToAstroDex}
           onSaveAsPreset={props.exportActions.onSaveAsPreset}
         />
       )}

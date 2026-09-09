@@ -135,9 +135,9 @@ after changing it).
 | General | `stacking_enabled` / `stacking_max_frames` / `stacking_retention_hours` | true / 2000 / 12 |
 | General | `stacking_workers` (register/align/combine threads; 0 = auto, cap 4) | 0 |
 | General | `stacking_watch_dir` / `stacking_watch_idle_minutes` / `stacking_watch_auto_process` (folder-watch ingest; empty dir = off) | "" / 10 / true |
-| Webhooks | AstroDex bearer tokens (create / revoke) | - |
-| Webhooks | `astrodex_callback_urls` (allowlist) | empty |
-| Webhooks | `astrodex_max_retries` / `astrodex_retry_delay_seconds` | 3 / 5s |
+| AstroDex | webhook token (create / revoke; paste token + signing secret into MyAstroBoard) | - |
+| AstroDex | `astrodex_callback_urls` (board-origin allowlist, fails closed) | empty |
+| AstroDex | `astrodex_max_retries` / `astrodex_retry_delay_seconds` (return delivery) | 3 / 5s |
 | Advanced | `cors_origins` | `http://localhost:3000` |
 | Advanced | `rate_limit_enabled` / `rate_limit_per_minute` / `max_concurrent_jobs_per_ip` | `true` / 600 / 5 |
 | Advanced | `log_level` / `console_log_level` | `info` / `warning` |

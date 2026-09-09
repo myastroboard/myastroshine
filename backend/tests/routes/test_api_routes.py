@@ -20,8 +20,8 @@ def test_openapi_schema_is_served(client) -> None:
         "/api/presets",
         "/api/depth-shift/{session_id}",
         "/api/tokens",
-        "/api/astrodex/receive",
-        "/api/send-to-astrodex",
+        "/api/astrodex/handoff/resume",
+        "/api/astrodex/handoff/return",
         "/api/stack/initiate",
         "/api/stack/{stack_id}/process",
     ):

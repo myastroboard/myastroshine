@@ -13,6 +13,8 @@ import type {
   DepthShiftResult,
   EngineStatusResponse,
   FocusPoint,
+  HandoffResumeResponse,
+  HandoffReturnResponse,
   LogLevel,
   LogLevels,
   LogTail,
@@ -28,7 +30,6 @@ import type {
   UploadFrameResult,
   UploadResponse,
   VersionCheckResult,
-  WebhookResponse,
   WebhookToken,
 } from '@/types';
 
@@ -201,16 +202,22 @@ export const apiClient = {
     return response.blob();
   },
 
-  sendToAstroDex(
-    sessionId: string,
-    astrodexImageId: string,
-    callbackUrl: string,
-    token: string,
-  ): Promise<WebhookResponse> {
-    return request<WebhookResponse>('/send-to-astrodex', {
+  /** Open an editing session from an AstroDex handoff token (the browser was
+   * sent here by MyAstroBoard). The backend verifies the token and pulls the
+   * source image itself. */
+  resumeAstrodexHandoff(handoff: string): Promise<HandoffResumeResponse> {
+    return request<HandoffResumeResponse>('/astrodex/handoff/resume', {
       method: 'POST',
-      bearer: token,
-      json: { sessionId, astrodexImageId, astrodexCallbackUrl: callbackUrl },
+      json: { handoff },
+    });
+  },
+
+  /** Send the enhanced result back to AstroDex, where it is filed as a new
+   * picture on the same object. */
+  returnToAstrodex(sessionId: string): Promise<HandoffReturnResponse> {
+    return request<HandoffReturnResponse>('/astrodex/handoff/return', {
+      method: 'POST',
+      json: { sessionId },
     });
   },
 

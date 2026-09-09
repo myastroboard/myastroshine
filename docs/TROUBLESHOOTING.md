@@ -158,10 +158,17 @@ schedule, or prune the data volume yourself.
 The CORS middleware reads `cors_origins` once at startup - restart the `api`
 container after changing it. Every other setting applies immediately.
 
-**AstroDex webhook delivery is refused (403).**
+**"Send back to AstroDex" fails, or opening an image from AstroDex is refused
+(403).**
 `astrodex_callback_urls` is an allowlist that fails closed - an empty allowlist
-rejects every callback URL. Add the AstroDex callback origin in
-**Settings -> Webhooks** before enabling delivery.
+rejects every board origin. Add the MyAstroBoard origin the handoff was minted
+with (the public URL and, if the container reaches the board another way, that
+address too) in **Settings -> Webhooks**.
+
+**"Send back to AstroDex" fails with a 502.**
+The container could not reach `callback_base`. If MyAstroBoard is behind a
+reverse proxy the LAN cannot hairpin, set the connector's callback-URL override
+on the board to an address this container can reach directly.
 
 **`ADMIN_ENABLED=false` and Settings won't save.**
 That flag disables `/api/admin/*` (and `/api/tokens`) entirely. It is a feature

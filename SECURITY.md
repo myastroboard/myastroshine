@@ -40,13 +40,16 @@ that adds real authentication in front of it.
   (`max_image_size_mb`), and the decoded pixel count is capped too
   (`app/utils/image_utils.py:decode_image`) - a small file that would
   decompress into a huge array is rejected rather than trusted.
-- **AstroDex webhook callback URLs fail closed**: an empty
-  `astrodex_callback_urls` allowlist rejects every callback URL rather than
-  allowing all of them. Configure at least one entry before enabling AstroDex
-  webhook delivery, or requests to `/api/send-to-astrodex` and
-  `/api/astrodex/receive` are refused. This is the main defense against the
-  server being used to make requests to arbitrary internal/external hosts
-  (SSRF) via the webhook feature.
+- **AstroDex callback URLs fail closed**: an empty `astrodex_callback_urls`
+  allowlist rejects every callback. A handoff token carries the board origin it
+  was minted with (`callback_base`); `/api/astrodex/handoff/resume` refuses it
+  unless that origin is on the allowlist, before making any outbound request.
+  Configure at least one entry before using the integration. This is the main
+  defense against the server being pointed at arbitrary internal/external hosts
+  (SSRF) through the handoff.
+- **Handoff tokens** are HMAC-SHA256 signed with a webhook token's
+  `signing_secret`, expire after 12 h, and are single-use for the return leg
+  (the board rejects a replayed `jti`). A tampered or expired token is a `401`.
 - **CORS**: `cors_origins` rejects a literal `"*"` entry - the API always sets
   `allow_credentials=True`, so a wildcard origin would be a real hole, not
   just a combination browsers already reject.
@@ -60,8 +63,8 @@ that adds real authentication in front of it.
   React's default JSX escaping is the only rendering path.
 - **Rate limiting**: per-IP request limits cover the full API surface,
   including `/api/tokens`, `/api/admin/*`, `/api/download/*`, and the AstroDex
-  routes, plus a separate per-IP concurrent-job cap (`docs/API.md` "Rate
-  Limiting").
+  handoff routes, plus a separate per-IP concurrent-job cap (`docs/API.md`
+  "Rate Limiting").
 - **Error handling**: the shared error envelope never includes a stack trace,
   file path, or other internal detail in a response body.
 

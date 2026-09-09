@@ -137,8 +137,8 @@ sky as far); the focal point pulls the chosen spot forward too.
 
 ### Export
 
-Download the result (JPEG), **Send to AstroDex** (when opened from AstroDex), or
-**Save as preset** to reuse the current settings later.
+Download the result (JPEG), **Send back to AstroDex** (when the session was
+opened from AstroDex), or **Save as preset** to reuse the current settings later.
 
 ## Edit milestones
 
@@ -225,11 +225,14 @@ chip list.
 
 ## AstroDex integration
 
-When AstroDex opens MyAstroShine it passes the image, a callback URL, and a
-token. Edit as normal, then **Send to AstroDex** delivers the enhanced image back
-as a signed webhook (background, retried). Standalone use needs none of this - the
-integration is inert unless a token and callback allowlist are configured. See
-[ARCHITECTURE.md](ARCHITECTURE.md#astrodex-integration).
+From a photo in MyAstroBoard's AstroDex, **Send to MyAstroShine** opens the
+editor here with a signed one-time handoff; the backend verifies it and pulls the
+image itself. Edit as normal, then **Send back to AstroDex** posts the result
+back, where it is filed as a **new** picture on the same object - the original is
+never replaced. MyAstroShine only ever calls out to the board, so it works even
+when the board is behind a reverse proxy. Standalone use needs none of this - the
+integration is inert unless a webhook token and the board-origin allowlist are
+configured. See [ARCHITECTURE.md](ARCHITECTURE.md#astrodex-integration).
 
 ## Themes and language
 
