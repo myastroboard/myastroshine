@@ -28,6 +28,10 @@ export interface ImagePreviewProps {
   /** Image aspect ratio (width / height); falls back to 16:9. */
   aspectRatio?: number;
   isLoading?: boolean;
+  /** 0-100 job progress; a determinate bar shows while it's strictly between. */
+  progress?: number;
+  /** Overrides the generic "Processing" label under the spinner (e.g. a long pass). */
+  progressLabel?: string;
   /** Present only while the Framing step is active. */
   framing?: FramingState | null;
   /** Detected star circles to draw over the preview, or null to hide the overlay. */
@@ -50,6 +54,8 @@ export function ImagePreview({
   histogram,
   aspectRatio,
   isLoading = false,
+  progress = 0,
+  progressLabel,
   framing,
   starMaskOverlay,
   focalPoint,
@@ -300,10 +306,26 @@ export function ImagePreview({
 
         {isLoading && (
           <div className="pointer-events-none absolute inset-0 grid place-items-center bg-black/45 backdrop-blur-[1px]">
-            <span className="flex items-center gap-2 text-xs font-medium text-white/85">
-              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/25 border-t-white/80" />
-              {t('image_preview.processing')}
-            </span>
+            <div className="flex w-40 flex-col items-center gap-2 text-xs font-medium text-white/85">
+              <span className="flex items-center gap-2">
+                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/25 border-t-white/80" />
+                {progressLabel ?? t('image_preview.processing')}
+              </span>
+              {progress > 0 && progress < 100 && (
+                <span
+                  role="progressbar"
+                  aria-valuenow={Math.round(progress)}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  className="h-1 w-full overflow-hidden rounded-full bg-white/20"
+                >
+                  <span
+                    className="block h-full rounded-full bg-white/80 transition-[width] duration-300"
+                    style={{ width: `${progress}%` }}
+                  />
+                </span>
+              )}
+            </div>
           </div>
         )}
       </div>

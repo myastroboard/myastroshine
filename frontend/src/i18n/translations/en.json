@@ -153,6 +153,7 @@
     "reset_zoom": "Reset zoom",
     "zoom_in": "Zoom in",
     "processing": "Processing",
+    "removing_stars_starnet2": "Removing stars (StarNet2)",
     "before_after": "Before / After",
     "open_depth_shift": "Open Depth Shift viewer",
     "change_focal_point": "Change focal point",

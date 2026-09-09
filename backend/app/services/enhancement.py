@@ -24,7 +24,7 @@ from app.services.external_starless import (
     StarlessSplitFn,
     blend_starless,
 )
-from app.services.image_processing import ImageProcessingService
+from app.services.image_processing import ImageProcessingService, StepCallback
 from app.services.job import JobService
 from app.services.session import SessionService
 from app.services.star_detection import StarDetectionService
@@ -35,6 +35,10 @@ from app.utils.app_settings import get_app_settings
 logger = get_logger(__name__)
 
 _ESTIMATE_SECONDS = {"queued": 8, "processing": 4}
+#: A StarNet2 pass dominates the job's wall time (minutes vs. seconds for every
+#: other stage), so its live progress drives the bar across this whole band
+#: instead of the single ~4-point slice a normal pipeline stage gets.
+_STARNET2_PROGRESS_BAND = (20, 80)
 
 
 class EnhancementService:
@@ -97,14 +101,15 @@ class EnhancementService:
         )
 
     def _starless_split(
-        self, session_id: str, params: ProcessingParameters
+        self, session_id: str, params: ProcessingParameters, on_step: StepCallback
     ) -> StarlessSplitFn | None:
         """A StarNet2-backed split for the pipeline, or ``None`` for the classical path.
 
         Returns ``None`` (classical) unless star removal is on, the edit asked for
         ``"starnet2"``, and the operator has a working binary. The returned fn caches
         StarNet2's estimate per session and falls back to the classical split if a
-        pass fails - so the pipeline can treat it as an ordinary split.
+        pass fails - so the pipeline can treat it as an ordinary split. ``on_step``
+        is fed the live per-pass progress a StarNet2 run reports.
         """
         if params.star_removal <= 0 or params.star_removal_engine != "starnet2":
             return None
@@ -116,7 +121,14 @@ class EnhancementService:
             return None
 
         settings = get_app_settings()
-        engine = ExternalStarlessService(settings.starnet2_path, settings.starnet2_stride)
+        low, high = _STARNET2_PROGRESS_BAND
+
+        def report(fraction: float) -> None:
+            on_step("star_removal", round(low + fraction * (high - low)))
+
+        engine = ExternalStarlessService(
+            settings.starnet2_path, settings.starnet2_stride, progress_cb=report
+        )
         cache = StarlessModelCache(self.storage, session_id)
         fallback = StarlessService(StarDetectionService())
         key = {"engine": "starnet2", "stride": settings.starnet2_stride}
@@ -150,11 +162,18 @@ class EnhancementService:
         try:
             self.sessions.get_session(session_id)
 
+            # Progress only moves forward within a job: the fixed per-stage
+            # percentages would otherwise pull the bar back after a StarNet2 pass
+            # (below) has pushed it deep into the creative stages' range.
+            progress_floor = 5
+
             def on_step(name: str, percent: int) -> None:
-                self.jobs.update(job_id, current_step=name, progress_percent=percent)
+                nonlocal progress_floor
+                progress_floor = max(progress_floor, percent)
+                self.jobs.update(job_id, current_step=name, progress_percent=progress_floor)
                 self._emit(job_id)
 
-            starless_split = self._starless_split(session_id, params)
+            starless_split = self._starless_split(session_id, params, on_step)
             stack_id = self._backing_stack_id(session_id)
             if stack_id is not None:
                 # A stacked-composite session: run the pipeline on the 32-bit

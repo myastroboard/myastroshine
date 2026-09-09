@@ -62,6 +62,8 @@ export function EditorView({ session, astrodexContext, onExit }: EditorViewProps
   const {
     parameters,
     status,
+    progress,
+    currentStep,
     previewVersion,
     updateParameter,
     updateStarRemovalEngine,
@@ -406,6 +408,12 @@ export function EditorView({ session, astrodexContext, onExit }: EditorViewProps
           histogram={session.histogram}
           aspectRatio={previewAspectRatio}
           isLoading={isProcessing}
+          progress={progress}
+          progressLabel={
+            currentStep === 'star_removal' && parameters.starRemovalEngine === 'starnet2'
+              ? t('image_preview.removing_stars_starnet2')
+              : undefined
+          }
           framing={
             framingActive && session.dimensions
               ? {
