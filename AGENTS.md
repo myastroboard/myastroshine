@@ -12,8 +12,8 @@ Keep the "Non-negotiables" section intact.
 - **Never offer or ask to commit.** Staging or showing a diff on request is fine.
 - **Never push, force-push, rebase-onto-shared, or rewrite published history**
   without an explicit request.
-- **Always add attribution lines** ("Generated with...", "Co-Authored-By: ...") to
-  commit messages or pull request descriptions, but never add link to the session.
+- **No attribution lines** in commit messages or pull request descriptions - no
+  "Generated with", no "Co-Authored-By", no link back to the assistant session.
 - **Never skip or disable hooks / signing / CI** unless explicitly asked. If a hook
   fails, fix the cause.
 - **Report outcomes honestly.** If tests fail, say so and show the output.
@@ -21,7 +21,9 @@ Keep the "Non-negotiables" section intact.
 ## 2. Before you write any code
 
 - Read `CONTRIBUTING.md`, this file, and the relevant `docs/*.md` for the subsystem
-  you are about to touch (`docs/API.md`, `docs/ALGORITHMS.md`, `docs/DEPLOYMENT.md`).
+  you are about to touch: [`docs/README.md`](docs/README.md) indexes them -
+  `ARCHITECTURE.md` (topology), `API.md` (contract), `ALGORITHMS.md` (the maths),
+  `DEPLOYMENT.md` (config), `DESIGN.md` (the frontend visual system).
 - Match the surrounding code: naming, idioms, comment density, file layout,
   error-handling style.
 - Prefer editing existing files over adding new ones. Do not introduce a new

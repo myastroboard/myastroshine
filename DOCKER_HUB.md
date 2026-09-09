@@ -2,18 +2,22 @@
 
 **A self-hosted astronomical image processing tool - enhancement, multi-image stacking, and depth effects.**
 
-MyAstroShine automatically enhances astrophotography images, aligns and stacks multiple frames to raise signal-to-noise, and adds a parallax "Depth Shift" effect - all from one Docker image, no account or cloud upload required. It integrates optionally with [MyAstroBoard](https://github.com/myastroboard/myastroboard)'s AstroDex but also runs entirely standalone.
+MyAstroShine automatically enhances astrophotography images, aligns and stacks 2-2000 frames to raise signal-to-noise, and adds a parallax "Depth Shift" effect - all from one Docker image, no account or cloud upload required. It integrates optionally with [MyAstroBoard](https://github.com/myastroboard/myastroboard)'s AstroDex but also runs entirely standalone.
 
 ---
 
 ## ✨ Features
 
-- **Automatic enhancement** - contrast, clarity, noise reduction, dynamic stretching, star reduction
-- **Adjustment sliders** - real-time fine-tuning of every parameter, grouped by category with inline help
+- **Automatic enhancement** - contrast, clarity, noise reduction, dynamic stretching, dehaze, gradient and vignette correction, in a workflow-ordered editor with inline help
+- **One-click Auto Astro** - analyses the image and applies an adaptive starting point; plus five built-in presets and your own
+- **Tone + colour curves** - an interactive master RGB curve and independent red / green / blue curves
+- **Star handling** - shrink stars in place, or lift them out entirely (starless workflow) and blend them back at the end
 - **Geometry tools** - rotate, flip, straighten, and crop before the pixel pipeline runs
 - **Depth Shift** - a parallax effect that adds a sense of 3D depth to a single frame
-- **Stacking** - align and combine 5-100 frames (SIFT/ORB registration, median/mean/sigma-clip combination) to raise SNR
-- **Presets** - five built-ins plus your own, applied to any session
+- **Stacking** - align and combine 2-2000 linear frames (calibration, per-frame quality scoring, asterism-matching registration, sigma-clip combination, optional drizzle) to raise SNR
+- **Optional ML engines** - point it at an operator-installed StarNet2 / DeepSNR binary (nothing bundled)
+- **FITS / camera RAW / 16-bit** upload support, plus edit milestones and a folder-watch stacking mode
+- **English + French** UI, light / dark themes
 - **AstroDex integration** - capture in AstroDex, enhance here, send back via a signed webhook
 - **Standalone workflow** - manual upload, edit, download - no other MyAstroBoard component required
 
@@ -83,7 +87,7 @@ persisted under the data volume. See the
 | Tag | Description |
 |-----|-------------|
 | `latest` | Latest stable release |
-| `x.y.z` | Specific version (e.g. `0.1.0`) |
+| `x.y.z` | Specific version (e.g. `0.2.0`) |
 | `x.y` | Latest patch of a minor version |
 | `x` | Latest minor of a major version |
 
@@ -107,7 +111,10 @@ persisted under the data volume. See the
 
 ## 📚 Documentation
 
+- [Documentation index](https://github.com/myastroboard/myastroshine/blob/main/docs/README.md)
+- [Features](https://github.com/myastroboard/myastroshine/blob/main/docs/FEATURES.md)
 - [Deployment Guide](https://github.com/myastroboard/myastroshine/blob/main/docs/DEPLOYMENT.md)
+- [Troubleshooting](https://github.com/myastroboard/myastroshine/blob/main/docs/TROUBLESHOOTING.md)
 - [API Reference](https://github.com/myastroboard/myastroshine/blob/main/docs/API.md)
 - [Contributing](https://github.com/myastroboard/myastroshine/blob/main/CONTRIBUTING.md)
 - [Security Policy](https://github.com/myastroboard/myastroshine/blob/main/SECURITY.md)
