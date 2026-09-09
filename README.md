@@ -16,7 +16,7 @@ runs just as well standalone, in a web browser.
 
 ![The MyAstroShine editor: a numbered workflow rail, the active step's inspector, and a pinned before/after preview with the histogram below](docs/export.png)
 
-> **Status: Alpha.** `v0.3.0` is tagged and published to `ghcr.io` and Docker
+> **Status: Alpha.** `v0.4.0` is tagged and published to `ghcr.io` and Docker
 > Hub. The full feature set is implemented and the frontend is wired end to end,
 > but the code has not been through a production shakedown - expect breaking
 > changes to the API, storage layout, and settings between releases, and don't
