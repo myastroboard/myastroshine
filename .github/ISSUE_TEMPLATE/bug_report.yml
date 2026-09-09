@@ -1,0 +1,95 @@
+name: Bug report
+description: Something in MyAstroShine behaves differently than expected
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. A few precise details up front usually save a round trip.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened
+      description: What went wrong, and what you expected instead.
+      placeholder: When I apply a preset, the preview keeps showing the previous result until I click again.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Upload a single image
+        2. Open the Stars step and raise "Remove stars"
+        3. ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: The part of the app the bug is in.
+      options:
+        - Enhancement (tone, contrast, clarity, denoise, stretch)
+        - Tone curves
+        - Geometry & framing (rotate / flip / straighten / crop)
+        - Star removal / starless
+        - Depth Shift
+        - Stacking & calibration
+        - Presets
+        - Edit milestones
+        - External ML engines (StarNet2 / DeepSNR)
+        - AstroDex integration / webhooks
+        - Settings & logs
+        - API / WebSocket
+        - Docker / installation
+        - UI / UX / theme
+        - Other / not sure
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Shown in the footer as `vX.Y.Z`, or the `VERSION` file at the repo root.
+      placeholder: 0.2.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: How are you running it
+      options:
+        - Docker Compose (release image)
+        - Docker Compose (dev / hot-reload)
+        - Local (uvicorn + Vite)
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: >
+        Export from Settings → Logs (or `docker compose logs`). Paste the lines
+        around the failure; redact anything sensitive.
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Screenshots & extra context
+      description: >
+        Before/after screenshots for a visual bug, the source file type
+        (FITS / RAW / JPEG), browser, or anything else that might matter.
+    validations:
+      required: false

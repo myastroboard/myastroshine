@@ -1,0 +1,59 @@
+name: Feature request
+description: Suggest a new capability or an improvement
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        MyAstroShine aims to stay a fast, self-hosted companion for everyday
+        enhancement — not a PixInsight/Siril replacement. Requests that fit that
+        scope are the most likely to land.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do
+      description: The workflow or frustration behind the request. Skip if it's self-evident.
+      placeholder: After stacking a night of subs I always have to...
+    validations:
+      required: false
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed change
+      description: What you'd like the app to do.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Enhancement (tone, contrast, clarity, denoise, stretch)
+        - Tone curves
+        - Geometry & framing (rotate / flip / straighten / crop)
+        - Star removal / starless
+        - Depth Shift
+        - Stacking & calibration
+        - Presets
+        - Edit milestones
+        - External ML engines (StarNet2 / DeepSNR)
+        - AstroDex integration / webhooks
+        - Settings & logs
+        - API / WebSocket
+        - Docker / installation
+        - UI / UX / theme
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Alternatives & context
+      description: Workarounds you've tried, mockups, or how other tools handle this.
+    validations:
+      required: false
