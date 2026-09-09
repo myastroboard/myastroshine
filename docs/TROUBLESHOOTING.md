@@ -177,9 +177,11 @@ An absolute `VITE_API_URL` makes `fetch` bypass the dev proxy while
 (`VITE_PROXY_TARGET`) forwards both to the backend.
 
 **Backend edits aren't picked up in the dev container.**
-File watching uses polling for Windows/macOS bind mounts (`VITE_USE_POLLING=1`,
-`watchmedo` for the worker). Give it a second; if it's still stuck, restart the
-service.
+`docker-compose.dev.yml` sets `WATCHFILES_FORCE_POLLING` so `uvicorn --reload`
+sees host edits over the bind mount. The **worker** (watchmedo) can still miss
+them - `docker compose -f docker-compose.dev.yml restart worker` after a backend
+change is the reliable path. If the editor was already wedged from an older
+build, restart `api` too (it clears the exhausted connection pool).
 
 **`pytest` fails on `test_deps_fresh.py`.**
 It queries PyPI/npm for stale pins. Offline, it skips itself; to skip it

@@ -181,6 +181,50 @@ describe('useImageProcessing.trackJob', () => {
     );
   });
 
+  it('proceeds anyway when the in-flight job has gone silent for too long', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      let n = 0;
+      mocked.processImage.mockImplementation(() =>
+        Promise.resolve({
+          sessionId: 's1',
+          jobId: `job-${(n += 1)}`,
+          status: 'queued',
+          previewUrl: '/api/preview/s1',
+          estimatedTimeSeconds: 8,
+          wsStatusUrl: `/ws/processing-status/job-${n}`,
+        }),
+      );
+
+      const { result } = renderHook(() => useImageProcessing('s1'));
+
+      await act(async () => {
+        void result.current.applyParameters({ ...result.current.parameters, contrast: 1.1 });
+      });
+      expect(mocked.processImage).toHaveBeenCalledTimes(1);
+
+      // The job never reports back. A second edit lands 10s later - coalesced.
+      vi.advanceTimersByTime(10_000);
+      await act(async () => {
+        void result.current.applyParameters({ ...result.current.parameters, contrast: 1.2 });
+      });
+      expect(mocked.processImage).toHaveBeenCalledTimes(1);
+
+      // Still silent 50s in - a further edit stops waiting and goes out.
+      vi.advanceTimersByTime(50_000);
+      await act(async () => {
+        void result.current.applyParameters({ ...result.current.parameters, contrast: 1.3 });
+      });
+      expect(mocked.processImage).toHaveBeenCalledTimes(2);
+      expect(mocked.processImage).toHaveBeenLastCalledWith(
+        's1',
+        expect.objectContaining({ contrast: 1.3 }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('a superseded job releases the slot and flushes the pending edit', async () => {
     let n = 0;
     mocked.processImage.mockImplementation(() =>

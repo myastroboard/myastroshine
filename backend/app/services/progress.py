@@ -67,8 +67,14 @@ def publish(job_id: str, event: JsonDict) -> None:
         logger.warning("progress publishing disabled (Redis unreachable)", error=str(exc))
 
 
-async def subscribe(job_id: str) -> AsyncIterator[JsonDict]:
-    """Yield progress events for ``job_id`` until the connection drops."""
+async def subscribe(job_id: str, *, idle_timeout: float = 3.0) -> AsyncIterator[JsonDict | None]:
+    """Yield progress events for ``job_id`` until the connection drops.
+
+    Yields ``None`` whenever ``idle_timeout`` seconds pass with no event - the
+    caller uses that tick to reconcile against the DB, so a terminal event
+    published in the gap between the caller's catch-up read and this
+    subscription (or lost to a Redis hiccup) can't wedge the stream open.
+    """
     client = aioredis.Redis.from_url(
         get_settings().redis_url,
         socket_connect_timeout=_CONNECT_TIMEOUT,
@@ -77,7 +83,11 @@ async def subscribe(job_id: str) -> AsyncIterator[JsonDict]:
     pubsub = client.pubsub()
     await pubsub.subscribe(channel(job_id))
     try:
-        async for message in pubsub.listen():
+        while True:
+            message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=idle_timeout)
+            if message is None:
+                yield None  # idle tick - caller re-reads the DB
+                continue
             if message.get("type") != "message":
                 continue
             data = message["data"]
