@@ -31,6 +31,7 @@ export function useImageProcessing(sessionId: string) {
   const [parameters, setParameters] = useState<ProcessingParameters>(DEFAULT_PARAMETERS);
   const [status, setStatus] = useState<JobStatus | 'idle'>('idle');
   const [progress, setProgress] = useState(0);
+  const [currentStep, setCurrentStep] = useState('');
   const [previewVersion, setPreviewVersion] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -39,6 +40,8 @@ export function useImageProcessing(sessionId: string) {
   const applyParameters = useCallback(
     async (next: ProcessingParameters) => {
       setStatus('processing');
+      setProgress(0);
+      setCurrentStep('');
       setError(null);
       // Drop the previous job's socket - the backend supersedes its job, so it
       // will never complete and its reconnect loop is just noise.
@@ -59,6 +62,7 @@ export function useImageProcessing(sessionId: string) {
           }
           setStatus(update.status);
           setProgress(update.progressPercent);
+          setCurrentStep(update.currentStep);
           if (update.status === 'completed') {
             setPreviewVersion((version) => version + 1);
             ws.disconnect();
@@ -224,6 +228,7 @@ export function useImageProcessing(sessionId: string) {
     parameters,
     status,
     progress,
+    currentStep,
     previewVersion,
     error,
     updateParameter,

@@ -149,4 +149,25 @@ describe('ImagePreview', () => {
 
     expect(onGeometryChange).toHaveBeenCalled();
   });
+
+  it('shows a determinate progress bar and a custom label while a long pass runs', () => {
+    const { rerender } = render(
+      <ImagePreview originalUrl="/a" processedUrl="/b" isLoading progress={0} />,
+    );
+    // No bar at 0 (a fast edit that never reports intermediate progress).
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    expect(screen.getByText('Processing')).toBeInTheDocument();
+
+    rerender(
+      <ImagePreview
+        originalUrl="/a"
+        processedUrl="/b"
+        isLoading
+        progress={45}
+        progressLabel="Removing stars (StarNet2)"
+      />,
+    );
+    expect(screen.getByText('Removing stars (StarNet2)')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '45');
+  });
 });

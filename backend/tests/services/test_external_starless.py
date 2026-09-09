@@ -13,6 +13,7 @@ from app.services.external_starless import (
     ExternalStarlessError,
     ExternalStarlessService,
     StarlessModelCache,
+    _parse_progress,
     blend_starless,
 )
 
@@ -22,7 +23,7 @@ def _image(height: int = 600, width: int = 800) -> np.ndarray:
 
 
 def _fake_starnet2(*, returncode: int = 0, write_output: bool = True):
-    """A stand-in for the binary: copies the input TIFF to the output path."""
+    """A stand-in for the binary (blocking path): copies the input TIFF to output."""
 
     def run(cmd: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
         if write_output and returncode == 0:
@@ -33,6 +34,36 @@ def _fake_starnet2(*, returncode: int = 0, write_output: bool = True):
         )
 
     return run
+
+
+def _fake_popen(
+    *,
+    returncode: int = 0,
+    write_output: bool = True,
+    lines: list[str] | None = None,
+    record: list[list[str]] | None = None,
+):
+    """A stand-in for ``Popen`` (streaming path): copies the TIFF, yields progress."""
+    progress_lines = lines if lines is not None else ['{"progress": 1.0}\n']
+
+    class _Popen:
+        def __init__(self, cmd: list[str], **_kwargs: object) -> None:
+            if record is not None:
+                record.append(cmd)
+            self.args = cmd
+            if write_output and returncode == 0:
+                source = cv2.imread(cmd[cmd.index("-i") + 1], cv2.IMREAD_COLOR)
+                cv2.imwrite(cmd[cmd.index("-o") + 1], source)
+            self.stdout = iter(progress_lines)
+            self.returncode = returncode
+
+        def wait(self, timeout: float | None = None) -> int:
+            return self.returncode
+
+        def kill(self) -> None:
+            self.returncode = -9
+
+    return _Popen
 
 
 def test_run_model_round_trips_shape_and_dtype(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -171,3 +202,76 @@ def test_cache_key_separates_images_and_settings() -> None:
     cache.get_or_compute(other, {"stride": 0}, compute)  # different pixels
 
     assert len(calls) == 3
+
+
+# --- progress streaming (--machine-progress) --------------------------------
+
+
+@pytest.mark.parametrize(
+    ("line", "expected"),
+    [
+        ('{"progress": 0.42}', 0.42),
+        ('{"percent": 75}', 0.75),
+        ('  {"fraction": 0.5}  \n', 0.5),
+        ('{"done": 1}', 1.0),
+        ("not json at all", None),
+        ('{"unrelated": 3}', None),
+        ("[1, 2, 3]", None),
+        ('{"progress": true}', None),
+        ('{"progress": 250}', 1.0),
+    ],
+)
+def test_parse_progress_is_tolerant(line: str, expected: float | None) -> None:
+    assert _parse_progress(line) == expected
+
+
+def test_streaming_forwards_each_progress_line_to_the_callback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        external_starless.subprocess,
+        "Popen",
+        _fake_popen(lines=['{"progress": 0.2}\n', "chatter\n", '{"percent": 90}\n']),
+    )
+    seen: list[float] = []
+
+    ExternalStarlessService("/opt/starnet2", progress_cb=seen.append).run_model(_image())
+
+    assert seen == [0.2, 0.9]
+
+
+def test_streaming_path_adds_the_machine_progress_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    record: list[list[str]] = []
+    monkeypatch.setattr(external_starless.subprocess, "Popen", _fake_popen(record=record))
+
+    ExternalStarlessService("/opt/starnet2", progress_cb=lambda _f: None).run_model(_image())
+
+    assert "--machine-progress" in record[0]
+
+
+def test_streaming_nonzero_exit_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        external_starless.subprocess,
+        "Popen",
+        _fake_popen(returncode=3, write_output=False, lines=["boom\n"]),
+    )
+    with pytest.raises(ExternalStarlessError, match="exited 3"):
+        ExternalStarlessService("/opt/starnet2", progress_cb=lambda _f: None).run_model(_image())
+
+
+def test_streaming_timeout_kills_and_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _ImmediateTimer:
+        def __init__(self, _interval: float, fn) -> None:
+            self._fn = fn
+
+        def start(self) -> None:
+            self._fn()
+
+        def cancel(self) -> None:
+            pass
+
+    monkeypatch.setattr(external_starless.threading, "Timer", _ImmediateTimer)
+    monkeypatch.setattr(external_starless.subprocess, "Popen", _fake_popen())
+
+    with pytest.raises(ExternalStarlessError, match="timed out"):
+        ExternalStarlessService("/opt/starnet2", progress_cb=lambda _f: None).run_model(_image())

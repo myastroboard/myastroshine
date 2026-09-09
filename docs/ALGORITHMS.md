@@ -314,6 +314,11 @@ output - logs and falls back to the classical split.
   `blend_starless` then applies `star_removal` exactly as the classical
   `StarlessService.split` does, so the 0-100 control means the same on both
   engines and changing only its strength never re-invokes the binary.
+- A pass is minutes, so it streams: `--machine-progress` JSON lines are read off
+  stdout as they arrive and forwarded to the job's `on_step`, which drives the
+  progress bar across a wide band (`_STARNET2_PROGRESS_BAND`, 20-80%). Job
+  progress is made monotonic so the fixed per-stage percentages of the later
+  creative stages can't pull the bar back afterwards.
 - `StarlessModelCache` keeps that estimate per session, keyed on the pixels fed to
   the split (which fold in every upstream stage) plus the engine settings - a
   full-resolution StarNet2 pass is minutes, and the editor re-runs the pipeline on

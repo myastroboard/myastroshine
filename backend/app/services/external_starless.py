@@ -15,8 +15,11 @@ both engines and changing only its strength never re-invokes the binary.
 from __future__ import annotations
 
 import hashlib
+import json
 import subprocess
 import tempfile
+import threading
+from collections import deque
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -35,10 +38,39 @@ logger = get_logger(__name__)
 #: the shape the pipeline's split step calls, shared with ``StarlessService.split``.
 StarlessSplitFn = Callable[[np.ndarray, int, int, int], tuple[np.ndarray, np.ndarray]]
 
+#: ``fraction (0..1) -> None`` - reports how far a StarNet2 pass has got.
+ProgressCallback = Callable[[float], None]
+
+#: JSON keys a ``--machine-progress`` line might carry a completion value under.
+#: StarNet2's exact schema is not pinned here (it is part of the pre-merge
+#: verification) - an unrecognised line is ignored, so a format change costs only
+#: the live progress bar, never correctness.
+_PROGRESS_KEYS = ("progress", "percent", "fraction", "value", "pct", "completed", "done")
+
 
 class ExternalStarlessError(RuntimeError):
     """StarNet2 could not run or produced nothing usable - the caller should
     fall back to the classical split, not surface this to the client."""
+
+
+def _parse_progress(line: str) -> float | None:
+    """Best-effort read of one ``--machine-progress`` line into a 0..1 fraction."""
+    stripped = line.strip()
+    if not stripped.startswith("{"):
+        return None
+    try:
+        payload = json.loads(stripped)
+    except ValueError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    for key in _PROGRESS_KEYS:
+        raw = payload.get(key)
+        if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+            continue
+        value = float(raw)
+        return max(0.0, min(1.0, value / 100.0 if value > 1.0 else value))
+    return None
 
 
 def blend_starless(
@@ -62,9 +94,12 @@ def blend_starless(
 class ExternalStarlessService:
     """Runs the operator's StarNet2 binary to estimate a star-free image."""
 
-    def __init__(self, binary_path: str, stride: int = 0) -> None:
+    def __init__(
+        self, binary_path: str, stride: int = 0, *, progress_cb: ProgressCallback | None = None
+    ) -> None:
         self._path = binary_path
         self._stride = stride
+        self._progress_cb = progress_cb
 
     def split(
         self, image: np.ndarray, _sensitivity: int, _max_size: int, removal_amount: int
@@ -104,22 +139,14 @@ class ExternalStarlessService:
             cmd = [self._path, "-i", str(in_path), "-o", str(out_path), "-q"]
             if self._stride:
                 cmd += ["-s", str(self._stride)]
-            try:
-                completed = subprocess.run(  # noqa: S603 - operator-supplied path, admin-gated
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=STARNET2_RUN_TIMEOUT_SECONDS,
-                    check=False,
-                )
-            except (OSError, subprocess.TimeoutExpired) as exc:
-                raise ExternalStarlessError(f"StarNet2 did not run: {exc}") from exc
 
-            if completed.returncode != 0 or not out_path.exists():
-                tail = (completed.stderr or completed.stdout or "").strip()[-400:]
-                raise ExternalStarlessError(
-                    f"StarNet2 exited {completed.returncode}: {tail or 'no output'}"
-                )
+            if self._progress_cb is None:
+                self._run_blocking(cmd)
+            else:
+                self._run_streaming([*cmd, "--machine-progress"])
+
+            if not out_path.exists():
+                raise ExternalStarlessError("StarNet2 exited cleanly but wrote no output")
             estimate = cv2.imread(str(out_path), cv2.IMREAD_COLOR)
 
         if estimate is None:
@@ -129,6 +156,69 @@ class ExternalStarlessService:
                 estimate, (image.shape[1], image.shape[0]), interpolation=cv2.INTER_AREA
             )
         return estimate
+
+    def _run_blocking(self, cmd: list[str]) -> None:
+        """Run to completion, capturing output - used when nobody wants progress."""
+        try:
+            completed = subprocess.run(  # noqa: S603 - operator-supplied path, admin-gated
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=STARNET2_RUN_TIMEOUT_SECONDS,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise ExternalStarlessError(f"StarNet2 did not run: {exc}") from exc
+        if completed.returncode != 0:
+            tail = (completed.stderr or completed.stdout or "").strip()[-400:]
+            raise ExternalStarlessError(
+                f"StarNet2 exited {completed.returncode}: {tail or 'no output'}"
+            )
+
+    def _run_streaming(self, cmd: list[str]) -> None:
+        """Stream stdout, forwarding each ``--machine-progress`` line to the callback.
+
+        The read loop runs on the calling thread (so the callback's job / Redis
+        writes stay on the thread that owns the DB session); a one-shot timer is
+        the only other thread and it just kills a runaway process.
+        """
+        try:
+            proc = subprocess.Popen(  # noqa: S603 - operator-supplied path, admin-gated
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+            )
+        except OSError as exc:
+            raise ExternalStarlessError(f"StarNet2 did not run: {exc}") from exc
+
+        timed_out = threading.Event()
+
+        def _kill() -> None:
+            timed_out.set()
+            proc.kill()
+
+        watchdog = threading.Timer(STARNET2_RUN_TIMEOUT_SECONDS, _kill)
+        watchdog.start()
+        tail: deque[str] = deque(maxlen=20)
+        try:
+            for line in proc.stdout or ():
+                tail.append(line.rstrip())
+                fraction = _parse_progress(line)
+                if fraction is not None and self._progress_cb is not None:
+                    self._progress_cb(fraction)
+            returncode = proc.wait()
+        finally:
+            watchdog.cancel()
+
+        if timed_out.is_set():
+            raise ExternalStarlessError(
+                f"StarNet2 timed out after {STARNET2_RUN_TIMEOUT_SECONDS}s"
+            )
+        if returncode != 0:
+            joined = " | ".join(tail)[-400:]
+            raise ExternalStarlessError(f"StarNet2 exited {returncode}: {joined or 'no output'}")
 
 
 class StarlessModelCache:

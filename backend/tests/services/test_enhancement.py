@@ -134,9 +134,8 @@ def test_starnet2_engine_invokes_the_binary_and_caches_it(
     enhancement: EnhancementService, sample_image: np.ndarray, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """star_removal_engine='starnet2' routes the split through the operator binary
-    when one is available; the second edit reuses the cached estimate."""
-    import subprocess
-
+    when one is available, streams its progress onto the job, and the second edit
+    reuses the cached estimate."""
     import cv2
 
     from app.models.engines import EngineStatus
@@ -158,12 +157,30 @@ def test_starnet2_engine_invokes_the_binary_and_caches_it(
 
     invocations: list[list[str]] = []
 
-    def fake_run(cmd: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
-        invocations.append(cmd)
-        cv2.imwrite(cmd[cmd.index("-o") + 1], cv2.imread(cmd[cmd.index("-i") + 1]))
-        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+    class FakePopen:
+        def __init__(self, cmd: list[str], **_kwargs: object) -> None:
+            invocations.append(cmd)
+            cv2.imwrite(cmd[cmd.index("-o") + 1], cv2.imread(cmd[cmd.index("-i") + 1]))
+            self.stdout = iter(['{"progress": 0.5}\n', '{"progress": 1.0}\n'])
+            self.returncode = 0
 
-    monkeypatch.setattr(external_starless.subprocess, "run", fake_run)
+        def wait(self, timeout: float | None = None) -> int:
+            return self.returncode
+
+        def kill(self) -> None:
+            self.returncode = -9
+
+    monkeypatch.setattr(external_starless.subprocess, "Popen", FakePopen)
+
+    seen_progress: list[tuple[str, int]] = []
+    original_emit = enhancement._emit
+
+    def spy_emit(job_id: str) -> None:
+        job = enhancement.jobs.get(job_id)
+        seen_progress.append((job.current_step, job.progress_percent))
+        original_emit(job_id)
+
+    monkeypatch.setattr(enhancement, "_emit", spy_emit)
 
     record = enhancement.sessions.create_session(image_path="")
     enhancement.storage.save_original(record.session_id, sample_image)
@@ -171,6 +188,11 @@ def test_starnet2_engine_invokes_the_binary_and_caches_it(
     params = ProcessingParameters(star_removal=100, star_removal_engine="starnet2")
     enhancement.run(record.session_id, params, enhancement.jobs.create(record.session_id).job_id)
     assert len(invocations) == 1
+    assert "--machine-progress" in invocations[0]
+    # StarNet2's 0.5 fraction lands mid-band (_STARNET2_PROGRESS_BAND = 20..80).
+    assert ("star_removal", 50) in seen_progress
+    # The bar never went backwards afterwards.
+    assert [p for _, p in seen_progress] == sorted(p for _, p in seen_progress)
 
     # Same detection inputs, a creative-only change -> cache hit, no new pass.
     enhancement.run(
