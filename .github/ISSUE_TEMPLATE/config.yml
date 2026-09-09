@@ -8,4 +8,4 @@ contact_links:
     about: Ask a question or float an idea before opening an issue.
   - name: 🔒 Security report
     url: https://github.com/myastroboard/myastroshine/security/policy
-    about: Report a vulnerability privately — do not open a public issue.
+    about: Report a vulnerability privately - do not open a public issue.

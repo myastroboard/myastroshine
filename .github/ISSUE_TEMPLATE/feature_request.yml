@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         MyAstroShine aims to stay a fast, self-hosted companion for everyday
-        enhancement — not a PixInsight/Siril replacement. Requests that fit that
+        enhancement - not a PixInsight/Siril replacement. Requests that fit that
         scope are the most likely to land.
 
   - type: textarea

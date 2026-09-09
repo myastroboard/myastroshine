@@ -78,7 +78,7 @@ body:
     attributes:
       label: Relevant logs
       description: >
-        Export from Settings → Logs (or `docker compose logs`). Paste the lines
+        Export from Settings -> Logs (or `docker compose logs`). Paste the lines
         around the failure; redact anything sensitive.
       render: shell
     validations:
