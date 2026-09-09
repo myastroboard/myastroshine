@@ -9,10 +9,12 @@
 **A self-hosted astronomical image processing tool: automatic enhancement,
 multi-image stacking, and a parallax depth effect - from one Docker image, with
 no account and no cloud upload.** It integrates optionally with
-[MyAstroBoard](https://github.com/myastroboard/myastroboard)'s AstroDex, and runs
-just as well standalone.
+[MyAstroBoard](https://github.com/myastroboard/myastroboard)'s AstroDex (planned), and runs
+just as well standalone, in a web browser.
 
-> **Status: Alpha.** `v0.2.0` is tagged and published to `ghcr.io` and Docker
+![The MyAstroShine editor: a numbered workflow rail, the active step's inspector, and a pinned before/after preview with the histogram below](docs/export.png)
+
+> **Status: Alpha.** `v0.3.0` is tagged and published to `ghcr.io` and Docker
 > Hub. The full feature set is implemented and the frontend is wired end to end,
 > but the code has not been through a production shakedown - expect breaking
 > changes to the API, storage layout, and settings between releases, and don't
@@ -21,13 +23,18 @@ just as well standalone.
 
 ## Contents
 
-- [What it does](#what-it-does)
-- [Quick start (Docker)](#quick-start-docker)
-- [Local development](#local-development)
-- [Documentation](#documentation)
-- [Technology](#technology)
-- [Contributing](#contributing)
-- [About](#about)
+- [MyAstroShine](#myastroshine)
+  - [Contents](#contents)
+  - [What it does](#what-it-does)
+  - [Quick start (Docker)](#quick-start-docker)
+  - [Local development](#local-development)
+    - [Backend](#backend)
+    - [Frontend](#frontend)
+    - [Checks (what CI runs)](#checks-what-ci-runs)
+  - [Documentation](#documentation)
+  - [Technology](#technology)
+  - [Contributing](#contributing)
+  - [About](#about)
 
 ## What it does
 
