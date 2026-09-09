@@ -19,10 +19,22 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   reconstruction is classical - a median-blur estimate on a downscaled copy,
   sized so galaxy and nebula cores are preserved - with no ML model and no new
   dependency (it also let `scikit-image`, unused since the v0.2 star-detection
-  rebuild, be dropped). An ONNX StarNet-style quality path was evaluated and
-  deferred (weights licensing / unproven models - see `docs/ALGORITHMS.md`
-  "Star removal (starless)"); a very dense Milky Way star field is the known
-  limit of the classical method.
+  rebuild, be dropped). A very dense Milky Way star field is the known limit of
+  the classical method; the **StarNet2 engine** below is the way past it.
+- Optional ML engines for star removal and noise reduction, **installed by the
+  operator, never bundled**. Point Settings -> Advanced at a
+  [StarNet2](https://starnetastro.com/) and/or DeepSNR binary you mount into the
+  containers and the editor gains an engine toggle: **StarNet2** in the Stars
+  step (per-edit, replaces the classical split for the run) and **DeepSNR** in
+  the Detail step's denoise control (runs early, before the tone stretch). Each
+  is arm's-length - MyAstroShine writes a TIFF, runs the tool, reads the result
+  back - and any failure (missing binary, timeout, bad output) logs and falls
+  back to the classical code, so a client can always request them. A pass streams
+  its progress onto the editor bar; the result is cached per session so a
+  creative-only tweak doesn't re-run it. Nothing ships in the image and no
+  Python dependency is added - see `docs/DEPLOYMENT.md` "External ML engines" and
+  `THIRD_PARTY.md` (the tools are non-commercial; the operator accepts their
+  terms).
 - Edit milestones: a timeline under the preview where you can save the current
   adjustments (sliders, curves, framing, and the Depth Shift focal point) as a
   checkpoint and click back to it if you push an edit too far. The first
@@ -157,7 +169,14 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The database schema is now brought to head automatically on API and worker
   startup (`alembic upgrade head`); a fresh database is built from the
   migrations. Previously a schema change needed a manual `alembic upgrade` and a
-  lagging dev database silently broke the cleanup task.
+  lagging dev database silently broke the cleanup task. Startup now also
+  **verifies the columns against the models** after the upgrade: a SQLite dev
+  database missing a column (a migration edited after it ran) is repaired in
+  place with a loud log line, and any other backend refuses to start with a
+  clear message instead of failing later with a cryptic `no such column`. A new
+  `tests/db/test_migrations.py` fails CI if the migrations and the models drift
+  apart at all. (`stacks.drizzle_factor`, which had been appended to an
+  already-applied migration, is split into its own idempotent revision.)
 - The development stack now defaults to `PROCESSING_MODE=queue` - a long job (a
   thousand-frame stack) runs on the Celery worker instead of blocking the single
   API process for its whole duration - and `POST /api/stack/{id}/process` no
