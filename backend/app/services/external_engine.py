@@ -129,9 +129,7 @@ def _invoke(
     if result is None:
         raise ExternalEngineError(f"{name} output TIFF was unreadable")
     if result.shape != image.shape:
-        result = cv2.resize(
-            result, (image.shape[1], image.shape[0]), interpolation=cv2.INTER_AREA
-        )
+        result = cv2.resize(result, (image.shape[1], image.shape[0]), interpolation=cv2.INTER_AREA)
     return result
 
 

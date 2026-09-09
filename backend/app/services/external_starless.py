@@ -37,8 +37,7 @@ def blend_starless(
     """
     weight = max(0, min(100, removal_amount)) / 100.0
     starless = to_uint8(
-        image.astype(np.float32) * (1.0 - weight)
-        + starless_estimate.astype(np.float32) * weight
+        image.astype(np.float32) * (1.0 - weight) + starless_estimate.astype(np.float32) * weight
     )
     stars_layer = to_uint8(image.astype(np.int16) - starless.astype(np.int16))
     return starless, stars_layer
