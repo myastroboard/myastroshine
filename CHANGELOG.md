@@ -6,6 +6,10 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.4.0] - 2026-09-09
+
 ### Changed
 
 - **AstroDex integration rebuilt around a signed handoff.** MyAstroBoard now
