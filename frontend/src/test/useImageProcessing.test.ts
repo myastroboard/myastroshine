@@ -144,4 +144,71 @@ describe('useImageProcessing.trackJob', () => {
     act(() => FakeWs.last?.emit(statusEvent({ jobId: 'job-9', status: 'completed' })));
     await waitFor(() => expect(result.current.previewVersion).toBe(1));
   });
+
+  it('coalesces a burst: one job in flight, the latest change sent on settle', async () => {
+    let n = 0;
+    mocked.processImage.mockImplementation(() =>
+      Promise.resolve({
+        sessionId: 's1',
+        jobId: `job-${(n += 1)}`,
+        status: 'queued',
+        previewUrl: '/api/preview/s1',
+        estimatedTimeSeconds: 8,
+        wsStatusUrl: `/ws/processing-status/job-${n}`,
+      }),
+    );
+
+    const { result } = renderHook(() => useImageProcessing('s1'));
+
+    // Three rapid edits while the first request is still resolving.
+    await act(async () => {
+      void result.current.applyParameters({ ...result.current.parameters, contrast: 1.1 });
+      void result.current.applyParameters({ ...result.current.parameters, contrast: 1.2 });
+      void result.current.applyParameters({ ...result.current.parameters, contrast: 1.3 });
+    });
+
+    // Only the first went to the backend; the other two were coalesced.
+    expect(mocked.processImage).toHaveBeenCalledTimes(1);
+
+    // First job finishes -> the coalesced (latest) edit is sent, once.
+    await act(async () => {
+      FakeWs.last?.emit(statusEvent({ status: 'completed' }));
+    });
+    await waitFor(() => expect(mocked.processImage).toHaveBeenCalledTimes(2));
+    expect(mocked.processImage).toHaveBeenLastCalledWith(
+      's1',
+      expect.objectContaining({ contrast: 1.3 }),
+    );
+  });
+
+  it('a superseded job releases the slot and flushes the pending edit', async () => {
+    let n = 0;
+    mocked.processImage.mockImplementation(() =>
+      Promise.resolve({
+        sessionId: 's1',
+        jobId: `job-${(n += 1)}`,
+        status: 'queued',
+        previewUrl: '/api/preview/s1',
+        estimatedTimeSeconds: 8,
+        wsStatusUrl: `/ws/processing-status/job-${n}`,
+      }),
+    );
+
+    const { result } = renderHook(() => useImageProcessing('s1'));
+
+    await act(async () => {
+      void result.current.applyParameters({ ...result.current.parameters, exposure: 0.1 });
+      void result.current.applyParameters({ ...result.current.parameters, exposure: 0.2 });
+    });
+    expect(mocked.processImage).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      FakeWs.last?.emit(statusEvent({ status: 'superseded' }));
+    });
+    await waitFor(() => expect(mocked.processImage).toHaveBeenCalledTimes(2));
+    expect(mocked.processImage).toHaveBeenLastCalledWith(
+      's1',
+      expect.objectContaining({ exposure: 0.2 }),
+    );
+  });
 });

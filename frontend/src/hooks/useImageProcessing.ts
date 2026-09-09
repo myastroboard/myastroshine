@@ -38,11 +38,19 @@ export function useImageProcessing(sessionId: string) {
   const [error, setError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const wsRef = useRef<ReturnType<typeof processingStatusClient> | null>(null);
+  // Only one job is followed at a time. `busy` is set the moment a /process
+  // starts and cleared when its job reaches a terminal state; params that arrive
+  // while busy are held in `pending` and sent once, on settle. A burst of slider
+  // moves therefore becomes at most two backend jobs, never a pile-up of
+  // soon-to-be-superseded work fighting over the (un-WAL) SQLite file.
+  const busyRef = useRef(false);
+  const pendingRef = useRef<ProcessingParameters | null>(null);
+  const applyRef = useRef<(next: ProcessingParameters) => void>(() => {});
 
   /**
    * Follow a processing job over the WebSocket until it finishes, bumping
    * `previewVersion` on completion so the preview refetches. Also handles a job
-   * that came back already `completed` (PROCESSING_MODE=sync).
+   * that came back already terminal (PROCESSING_MODE=sync).
    *
    * Used for /process here and, via the returned handle, for jobs kicked off by
    * other endpoints (preset apply, Auto Astro) - without this a queued job
@@ -50,6 +58,7 @@ export function useImageProcessing(sessionId: string) {
    * the next user action.
    */
   const trackJob = useCallback((response: ProcessResponse) => {
+    busyRef.current = true;
     setStatus('processing');
     setProgress(0);
     setCurrentStep('');
@@ -58,15 +67,36 @@ export function useImageProcessing(sessionId: string) {
     // will never complete and its reconnect loop is just noise.
     wsRef.current?.disconnect();
     wsRef.current = null;
-    if (response.status === 'completed') {
-      setStatus('completed');
-      setPreviewVersion((version) => version + 1);
+
+    // Release the slot and send whatever the user changed while this job ran.
+    const settle = (): void => {
+      busyRef.current = false;
+      const queued = pendingRef.current;
+      pendingRef.current = null;
+      if (queued) {
+        applyRef.current(queued);
+      }
+    };
+
+    if (response.status === 'completed' || response.status === 'failed') {
+      // Sync mode: the pipeline already ran (result on disk) - no socket needed.
+      if (response.status === 'completed') {
+        setStatus('completed');
+        setPreviewVersion((version) => version + 1);
+      } else {
+        setStatus('failed');
+        setError('Processing failed');
+      }
+      settle();
+      return;
     }
+
     const ws = processingStatusClient(response.jobId);
     wsRef.current = ws;
     ws.onStatusUpdate((update) => {
       if (update.status === 'superseded') {
         ws.disconnect();
+        settle();
         return;
       }
       setStatus(update.status);
@@ -75,9 +105,11 @@ export function useImageProcessing(sessionId: string) {
       if (update.status === 'completed') {
         setPreviewVersion((version) => version + 1);
         ws.disconnect();
+        settle();
       } else if (update.status === 'failed') {
         setError(update.error ?? 'Processing failed');
         ws.disconnect();
+        settle();
       }
     });
     ws.connect();
@@ -85,17 +117,33 @@ export function useImageProcessing(sessionId: string) {
 
   const applyParameters = useCallback(
     async (next: ProcessingParameters) => {
+      // A job is already in flight - remember the latest state and let `settle`
+      // send it when that job finishes.
+      if (busyRef.current) {
+        pendingRef.current = next;
+        return;
+      }
+      busyRef.current = true; // claim the slot before the await
       setStatus('processing');
       setError(null);
       try {
         trackJob(await apiClient.processImage(sessionId, next));
       } catch (err) {
+        busyRef.current = false;
         setStatus('failed');
         setError(errorMessage(err, t, 'Processing failed'));
+        // A queued edit still deserves a try even if this request errored.
+        const queued = pendingRef.current;
+        pendingRef.current = null;
+        if (queued) {
+          void applyParameters(queued);
+        }
       }
     },
     [sessionId, t, trackJob],
   );
+
+  applyRef.current = (next: ProcessingParameters) => void applyParameters(next);
 
   const updateParameter = useCallback(
     (key: SliderParameterKey, value: number) => {

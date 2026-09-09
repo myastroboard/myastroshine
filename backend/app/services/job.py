@@ -18,6 +18,7 @@ from app.constants import STALE_JOB_SECONDS
 from app.db.models import JobRecord
 from app.exceptions import RateLimitedError, ResourceNotFoundError
 from app.logging_config import get_logger
+from app.services import progress
 from app.types import JsonDict
 from app.utils.app_settings import get_app_settings
 
@@ -86,6 +87,10 @@ class JobService:
         for record in pending:
             record.status = "superseded"
         self.db.commit()
+        # Tell any open progress socket now, so it closes instead of waiting for
+        # the worker to reach this job and emit the terminal event itself.
+        for record in pending:
+            progress.publish(record.job_id, self.to_event(record))
         return len(pending)
 
     def cleanup_stale_jobs(self) -> int:
