@@ -230,7 +230,7 @@ function WebhooksSection({ draft, patch }: SectionProps) {
           label={t('settings.webhooks.allowlist.label')}
           hint={t('settings.webhooks.allowlist.hint')}
           value={draft.astrodexCallbackUrls}
-          placeholder="http://myastroboard.local/api/webhooks/enhanced-images"
+          placeholder="https://astro.example.com"
           onChange={(astrodexCallbackUrls) => patch({ astrodexCallbackUrls })}
         />
         <NumberRow

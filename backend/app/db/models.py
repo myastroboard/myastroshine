@@ -73,16 +73,28 @@ class PresetRecord(Base):
 
 
 class AstroDexLink(Base):
-    """Links a local session to an AstroDex gallery image."""
+    """Links an editing session to the AstroDex picture it was handed off from.
+
+    Created by ``POST /api/astrodex/handoff/resume``: MyAstroBoard opens the
+    editor with a signed handoff token, the backend pulls the source image and
+    its metadata from ``callback_base``, and this row remembers where to send
+    the enhanced result back to (``POST /api/astrodex/handoff/return``).
+    """
 
     __tablename__ = "astrodex_links"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     session_id: Mapped[str] = mapped_column(ForeignKey("sessions.session_id"), unique=True)
-    astrodex_image_id: Mapped[str] = mapped_column(String(64))
-    callback_url: Mapped[str] = mapped_column(String(512))
-    callback_token: Mapped[str | None] = mapped_column(String(512))
-    webhook_status: Mapped[str] = mapped_column(String(16), default="pending")
+    #: MyAstroBoard origin the enhanced image is POSTed back to (set by the board
+    #: inside the signed handoff, re-checked against ``astrodex_callback_urls``).
+    callback_base: Mapped[str] = mapped_column(String(512))
+    #: The signed handoff token, kept verbatim so the return call can echo it.
+    handoff_token: Mapped[str] = mapped_column(Text)
+    astrodex_item_id: Mapped[str] = mapped_column(String(64))
+    astrodex_picture_id: Mapped[str] = mapped_column(String(64))
+    object_name: Mapped[str | None] = mapped_column(String(255))
+    #: received -> pending -> sent | failed
+    webhook_status: Mapped[str] = mapped_column(String(16), default="received")
     webhook_error: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 

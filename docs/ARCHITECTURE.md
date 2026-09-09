@@ -175,8 +175,8 @@ Six tables (`app/db/models.py`):
 | `jobs` | an async processing job: status, progress, current step, client IP |
 | `presets` | a named `ProcessingParameters` set (5 built-ins + user presets) |
 | `stacks` | a stacking session: frame count, settings, per-frame quality report, result stats |
-| `astrodex_links` | links a session to an AstroDex image + the outbound webhook status |
-| `webhook_tokens` | long-lived bearer tokens (hash only) + per-token signing secret |
+| `astrodex_links` | ties a session to the AstroDex picture it was handed off from + the return-delivery status |
+| `webhook_tokens` | webhook token (hash only) + its signing secret, for the AstroDex handoff |
 
 **Migrations** live in `backend/migrations/` (Alembic). Apply them with
 `alembic upgrade head` before starting a production instance. For local dev and
@@ -235,8 +235,8 @@ React 19 + TypeScript + Vite + Tailwind v4 (configured CSS-first in
 (`#/settings`), no router dependency.
 
 - **`App.tsx`** is the orchestrator: a single-image editor, a stacking view, and
-  a Settings screen. It reads `?image_id=&astrodex_url=&token=` on load to detect
-  an AstroDex hand-off.
+  a Settings screen. It reads a `?handoff=` token on load to detect an AstroDex
+  hand-off and resume straight into the editor.
 - **`components/`** are function components with typed props; **`hooks/`** own
   state and side effects (`useImageProcessing`, `useStackProcessing`,
   `useDepthShift`, ...); **`services/`** are the API and WebSocket clients.
@@ -249,15 +249,19 @@ See [DESIGN.md](DESIGN.md) for the visual system.
 
 ## AstroDex integration
 
-Optional, and off unless configured. AstroDex opens MyAstroShine with the image
-id, a callback URL, and a bearer token in the query string.
+Optional, and off unless configured. MyAstroBoard opens MyAstroShine with a
+single signed **handoff token** in the URL; this instance is never called *by*
+the board, only ever calls *out* to it, so the flow survives the board being
+behind a reverse proxy.
 
-- **Inbound** - `POST /api/astrodex/receive` (bearer auth) pulls the image into a
-  new session and records the callback.
-- **Outbound** - `POST /api/send-to-astrodex` returns `202` at once and delivers
-  the enhanced image in the background as an **HMAC-signed** webhook, retried
-  with backoff. The callback URL must be on the `astrodex_callback_urls`
-  allowlist (empty allowlist = every URL refused - this is the main SSRF guard).
+- **Resume** - `POST /api/astrodex/handoff/resume` verifies the token (its `kid`
+  picks the webhook token whose `signing_secret` signs it), checks
+  `callback_base` against the `astrodex_callback_urls` allowlist, then pulls the
+  source image + metadata from the board and opens a session.
+- **Return** - `POST /api/astrodex/handoff/return` posts the processed image
+  back as a signed `multipart/form-data` request; the board files it as a **new**
+  picture on the same object (never a replacement). Retried with backoff.
 
-Contract detail: [API.md](API.md#astrodex-integration). Token model:
-[SECURITY.md](../SECURITY.md).
+The allowlist fails closed (empty = every URL refused) - the main SSRF guard.
+Contract detail: [API.md](API.md#astrodex-integration). Full design:
+`initial_plan/PASSATION_MYASTROBOARD_INTEGRATION.md`.

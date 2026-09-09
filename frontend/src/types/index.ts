@@ -398,6 +398,30 @@ export interface EditorSession {
   dimensions?: Dimensions;
   /** True when the session is a stacked composite - unlocks the "Stack" step. */
   isStack?: boolean;
+  /** Set when the session was opened from an AstroDex handoff - unlocks the
+   * "Send back to AstroDex" action in the Export step. */
+  astrodex?: AstroDexReturn;
+}
+
+/** What the editor needs to send the enhanced result back to AstroDex. */
+export interface AstroDexReturn {
+  itemId: string;
+  objectName: string | null;
+}
+
+export interface HandoffResumeResponse {
+  sessionId: string;
+  imageUrl: string;
+  dimensions: Dimensions;
+  histogram: HistogramData;
+  objectName: string | null;
+  astrodexItemId: string;
+}
+
+export interface HandoffReturnResponse {
+  sessionId: string;
+  status: 'received' | 'pending' | 'sent' | 'failed';
+  astrodexItemId: string;
 }
 
 export type JobStatus = 'queued' | 'processing' | 'completed' | 'failed' | 'superseded';
@@ -422,12 +446,6 @@ export interface Preset {
   author: string;
   isFavorite: boolean;
   createdAt?: string;
-}
-
-export interface WebhookResponse {
-  webhookId: string;
-  status: 'pending' | 'sent' | 'failed';
-  message: string;
 }
 
 // --- Webhook tokens ------------------------------------------------------

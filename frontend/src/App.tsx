@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { EditorView } from '@/components/EditorView';
 import { Footer } from '@/components/Footer';
@@ -21,6 +21,22 @@ function navigate(route: Route): void {
   window.location.hash = route === 'settings' ? '#/settings' : '#/';
 }
 
+/**
+ * The AstroDex handoff token, from either the query string (`?handoff=`) or the
+ * hash (`#/?handoff=`) - the board builds the URL with hash routing, so the
+ * token usually rides in the fragment where `location.search` never sees it.
+ */
+function readHandoffToken(): string | null {
+  const fromSearch = new URLSearchParams(window.location.search).get('handoff');
+  if (fromSearch) {
+    return fromSearch;
+  }
+  const query = window.location.hash.slice(window.location.hash.indexOf('?') + 1);
+  return window.location.hash.includes('?')
+    ? new URLSearchParams(query).get('handoff')
+    : null;
+}
+
 /** Minimal hash routing - no dependency, keeps the browser back button working. */
 function useRoute(): Route {
   const [route, setRoute] = useState<Route>(readRoute);
@@ -35,8 +51,8 @@ function useRoute(): Route {
 /**
  * Root orchestrator.
  *
- * When opened from AstroDex the URL carries `image_id`, `astrodex_url` and
- * `token` query params; otherwise the app runs in standalone mode.
+ * When opened from AstroDex the URL carries a single signed `handoff` token;
+ * otherwise the app runs in standalone mode.
  */
 export default function App() {
   const { t } = useTranslation();
@@ -49,19 +65,37 @@ export default function App() {
   // 0-1 while the file bytes transfer; null once they're sent and the server is
   // decoding (indeterminate). Undefined/not-uploading between sessions.
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [resumingHandoff, setResumingHandoff] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const handoffStarted = useRef(false);
 
-  const astrodexContext = useMemo(() => {
-    const params = new URLSearchParams(window.location.search);
-    const imageId = params.get('image_id');
-    if (!imageId) {
-      return null;
+  // Opened from MyAstroBoard: the URL carries a signed `handoff` token. The
+  // backend verifies it and pulls the source image; we land straight in the
+  // editor. The param is stripped once consumed (it is single-use anyway).
+  useEffect(() => {
+    const handoff = readHandoffToken();
+    if (!handoff || handoffStarted.current) {
+      return;
     }
-    return {
-      imageId,
-      callbackUrl: params.get('astrodex_url') ?? '',
-      token: params.get('token') ?? '',
-    };
+    handoffStarted.current = true;
+    // Drop the token from the URL (it is single-use) and land on the editor route.
+    window.history.replaceState(null, '', `${window.location.pathname}#/`);
+    setResumingHandoff(true);
+    setError(null);
+    apiClient
+      .resumeAstrodexHandoff(handoff)
+      .then((resumed) => {
+        setSession({
+          sessionId: resumed.sessionId,
+          histogram: resumed.histogram,
+          dimensions: resumed.dimensions,
+          astrodex: { itemId: resumed.astrodexItemId, objectName: resumed.objectName },
+        });
+      })
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : 'Could not open the AstroDex image');
+      })
+      .finally(() => setResumingHandoff(false));
   }, []);
 
   async function handleUpload(file: File): Promise<void> {
@@ -135,7 +169,7 @@ export default function App() {
               </p>
             )}
 
-            {(mode === 'stack' ? !stackWorking : !session) && (
+            {(mode === 'stack' ? !stackWorking : !session) && !resumingHandoff && (
               <StackMode mode={mode} onModeChange={setMode} />
             )}
 
@@ -145,11 +179,9 @@ export default function App() {
                 onWorkingChange={setStackWorking}
               />
             ) : session ? (
-              <EditorView
-                session={session}
-                astrodexContext={astrodexContext}
-                onExit={handleExitEditor}
-              />
+              <EditorView session={session} onExit={handleExitEditor} />
+            ) : resumingHandoff ? (
+              <p className="panel text-sm text-muted">{t('app.opening_from_astrodex')}</p>
             ) : (
               <ImageUpload
                 onUpload={handleUpload}

@@ -6,7 +6,27 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- **AstroDex integration rebuilt around a signed handoff.** MyAstroBoard now
+  opens the editor with a single `?handoff=` token; the backend verifies it,
+  pulls the source image from the board itself, and drops you straight into the
+  editor. The Export step gains **Send back to AstroDex**, which posts the
+  processed image back as a signed `multipart/form-data` request - the board
+  files it as a **new** picture on the same object, never a replacement. This
+  instance is never contacted *by* the board, only ever calls *out* to it, so
+  the flow works whether the board is on the LAN or behind a reverse proxy. The
+  handoff token is HMAC-SHA256 signed with a webhook token's `signing_secret`,
+  expires after 12 h, and is single-use for the return. See `docs/API.md`
+  "AstroDex integration" and `initial_plan/PASSATION_MYASTROBOARD_INTEGRATION.md`.
+
+### Removed
+
+- The never-wired push endpoints `POST /api/astrodex/receive` and
+  `POST /api/send-to-astrodex` (and the `AstroDexService` / `AstroDexDispatch`
+  services), replaced by the handoff routes above. `astrodex_links` is reshaped
+  by migration `d4e5f6a7b8c9`; `astrodex_callback_urls` /
+  `astrodex_max_retries` / `astrodex_retry_delay_seconds` are unchanged.
 
 ## [0.3.0] - 2026-09-09
 

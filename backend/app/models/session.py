@@ -17,4 +17,4 @@ class SessionInfo(BaseModel):
     expires_at: datetime
     original_filename: str | None = None
     parameters: ProcessingParameters | None = None
-    astrodex_image_id: str | None = None
+    astrodex_picture_id: str | None = None

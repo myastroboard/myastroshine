@@ -51,7 +51,8 @@
     "whats_new": "What's new"
   },
   "app": {
-    "nav_settings": "Settings"
+    "nav_settings": "Settings",
+    "opening_from_astrodex": "Opening your image from AstroDex..."
   },
   "image_upload": {
     "format_not_supported": "Format {ext} not supported",
@@ -140,10 +141,12 @@
   },
   "export_panel": {
     "download": "Download",
-    "send_to_astrodex": "Send to AstroDex",
-    "sending": "Sending...",
-    "sent": "Sent to AstroDex.",
-    "send_failed": "Could not send to AstroDex: {error}"
+    "return_to_astrodex": "Send back to AstroDex",
+    "returning": "Sending...",
+    "returned": "Added to the AstroDex object as a new picture.",
+    "return_hint": "Adds a copy to the AstroDex object with your enhanced image - the original is kept.",
+    "return_hint_named": "Adds a copy to '{object}' in the AstroDex with your enhanced image - the original is kept.",
+    "return_failed": "Could not send back to AstroDex: {error}"
   },
   "image_preview": {
     "processed_alt": "Processed",
@@ -431,12 +434,12 @@
     },
     "webhooks": {
       "allowlist": {
-        "label": "Callback URL allowlist",
-        "hint": "One URL prefix per line. An empty list allows any host (development only)."
+        "label": "AstroDex origin allowlist",
+        "hint": "One URL prefix per line - the MyAstroBoard origin(s) a handoff may come from, e.g. https://astro.example.com. Empty means every AstroDex handoff is refused."
       },
       "max_retries": {
         "label": "Maximum retries",
-        "hint": "Delivery attempts before a webhook is marked failed."
+        "hint": "Delivery attempts before the return to AstroDex is marked failed."
       },
       "retry_delay": {
         "label": "Retry delay",

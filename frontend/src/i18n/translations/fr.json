@@ -51,7 +51,8 @@
     "whats_new": "Quoi de neuf"
   },
   "app": {
-    "nav_settings": "Paramètres"
+    "nav_settings": "Paramètres",
+    "opening_from_astrodex": "Ouverture de votre image depuis l'AstroDex..."
   },
   "image_upload": {
     "format_not_supported": "Format {ext} non pris en charge",
@@ -140,10 +141,12 @@
   },
   "export_panel": {
     "download": "Télécharger",
-    "send_to_astrodex": "Envoyer vers AstroDex",
-    "sending": "Envoi...",
-    "sent": "Envoyé vers AstroDex.",
-    "send_failed": "Échec de l'envoi vers AstroDex : {error}"
+    "return_to_astrodex": "Renvoyer dans l'AstroDex",
+    "returning": "Envoi...",
+    "returned": "Ajoutée à l'objet AstroDex comme nouvelle photo.",
+    "return_hint": "Ajoute une copie à l'objet AstroDex avec votre image améliorée - l'originale est conservée.",
+    "return_hint_named": "Ajoute une copie à '{object}' dans l'AstroDex avec votre image améliorée - l'originale est conservée.",
+    "return_failed": "Échec du renvoi dans l'AstroDex : {error}"
   },
   "image_preview": {
     "processed_alt": "Traitée",
@@ -431,12 +434,12 @@
     },
     "webhooks": {
       "allowlist": {
-        "label": "Liste blanche des URL de rappel",
-        "hint": "Un préfixe d'URL par ligne. Une liste vide autorise n'importe quel hôte (développement uniquement)."
+        "label": "Liste blanche des origines AstroDex",
+        "hint": "Un préfixe d'URL par ligne - la ou les origines MyAstroBoard d'ou un handoff peut venir, ex. https://astro.example.com. Une liste vide refuse tout handoff AstroDex."
       },
       "max_retries": {
         "label": "Nombre maximal de tentatives",
-        "hint": "Tentatives de livraison avant qu'un webhook soit marqué en échec."
+        "hint": "Tentatives de livraison avant que le renvoi vers AstroDex soit marqué en échec."
       },
       "retry_delay": {
         "label": "Délai entre les tentatives",

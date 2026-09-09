@@ -2,25 +2,28 @@ import { useTranslation } from '@/hooks/useTranslation';
 
 export interface ExportPanelProps {
   isProcessing?: boolean;
-  canSendToAstroDex?: boolean;
-  astrodexSending?: boolean;
-  astrodexSent?: boolean;
+  /** True when the session was opened from an AstroDex handoff. */
+  canReturnToAstroDex?: boolean;
+  astrodexObjectName?: string | null;
+  astrodexReturning?: boolean;
+  astrodexReturned?: boolean;
   astrodexError?: string | null;
   onDownload: () => void;
-  onSendToAstroDex: () => void;
+  onReturnToAstroDex: () => void;
   onSaveAsPreset: () => void;
 }
 
-/** Getting the enhanced image out of the editor: download, hand it to AstroDex,
- * or save the current parameters as a reusable preset. */
+/** Getting the enhanced image out of the editor: download, send it back to the
+ * AstroDex object it came from, or save the current parameters as a preset. */
 export function ExportPanel({
   isProcessing = false,
-  canSendToAstroDex = false,
-  astrodexSending = false,
-  astrodexSent = false,
+  canReturnToAstroDex = false,
+  astrodexObjectName = null,
+  astrodexReturning = false,
+  astrodexReturned = false,
   astrodexError = null,
   onDownload,
-  onSendToAstroDex,
+  onReturnToAstroDex,
   onSaveAsPreset,
 }: ExportPanelProps) {
   const { t } = useTranslation();
@@ -35,25 +38,32 @@ export function ExportPanel({
         >
           {t('export_panel.download')}
         </button>
-        {canSendToAstroDex && (
+        {canReturnToAstroDex && (
           <button
             type="button"
             className="btn btn-amber"
-            disabled={isProcessing || astrodexSending}
-            onClick={onSendToAstroDex}
+            disabled={isProcessing || astrodexReturning}
+            onClick={onReturnToAstroDex}
           >
-            {astrodexSending
-              ? t('export_panel.sending')
-              : t('export_panel.send_to_astrodex')}
+            {astrodexReturning
+              ? t('export_panel.returning')
+              : t('export_panel.return_to_astrodex')}
           </button>
         )}
       </div>
-      {canSendToAstroDex && astrodexSent && !astrodexError && (
-        <p className="text-xs text-success">{t('export_panel.sent')}</p>
+      {canReturnToAstroDex && !astrodexReturned && !astrodexError && (
+        <p className="text-xs text-faint">
+          {astrodexObjectName
+            ? t('export_panel.return_hint_named', { object: astrodexObjectName })
+            : t('export_panel.return_hint')}
+        </p>
       )}
-      {canSendToAstroDex && astrodexError && (
+      {canReturnToAstroDex && astrodexReturned && !astrodexError && (
+        <p className="text-xs text-success">{t('export_panel.returned')}</p>
+      )}
+      {canReturnToAstroDex && astrodexError && (
         <p className="rounded-md border border-danger/30 bg-danger-wash px-3 py-2 text-xs text-danger">
-          {t('export_panel.send_failed', { error: astrodexError })}
+          {t('export_panel.return_failed', { error: astrodexError })}
         </p>
       )}
       <button

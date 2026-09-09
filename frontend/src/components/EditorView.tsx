@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { DepthShiftViewer } from '@/components/DepthShiftViewer';
 import { EditorInspector } from '@/components/EditorInspector';
@@ -22,6 +22,7 @@ import {
   geometryEquals,
   hasEdits,
   isDefaultGeometry,
+  parametersEqual,
   type CurveChannel,
   type CurvePoint,
   type Dimensions,
@@ -29,18 +30,12 @@ import {
   type EditorStepId,
   type FocusPoint,
   type GeometryParameters,
+  type ProcessingParameters,
   type SliderParameterKey,
 } from '@/types';
 
-export interface AstroDexContext {
-  imageId: string;
-  callbackUrl: string;
-  token: string;
-}
-
 export interface EditorViewProps {
   session: EditorSession;
-  astrodexContext: AstroDexContext | null;
   /** Leave the editor and go back to the upload screen. */
   onExit: () => void;
 }
@@ -56,8 +51,15 @@ function displayedAspect(dimensions: Dimensions | undefined, geometry: GeometryP
   return width / height;
 }
 
+function focusPointsEqual(a: FocusPoint | null, b: FocusPoint | null): boolean {
+  if (a === null || b === null) {
+    return a === b;
+  }
+  return a.x === b.x && a.y === b.y;
+}
+
 /** Main editing surface: workflow rail + step inspector + persistent preview. */
-export function EditorView({ session, astrodexContext, onExit }: EditorViewProps) {
+export function EditorView({ session, onExit }: EditorViewProps) {
   const { t } = useTranslation();
   const {
     parameters,
@@ -98,6 +100,12 @@ export function EditorView({ session, astrodexContext, onExit }: EditorViewProps
   const [framingGeom, setFramingGeom] = useState<GeometryParameters>(parameters.geometry);
   const [framingRatioFrac, setFramingRatioFrac] = useState<number | null>(null);
   const [confirmExit, setConfirmExit] = useState(false);
+  // The edit state that was last sent back to AstroDex - once it matches the
+  // current state the work is delivered, so the unsaved-changes guard stands down.
+  const [delivered, setDelivered] = useState<{
+    parameters: ProcessingParameters;
+    focalPoint: FocusPoint | null;
+  } | null>(null);
 
   const {
     milestones,
@@ -105,7 +113,16 @@ export function EditorView({ session, astrodexContext, onExit }: EditorViewProps
     capture: captureMilestone,
   } = useMilestones(session.sessionId, parameters, focalPoint);
 
-  const dirty = hasEdits(parameters) || focalPoint !== null;
+  const editState = useRef({ parameters, focalPoint });
+  editState.current = { parameters, focalPoint };
+
+  const deliveredToAstrodex =
+    delivered !== null &&
+    !astrodex.error &&
+    parametersEqual(parameters, delivered.parameters) &&
+    focusPointsEqual(focalPoint, delivered.focalPoint);
+
+  const dirty = (hasEdits(parameters) || focalPoint !== null) && !deliveredToAstrodex;
 
   // Warn before a full-page navigation (mobile edge-swipe back, reload, tab
   // close) drops unsaved edits - there is no server-side draft to recover.
@@ -295,16 +312,14 @@ export function EditorView({ session, astrodexContext, onExit }: EditorViewProps
     URL.revokeObjectURL(url);
   }
 
-  function handleSendToAstroDex(): void {
-    if (!astrodexContext) {
+  async function handleReturnToAstrodex(): Promise<void> {
+    if (!session.astrodex) {
       return;
     }
-    void astrodex.sendImage(
-      session.sessionId,
-      astrodexContext.imageId,
-      astrodexContext.callbackUrl,
-      astrodexContext.token,
-    );
+    const ok = await astrodex.returnImage(session.sessionId);
+    if (ok) {
+      setDelivered(editState.current);
+    }
   }
 
   const isProcessing = status === 'processing';
@@ -400,12 +415,13 @@ export function EditorView({ session, astrodexContext, onExit }: EditorViewProps
           error: depthShift.error,
         }}
         exportActions={{
-          canSendToAstroDex: Boolean(astrodexContext),
-          astrodexSending: astrodex.isLoading,
-          astrodexSent: astrodex.success,
+          canReturnToAstroDex: Boolean(session.astrodex),
+          astrodexObjectName: session.astrodex?.objectName ?? null,
+          astrodexReturning: astrodex.isLoading,
+          astrodexReturned: astrodex.success,
           astrodexError: astrodex.error,
           onDownload: () => void handleDownload(),
-          onSendToAstroDex: handleSendToAstroDex,
+          onReturnToAstroDex: () => void handleReturnToAstrodex(),
           onSaveAsPreset: () => setShowSavePreset(true),
         }}
       />

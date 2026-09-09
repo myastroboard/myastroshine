@@ -2,9 +2,10 @@
 
 Base URL: `http://localhost:8002/api` (configurable via `VITE_API_URL` on the
 frontend). Most routes are unauthenticated (local deployment). The AstroDex
-routes (`/astrodex/receive`, `/send-to-astrodex`) require a long-lived webhook
-token: `Authorization: Bearer <token>`, created and revoked from the Settings UI
-(`/api/tokens`).
+handoff routes (`/astrodex/handoff/resume`, `/astrodex/handoff/return`) are
+authenticated by the signed handoff token in the request body, not a bearer
+header - the token's `kid` selects the webhook token (created in the Settings UI,
+`/api/tokens`) whose `signing_secret` verifies it.
 
 ## Contents
 
@@ -113,8 +114,8 @@ Every route is implemented and tested end to end.
 | GET | `/tokens` | List webhook tokens (metadata only) |
 | POST | `/tokens` | Create a webhook token (raw value shown once) |
 | DELETE | `/tokens/{token_id}` | Revoke a token |
-| POST | `/astrodex/receive` | Receive an image pushed from AstroDex (bearer auth) |
-| POST | `/send-to-astrodex` | Send the enhanced image back (bearer auth, signed webhook) |
+| POST | `/astrodex/handoff/resume` | Open a session from an AstroDex handoff token |
+| POST | `/astrodex/handoff/return` | Send the enhanced image back to AstroDex |
 | GET | `/version` | The version this instance is running |
 | GET | `/version/check-updates` | Latest GitHub release, cached ~4h |
 
@@ -464,54 +465,55 @@ downgrade.
 
 ## Webhook tokens
 
-Long-lived bearer tokens authenticate AstroDex to this instance. Create from the
-Settings UI or `POST /tokens { name, expires_in_days? }` -> `201`:
+A webhook token pairs the AstroDex integration with this instance. Create one
+from the Settings UI or `POST /tokens { name, expires_in_days? }` -> `201`:
 
 ```json
 {
   "id": "...", "name": "AstroDex prod", "token_prefix": "mas_1wZcTkdO",
   "created_at": "...", "expires_at": null, "revoked": false,
-  "token": "mas_<long secret>",        // bearer credential
-  "signing_secret": "<64 hex chars>"   // configure in AstroDex to verify webhooks
+  "token": "mas_<long secret>",        // the value; its first 12 chars are the kid
+  "signing_secret": "<64 hex chars>"   // HMAC key, both directions
 }
 ```
 
 `token` and `signing_secret` are shown **only** in this response. `GET /tokens`
-never returns them. `DELETE /tokens/{id}` revokes immediately (`401` on next use).
+never returns them. `DELETE /tokens/{id}` revokes immediately. Paste both into
+MyAstroBoard's MyAstroShine connector; it mints the handoff tokens below.
 
 ## AstroDex integration
 
-**Inbound** - `POST /astrodex/receive` (multipart: `image_id`, `image`,
-`callback_url`, `callback_token?`; `Authorization: Bearer <token>`) opens a
-session and records the callback. Returns `201 { session_id, image_url, ... }`.
+The browser is opened here from MyAstroBoard with a signed **handoff token** in
+the URL. This instance never needs to be reachable *from* the board - it only
+ever calls out - so the flow works whether the board is on the LAN or behind a
+public reverse proxy. Full design:
+`initial_plan/PASSATION_MYASTROBOARD_INTEGRATION.md`.
 
-**Outbound** - `POST /send-to-astrodex` (`{ session_id, astrodex_image_id,
-astrodex_callback_url }`; bearer auth) returns `202` immediately and delivers
-this signed payload in the background:
+**Handoff token** - `b64url(payload).b64url(HMAC_SHA256(b64url(payload), secret))`,
+b64url without padding, the signature segment is the raw digest (not hex). The
+payload claims: `kid` (first 12 chars of the webhook token), `callback_base`
+(the board origin, set by the board), `item_id`, `picture_id`, `user_id`, `iat`,
+`exp` (12 h), `jti` (single-use, enforced by the board on return).
 
-```json
-{
-  "event": "image_enhanced",
-  "source": "MyAstroShine",
-  "timestamp": "2026-09-03T14:32:20Z",
-  "data": {
-    "original_image_id": "astrodex_img_12345",
-    "enhanced_image": { "blob": "<base64>", "format": "jpeg", "width": 3840,
-                        "height": 2160, "file_size_bytes": 5242880 },
-    "processing_metadata": { "session_id": "...", "parameters": { } },
-    "preview_url": "/api/preview/...?full=true"
-  }
-}
-```
+**`POST /astrodex/handoff/resume`** `{ handoff }` -> verify the signature and
+expiry, check `callback_base` against the `astrodex_callback_urls` allowlist,
+`GET {callback_base}/api/astrodex/integration/source` (+ `/source/image`) for the
+picture and its metadata, open a session. Returns
+`200 { session_id, image_url, dimensions, histogram, object_name, astrodex_item_id }`.
 
-Headers: `X-Webhook-Signature: sha256=<hmac>`,
-`X-Webhook-Signature-Algorithm: HMAC-SHA256`. The HMAC is over
-`canonical_json(payload)` (sorted keys, `(",", ":")` separators) keyed by the
-token's `signing_secret` (or `ASTRODEX_WEBHOOK_SECRET` as fallback). Delivery
-retries `ASTRODEX_MAX_RETRIES` times with exponential backoff; the
-`astrodex_links` row tracks `webhook_status` (`pending` / `sent` / `failed`).
-`astrodex_callback_url` must match `ASTRODEX_CALLBACK_URLS` when that allowlist
-is set (else `403`).
+**`POST /astrodex/handoff/return`** `{ session_id }` -> encode the processed
+image, POST it back as `multipart/form-data` to
+`{callback_base}/api/astrodex/integration/enhanced` with fields `handoff`,
+`payload` (`canonical_json({ parameters, myastroshine_version })`), and `image`.
+Signed with `X-Webhook-Signature: sha256=<hex>` over
+`canonical_json(payload) + "\n" + sha256_hex(image_bytes)`, keyed by the webhook
+token's `signing_secret`. The board files the result as a **new** picture on the
+same object (the original is never replaced). Retries `astrodex_max_retries`
+times with backoff; a `409` means the board already has it. Returns
+`200 { session_id, status, astrodex_item_id }`; a delivery failure is `502`.
+
+`callback_base` must match `astrodex_callback_urls` when that allowlist is set
+(empty = every URL refused - the main SSRF guard).
 
 ## Stacking
 

@@ -1,97 +1,99 @@
-"""AstroDexService: HMAC signing and webhook delivery with retries."""
+"""The shared HMAC contract with MyAstroBoard: handoff tokens and the
+enhanced-upload signature."""
 
 from __future__ import annotations
 
-import json
+import time
 
-import httpx
 import pytest
 
+from app.exceptions import UnauthorizedError
 from app.services.astrodex_integration import (
-    AstroDexService,
     canonical_json,
-    generate_signature,
-    verify_signature,
+    decode_handoff_claims,
+    enhanced_signing_input,
+    sign_enhanced_upload,
+    sign_handoff,
+    verify_handoff,
 )
 
-_PAYLOAD = {"event": "image_enhanced", "data": {"b": 2, "a": 1}}
+_SECRET = "s" * 64
+
+
+def _claims(**overrides: object) -> dict[str, object]:
+    base: dict[str, object] = {
+        "kid": "mas_1wZcTkdO",
+        "callback_base": "https://astro.example.test",
+        "item_id": "item-1",
+        "picture_id": "pic-1",
+        "user_id": "user-1",
+        "iat": int(time.time()),
+        "exp": int(time.time()) + 3600,
+        "jti": "abc123",
+    }
+    base.update(overrides)
+    return base
 
 
 def test_canonical_json_is_sorted_and_compact() -> None:
     assert canonical_json({"b": 1, "a": 2}) == '{"a":2,"b":1}'
 
 
-def test_signature_roundtrip() -> None:
-    """A payload signed by generate_signature verifies with verify_signature."""
-    header = generate_signature(_PAYLOAD, "secret")
+def test_handoff_round_trip_returns_the_claims() -> None:
+    """A token from sign_handoff verifies and yields the original claims."""
+    claims = _claims()
+    token = sign_handoff(claims, _SECRET)
+
+    verified = verify_handoff(token, _SECRET)
+
+    assert verified["item_id"] == "item-1"
+    assert verified["callback_base"] == "https://astro.example.test"
+
+
+def test_verify_handoff_rejects_a_wrong_secret() -> None:
+    token = sign_handoff(_claims(), _SECRET)
+    with pytest.raises(UnauthorizedError, match="signature"):
+        verify_handoff(token, "x" * 64)
+
+
+def test_verify_handoff_rejects_a_tampered_payload() -> None:
+    token = sign_handoff(_claims(), _SECRET)
+    payload_segment, _, signature_segment = token.partition(".")
+    forged = sign_handoff(_claims(item_id="other"), _SECRET).partition(".")[0]
+    with pytest.raises(UnauthorizedError):
+        verify_handoff(f"{forged}.{signature_segment}", _SECRET)
+    assert payload_segment  # (sanity: the original had a payload segment)
+
+
+def test_verify_handoff_rejects_an_expired_token() -> None:
+    token = sign_handoff(_claims(exp=int(time.time()) - 1), _SECRET)
+    with pytest.raises(UnauthorizedError, match="expired"):
+        verify_handoff(token, _SECRET)
+
+
+def test_verify_handoff_rejects_a_malformed_token() -> None:
+    with pytest.raises(UnauthorizedError, match="Malformed"):
+        verify_handoff("not-a-token", _SECRET)
+
+
+def test_decode_claims_does_not_verify_but_reads_routing_fields() -> None:
+    """decode_handoff_claims exposes kid/callback_base before the key is known."""
+    token = sign_handoff(_claims(), "some-other-secret")
+    claims = decode_handoff_claims(token)
+    assert claims["kid"] == "mas_1wZcTkdO"
+    assert claims["callback_base"] == "https://astro.example.test"
+
+
+def test_enhanced_signature_is_hex_and_covers_the_image() -> None:
+    payload = {"parameters": {"contrast": 1.2}, "myastroshine_version": "0.3.0"}
+    header = sign_enhanced_upload(payload, b"image-bytes", _SECRET)
     assert header.startswith("sha256=")
-    assert verify_signature(json.dumps(_PAYLOAD), header, "secret")
+    # A different image body changes the signature.
+    other = sign_enhanced_upload(payload, b"other-bytes", _SECRET)
+    assert other != header
 
 
-def test_verify_rejects_tampered_payload() -> None:
-    header = generate_signature(_PAYLOAD, "secret")
-    tampered = json.dumps({**_PAYLOAD, "data": {"a": 1, "b": 3}})
-    assert not verify_signature(tampered, header, "secret")
-
-
-def test_verify_rejects_wrong_secret() -> None:
-    header = generate_signature(_PAYLOAD, "secret")
-    assert not verify_signature(json.dumps(_PAYLOAD), header, "other")
-
-
-@pytest.mark.asyncio
-async def test_send_webhook_success_signs_request() -> None:
-    """A 200 stops after one attempt and the request carries the signature."""
-    seen: dict[str, str] = {}
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        seen.update(request.headers)
-        return httpx.Response(200, json={"ok": True})
-
-    service = AstroDexService(transport=httpx.MockTransport(handler))
-    result = await service.send_webhook("https://astrodex.test/hook", _PAYLOAD, "secret")
-
-    assert result == {"success": True, "attempts": 1, "status_code": 200}
-    assert seen["x-webhook-signature"] == generate_signature(_PAYLOAD, "secret")
-
-
-@pytest.mark.asyncio
-async def test_send_webhook_retries_transient_then_succeeds() -> None:
-    """503 twice, then 200 -> success on the third attempt."""
-    calls = {"n": 0}
-
-    def handler(_request: httpx.Request) -> httpx.Response:
-        calls["n"] += 1
-        return httpx.Response(200) if calls["n"] >= 3 else httpx.Response(503)
-
-    service = AstroDexService(transport=httpx.MockTransport(handler))
-    result = await service.send_webhook("https://astrodex.test/hook", _PAYLOAD, "secret")
-
-    assert result["success"] is True
-    assert result["attempts"] == 3
-
-
-@pytest.mark.asyncio
-async def test_send_webhook_gives_up_after_max_retries() -> None:
-    """Persistent 503 exhausts the retries and reports failure."""
-    service = AstroDexService(transport=httpx.MockTransport(lambda _r: httpx.Response(503)))
-    result = await service.send_webhook("https://astrodex.test/hook", _PAYLOAD, "secret")
-
-    assert result["success"] is False
-    assert result["attempts"] == 3
-
-
-@pytest.mark.asyncio
-async def test_send_webhook_does_not_retry_client_error() -> None:
-    """A 400 is terminal - no retries."""
-    calls = {"n": 0}
-
-    def handler(_request: httpx.Request) -> httpx.Response:
-        calls["n"] += 1
-        return httpx.Response(400)
-
-    service = AstroDexService(transport=httpx.MockTransport(handler))
-    result = await service.send_webhook("https://astrodex.test/hook", _PAYLOAD, "secret")
-
-    assert result["success"] is False
-    assert calls["n"] == 1
+def test_enhanced_signing_input_is_stable_across_payload_key_order() -> None:
+    a = enhanced_signing_input({"a": 1, "b": 2}, b"x")
+    b = enhanced_signing_input({"b": 2, "a": 1}, b"x")
+    assert a == b

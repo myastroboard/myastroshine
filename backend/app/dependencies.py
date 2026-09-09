@@ -15,7 +15,7 @@ from app.config import get_settings
 from app.db.database import get_db
 from app.db.models import WebhookToken
 from app.exceptions import ForbiddenError, UnauthorizedError
-from app.services.astrodex_dispatch import AstroDexDispatch
+from app.services.astrodex_handoff import AstroDexHandoffService
 from app.services.auto_astro import AutoAstroService
 from app.services.depth_map import DepthMapService
 from app.services.depth_shift import DepthShiftService
@@ -126,13 +126,13 @@ RequireAdmin = Annotated[None, Depends(require_admin)]
 RequireRateLimit = Annotated[None, Depends(enforce_request_rate_limit)]
 
 
-def get_astrodex_dispatch(
+def get_astrodex_handoff_service(
     db: DbSession, sessions: SessionServiceDep, storage: StorageDep
-) -> AstroDexDispatch:
-    return AstroDexDispatch(db, sessions, storage)
+) -> AstroDexHandoffService:
+    return AstroDexHandoffService(db, sessions, storage)
 
 
-AstroDexDispatchDep = Annotated[AstroDexDispatch, Depends(get_astrodex_dispatch)]
+AstroDexHandoffServiceDep = Annotated[AstroDexHandoffService, Depends(get_astrodex_handoff_service)]
 
 
 def get_stacking_service(

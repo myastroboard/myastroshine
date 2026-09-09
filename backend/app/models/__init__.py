@@ -1,5 +1,11 @@
 """Pydantic request/response models for the MyAstroShine API."""
 
+from app.models.astrodex import (
+    HandoffResumeRequest,
+    HandoffResumeResponse,
+    HandoffReturnRequest,
+    HandoffReturnResponse,
+)
 from app.models.auto_astro import AutoAstroResponse
 from app.models.depth_shift import (
     DepthLayerInfo,
@@ -70,6 +76,10 @@ __all__ = [
     "FocusPoint",
     "FrameQualityInfo",
     "GeometryParameters",
+    "HandoffResumeRequest",
+    "HandoffResumeResponse",
+    "HandoffReturnRequest",
+    "HandoffReturnResponse",
     "HistogramData",
     "InitiateStackRequest",
     "LogLevelUpdate",
