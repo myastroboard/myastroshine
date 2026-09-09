@@ -34,6 +34,11 @@ services:
     volumes:
       - ./backend:/app
       - ./data:/data
+      # Optional external ML engines (StarNet2 / DeepSNR). Nothing is bundled -
+      # see docs/DEPLOYMENT.md "External ML engines". The ./engines dir is always
+      # mounted (empty and inert by default); drop the binary in it and set
+      # starnet2_path (e.g. /opt/engines/starnet2/starnet2) in Settings.
+      - ./engines:/opt/engines:ro
     depends_on:
       - redis
     restart: unless-stopped
@@ -53,6 +58,9 @@ services:
     volumes:
       - ./backend:/app
       - ./data:/data
+      # External ML engines - queue mode runs the pass here, so the worker needs
+      # the same mount as api (see the api service above).
+      - ./engines:/opt/engines:ro
     depends_on:
       - redis
     restart: unless-stopped

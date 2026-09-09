@@ -55,6 +55,12 @@ COPY backend/migrations/ migrations/
 ENV DATA_DIR=/data
 RUN mkdir -p /data
 
+# Mount point for optional operator-installed ML engines (StarNet2 / DeepSNR).
+# Nothing is bundled: the compose files bind-mount ./engines here read-only and
+# the operator drops the binary in. Empty and inert unless a path is set in
+# Settings. See docs/DEPLOYMENT.md "External ML engines" and THIRD_PARTY.md.
+RUN mkdir -p /opt/engines
+
 EXPOSE 8002
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \

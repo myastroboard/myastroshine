@@ -36,6 +36,12 @@ services:
       - "8002:8002"
     volumes:
       - myastroshine_data:/data
+      # Optional external ML engines (StarNet2 star removal / DeepSNR denoise).
+      # Nothing is bundled - see docs/DEPLOYMENT.md "External ML engines" and
+      # THIRD_PARTY.md. The ./engines dir is always mounted (empty and inert by
+      # default); drop the operator-installed binary in it and set starnet2_path
+      # (e.g. /opt/engines/starnet2/starnet2) in Settings -> Advanced.
+      - ./engines:/opt/engines:ro
     depends_on:
       - redis
     restart: unless-stopped
@@ -60,6 +66,9 @@ services:
     environment: *backend-env
     volumes:
       - myastroshine_data:/data
+      # External ML engines - queue mode runs the pass here, so the worker needs
+      # the same mount as api (see the api service above).
+      - ./engines:/opt/engines:ro
     depends_on:
       - redis
       - api
