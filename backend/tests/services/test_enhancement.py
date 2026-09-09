@@ -128,3 +128,77 @@ def test_run_marks_job_failed_on_missing_image(
         enhancement.run(record.session_id, ProcessingParameters(), job.job_id)
 
     assert enhancement.jobs.get(job.job_id).status == "failed"
+
+
+def test_starnet2_engine_invokes_the_binary_and_caches_it(
+    enhancement: EnhancementService, sample_image: np.ndarray, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """star_removal_engine='starnet2' routes the split through the operator binary
+    when one is available; the second edit reuses the cached estimate."""
+    import subprocess
+
+    import cv2
+
+    from app.models.engines import EngineStatus
+    from app.services import enhancement as enh_module
+    from app.services import external_starless
+    from app.utils.app_settings import save_app_settings
+
+    save_app_settings({"starnet2_path": "/opt/starnet2"})
+    monkeypatch.setattr(
+        enh_module,
+        "get_engine_statuses",
+        lambda: {
+            "starnet2": EngineStatus(
+                configured=True, found=True, version="2.6.1", known_good=True, detail="ok"
+            ),
+            "deepsnr": EngineStatus(configured=False, found=False, detail="x"),
+        },
+    )
+
+    invocations: list[list[str]] = []
+
+    def fake_run(cmd: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        invocations.append(cmd)
+        cv2.imwrite(cmd[cmd.index("-o") + 1], cv2.imread(cmd[cmd.index("-i") + 1]))
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(external_starless.subprocess, "run", fake_run)
+
+    record = enhancement.sessions.create_session(image_path="")
+    enhancement.storage.save_original(record.session_id, sample_image)
+
+    params = ProcessingParameters(star_removal=100, star_removal_engine="starnet2")
+    enhancement.run(record.session_id, params, enhancement.jobs.create(record.session_id).job_id)
+    assert len(invocations) == 1
+
+    # Same detection inputs, a creative-only change -> cache hit, no new pass.
+    enhancement.run(
+        record.session_id,
+        params.model_copy(update={"contrast": 1.6}),
+        enhancement.jobs.create(record.session_id).job_id,
+    )
+    assert len(invocations) == 1
+
+
+def test_starnet2_engine_falls_back_to_classical_when_unavailable(
+    enhancement: EnhancementService, sample_image: np.ndarray, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.services import external_starless
+
+    def must_not_run(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("the external binary must not be called when unavailable")
+
+    monkeypatch.setattr(external_starless.subprocess, "run", must_not_run)
+
+    record = enhancement.sessions.create_session(image_path="")
+    enhancement.storage.save_original(record.session_id, sample_image)
+    job = enhancement.jobs.create(record.session_id)
+
+    enhancement.run(
+        record.session_id,
+        ProcessingParameters(star_removal=80, star_removal_engine="starnet2"),
+        job.job_id,
+    )
+
+    assert enhancement.jobs.get(job.job_id).status == "completed"

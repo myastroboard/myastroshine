@@ -39,6 +39,9 @@ const SETTINGS: AppSettings = {
   stackingWatchDir: '',
   stackingWatchIdleMinutes: 10,
   stackingWatchAutoProcess: true,
+  starnet2Path: '',
+  deepsnrPath: '',
+  starnet2Stride: 0,
   logLevel: 'info',
   consoleLogLevel: 'warning',
 };

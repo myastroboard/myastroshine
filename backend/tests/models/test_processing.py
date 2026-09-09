@@ -49,6 +49,7 @@ _WIRE = {
     "star_max_size": 40,
     "star_removal": 75,
     "star_recombine": 40,
+    "star_removal_engine": "starnet2",
     "sharpness": 1.2,
     "temperature": 5500,
     "tint": 5,

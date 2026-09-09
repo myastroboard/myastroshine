@@ -5,11 +5,19 @@ Constraints mirror docs/API.md. Keep the two in sync.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 _LEVEL_MIN = 0
 _LEVEL_MAX = 255
 _MIN_CURVE_POINTS = 2
+
+#: Star-removal backends selectable per edit. ``"classic"`` is the built-in
+#: classical split (always available). ``"starnet2"`` routes the split through the
+#: operator-installed StarNet2 binary when one is configured and working, and
+#: falls back to ``"classic"`` otherwise (initial_plan/13_EXTERNAL_ML_ENGINES.md).
+StarRemovalEngine = Literal["classic", "starnet2"]
 
 
 class GeometryParameters(BaseModel):
@@ -116,6 +124,10 @@ class ProcessingParameters(BaseModel):
     # Detection reuses star_sensitivity / star_max_size above.
     star_removal: int = Field(default=0, ge=0, le=100)
     star_recombine: int = Field(default=0, ge=0, le=100)
+    #: Which backend performs the split. ``"starnet2"`` is honoured only when the
+    #: operator has a working binary configured; otherwise the pipeline logs and
+    #: uses the classical split. Ignored entirely when ``star_removal == 0``.
+    star_removal_engine: StarRemovalEngine = "classic"
     sharpness: float = Field(default=1.0, ge=0.0, le=2.0)
     temperature: int = Field(default=6500, ge=2000, le=8000)
     tint: int = Field(default=0, ge=-50, le=50)
