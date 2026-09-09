@@ -119,7 +119,7 @@ after changing it).
 | Advanced | `cors_origins` | `http://localhost:3000` |
 | Advanced | `rate_limit_enabled` / `rate_limit_per_minute` / `max_concurrent_jobs_per_ip` | `true` / 120 / 5 |
 | Advanced | `log_level` / `console_log_level` | `info` / `warning` |
-| Advanced | `starnet2_path` / `deepsnr_path` / `starnet2_stride` (external ML engines; empty = off) | "" / "" / 0 |
+| Advanced | `starnet2_path` / `deepsnr_path` / `starnet2_stride` / `deepsnr_stride` (external ML engines; empty = off) | "" / "" / 0 / 0 |
 
 ## External ML engines (optional)
 
@@ -135,18 +135,24 @@ set a path). Its contents are git-ignored.
 
 1. Download the CLI build for **linux-x64** from `starnetastro.com` (there is no
    linux-arm64 build - an ARM host cannot use this). Read its bundled
-   `LICENSE.txt` and satisfy yourself that your use is within its terms (the
-   models are non-commercial).
-2. Unpack it into `./engines/`, e.g. `./engines/starnet2/starnet2`, and
-   `docker compose up -d`. (Running the published image without the repo? Create
-   an `engines/` dir next to your `docker-compose.yml` first.)
-3. In **Settings -> Advanced -> External ML engines**, set `starnet2_path` to the
-   path inside the container (e.g. `/opt/engines/starnet2/starnet2`), Save, then
-   **Re-check engines**. A green "StarNet2 x.y.z detected" line means the editor's
-   Star step now offers a "StarNet2" engine toggle.
+   `LICENSE.txt` - it grants use "solely for astrophotography image processing";
+   the model is non-commercial, so a monetised instance takes that clause on.
+2. Unpack it into `./engines/`, e.g. `./engines/starnet2/starnet2` and/or
+   `./engines/deepsnr/deepsnr`, then `docker compose up -d`. (Running the
+   published image without the repo? Create an `engines/` dir next to your
+   `docker-compose.yml` first.) The image runs on Debian 13 / glibc 2.41, which
+   meets the tools' runtime baseline.
+3. In **Settings -> Advanced -> External ML engines**, set `starnet2_path` /
+   `deepsnr_path` to the path inside the container (e.g.
+   `/opt/engines/starnet2/starnet2`), Save, then **Re-check engines**. A green
+   "detected" line means the editor now offers that engine: a "StarNet2" toggle
+   in the **Stars** step, a "DeepSNR" toggle in the **Detail** step's denoise
+   control.
 
-The probe result is cached until the next settings save. A version outside the
-range this release was tested against still runs, with an amber warning.
+The probe result is cached until the next settings save. Tested against StarNet2
+**2.6.1** / DeepSNR **1.3.1**; a version outside `2.6.x` / `1.3.x` still runs,
+with an amber "untested" warning. A pass streams progress to the editor's bar; on
+failure or timeout (15 min) the pipeline falls back to the classical code.
 
 ## Frontend environment
 

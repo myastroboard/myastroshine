@@ -15,6 +15,7 @@ import {
   type FocusPoint,
   type GeometryParameters,
   type Preset,
+  type DenoiseEngine,
   type ProcessingParameters,
   type SliderParameterKey,
   type StackParameters,
@@ -64,6 +65,14 @@ export interface StarsBundle {
   onEngineChange: (engine: StarlessEngine) => void;
 }
 
+export interface DenoiseBundle {
+  /** Denoise backends the server offers (`GET /api/config`). The engine picker
+   * only shows when there's more than one. */
+  engines: DenoiseEngine[];
+  engine: DenoiseEngine;
+  onEngineChange: (engine: DenoiseEngine) => void;
+}
+
 export interface DepthBundle {
   focalPoint: FocusPoint | null;
   picking: boolean;
@@ -96,6 +105,7 @@ export interface EditorInspectorProps {
   stack: StackBundle;
   framing: FramingBundle;
   stars: StarsBundle;
+  denoise: DenoiseBundle;
   depth: DepthBundle;
   exportActions: ExportBundle;
 }
@@ -166,7 +176,7 @@ export function EditorInspector(props: EditorInspectorProps) {
           <p className="text-xs text-faint">{t('editor.steps.frame.unavailable')}</p>
         ))}
 
-      {sliderKeys.length > 0 && activeStep !== 'stars' && (
+      {sliderKeys.length > 0 && activeStep !== 'stars' && activeStep !== 'detail' && (
         <SliderGroup
           keys={sliderKeys}
           parameters={parameters}
@@ -181,6 +191,15 @@ export function EditorInspector(props: EditorInspectorProps) {
           onParameterChange={props.onParameterChange}
           isProcessing={props.isProcessing}
           stars={props.stars}
+        />
+      )}
+
+      {activeStep === 'detail' && (
+        <DetailPanel
+          parameters={parameters}
+          onParameterChange={props.onParameterChange}
+          isProcessing={props.isProcessing}
+          denoise={props.denoise}
         />
       )}
 
@@ -397,11 +416,13 @@ function StarsPanel({
         <span className="text-xs font-medium text-ink">{t('stars_panel.remove.heading')}</span>
         <p className="text-xs text-faint">{t('stars_panel.remove.help')}</p>
         {stars.engines.length > 1 && (
-          <StarRemovalEnginePicker
+          <EnginePicker
             engines={stars.engines}
             engine={stars.engine}
             onChange={stars.onEngineChange}
             disabled={isProcessing}
+            i18nPrefix="stars_panel.remove.engine"
+            hintEngine="starnet2"
           />
         )}
         <SliderGroup
@@ -428,28 +449,29 @@ function StarsPanel({
   );
 }
 
-/** Pick the star-removal backend. Only rendered when the server offers more than
- * one (i.e. the operator has a working StarNet2 binary - see
- * initial_plan/13_EXTERNAL_ML_ENGINES.md). */
-function StarRemovalEnginePicker({
+/** Pick an ML backend for a stage. Only rendered when the server offers more than
+ * one (i.e. the operator has a working binary - see docs/ALGORITHMS.md "Quality
+ * path"). ``i18nPrefix`` keys the aria-label (``.aria``), each engine's chip label
+ * (``.<engine>``), and the optional active-engine ``hint``. */
+function EnginePicker<E extends string>({
   engines,
   engine,
   onChange,
   disabled,
+  i18nPrefix,
+  hintEngine,
 }: {
-  engines: StarlessEngine[];
-  engine: StarlessEngine;
-  onChange: (engine: StarlessEngine) => void;
+  engines: E[];
+  engine: E;
+  onChange: (engine: E) => void;
   disabled: boolean;
+  i18nPrefix: string;
+  hintEngine?: E;
 }) {
   const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-1">
-      <div
-        className="flex gap-1"
-        role="radiogroup"
-        aria-label={t('stars_panel.remove.engine_aria_label')}
-      >
+      <div className="flex gap-1" role="radiogroup" aria-label={t(`${i18nPrefix}.aria`)}>
         {engines.map((entry) => (
           <button
             key={entry}
@@ -460,13 +482,62 @@ function StarRemovalEnginePicker({
             className={`chip ${engine === entry ? 'chip-active' : ''}`}
             onClick={() => onChange(entry)}
           >
-            {t(`stars_panel.remove.engine.${entry}`)}
+            {t(`${i18nPrefix}.${entry}`)}
           </button>
         ))}
       </div>
-      {engine === 'starnet2' && (
-        <p className="text-xs text-faint">{t('stars_panel.remove.engine_starnet2_hint')}</p>
+      {hintEngine && engine === hintEngine && (
+        <p className="text-xs text-faint">{t(`${i18nPrefix}.hint`)}</p>
       )}
+    </div>
+  );
+}
+
+function DetailPanel({
+  parameters,
+  onParameterChange,
+  isProcessing,
+  denoise,
+}: {
+  parameters: ProcessingParameters;
+  onParameterChange: (key: SliderParameterKey, value: number) => void;
+  isProcessing: boolean;
+  denoise: DenoiseBundle;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex flex-col gap-4">
+      <SliderGroup
+        keys={['clarity']}
+        parameters={parameters}
+        onParameterChange={onParameterChange}
+        isProcessing={isProcessing}
+      />
+      <div className="flex flex-col gap-2">
+        <span className="text-xs font-medium text-ink">{t('detail_panel.denoise.heading')}</span>
+        {denoise.engines.length > 1 && (
+          <EnginePicker
+            engines={denoise.engines}
+            engine={denoise.engine}
+            onChange={denoise.onEngineChange}
+            disabled={isProcessing}
+            i18nPrefix="detail_panel.denoise.engine"
+            hintEngine="deepsnr"
+          />
+        )}
+        <SliderGroup
+          keys={['denoise', 'chromaDenoise']}
+          parameters={parameters}
+          onParameterChange={onParameterChange}
+          isProcessing={isProcessing}
+        />
+      </div>
+      <SliderGroup
+        keys={['sharpness']}
+        parameters={parameters}
+        onParameterChange={onParameterChange}
+        isProcessing={isProcessing}
+      />
     </div>
   );
 }

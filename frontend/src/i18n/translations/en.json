@@ -327,16 +327,27 @@
     "remove": {
       "heading": "Remove (starless)",
       "help": "Lifts the stars out so every other step only touches the nebula, then Bring stars back fades them in at the end (0 = keep the image starless). Slower, but lets you stretch and sharpen the nebula without bloating stars.",
-      "engine_aria_label": "Star removal engine",
       "engine": {
+        "aria": "Star removal engine",
         "classic": "Classic",
-        "starnet2": "StarNet2"
-      },
-      "engine_starnet2_hint": "Uses the StarNet2 model installed on the server. The first pass on a new image can take a while; detection controls below don't apply."
+        "starnet2": "StarNet2",
+        "hint": "Uses the StarNet2 model installed on the server. The first pass on a new image can take a while; detection controls below don't apply."
+      }
     },
     "detection": {
       "heading": "Detection",
       "help": "What counts as a star. Both Reduce and Remove use these. Turn on the mask to check before committing."
+    }
+  },
+  "detail_panel": {
+    "denoise": {
+      "heading": "Noise reduction",
+      "engine": {
+        "aria": "Denoise engine",
+        "classic": "Classic",
+        "deepsnr": "DeepSNR",
+        "hint": "Uses the DeepSNR model installed on the server, applied early (before the tone stretch). The first pass on a new image can take a while."
+      }
     }
   },
   "histogram": {
@@ -464,11 +475,15 @@
       },
       "starnet2_stride": {
         "label": "StarNet2 stride",
-        "hint": "Even, 2-512. 0 lets StarNet2 pick. Larger is faster and coarser."
+        "hint": "Tile stride, even, 2-512. 0 = use StarNet2's own default (256). Larger is faster and coarser; smaller is slower with fewer seams."
       },
       "deepsnr_path": {
         "label": "DeepSNR binary path",
-        "hint": "Absolute path inside the container. Denoise engine (used on the linear composite path)."
+        "hint": "Absolute path inside the container. Adds a DeepSNR option to the Detail step's denoise control, applied early in the pipeline."
+      },
+      "deepsnr_stride": {
+        "label": "DeepSNR stride",
+        "hint": "Tile stride, even, 2-512. 0 = use DeepSNR's own default (480)."
       },
       "recheck_engines": "Re-check engines"
     },

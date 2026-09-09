@@ -114,6 +114,10 @@ export interface ProcessingParameters {
   clarity: number;
   vibrance: number;
   denoise: number;
+  /** Backend for the `denoise` stage. `'deepsnr'` is honoured only when the
+   * operator has a working binary; otherwise the classical filter runs. Ignored
+   * when `denoise === 0`; `chromaDenoise` is always classical. */
+  denoiseEngine: DenoiseEngine;
   chromaDenoise: number;
   vignetteCorrection: number;
   gradientReduction: number;
@@ -149,6 +153,7 @@ export const DEFAULT_PARAMETERS: ProcessingParameters = {
   clarity: 0.0,
   vibrance: 1.0,
   denoise: 0,
+  denoiseEngine: 'classic',
   chromaDenoise: 0,
   vignetteCorrection: 0,
   gradientReduction: 0,
@@ -237,7 +242,7 @@ export const CURVE_CHANNEL_FIELD: Record<CurveChannel, keyof ProcessingParameter
 };
 
 /** Numeric parameters driven by the slider panel (everything but geometry / stack /
- * curve fields, and `starRemovalEngine` which is a discrete choice, not a slider). */
+ * curve fields, and the discrete engine choices, which are pickers, not sliders). */
 export type SliderParameterKey = Exclude<
   keyof ProcessingParameters,
   | 'geometry'
@@ -247,6 +252,7 @@ export type SliderParameterKey = Exclude<
   | 'greenCurvePoints'
   | 'blueCurvePoints'
   | 'starRemovalEngine'
+  | 'denoiseEngine'
 >;
 
 interface ParameterBound {
@@ -465,10 +471,11 @@ export interface AppSettings {
   stackingWatchIdleMinutes: number;
   stackingWatchAutoProcess: boolean;
   /** Optional operator-installed external ML engines, invoked as a subprocess.
-   * Empty = off (initial_plan/13_EXTERNAL_ML_ENGINES.md). */
+   * Empty = off (docs/DEPLOYMENT.md "External ML engines"). */
   starnet2Path: string;
   deepsnrPath: string;
   starnet2Stride: number;
+  deepsnrStride: number;
   logLevel: LogLevel;
   consoleLogLevel: LogLevel;
 }
@@ -496,7 +503,7 @@ export interface PublicConfig {
   stackingMaxFrames: number;
   /** Star-removal engines the editor may offer. Always includes `'classic'`;
    * `'starnet2'` appears only when the operator has a working binary configured
-   * (initial_plan/13_EXTERNAL_ML_ENGINES.md). */
+   * (docs/DEPLOYMENT.md "External ML engines"). */
   starlessEngines: StarlessEngine[];
   /** Denoise engines, same rule: `'classic'` always, `'deepsnr'` when found. */
   denoiseEngines: DenoiseEngine[];

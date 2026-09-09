@@ -327,16 +327,27 @@
     "remove": {
       "heading": "Retirer (sans étoiles)",
       "help": "Extrait les étoiles pour que les autres étapes n'agissent que sur la nébuleuse, puis Rétablir les étoiles les réincorpore à la fin (0 = image sans étoiles). Plus lent, mais permet d'étirer et d'accentuer la nébuleuse sans gonfler les étoiles.",
-      "engine_aria_label": "Moteur de suppression d'étoiles",
       "engine": {
+        "aria": "Moteur de suppression d'étoiles",
         "classic": "Classique",
-        "starnet2": "StarNet2"
-      },
-      "engine_starnet2_hint": "Utilise le modèle StarNet2 installé sur le serveur. La première passe sur une nouvelle image peut être longue ; les réglages de détection ci-dessous ne s'appliquent pas."
+        "starnet2": "StarNet2",
+        "hint": "Utilise le modèle StarNet2 installé sur le serveur. La première passe sur une nouvelle image peut être longue ; les réglages de détection ci-dessous ne s'appliquent pas."
+      }
     },
     "detection": {
       "heading": "Détection",
       "help": "Ce qui compte comme une étoile. Réduire et Retirer utilisent ces réglages. Activez le masque pour vérifier avant de valider."
+    }
+  },
+  "detail_panel": {
+    "denoise": {
+      "heading": "Réduction du bruit",
+      "engine": {
+        "aria": "Moteur de débruitage",
+        "classic": "Classique",
+        "deepsnr": "DeepSNR",
+        "hint": "Utilise le modèle DeepSNR installé sur le serveur, appliqué tôt (avant l'étirement des tons). La première passe sur une nouvelle image peut être longue."
+      }
     }
   },
   "histogram": {
@@ -464,11 +475,15 @@
       },
       "starnet2_stride": {
         "label": "Pas (stride) StarNet2",
-        "hint": "Pair, 2-512. 0 laisse StarNet2 choisir. Plus grand = plus rapide et plus grossier."
+        "hint": "Pas de tuilage, pair, 2-512. 0 = valeur par défaut de StarNet2 (256). Plus grand = plus rapide et plus grossier ; plus petit = plus lent avec moins de raccords."
       },
       "deepsnr_path": {
         "label": "Chemin du binaire DeepSNR",
-        "hint": "Chemin absolu dans le conteneur. Moteur de débruitage (utilisé sur le composite linéaire)."
+        "hint": "Chemin absolu dans le conteneur. Ajoute une option DeepSNR au débruitage de l'étape Détail, appliquée tôt dans le pipeline."
+      },
+      "deepsnr_stride": {
+        "label": "Pas (stride) DeepSNR",
+        "hint": "Pas de tuilage, pair, 2-512. 0 = valeur par défaut de DeepSNR (480)."
       },
       "recheck_engines": "Revérifier les moteurs"
     },

@@ -11,6 +11,7 @@ import {
   type CurvePoint,
   type GeometryParameters,
   type JobStatus,
+  type DenoiseEngine,
   type ProcessingParameters,
   type SliderParameterKey,
   type StackParameters,
@@ -92,12 +93,24 @@ export function useImageProcessing(sessionId: string) {
     [applyParameters],
   );
 
-  /** Switch the star-removal backend. Applied at once, not debounced - it's a
-   * deliberate choice and a StarNet2 pass is long; there's nothing to coalesce. */
+  /** Switch the star-removal / denoise backend. Applied at once, not debounced -
+   * it's a deliberate choice and an ML pass is long; there's nothing to coalesce. */
   const updateStarRemovalEngine = useCallback(
     (engine: StarlessEngine) => {
       setParameters((prev) => {
         const next = { ...prev, starRemovalEngine: engine };
+        clearTimeout(debounceRef.current);
+        void applyParameters(next);
+        return next;
+      });
+    },
+    [applyParameters],
+  );
+
+  const updateDenoiseEngine = useCallback(
+    (engine: DenoiseEngine) => {
+      setParameters((prev) => {
+        const next = { ...prev, denoiseEngine: engine };
         clearTimeout(debounceRef.current);
         void applyParameters(next);
         return next;
@@ -233,6 +246,7 @@ export function useImageProcessing(sessionId: string) {
     error,
     updateParameter,
     updateStarRemovalEngine,
+    updateDenoiseEngine,
     updateStackParameter,
     updateChannelCurve,
     applyGeometry,

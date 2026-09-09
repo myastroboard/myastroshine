@@ -322,7 +322,7 @@ function AdvancedSection({ draft, patch }: SectionProps) {
 }
 
 /** Operator-installed StarNet2 / DeepSNR paths, with a live `--version` probe.
- * See initial_plan/13_EXTERNAL_ML_ENGINES.md. The probe result is cached on the
+ * See docs/DEPLOYMENT.md "External ML engines". The probe result is cached on the
  * server until settings change, so "Re-check" is the way to confirm a save. */
 function ExternalEnginesGroup({ draft, patch }: SectionProps) {
   const { t } = useTranslation();
@@ -377,6 +377,16 @@ function ExternalEnginesGroup({ draft, patch }: SectionProps) {
         placeholder="/opt/engines/deepsnr/deepsnr"
         onChange={(deepsnrPath) => patch({ deepsnrPath })}
         below={<EngineStatusLine status={status?.deepsnr} />}
+      />
+      <NumberRow
+        id="deepsnr-stride"
+        label={t('settings.advanced.deepsnr_stride.label')}
+        hint={t('settings.advanced.deepsnr_stride.hint')}
+        value={draft.deepsnrStride}
+        min={0}
+        max={512}
+        step={2}
+        onChange={(deepsnrStride) => patch({ deepsnrStride })}
       />
       <button
         type="button"

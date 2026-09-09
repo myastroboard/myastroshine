@@ -16,8 +16,13 @@ _MIN_CURVE_POINTS = 2
 #: Star-removal backends selectable per edit. ``"classic"`` is the built-in
 #: classical split (always available). ``"starnet2"`` routes the split through the
 #: operator-installed StarNet2 binary when one is configured and working, and
-#: falls back to ``"classic"`` otherwise (initial_plan/13_EXTERNAL_ML_ENGINES.md).
+#: falls back to ``"classic"`` otherwise (docs/ALGORITHMS.md "Quality path").
 StarRemovalEngine = Literal["classic", "starnet2"]
+
+#: Denoise backends, same rule. ``"deepsnr"`` routes the ``denoise`` stage through
+#: the operator-installed DeepSNR binary (run early, before the tone stretch) and
+#: falls back to ``"classic"`` when one is not available.
+DenoiseEngine = Literal["classic", "deepsnr"]
 
 
 class GeometryParameters(BaseModel):
@@ -110,6 +115,10 @@ class ProcessingParameters(BaseModel):
     clarity: float = Field(default=0.0, ge=-1.0, le=1.0)
     vibrance: float = Field(default=1.0, ge=0.0, le=2.0)
     denoise: int = Field(default=0, ge=0, le=100)
+    #: Backend for the ``denoise`` stage. ``"deepsnr"`` is honoured only when the
+    #: operator has a working binary; otherwise the classical bilateral filter
+    #: runs. Ignored when ``denoise == 0``. ``chroma_denoise`` is always classical.
+    denoise_engine: DenoiseEngine = "classic"
     chroma_denoise: int = Field(default=0, ge=0, le=100)
     vignette_correction: int = Field(default=0, ge=0, le=100)
     gradient_reduction: int = Field(default=0, ge=0, le=100)

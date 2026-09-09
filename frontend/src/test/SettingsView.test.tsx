@@ -43,6 +43,7 @@ const SETTINGS: AppSettings = {
   starnet2Path: '',
   deepsnrPath: '',
   starnet2Stride: 0,
+  deepsnrStride: 0,
   logLevel: 'info',
   consoleLogLevel: 'warning',
 };

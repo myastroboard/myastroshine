@@ -25,7 +25,7 @@ class PublicConfig(BaseModel):
     stacking_max_frames: int
     #: Star-removal engines the editor may offer. Always contains ``"classic"``;
     #: ``"starnet2"`` is appended only when the operator has a working binary
-    #: configured (initial_plan/13_EXTERNAL_ML_ENGINES.md).
+    #: configured (docs/DEPLOYMENT.md "External ML engines").
     starless_engines: list[str]
     #: Denoise engines, same rule - ``"classic"`` always, ``"deepsnr"`` when found.
     denoise_engines: list[str]
