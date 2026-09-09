@@ -9,6 +9,7 @@ from app.models.depth_shift import (
     DepthStatistics,
     FocusPoint,
 )
+from app.models.engines import EngineStatus, EngineStatusResponse
 from app.models.image import Dimensions, HistogramData, UploadResponse
 from app.models.logs import LogLevels, LogLevelUpdate, LogTailResponse
 from app.models.preset import (
@@ -63,6 +64,8 @@ __all__ = [
     "DepthShiftResponse",
     "DepthStatistics",
     "Dimensions",
+    "EngineStatus",
+    "EngineStatusResponse",
     "ExcludeFrameRequest",
     "FocusPoint",
     "FrameQualityInfo",

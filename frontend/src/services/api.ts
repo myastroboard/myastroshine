@@ -11,6 +11,7 @@ import type {
   CalibrationSummary,
   CreatedToken,
   DepthShiftResult,
+  EngineStatusResponse,
   FocusPoint,
   LogLevel,
   LogLevels,
@@ -220,6 +221,11 @@ export const apiClient = {
 
   saveAppSettings(settings: AppSettings): Promise<AppSettings> {
     return request<AppSettings>('/admin/app-settings', { method: 'POST', json: settings });
+  },
+
+  /** Probe the configured StarNet2 / DeepSNR paths (Settings -> engine status line). */
+  getEngineStatus(): Promise<EngineStatusResponse> {
+    return request<EngineStatusResponse>('/admin/engine-status');
   },
 
   // --- Logs (Settings -> Logs) ---

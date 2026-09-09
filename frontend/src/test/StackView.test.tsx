@@ -83,6 +83,8 @@ describe('StackView', () => {
       maxImageSizeMb: 100,
       stackingEnabled: true,
       stackingMaxFrames: 2000,
+      starlessEngines: ['classic'],
+      denoiseEngines: ['classic'],
     });
     mocked.initiateStack.mockResolvedValue({
       stackId: 'stack-1',

@@ -234,6 +234,8 @@ separate the stars from the nebulosity so the starless image can be stretched /
 sharpened / denoised hard without bloating the stars, then blend the stars back.
 Driven by two parameters, `star_removal` and `star_recombine` (0-100 each, both
 default 0 = off); detection reuses `star_sensitivity` / `star_max_size`.
+`star_removal_engine` selects the split backend - the classical one below, or an
+operator-installed StarNet2 (see "Quality path" at the end of this section).
 
 **Split** (`StarlessService.split`):
 1. Detect stars with `StarDetectionService.detect` (the same per-star detector
@@ -292,22 +294,32 @@ from the neighbourhood and has no model of what a star sits on top of; this is
 exactly where a trained model wins, and why the ONNX path (below) stays on the
 list.
 
-**ONNX quality path - evaluated, deferred (2026-09-07).** The roadmap paired the
-classical path with "an ONNX StarNet-style model (quality path)". Findings:
-- The canonical StarNet (`nekitmm/starnet`) is MIT for code but its **weights
-  are CC BY-NC-SA 4.0 - non-commercial** - so they cannot ship in an AGPL
-  project distributed as a public Docker image, and the official
-  `starnetastro.com` CLI publishes no separately-licensed model.
-- The MIT-licensed alternatives - `code2k13/starrem2k13` (U2NET-P, weights MIT
-  but trained on 3 base images, no published `.onnx`) and `charvey2718/nox`
-  (MIT incl. weights, TensorFlow `.pb`, needs conversion) - are unproven on real
-  astrophotos and would need the same real-image test rounds the star-reduction
-  rebuild took.
-- Adopting any of them means a new `onnxruntime` dependency (~20-40 MB per arch,
-  multi-arch OK) plus a bundled model file.
-This is the same call v0.2 made for ML denoise and ML depth (see "Depth map" and
-"ML denoising" here): evaluate, adopt only if genuinely viable. No dependency or
-model added; revisit as a dedicated spike against a real photo.
+**Quality path - StarNet2 as an optional external engine.** The roadmap paired the
+classical path with "an ONNX StarNet-style model (quality path)". Bundling a model
+was ruled out on licensing: the canonical StarNet (`nekitmm/starnet`) is MIT for
+code but its **weights are CC BY-NC-SA 4.0 - non-commercial**, and the official
+`starnetastro.com` StarNet2 / DeepSNR binaries are "all rights reserved" with no
+redistribution grant. Nothing from that lineage can ship in a public image.
+
+The way in (see `initial_plan/13_EXTERNAL_ML_ENGINES.md`): the operator installs
+StarNet2 themselves and MyAstroShine shells out to it - arm's-length, never
+bundled. `star_removal_engine` (`"classic"` default, `"starnet2"`) picks the
+backend per edit; `"starnet2"` is honoured only when
+`AppSettings.starnet2_path` points at a working binary (probed by
+`app.services.engine_probe`), and any failure - missing binary, timeout, bad
+output - logs and falls back to the classical split.
+
+- `ExternalStarlessService` (`app/services/external_starless.py`) writes a TIFF,
+  runs `starnet2 -i … -o … -q [-s stride]`, reads the star-free estimate back.
+  `blend_starless` then applies `star_removal` exactly as the classical
+  `StarlessService.split` does, so the 0-100 control means the same on both
+  engines and changing only its strength never re-invokes the binary.
+- `StarlessModelCache` keeps that estimate per session, keyed on the pixels fed to
+  the split (which fold in every upstream stage) plus the engine settings - a
+  full-resolution StarNet2 pass is minutes, and the editor re-runs the pipeline on
+  every slider move, so a creative-only edit must reuse it.
+- No new Python dependency: the StarNet2 CLI is self-contained (its own ONNX
+  Runtime). `DeepSNR` (denoise) is the same story, deferred to a later phase.
 
 ## Auto Astro (one-click adaptive enhancement)
 

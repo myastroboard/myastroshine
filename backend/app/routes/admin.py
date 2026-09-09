@@ -3,6 +3,7 @@
 Settings:
     GET  /api/admin/app-settings     - the live runtime settings
     POST /api/admin/app-settings     - replace them (writes app_settings.json)
+    GET  /api/admin/engine-status    - probe the configured StarNet2 / DeepSNR paths
 
 Logs (see app/logging_config.py):
     GET  /api/admin/logs             - tail the rotating log file (newest first)
@@ -33,10 +34,12 @@ from app.logging_config import apply_runtime_log_levels, get_logger, truncate_ma
 from app.models import (
     AppSettingsResponse,
     AppSettingsUpdate,
+    EngineStatusResponse,
     LogLevels,
     LogLevelUpdate,
     LogTailResponse,
 )
+from app.services.engine_probe import get_engine_statuses
 from app.utils.app_settings import get_app_settings, save_app_settings
 
 logger = get_logger(__name__)
@@ -66,6 +69,19 @@ async def update_app_settings(
     apply_runtime_log_levels()
     logger.info("app settings replaced via API")
     return AppSettingsResponse.model_validate(updated.model_dump())
+
+
+@router.get("/engine-status", response_model=EngineStatusResponse)
+async def read_engine_status(
+    _admin: RequireAdmin, _rate_limit: RequireRateLimit
+) -> EngineStatusResponse:
+    """Probe the configured external ML engine paths (StarNet2 / DeepSNR).
+
+    Drives the "engine detected / not found / untested version" line in Settings.
+    Memoised until the next settings change; a no-op for an engine with no path.
+    """
+    statuses = get_engine_statuses()
+    return EngineStatusResponse(starnet2=statuses["starnet2"], deepsnr=statuses["deepsnr"])
 
 
 # --- logs ----------------------------------------------------------------

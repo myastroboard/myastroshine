@@ -9,6 +9,8 @@ const DEFAULTS: PublicConfig = {
   maxImageSizeMb: 100,
   stackingEnabled: true,
   stackingMaxFrames: 2000,
+  starlessEngines: ['classic'],
+  denoiseEngines: ['classic'],
 };
 
 /**

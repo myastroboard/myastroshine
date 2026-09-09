@@ -86,9 +86,29 @@ class AppSettings(BaseModel):
     stacking_watch_idle_minutes: int = Field(default=10, ge=1, le=1440)
     stacking_watch_auto_process: bool = True
 
+    # External ML engines - optional, operator-installed StarNet2 / DeepSNR, invoked
+    # as a subprocess (initial_plan/13_EXTERNAL_ML_ENGINES.md). Nothing is bundled:
+    # the operator downloads the binary from starnetastro.com, mounts it into the
+    # container, and points these at it. Empty (the default) = that engine is off and
+    # the classical path is the only star-removal / denoise engine. Both the API and
+    # the worker need the binary reachable at the same path.
+    starnet2_path: str = ""
+    deepsnr_path: str = ""
+    #: StarNet2 -s/--stride; the tool requires an even value in 2-512. 0 = omit the
+    #: flag and let StarNet2 pick its own default.
+    starnet2_stride: int = Field(default=0, ge=0, le=512)
+
     # Logging - file level and console level (changeable at runtime, see #4)
     log_level: str = "info"
     console_log_level: str = "warning"
+
+    @field_validator("starnet2_stride", mode="after")
+    @classmethod
+    def _stride_even(cls, value: int) -> int:
+        """StarNet2 rejects an odd stride outright - fail here, not at run time."""
+        if value and value % 2:
+            raise ValueError("starnet2_stride must be even (or 0 to use the tool default)")
+        return value
 
     @field_validator("cors_origins", "astrodex_callback_urls", mode="after")
     @classmethod
@@ -154,10 +174,18 @@ def get_app_settings() -> AppSettings:
     return _cache.settings
 
 
+def _invalidate_derived_caches() -> None:
+    """Drop caches keyed on settings values (use after any settings change)."""
+    from app.services.engine_probe import clear_engine_probe_cache  # noqa: PLC0415 - import cycle
+
+    clear_engine_probe_cache()
+
+
 def reload_app_settings() -> AppSettings:
     """Drop the cache and re-read the file (use after an external write)."""
     with _lock:
         _cache.settings = _load_from_disk()
+    _invalidate_derived_caches()
     return _cache.settings
 
 
@@ -173,6 +201,7 @@ def save_app_settings(patch: dict[str, Any]) -> AppSettings:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(merged.model_dump_json(indent=2), encoding="utf-8")
         _cache.settings = merged
+    _invalidate_derived_caches()
     applied = sorted(k for k in patch if k in AppSettings.model_fields)
     logger.info("app settings updated", keys=applied)
     return merged

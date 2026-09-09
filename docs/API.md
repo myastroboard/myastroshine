@@ -61,6 +61,7 @@ Celery job queue (`PROCESSING_MODE=queue`), and the progress WebSockets.
 | GET | `/config` | Public runtime limits (upload cap, stacking limits) - no admin gate | v0.3 |
 | GET | `/admin/app-settings` | Current runtime settings (`app_settings.json`) | 1 |
 | POST | `/admin/app-settings` | Replace runtime settings (gated by `ADMIN_ENABLED`) | 1 |
+| GET | `/admin/engine-status` | Probe the configured StarNet2 / DeepSNR paths | v0.3 |
 | GET | `/admin/logs` | Tail the log file, newest first (`limit`, `offset`, `level`) | 1 |
 | GET / POST | `/admin/logs/level` | Read / change the file and console log levels | 1 |
 | POST | `/admin/logs/clear` | Empty `myastroshine.log` | 1 |
@@ -138,6 +139,7 @@ guard, independent of `max_image_size_mb`'s compressed-byte-size check).
 | star_max_size | 0 | 100 | 30 | int |
 | star_removal | 0 | 100 | 0 | int |
 | star_recombine | 0 | 100 | 0 | int |
+| star_removal_engine | - | - | `"classic"` | `"classic"` \| `"starnet2"` |
 | sharpness | 0.0 | 2.0 | 1.0 | float |
 | temperature | 2000 | 8000 | 6500 | int (Kelvin) |
 | tint | -50 | 50 | 0 | int |
@@ -190,6 +192,12 @@ the removed star flux back at the end (0 = fully starless output, 100 = stars at
 full strength). Detection reuses `star_sensitivity` / `star_max_size`. `0` (the
 default) is byte-identical to the flat pipeline. See `docs/ALGORITHMS.md`
 "Star removal (starless)".
+
+`star_removal_engine` picks the split backend. `"classic"` (default) is the
+built-in classical split. `"starnet2"` routes it through the operator-installed
+StarNet2 binary when one is configured and working (see "External ML engines"),
+and silently falls back to `"classic"` otherwise - so a client may always request
+it. `star_sensitivity` / `star_max_size` have no effect on the StarNet2 engine.
 
 The canonical model is `app/models/processing.py`; keep this table in sync with it.
 
@@ -344,11 +352,57 @@ stacking limits. No `ADMIN_ENABLED` gate (unlike `GET /admin/app-settings`,
 which returns the full settings object):
 
 ```json
-{ "max_image_size_mb": 100, "stacking_enabled": true, "stacking_max_frames": 100 }
+{
+  "max_image_size_mb": 100,
+  "stacking_enabled": true,
+  "stacking_max_frames": 100,
+  "starless_engines": ["classic"],
+  "denoise_engines": ["classic"]
+}
 ```
 
 Values track `app_settings.json` - change `max_image_size_mb` in Settings and
 the upload screen's hint and pre-flight check follow.
+
+`starless_engines` / `denoise_engines` list the processing engines the editor may
+offer. `"classic"` is always present; `"starnet2"` / `"deepsnr"` appear only when
+the operator has configured a working external binary (see "External ML engines"
+below and `initial_plan/13_EXTERNAL_ML_ENGINES.md`).
+
+## External ML engines
+
+Optional star removal (StarNet2) and denoise (DeepSNR) via an operator-installed
+binary, invoked as a subprocess. **Nothing is bundled** - the operator downloads
+the tool from `starnetastro.com`, mounts it into the API and worker containers,
+and sets `starnet2_path` / `deepsnr_path` (and optional even `starnet2_stride`) in
+Settings. Empty paths (the default) leave the classical engines as the only
+option.
+
+`GET /admin/engine-status` (gated by `ADMIN_ENABLED`) probes the configured paths
+with `<binary> --version` and drives the status line in Settings:
+
+```json
+{
+  "starnet2": {
+    "configured": true,
+    "found": true,
+    "version": "2.6.1",
+    "known_good": true,
+    "detail": "StarNet2 2.6.1 detected"
+  },
+  "deepsnr": {
+    "configured": false,
+    "found": false,
+    "version": null,
+    "known_good": false,
+    "detail": "No path configured"
+  }
+}
+```
+
+`known_good` is false when the binary's version falls outside the range this
+release was tested against - the engine still runs, with a warning in Settings.
+The probe result is memoised until the next settings change.
 
 ## Update check
 

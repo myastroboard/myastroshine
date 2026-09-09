@@ -23,6 +23,7 @@ import numpy as np
 
 from app.logging_config import get_logger
 from app.models import CurvePoint, GeometryParameters, ProcessingParameters
+from app.services.external_starless import StarlessSplitFn
 from app.services.post_stack import render_stack_base
 from app.services.star_detection import StarDetectionService
 from app.services.starless import StarlessService
@@ -565,6 +566,7 @@ class ImageProcessingService:
         on_step: StepCallback | None = None,
         *,
         linear_composite: bool = False,
+        starless_split: StarlessSplitFn | None = None,
     ) -> np.ndarray:
         """Run the full pipeline in the recommended order.
 
@@ -572,10 +574,14 @@ class ImageProcessingService:
         ``on_step(step_name, percent)`` is called as each stage begins.
 
         When ``star_removal`` is set, the pipeline splits after the background
-        corrections: the stars are pulled out (``StarlessService.split``), every
-        creative stage runs on the starless image, and ``star_recombine``
-        screen-blends the removed star flux back at the end. ``star_removal = 0``
-        (the default) is byte-identical to the flat pipeline.
+        corrections: the stars are pulled out, every creative stage runs on the
+        starless image, and ``star_recombine`` screen-blends the removed star flux
+        back at the end. ``star_removal = 0`` (the default) is byte-identical to
+        the flat pipeline. The split defaults to the classical
+        ``StarlessService.split``; ``starless_split`` overrides it with an
+        alternative backend of the same shape (the StarNet2 engine - see
+        ``app.services.external_starless``), which the caller has already vetted
+        and wrapped with its own fallback.
 
         ``linear_composite``: ``image`` is a linear stacked composite (RGB
         planes, ``float32``), not a uint8 upload - prepend the ``stack_base``
@@ -594,11 +600,13 @@ class ImageProcessingService:
         if params.star_removal <= 0:
             stages = background + creative
         else:
-            # StarlessService is uint8-native (mask units, the detector); round-trip it.
+            # The split is uint8-native (mask units, the detector, the TIFF a
+            # StarNet2 pass round-trips); convert at this boundary either way.
+            split_impl = starless_split or self._starless.split
             stars_layer: list[np.ndarray] = []
 
             def split(r: np.ndarray) -> np.ndarray:
-                starless, removed = self._starless.split(
+                starless, removed = split_impl(
                     _to_u8(r), params.star_sensitivity, params.star_max_size, params.star_removal
                 )
                 stars_layer.append(removed)

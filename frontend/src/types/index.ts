@@ -123,6 +123,10 @@ export interface ProcessingParameters {
   starMaxSize: number;
   starRemoval: number;
   starRecombine: number;
+  /** Which backend performs the star/nebula split. `'starnet2'` is honoured only
+   * when the operator has a working binary; the pipeline otherwise uses the
+   * classical split. Ignored when `starRemoval === 0`. */
+  starRemovalEngine: StarlessEngine;
   sharpness: number;
   temperature: number;
   tint: number;
@@ -154,6 +158,7 @@ export const DEFAULT_PARAMETERS: ProcessingParameters = {
   starMaxSize: 30,
   starRemoval: 0,
   starRecombine: 0,
+  starRemovalEngine: 'classic',
   sharpness: 1.0,
   temperature: 6500,
   tint: 0,
@@ -231,10 +236,17 @@ export const CURVE_CHANNEL_FIELD: Record<CurveChannel, keyof ProcessingParameter
   blue: 'blueCurvePoints',
 };
 
-/** Numeric parameters driven by the slider panel (everything but geometry / stack / curve fields). */
+/** Numeric parameters driven by the slider panel (everything but geometry / stack /
+ * curve fields, and `starRemovalEngine` which is a discrete choice, not a slider). */
 export type SliderParameterKey = Exclude<
   keyof ProcessingParameters,
-  'geometry' | 'stack' | 'curvePoints' | 'redCurvePoints' | 'greenCurvePoints' | 'blueCurvePoints'
+  | 'geometry'
+  | 'stack'
+  | 'curvePoints'
+  | 'redCurvePoints'
+  | 'greenCurvePoints'
+  | 'blueCurvePoints'
+  | 'starRemovalEngine'
 >;
 
 interface ParameterBound {
@@ -452,8 +464,28 @@ export interface AppSettings {
   stackingWatchDir: string;
   stackingWatchIdleMinutes: number;
   stackingWatchAutoProcess: boolean;
+  /** Optional operator-installed external ML engines, invoked as a subprocess.
+   * Empty = off (initial_plan/13_EXTERNAL_ML_ENGINES.md). */
+  starnet2Path: string;
+  deepsnrPath: string;
+  starnet2Stride: number;
   logLevel: LogLevel;
   consoleLogLevel: LogLevel;
+}
+
+/** Result of probing one configured engine path (`GET /api/admin/engine-status`).
+ * Mirror of `app/models/engines.py::EngineStatus`. */
+export interface EngineStatus {
+  configured: boolean;
+  found: boolean;
+  version: string | null;
+  knownGood: boolean;
+  detail: string;
+}
+
+export interface EngineStatusResponse {
+  starnet2: EngineStatus;
+  deepsnr: EngineStatus;
 }
 
 /** Non-sensitive runtime limits the UI needs before a session exists
@@ -462,7 +494,16 @@ export interface PublicConfig {
   maxImageSizeMb: number;
   stackingEnabled: boolean;
   stackingMaxFrames: number;
+  /** Star-removal engines the editor may offer. Always includes `'classic'`;
+   * `'starnet2'` appears only when the operator has a working binary configured
+   * (initial_plan/13_EXTERNAL_ML_ENGINES.md). */
+  starlessEngines: StarlessEngine[];
+  /** Denoise engines, same rule: `'classic'` always, `'deepsnr'` when found. */
+  denoiseEngines: DenoiseEngine[];
 }
+
+export type StarlessEngine = 'classic' | 'starnet2';
+export type DenoiseEngine = 'classic' | 'deepsnr';
 
 export type LogLevel = 'debug' | 'info' | 'warning' | 'error' | 'critical';
 

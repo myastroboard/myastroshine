@@ -63,10 +63,45 @@ def test_post_app_settings_rejects_cors_wildcard(client) -> None:
     assert response.status_code == 400
 
 
+def test_post_app_settings_rejects_an_odd_starnet2_stride(client) -> None:
+    current = client.get("/api/admin/app-settings").json()
+    current["starnet2_stride"] = 7
+
+    assert client.post("/api/admin/app-settings", json=current).status_code == 400
+
+
+def test_engine_status_reports_nothing_configured_by_default(client) -> None:
+    response = client.get("/api/admin/engine-status")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["starnet2"] == {
+        "configured": False,
+        "found": False,
+        "version": None,
+        "known_good": False,
+        "detail": "No path configured",
+    }
+    assert body["deepsnr"]["configured"] is False
+
+
+def test_engine_status_probes_a_configured_path(client) -> None:
+    current = client.get("/api/admin/app-settings").json()
+    current["starnet2_path"] = "/nonexistent/starnet2"
+    client.post("/api/admin/app-settings", json=current)
+
+    body = client.get("/api/admin/engine-status").json()
+
+    assert body["starnet2"]["configured"] is True
+    assert body["starnet2"]["found"] is False
+    assert "not found" in body["starnet2"]["detail"].lower()
+
+
 @pytest.mark.parametrize(
     ("method", "path"),
     [
         ("GET", "/api/admin/app-settings"),
+        ("GET", "/api/admin/engine-status"),
         ("GET", "/api/admin/logs"),
         ("GET", "/api/admin/logs/level"),
         ("GET", "/api/admin/logs/export"),
