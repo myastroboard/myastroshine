@@ -18,6 +18,12 @@ x-backend-env: &backend-env
   # thousand-frame stack) never blocks the API. Override to `sync` for a
   # worker-free run.
   PROCESSING_MODE: ${PROCESSING_MODE:-queue}
+  # inotify does not fire over a Docker Desktop bind mount on Windows/macOS, so
+  # uvicorn --reload (watchfiles) misses code edits without polling - same reason
+  # the web service sets VITE_USE_POLLING. The worker (watchmedo) can still miss
+  # them; `docker compose -f docker-compose.dev.yml restart worker` after a
+  # backend change is the reliable path there.
+  WATCHFILES_FORCE_POLLING: "true"
 
 services:
   api:

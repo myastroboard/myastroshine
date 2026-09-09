@@ -46,6 +46,12 @@ export function useImageProcessing(sessionId: string) {
   const busyRef = useRef(false);
   const pendingRef = useRef<ProcessingParameters | null>(null);
   const applyRef = useRef<(next: ProcessingParameters) => void>(() => {});
+  // Last sign of life from the in-flight job (its POST returned, or the socket
+  // sent an update). If nothing moves for this long the job is treated as wedged
+  // - a new edit proceeds anyway (the backend supersedes the stuck one) instead
+  // of being coalesced into a slot that never opens.
+  const lastActivityRef = useRef(0);
+  const STALE_JOB_MS = 45_000;
 
   /**
    * Follow a processing job over the WebSocket until it finishes, bumping
@@ -59,6 +65,7 @@ export function useImageProcessing(sessionId: string) {
    */
   const trackJob = useCallback((response: ProcessResponse) => {
     busyRef.current = true;
+    lastActivityRef.current = Date.now();
     setStatus('processing');
     setProgress(0);
     setCurrentStep('');
@@ -94,6 +101,7 @@ export function useImageProcessing(sessionId: string) {
     const ws = processingStatusClient(response.jobId);
     wsRef.current = ws;
     ws.onStatusUpdate((update) => {
+      lastActivityRef.current = Date.now();
       if (update.status === 'superseded') {
         ws.disconnect();
         settle();
@@ -118,12 +126,16 @@ export function useImageProcessing(sessionId: string) {
   const applyParameters = useCallback(
     async (next: ProcessingParameters) => {
       // A job is already in flight - remember the latest state and let `settle`
-      // send it when that job finishes.
-      if (busyRef.current) {
+      // send it when that job finishes. Unless that job has gone quiet for too
+      // long (socket never connected, worker died): then proceed and let the
+      // backend supersede it, rather than stashing into a slot that never opens.
+      const wedged = Date.now() - lastActivityRef.current > STALE_JOB_MS;
+      if (busyRef.current && !wedged) {
         pendingRef.current = next;
         return;
       }
       busyRef.current = true; // claim the slot before the await
+      lastActivityRef.current = Date.now();
       setStatus('processing');
       setError(null);
       try {

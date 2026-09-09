@@ -233,13 +233,20 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the API log filled with `QueuePool limit ... connection timed out` (a 500 on
   the next `/process`), and every change then landed at once. The progress
   WebSocket held a pooled database connection open for its whole lifetime, so a
-  handful of concurrent sockets (one per queued job) exhausted the pool. Fixed
-  on three fronts: the WebSocket now reads the job once with a short-lived
-  session and holds no connection while it streams; the editor keeps at most one
-  `/process` in flight per session and coalesces the rest, so a drag becomes two
-  jobs, not twenty; and a job that a newer edit supersedes now bails out at the
-  next pipeline stage instead of running to completion (and `superseded` is
-  pushed to the socket immediately so it closes).
+  handful of concurrent sockets (one per queued job) exhausted the pool. Fixed:
+  - the WebSocket reads the job once with a short-lived session and holds **no
+    connection** while it streams, and on an idle tick it re-reads the DB, so a
+    terminal event lost by Redis (or published before it subscribed) still
+    closes the socket instead of hanging the client;
+  - the editor keeps **at most one `/process` in flight per session** and
+    coalesces the rest, so a drag becomes two jobs, not twenty (and if that one
+    job goes silent for 45 s, a new edit proceeds rather than waiting forever);
+  - a job a newer edit **supersedes now bails out at the next pipeline stage**
+    instead of running to completion, and `superseded` is pushed to the socket
+    at once so it closes.
+- `docker-compose.dev.yml` sets `WATCHFILES_FORCE_POLLING` so `uvicorn --reload`
+  actually picks up backend edits over a Docker Desktop bind mount on
+  Windows / macOS (the web service already polled for HMR).
 - The editor no longer 429s itself ("Too many concurrent processing jobs") when
   you move several sliders quickly: a new `/process` for a session now retires
   any still-pending job for that same session (status `superseded`) before it

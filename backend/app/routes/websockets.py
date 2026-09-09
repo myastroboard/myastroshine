@@ -44,13 +44,25 @@ async def _stream_job(websocket: WebSocket, job_id: str) -> None:
 
     event, terminal = _catch_up(job_id)
     await websocket.send_json(event)
+    last_status = event.get("status")
     if terminal:
         await websocket.close()
         return
 
     try:
         async for update in progress.subscribe(job_id):
+            if update is None:
+                # Idle tick: reconcile against the DB in case the terminal event
+                # was published before we subscribed, or lost by Redis.
+                event, terminal = _catch_up(job_id)
+                if event.get("status") != last_status:
+                    await websocket.send_json(event)
+                    last_status = event.get("status")
+                if terminal:
+                    break
+                continue
             await websocket.send_json(update)
+            last_status = update.get("status")
             if update.get("status") in TERMINAL_STATUSES:
                 break
     except WebSocketDisconnect:
