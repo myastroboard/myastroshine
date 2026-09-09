@@ -24,10 +24,12 @@ export function usePresets(sessionId: string) {
     void refresh();
   }, [refresh]);
 
+  /** Apply the preset server-side and return the job handle so the caller can
+   * follow it to completion (the preview only updates once the job finishes). */
   const applyPreset = useCallback(
     async (presetId: string) => {
       setActivePreset(presetId);
-      await apiClient.applyPreset(presetId, sessionId);
+      return apiClient.applyPreset(presetId, sessionId);
     },
     [sessionId],
   );

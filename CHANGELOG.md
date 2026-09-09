@@ -221,6 +221,14 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   "queued" forever - a few stacks (or re-stacks) in a session would trip "Too
   many concurrent processing jobs" and stay tripped. Sync-mode stacks now mark
   the job completed/failed the same way the queue path does.
+- With `PROCESSING_MODE=queue` (the Docker default), applying a preset or **Auto
+  Astro**, or **re-stacking** an already-finished stack, took two clicks: the
+  first appeared to do nothing (or flashed the previous result). The backend
+  answers before the worker has run, and these callers assumed the response
+  meant "done" - so the preview never refetched. Preset apply and Auto Astro now
+  follow the job to completion over the WebSocket (the same way a slider edit
+  does), and `POST /stack/{id}/process` reports `processing` for the new run
+  instead of echoing the previous run's `completed`.
 - The editor no longer 429s itself ("Too many concurrent processing jobs") when
   you move several sliders quickly: a new `/process` for a session now retires
   any still-pending job for that same session (status `superseded`) before it

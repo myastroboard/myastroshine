@@ -13,6 +13,7 @@ import {
   type JobStatus,
   type DenoiseEngine,
   type ProcessingParameters,
+  type ProcessResponse,
   type SliderParameterKey,
   type StackParameters,
   type StarlessEngine,
@@ -38,47 +39,62 @@ export function useImageProcessing(sessionId: string) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const wsRef = useRef<ReturnType<typeof processingStatusClient> | null>(null);
 
+  /**
+   * Follow a processing job over the WebSocket until it finishes, bumping
+   * `previewVersion` on completion so the preview refetches. Also handles a job
+   * that came back already `completed` (PROCESSING_MODE=sync).
+   *
+   * Used for /process here and, via the returned handle, for jobs kicked off by
+   * other endpoints (preset apply, Auto Astro) - without this a queued job
+   * (PROCESSING_MODE=queue) would leave the preview on the previous result until
+   * the next user action.
+   */
+  const trackJob = useCallback((response: ProcessResponse) => {
+    setStatus('processing');
+    setProgress(0);
+    setCurrentStep('');
+    setError(null);
+    // Drop the previous job's socket - the backend supersedes its job, so it
+    // will never complete and its reconnect loop is just noise.
+    wsRef.current?.disconnect();
+    wsRef.current = null;
+    if (response.status === 'completed') {
+      setStatus('completed');
+      setPreviewVersion((version) => version + 1);
+    }
+    const ws = processingStatusClient(response.jobId);
+    wsRef.current = ws;
+    ws.onStatusUpdate((update) => {
+      if (update.status === 'superseded') {
+        ws.disconnect();
+        return;
+      }
+      setStatus(update.status);
+      setProgress(update.progressPercent);
+      setCurrentStep(update.currentStep);
+      if (update.status === 'completed') {
+        setPreviewVersion((version) => version + 1);
+        ws.disconnect();
+      } else if (update.status === 'failed') {
+        setError(update.error ?? 'Processing failed');
+        ws.disconnect();
+      }
+    });
+    ws.connect();
+  }, []);
+
   const applyParameters = useCallback(
     async (next: ProcessingParameters) => {
       setStatus('processing');
-      setProgress(0);
-      setCurrentStep('');
       setError(null);
-      // Drop the previous job's socket - the backend supersedes its job, so it
-      // will never complete and its reconnect loop is just noise.
-      wsRef.current?.disconnect();
-      wsRef.current = null;
       try {
-        const response = await apiClient.processImage(sessionId, next);
-        if (response.status === 'completed') {
-          setStatus('completed');
-          setPreviewVersion((version) => version + 1);
-        }
-        const ws = processingStatusClient(response.jobId);
-        wsRef.current = ws;
-        ws.onStatusUpdate((update) => {
-          if (update.status === 'superseded') {
-            ws.disconnect();
-            return;
-          }
-          setStatus(update.status);
-          setProgress(update.progressPercent);
-          setCurrentStep(update.currentStep);
-          if (update.status === 'completed') {
-            setPreviewVersion((version) => version + 1);
-            ws.disconnect();
-          } else if (update.status === 'failed') {
-            setError(update.error ?? 'Processing failed');
-            ws.disconnect();
-          }
-        });
-        ws.connect();
+        trackJob(await apiClient.processImage(sessionId, next));
       } catch (err) {
         setStatus('failed');
         setError(errorMessage(err, t, 'Processing failed'));
       }
     },
-    [sessionId, t],
+    [sessionId, t, trackJob],
   );
 
   const updateParameter = useCallback(
@@ -251,6 +267,7 @@ export function useImageProcessing(sessionId: string) {
     updateChannelCurve,
     applyGeometry,
     applyParameters,
+    trackJob,
     resetParameters,
     resetStack,
     resetCurves,
