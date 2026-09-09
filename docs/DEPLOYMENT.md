@@ -60,9 +60,9 @@ move beat to its own service first if you ever do that.
 
 ## Clean-machine quick start (no repo clone)
 
-Every tagged release publishes one image - `ghcr.io/myastroboard/myastroshine`
-(also mirrored to Docker Hub as `myastroboard/myastroshine`) - covering both
-the API and the web UI. If you just want to run MyAstroShine and don't need
+Every tagged release publishes one image to both `myastroboard/myastroshine`
+(Docker Hub - what `docker-compose.yml` pulls) and its mirror
+`ghcr.io/myastroboard/myastroshine` - covering both the API and the web UI. If you just want to run MyAstroShine and don't need
 the source, grab `docker-compose.yml` on its own and start it - `docker
 compose up -d` pulls the published image by default (`api`'s `image:` line),
 it does not need `build:` or a local Dockerfile:
