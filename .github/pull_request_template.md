@@ -6,7 +6,7 @@
 
 ## Related issues
 
-<!-- e.g. Fixes #123 — or "none" -->
+<!-- e.g. Fixes #123 - or "none" -->
 
 ## Type of change
 
