@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { EditorInspector, type EditorInspectorProps } from '@/components/EditorInspector';
-import { DEFAULT_GEOMETRY, DEFAULT_PARAMETERS } from '@/types';
+import { DEFAULT_GEOMETRY, DEFAULT_PARAMETERS, type StarlessEngine } from '@/types';
 
 function makeProps(overrides: Partial<EditorInspectorProps> = {}): EditorInspectorProps {
   return {
@@ -36,7 +36,15 @@ function makeProps(overrides: Partial<EditorInspectorProps> = {}): EditorInspect
       onApply: vi.fn(),
       onReset: vi.fn(),
     },
-    stars: { enabled: false, onToggle: vi.fn(), sourceCount: null, loading: false },
+    stars: {
+      enabled: false,
+      onToggle: vi.fn(),
+      sourceCount: null,
+      loading: false,
+      engines: ['classic'] as StarlessEngine[],
+      engine: 'classic' as StarlessEngine,
+      onEngineChange: vi.fn(),
+    },
     depth: {
       focalPoint: null,
       picking: false,
@@ -116,7 +124,15 @@ describe('EditorInspector', () => {
       <EditorInspector
         {...makeProps({
           activeStep: 'stars',
-          stars: { enabled: false, onToggle, sourceCount: null, loading: false },
+          stars: {
+            enabled: false,
+            onToggle,
+            sourceCount: null,
+            loading: false,
+            engines: ['classic'] as StarlessEngine[],
+            engine: 'classic' as StarlessEngine,
+            onEngineChange: vi.fn(),
+          },
         })}
       />,
     );

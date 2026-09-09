@@ -119,6 +119,39 @@ after changing it).
 | Advanced | `cors_origins` | `http://localhost:3000` |
 | Advanced | `rate_limit_enabled` / `rate_limit_per_minute` / `max_concurrent_jobs_per_ip` | `true` / 120 / 5 |
 | Advanced | `log_level` / `console_log_level` | `info` / `warning` |
+| Advanced | `starnet2_path` / `deepsnr_path` / `starnet2_stride` (external ML engines; empty = off) | "" / "" / 0 |
+
+## External ML engines (optional)
+
+Star removal can run through [StarNet2](https://starnetastro.com/) and denoise
+through DeepSNR instead of the built-in classical code. **MyAstroShine bundles
+neither** - see `THIRD_PARTY.md`. The operator installs the binary and MyAstroShine
+shells out to it; with no path set, the classical engines are the only option and
+nothing changes.
+
+1. Download the CLI build for **linux-x64** from `starnetastro.com` (there is no
+   linux-arm64 build - an ARM host cannot use this). Read its bundled
+   `LICENSE.txt` and satisfy yourself that your use is within its terms (the
+   models are non-commercial).
+2. Put it on a host directory and mount it **read-only into both `api` and
+   `worker`** (queue mode runs the pass in the worker):
+
+   ```yaml
+   services:
+     api:
+       volumes:
+         - ./engines:/opt/engines:ro
+     worker:
+       volumes:
+         - ./engines:/opt/engines:ro
+   ```
+3. In **Settings -> Advanced -> External ML engines**, set `starnet2_path` to the
+   path inside the container (e.g. `/opt/engines/starnet2/starnet2`), Save, then
+   **Re-check engines**. A green "StarNet2 x.y.z detected" line means the editor's
+   Star step now offers a "StarNet2" engine toggle.
+
+The probe result is cached until the next settings save. A version outside the
+range this release was tested against still runs, with an amber warning.
 
 ## Frontend environment
 

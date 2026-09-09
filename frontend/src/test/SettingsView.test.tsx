@@ -9,6 +9,7 @@ vi.mock('@/services/api', () => ({
   apiClient: {
     getAppSettings: vi.fn(),
     saveAppSettings: vi.fn(),
+    getEngineStatus: vi.fn(),
     listTokens: vi.fn(),
     createToken: vi.fn(),
     revokeToken: vi.fn(),
@@ -55,6 +56,10 @@ describe('SettingsView', () => {
     vi.clearAllMocks();
     mocked.getAppSettings.mockResolvedValue({ ...SETTINGS });
     mocked.saveAppSettings.mockImplementation((next) => Promise.resolve(next));
+    mocked.getEngineStatus.mockResolvedValue({
+      starnet2: { configured: false, found: false, version: null, knownGood: false, detail: 'x' },
+      deepsnr: { configured: false, found: false, version: null, knownGood: false, detail: 'x' },
+    });
     mocked.listTokens.mockResolvedValue({ tokens: [], total: 0 });
     mocked.getLogs.mockResolvedValue({
       lines: ['2026-09-04 10:00:00,000 +0000 - app.main - INFO [x:1] - started'],
@@ -133,5 +138,33 @@ describe('SettingsView', () => {
 
     await waitFor(() => expect(screen.getByText(/INFO \[x:1\] - started/)).toBeInTheDocument());
     expect(mocked.getLogs).toHaveBeenCalled();
+  });
+
+  it('probes the external engine paths under the Advanced section', async () => {
+    mocked.getEngineStatus.mockResolvedValue({
+      starnet2: {
+        configured: true,
+        found: true,
+        version: '2.6.1',
+        knownGood: true,
+        detail: 'StarNet2 2.6.1 detected',
+      },
+      deepsnr: { configured: false, found: false, version: null, knownGood: false, detail: 'x' },
+    });
+    renderView();
+    await screen.findByLabelText('Maximum upload size');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Advanced' }));
+
+    const path = await screen.findByLabelText('StarNet2 binary path');
+    fireEvent.change(path, { target: { value: '/opt/engines/starnet2/starnet2' } });
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => expect(mocked.saveAppSettings).toHaveBeenCalledTimes(1));
+    expect(mocked.saveAppSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ starnet2Path: '/opt/engines/starnet2/starnet2' }),
+    );
+    expect(await screen.findByText('StarNet2 2.6.1 detected')).toBeInTheDocument();
+    expect(mocked.getEngineStatus).toHaveBeenCalled();
   });
 });

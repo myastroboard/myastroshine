@@ -1,10 +1,11 @@
-import { useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 
 import { TokenManager } from '@/components/TokenManager';
 import { useAppSettings } from '@/hooks/useAppSettings';
 import { useLogs } from '@/hooks/useLogs';
 import { useTranslation } from '@/hooks/useTranslation';
-import type { AppSettings, LogLevel } from '@/types';
+import { apiClient } from '@/services/api';
+import type { AppSettings, EngineStatus, EngineStatusResponse, LogLevel } from '@/types';
 
 type Section = 'general' | 'webhooks' | 'advanced' | 'logs';
 
@@ -314,8 +315,92 @@ function AdvancedSection({ draft, patch }: SectionProps) {
         options={LOG_LEVELS}
         onChange={(consoleLogLevel) => patch({ consoleLogLevel })}
       />
+
+      <ExternalEnginesGroup draft={draft} patch={patch} />
     </div>
   );
+}
+
+/** Operator-installed StarNet2 / DeepSNR paths, with a live `--version` probe.
+ * See initial_plan/13_EXTERNAL_ML_ENGINES.md. The probe result is cached on the
+ * server until settings change, so "Re-check" is the way to confirm a save. */
+function ExternalEnginesGroup({ draft, patch }: SectionProps) {
+  const { t } = useTranslation();
+  const [status, setStatus] = useState<EngineStatusResponse | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  const check = useCallback(async () => {
+    setChecking(true);
+    try {
+      setStatus(await apiClient.getEngineStatus());
+    } catch {
+      setStatus(null);
+    } finally {
+      setChecking(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void check();
+  }, [check]);
+
+  return (
+    <>
+      <GroupLabel>{t('settings.groups.external_engines')}</GroupLabel>
+      <p className="-mt-0.5 mb-2 text-xs text-muted">
+        {t('settings.advanced.external_engines_blurb')}
+      </p>
+      <TextRow
+        id="starnet2-path"
+        label={t('settings.advanced.starnet2_path.label')}
+        hint={t('settings.advanced.starnet2_path.hint')}
+        value={draft.starnet2Path}
+        placeholder="/opt/engines/starnet2/starnet2"
+        onChange={(starnet2Path) => patch({ starnet2Path })}
+        below={<EngineStatusLine status={status?.starnet2} />}
+      />
+      <NumberRow
+        id="starnet2-stride"
+        label={t('settings.advanced.starnet2_stride.label')}
+        hint={t('settings.advanced.starnet2_stride.hint')}
+        value={draft.starnet2Stride}
+        min={0}
+        max={512}
+        step={2}
+        onChange={(starnet2Stride) => patch({ starnet2Stride })}
+      />
+      <TextRow
+        id="deepsnr-path"
+        label={t('settings.advanced.deepsnr_path.label')}
+        hint={t('settings.advanced.deepsnr_path.hint')}
+        value={draft.deepsnrPath}
+        placeholder="/opt/engines/deepsnr/deepsnr"
+        onChange={(deepsnrPath) => patch({ deepsnrPath })}
+        below={<EngineStatusLine status={status?.deepsnr} />}
+      />
+      <button
+        type="button"
+        className="btn btn-outline btn-sm mt-3 w-fit"
+        onClick={() => void check()}
+        disabled={checking}
+      >
+        {checking ? t('common.loading') : t('settings.advanced.recheck_engines')}
+      </button>
+    </>
+  );
+}
+
+function EngineStatusLine({ status }: { status?: EngineStatus }) {
+  if (!status || !status.configured) {
+    return null;
+  }
+  const tone =
+    status.found && status.knownGood
+      ? 'text-success'
+      : status.found
+        ? 'text-warning'
+        : 'text-danger';
+  return <p className={`mt-1.5 text-xs ${tone}`}>{status.detail}</p>;
 }
 
 function LogsSection() {
@@ -472,6 +557,7 @@ function TextRow({
   value,
   onChange,
   placeholder,
+  below,
 }: {
   id: string;
   label: string;
@@ -479,6 +565,8 @@ function TextRow({
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  /** Optional content rendered under the input (e.g. a live status line). */
+  below?: ReactNode;
 }) {
   return (
     <SettingsRow id={id} label={label} hint={hint} stacked>
@@ -490,6 +578,7 @@ function TextRow({
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
       />
+      {below}
     </SettingsRow>
   );
 }

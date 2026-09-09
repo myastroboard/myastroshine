@@ -18,6 +18,7 @@ import {
   type ProcessingParameters,
   type SliderParameterKey,
   type StackParameters,
+  type StarlessEngine,
 } from '@/types';
 
 export interface StartBundle {
@@ -56,6 +57,11 @@ export interface StarsBundle {
   onToggle: (enabled: boolean) => void;
   sourceCount: number | null;
   loading: boolean;
+  /** Star-removal backends the server offers (`GET /api/config`). The engine
+   * picker only shows when there's more than one. */
+  engines: StarlessEngine[];
+  engine: StarlessEngine;
+  onEngineChange: (engine: StarlessEngine) => void;
 }
 
 export interface DepthBundle {
@@ -387,7 +393,24 @@ function StarsPanel({
   return (
     <div className="flex flex-col gap-4">
       {sub(['starReduction'], 'reduce')}
-      {sub(['starRemoval', 'starRecombine'], 'remove')}
+      <div className="flex flex-col gap-2">
+        <span className="text-xs font-medium text-ink">{t('stars_panel.remove.heading')}</span>
+        <p className="text-xs text-faint">{t('stars_panel.remove.help')}</p>
+        {stars.engines.length > 1 && (
+          <StarRemovalEnginePicker
+            engines={stars.engines}
+            engine={stars.engine}
+            onChange={stars.onEngineChange}
+            disabled={isProcessing}
+          />
+        )}
+        <SliderGroup
+          keys={['starRemoval', 'starRecombine']}
+          parameters={parameters}
+          onParameterChange={onParameterChange}
+          isProcessing={isProcessing}
+        />
+      </div>
       <div className="flex flex-col gap-2">
         <span className="text-xs font-medium text-ink">
           {t('stars_panel.detection.heading')}
@@ -401,6 +424,49 @@ function StarsPanel({
         />
         <StarMaskToggle {...stars} />
       </div>
+    </div>
+  );
+}
+
+/** Pick the star-removal backend. Only rendered when the server offers more than
+ * one (i.e. the operator has a working StarNet2 binary - see
+ * initial_plan/13_EXTERNAL_ML_ENGINES.md). */
+function StarRemovalEnginePicker({
+  engines,
+  engine,
+  onChange,
+  disabled,
+}: {
+  engines: StarlessEngine[];
+  engine: StarlessEngine;
+  onChange: (engine: StarlessEngine) => void;
+  disabled: boolean;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex flex-col gap-1">
+      <div
+        className="flex gap-1"
+        role="radiogroup"
+        aria-label={t('stars_panel.remove.engine_aria_label')}
+      >
+        {engines.map((entry) => (
+          <button
+            key={entry}
+            type="button"
+            role="radio"
+            aria-checked={engine === entry}
+            disabled={disabled}
+            className={`chip ${engine === entry ? 'chip-active' : ''}`}
+            onClick={() => onChange(entry)}
+          >
+            {t(`stars_panel.remove.engine.${entry}`)}
+          </button>
+        ))}
+      </div>
+      {engine === 'starnet2' && (
+        <p className="text-xs text-faint">{t('stars_panel.remove.engine_starnet2_hint')}</p>
+      )}
     </div>
   );
 }
