@@ -117,6 +117,28 @@ def test_run_skips_a_superseded_job(
     assert enhancement.jobs.get(job.job_id).status == "superseded"
 
 
+def test_run_aborts_when_the_job_is_superseded_mid_pipeline(
+    enhancement: EnhancementService, sample_image: np.ndarray, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A newer edit that lands after the pipeline has started still stops this
+    job at the next stage boundary - it does not run to completion."""
+    record = enhancement.sessions.create_session(image_path="")
+    enhancement.storage.save_original(record.session_id, sample_image)
+    job = enhancement.jobs.create(record.session_id)
+
+    def supersede_then_step(_image, _params, on_step=None, **_kwargs):  # type: ignore[no-untyped-def]
+        enhancement.jobs.update(job.job_id, status="superseded")
+        assert on_step is not None
+        on_step("contrast", 30)  # must raise back out of run()
+        raise AssertionError("pipeline continued past a superseded checkpoint")
+
+    monkeypatch.setattr(enhancement.processing, "apply_parameters", supersede_then_step)
+
+    enhancement.run(record.session_id, ProcessingParameters(contrast=2.0), job.job_id)
+
+    assert enhancement.jobs.get(job.job_id).status == "superseded"  # not completed/failed
+
+
 def test_run_marks_job_failed_on_missing_image(
     enhancement: EnhancementService,
 ) -> None:

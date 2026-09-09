@@ -22,7 +22,7 @@
 
 ## Checklist
 
-- [ ] Branch is `feature/…` or `fix/…`, rebased on the latest `main`
+- [ ] Branch is `feature/...` or `fix/...`, rebased on the latest `main`
 - [ ] Backend green: `ruff format . && ruff check . && mypy app && pytest`
 - [ ] Frontend green: `npm run lint && npm run typecheck && npm test && npm run build`
 - [ ] Tests added or updated for the change

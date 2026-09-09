@@ -10,10 +10,11 @@ terminal status arrives.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from sqlalchemy.orm import Session
+from typing import Any
 
-from app.dependencies import DbSession
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+
+from app.db import database
 from app.logging_config import get_logger
 from app.services import progress
 from app.services.job import TERMINAL_STATUSES, JobService
@@ -23,22 +24,34 @@ logger = get_logger(__name__)
 router = APIRouter(tags=["websockets"])
 
 
-async def _stream_job(websocket: WebSocket, job_id: str, db: Session) -> None:
+def _catch_up(job_id: str) -> tuple[dict[str, Any], bool]:
+    """The current job event and whether it is terminal.
+
+    Read with a short-lived session that hands its pooled connection straight
+    back. A progress socket can stay open for minutes; holding a DB connection
+    open that whole time exhausts the pool once a handful of them are live (a
+    burst of edits opens one socket per job).
+    """
+    with database.SessionLocal() as db:
+        job = JobService(db).get_or_none(job_id)
+        if job is None:
+            return {"job_id": job_id, "status": "unknown"}, False
+        return JobService.to_event(job), job.status in TERMINAL_STATUSES
+
+
+async def _stream_job(websocket: WebSocket, job_id: str) -> None:
     await websocket.accept()
 
-    job = JobService(db).get_or_none(job_id)
-    if job is not None:
-        await websocket.send_json(JobService.to_event(job))
-        if job.status in TERMINAL_STATUSES:
-            await websocket.close()
-            return
-    else:
-        await websocket.send_json({"job_id": job_id, "status": "unknown"})
+    event, terminal = _catch_up(job_id)
+    await websocket.send_json(event)
+    if terminal:
+        await websocket.close()
+        return
 
     try:
-        async for event in progress.subscribe(job_id):
-            await websocket.send_json(event)
-            if event.get("status") in TERMINAL_STATUSES:
+        async for update in progress.subscribe(job_id):
+            await websocket.send_json(update)
+            if update.get("status") in TERMINAL_STATUSES:
                 break
     except WebSocketDisconnect:
         return
@@ -49,12 +62,12 @@ async def _stream_job(websocket: WebSocket, job_id: str, db: Session) -> None:
 
 
 @router.websocket("/ws/processing-status/{job_id}")
-async def processing_status(websocket: WebSocket, job_id: str, db: DbSession) -> None:
+async def processing_status(websocket: WebSocket, job_id: str) -> None:
     """Stream progress for a single-image processing job."""
-    await _stream_job(websocket, job_id, db)
+    await _stream_job(websocket, job_id)
 
 
 @router.websocket("/ws/stack-status/{job_id}")
-async def stack_status(websocket: WebSocket, job_id: str, db: DbSession) -> None:
+async def stack_status(websocket: WebSocket, job_id: str) -> None:
     """Stream progress for a stacking job."""
-    await _stream_job(websocket, job_id, db)
+    await _stream_job(websocket, job_id)

@@ -36,6 +36,11 @@ from app.utils.app_settings import get_app_settings
 
 logger = get_logger(__name__)
 
+
+class _JobSuperseded(Exception):
+    """A newer edit for this session landed - stop and drop this job's work."""
+
+
 _ESTIMATE_SECONDS = {"queued": 8, "processing": 4}
 #: An external-engine pass dominates the job's wall time (seconds to minutes vs.
 #: milliseconds for a normal stage), so its live progress drives the bar across a
@@ -217,6 +222,13 @@ class EnhancementService:
 
             def on_step(name: str, percent: int) -> None:
                 nonlocal progress_floor
+                # A newer edit for this session retires this job (dispatch ->
+                # supersede_pending_for_session). Bail out here rather than
+                # grinding a full pipeline - and a burst of DB writes - to a
+                # result nobody will look at; the worker's other slot is then
+                # free for the edit that replaced it.
+                if self.jobs.get(job_id).status == "superseded":
+                    raise _JobSuperseded
                 progress_floor = max(progress_floor, percent)
                 self.jobs.update(job_id, current_step=name, progress_percent=progress_floor)
                 self._emit(job_id)
@@ -252,6 +264,10 @@ class EnhancementService:
             self._emit(job_id)
             self.storage.save_result(session_id, result)
             self.sessions.update_parameters(session_id, params.model_dump())
+        except _JobSuperseded:
+            self._emit(job_id)
+            logger.info("dropped superseded job mid-run", session_id=session_id, job_id=job_id)
+            return
         except AppError as exc:
             self.jobs.update(job_id, status="failed", error=exc.message)
             self._emit(job_id)
