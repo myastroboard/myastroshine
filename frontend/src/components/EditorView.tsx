@@ -12,6 +12,7 @@ import { useDepthShift } from '@/hooks/useDepthShift';
 import { useImageProcessing } from '@/hooks/useImageProcessing';
 import { useMilestones, type Milestone } from '@/hooks/useMilestones';
 import { usePresets } from '@/hooks/usePresets';
+import { useServerConfig } from '@/hooks/useServerConfig';
 import { useStarMask } from '@/hooks/useStarMask';
 import { useTranslation } from '@/hooks/useTranslation';
 import { apiClient } from '@/services/api';
@@ -63,6 +64,7 @@ export function EditorView({ session, astrodexContext, onExit }: EditorViewProps
     status,
     previewVersion,
     updateParameter,
+    updateStarRemovalEngine,
     updateStackParameter,
     updateChannelCurve,
     applyGeometry,
@@ -76,6 +78,7 @@ export function EditorView({ session, astrodexContext, onExit }: EditorViewProps
   const { presets, applyPreset, activePreset, savePreset, deletePreset, clearActivePreset } =
     usePresets(session.sessionId);
   const depthShift = useDepthShift(session.sessionId);
+  const serverConfig = useServerConfig();
   const starMask = useStarMask(session.sessionId);
   const autoAstro = useAutoAstro(session.sessionId);
   const astrodex = useAstroDexIntegration();
@@ -373,6 +376,9 @@ export function EditorView({ session, astrodexContext, onExit }: EditorViewProps
           onToggle: handleStarMaskToggle,
           sourceCount: starMask.sourceCount,
           loading: starMask.isLoading,
+          engines: serverConfig.starlessEngines,
+          engine: parameters.starRemovalEngine,
+          onEngineChange: updateStarRemovalEngine,
         }}
         depth={{
           focalPoint,

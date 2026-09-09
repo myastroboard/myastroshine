@@ -325,7 +325,13 @@
     },
     "remove": {
       "heading": "Remove (starless)",
-      "help": "Lifts the stars out so every other step only touches the nebula, then Bring stars back fades them in at the end (0 = keep the image starless). Slower, but lets you stretch and sharpen the nebula without bloating stars."
+      "help": "Lifts the stars out so every other step only touches the nebula, then Bring stars back fades them in at the end (0 = keep the image starless). Slower, but lets you stretch and sharpen the nebula without bloating stars.",
+      "engine_aria_label": "Star removal engine",
+      "engine": {
+        "classic": "Classic",
+        "starnet2": "StarNet2"
+      },
+      "engine_starnet2_hint": "Uses the StarNet2 model installed on the server. The first pass on a new image can take a while; detection controls below don't apply."
     },
     "detection": {
       "heading": "Detection",
@@ -366,7 +372,8 @@
       "callback_delivery": "Callback delivery",
       "network": "Network",
       "rate_limiting": "Rate limiting",
-      "logging": "Logging"
+      "logging": "Logging",
+      "external_engines": "External ML engines"
     },
     "general": {
       "max_upload": {
@@ -448,7 +455,21 @@
       "log_console_level": {
         "label": "Console log level",
         "hint": "Level echoed to the container logs."
-      }
+      },
+      "external_engines_blurb": "Optional star removal (StarNet2) and denoise (DeepSNR). Nothing is bundled: install the binary from starnetastro.com, mount it into the api and worker containers, and point these at it. You are responsible for the tool's own licence terms. Leave blank to keep the classical engines.",
+      "starnet2_path": {
+        "label": "StarNet2 binary path",
+        "hint": "Absolute path inside the container, e.g. /opt/engines/starnet2/starnet2."
+      },
+      "starnet2_stride": {
+        "label": "StarNet2 stride",
+        "hint": "Even, 2-512. 0 lets StarNet2 pick. Larger is faster and coarser."
+      },
+      "deepsnr_path": {
+        "label": "DeepSNR binary path",
+        "hint": "Absolute path inside the container. Denoise engine (used on the linear composite path)."
+      },
+      "recheck_engines": "Re-check engines"
     },
     "logs": {
       "level_label": "Level",

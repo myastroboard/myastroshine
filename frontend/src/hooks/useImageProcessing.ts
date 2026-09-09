@@ -14,6 +14,7 @@ import {
   type ProcessingParameters,
   type SliderParameterKey,
   type StackParameters,
+  type StarlessEngine,
 } from '@/types';
 
 const DEBOUNCE_MS = 500;
@@ -81,6 +82,20 @@ export function useImageProcessing(sessionId: string) {
         const next = { ...prev, [key]: value };
         clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(() => void applyParameters(next), DEBOUNCE_MS);
+        return next;
+      });
+    },
+    [applyParameters],
+  );
+
+  /** Switch the star-removal backend. Applied at once, not debounced - it's a
+   * deliberate choice and a StarNet2 pass is long; there's nothing to coalesce. */
+  const updateStarRemovalEngine = useCallback(
+    (engine: StarlessEngine) => {
+      setParameters((prev) => {
+        const next = { ...prev, starRemovalEngine: engine };
+        clearTimeout(debounceRef.current);
+        void applyParameters(next);
         return next;
       });
     },
@@ -212,6 +227,7 @@ export function useImageProcessing(sessionId: string) {
     previewVersion,
     error,
     updateParameter,
+    updateStarRemovalEngine,
     updateStackParameter,
     updateChannelCurve,
     applyGeometry,

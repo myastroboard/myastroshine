@@ -325,7 +325,13 @@
     },
     "remove": {
       "heading": "Retirer (sans étoiles)",
-      "help": "Extrait les étoiles pour que les autres étapes n'agissent que sur la nébuleuse, puis Rétablir les étoiles les réincorpore à la fin (0 = image sans étoiles). Plus lent, mais permet d'étirer et d'accentuer la nébuleuse sans gonfler les étoiles."
+      "help": "Extrait les étoiles pour que les autres étapes n'agissent que sur la nébuleuse, puis Rétablir les étoiles les réincorpore à la fin (0 = image sans étoiles). Plus lent, mais permet d'étirer et d'accentuer la nébuleuse sans gonfler les étoiles.",
+      "engine_aria_label": "Moteur de suppression d'étoiles",
+      "engine": {
+        "classic": "Classique",
+        "starnet2": "StarNet2"
+      },
+      "engine_starnet2_hint": "Utilise le modèle StarNet2 installé sur le serveur. La première passe sur une nouvelle image peut être longue ; les réglages de détection ci-dessous ne s'appliquent pas."
     },
     "detection": {
       "heading": "Détection",
@@ -366,7 +372,8 @@
       "callback_delivery": "Livraison des rappels",
       "network": "Réseau",
       "rate_limiting": "Limitation de débit",
-      "logging": "Journalisation"
+      "logging": "Journalisation",
+      "external_engines": "Moteurs ML externes"
     },
     "general": {
       "max_upload": {
@@ -448,7 +455,21 @@
       "log_console_level": {
         "label": "Niveau du journal console",
         "hint": "Niveau affiché dans les journaux du conteneur."
-      }
+      },
+      "external_engines_blurb": "Suppression d'étoiles (StarNet2) et débruitage (DeepSNR) optionnels. Rien n'est embarqué : installez le binaire depuis starnetastro.com, montez-le dans les conteneurs api et worker, puis indiquez son chemin ici. Les conditions de licence de l'outil sont de votre responsabilité. Laissez vide pour conserver les moteurs classiques.",
+      "starnet2_path": {
+        "label": "Chemin du binaire StarNet2",
+        "hint": "Chemin absolu dans le conteneur, ex. /opt/engines/starnet2/starnet2."
+      },
+      "starnet2_stride": {
+        "label": "Pas (stride) StarNet2",
+        "hint": "Pair, 2-512. 0 laisse StarNet2 choisir. Plus grand = plus rapide et plus grossier."
+      },
+      "deepsnr_path": {
+        "label": "Chemin du binaire DeepSNR",
+        "hint": "Chemin absolu dans le conteneur. Moteur de débruitage (utilisé sur le composite linéaire)."
+      },
+      "recheck_engines": "Revérifier les moteurs"
     },
     "logs": {
       "level_label": "Niveau",
