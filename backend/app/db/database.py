@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import Column, create_engine, inspect
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 if TYPE_CHECKING:
@@ -70,6 +71,80 @@ def init_db() -> None:
     else:
         command.upgrade(cfg, "head")
         logger.info("database schema up to date", url=_database_url)
+
+    _reconcile_schema_drift(engine, _database_url)
+
+
+def _missing_columns(eng: Engine) -> dict[str, list[Column[Any]]]:
+    """ORM columns that don't exist in ``eng``'s database, keyed by table.
+
+    A migration edited *after* it ran (a common mistake during active
+    development) leaves ``alembic_version`` at head while the schema is behind -
+    ``alembic upgrade`` then has nothing to do and the gap only surfaces later as
+    a cryptic ``no such column``.
+    """
+    inspector = inspect(eng)
+    live = {t: {c["name"] for c in inspector.get_columns(t)} for t in inspector.get_table_names()}
+    drift: dict[str, list[Column[Any]]] = {}
+    for table in Base.metadata.sorted_tables:
+        gap = [c for c in table.columns if c.name not in live.get(table.name, set())]
+        if gap:
+            drift[table.name] = gap
+    return drift
+
+
+def _reconcile_schema_drift(eng: Engine, url: str) -> None:
+    """Detect (and, on SQLite, auto-repair) columns the migrations never added.
+
+    SQLite is the single-file dev / hobby database - add the missing columns in
+    place so ``docker compose up`` just works, and log loudly so the migration
+    still gets fixed. Any other backend (Postgres = a real deployment) raises:
+    migrations must be correct there, and ``tests/db/test_migrations.py`` keeps
+    them that way.
+    """
+    drift = _missing_columns(eng)
+    if not drift:
+        return
+
+    summary = ", ".join(f"{table}.{col.name}" for table, cols in drift.items() for col in cols)
+    if not url.startswith("sqlite"):
+        raise RuntimeError(
+            f"database schema is behind the models (missing: {summary}); "
+            "run the migrations or fix the one that was edited after it ran"
+        )
+
+    from sqlalchemy import text  # noqa: PLC0415 - only on the (rare) repair path
+
+    # The table / column names come from Base.metadata (our own models), not user
+    # input - the only bound value is the backfill literal.
+    with eng.begin() as conn:
+        for table, cols in drift.items():
+            for col in cols:
+                type_sql = col.type.compile(dialect=eng.dialect)
+                conn.execute(text(f'ALTER TABLE "{table}" ADD COLUMN "{col.name}" {type_sql}'))
+                fill = _column_backfill(col)
+                if fill is None:
+                    continue
+                update = f'UPDATE "{table}" SET "{col.name}" = :v WHERE "{col.name}" IS NULL'  # noqa: S608
+                conn.execute(text(update), {"v": fill})
+    logger.error(
+        "schema drift auto-repaired on SQLite - a migration is missing these columns: %s",
+        summary,
+    )
+
+
+_UNSET = object()
+
+
+def _column_backfill(column: Column[Any]) -> Any:
+    """A literal to seed existing rows with, or ``None`` to leave them NULL."""
+    server_arg = getattr(column.server_default, "arg", _UNSET)
+    if server_arg is not _UNSET:
+        return getattr(server_arg, "text", server_arg)  # SQL text, or a plain literal
+    default = column.default
+    if default is not None and not getattr(default, "is_callable", False):
+        return getattr(default, "arg", None)
+    return None
 
 
 def get_db() -> Iterator[Session]:
