@@ -17,8 +17,8 @@ backs both `api` and `worker`:
 
 | Service | Image / build | Port | Volumes |
 |---------|---------------|------|---------|
-| `api` | `.` (API + web UI) | 8002 | `myastroshine_data:/data` |
-| `worker` | `.` (Celery worker + embedded beat, `target: backend`) | - | `myastroshine_data:/data` |
+| `api` | `.` (API + web UI) | 8002 | `myastroshine_data:/data`, `./engines:/opt/engines:ro` |
+| `worker` | `.` (Celery worker + embedded beat, `target: backend`) | - | `myastroshine_data:/data`, `./engines:/opt/engines:ro` |
 | `redis` | `redis:7-alpine` | 6379 | `myastroshine_redis:/data` |
 
 This stack sets `PROCESSING_MODE=queue`, so `/api/process` and
@@ -129,22 +129,17 @@ neither** - see `THIRD_PARTY.md`. The operator installs the binary and MyAstroSh
 shells out to it; with no path set, the classical engines are the only option and
 nothing changes.
 
+The `./engines` directory next to the compose file is **already bind-mounted
+read-only into `api` and `worker`** at `/opt/engines` (empty and inert until you
+set a path). Its contents are git-ignored.
+
 1. Download the CLI build for **linux-x64** from `starnetastro.com` (there is no
    linux-arm64 build - an ARM host cannot use this). Read its bundled
    `LICENSE.txt` and satisfy yourself that your use is within its terms (the
    models are non-commercial).
-2. Put it on a host directory and mount it **read-only into both `api` and
-   `worker`** (queue mode runs the pass in the worker):
-
-   ```yaml
-   services:
-     api:
-       volumes:
-         - ./engines:/opt/engines:ro
-     worker:
-       volumes:
-         - ./engines:/opt/engines:ro
-   ```
+2. Unpack it into `./engines/`, e.g. `./engines/starnet2/starnet2`, and
+   `docker compose up -d`. (Running the published image without the repo? Create
+   an `engines/` dir next to your `docker-compose.yml` first.)
 3. In **Settings -> Advanced -> External ML engines**, set `starnet2_path` to the
    path inside the container (e.g. `/opt/engines/starnet2/starnet2`), Save, then
    **Re-check engines**. A green "StarNet2 x.y.z detected" line means the editor's

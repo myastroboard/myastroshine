@@ -55,6 +55,13 @@ data/
 /tmp/
 *.npy
 
+# Operator-installed external ML engine binaries (StarNet2 / DeepSNR) - never
+# bundled or committed. The directory and its README are tracked so the compose
+# bind mount always has a target; anything the operator drops in is ignored.
+# See docs/DEPLOYMENT.md "External ML engines".
+engines/*
+!engines/README.md
+
 # ---------------------------------------------------------------------------
 # Editors / OS
 # ---------------------------------------------------------------------------
