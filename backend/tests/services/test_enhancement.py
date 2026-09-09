@@ -130,47 +130,33 @@ def test_run_marks_job_failed_on_missing_image(
     assert enhancement.jobs.get(job.job_id).status == "failed"
 
 
+def _all_engines_found():
+    from app.models.engines import EngineStatus
+
+    ok = EngineStatus(configured=True, found=True, version="9.9.9", known_good=True, detail="ok")
+    return {"starnet2": ok, "deepsnr": ok}
+
+
 def test_starnet2_engine_invokes_the_binary_and_caches_it(
     enhancement: EnhancementService, sample_image: np.ndarray, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """star_removal_engine='starnet2' routes the split through the operator binary
     when one is available, streams its progress onto the job, and the second edit
     reuses the cached estimate."""
-    import cv2
-
-    from app.models.engines import EngineStatus
     from app.services import enhancement as enh_module
-    from app.services import external_starless
+    from app.services import external_engine
     from app.utils.app_settings import save_app_settings
+    from tests.support import fake_engine_popen
 
     save_app_settings({"starnet2_path": "/opt/starnet2"})
-    monkeypatch.setattr(
-        enh_module,
-        "get_engine_statuses",
-        lambda: {
-            "starnet2": EngineStatus(
-                configured=True, found=True, version="2.6.1", known_good=True, detail="ok"
-            ),
-            "deepsnr": EngineStatus(configured=False, found=False, detail="x"),
-        },
-    )
+    monkeypatch.setattr(enh_module, "get_engine_statuses", _all_engines_found)
 
     invocations: list[list[str]] = []
-
-    class FakePopen:
-        def __init__(self, cmd: list[str], **_kwargs: object) -> None:
-            invocations.append(cmd)
-            cv2.imwrite(cmd[cmd.index("-o") + 1], cv2.imread(cmd[cmd.index("-i") + 1]))
-            self.stdout = iter(['{"progress": 0.5}\n', '{"progress": 1.0}\n'])
-            self.returncode = 0
-
-        def wait(self, timeout: float | None = None) -> int:
-            return self.returncode
-
-        def kill(self) -> None:
-            self.returncode = -9
-
-    monkeypatch.setattr(external_starless.subprocess, "Popen", FakePopen)
+    monkeypatch.setattr(
+        external_engine.subprocess,
+        "Popen",
+        fake_engine_popen(lines=['{"percent": 50}\n', '{"percent": 100}\n'], record=invocations),
+    )
 
     seen_progress: list[tuple[str, int]] = []
     original_emit = enhancement._emit
@@ -206,12 +192,13 @@ def test_starnet2_engine_invokes_the_binary_and_caches_it(
 def test_starnet2_engine_falls_back_to_classical_when_unavailable(
     enhancement: EnhancementService, sample_image: np.ndarray, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from app.services import external_starless
+    from app.services import external_engine
 
     def must_not_run(*_args: object, **_kwargs: object) -> object:
         raise AssertionError("the external binary must not be called when unavailable")
 
-    monkeypatch.setattr(external_starless.subprocess, "run", must_not_run)
+    monkeypatch.setattr(external_engine.subprocess, "run", must_not_run)
+    monkeypatch.setattr(external_engine.subprocess, "Popen", must_not_run)
 
     record = enhancement.sessions.create_session(image_path="")
     enhancement.storage.save_original(record.session_id, sample_image)
@@ -220,6 +207,80 @@ def test_starnet2_engine_falls_back_to_classical_when_unavailable(
     enhancement.run(
         record.session_id,
         ProcessingParameters(star_removal=80, star_removal_engine="starnet2"),
+        job.job_id,
+    )
+
+    assert enhancement.jobs.get(job.job_id).status == "completed"
+
+
+def test_deepsnr_engine_denoises_early_and_drops_the_classical_stage(
+    enhancement: EnhancementService, sample_image: np.ndarray, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """denoise_engine='deepsnr' runs the binary once (before the tone work), the
+    classical bilateral filter does not run, and its progress lands on the bar."""
+    from app.services import enhancement as enh_module
+    from app.services import external_engine, image_processing
+    from app.utils.app_settings import save_app_settings
+    from tests.support import fake_engine_popen
+
+    save_app_settings({"deepsnr_path": "/opt/deepsnr"})
+    monkeypatch.setattr(enh_module, "get_engine_statuses", _all_engines_found)
+
+    invocations: list[list[str]] = []
+    monkeypatch.setattr(
+        external_engine.subprocess,
+        "Popen",
+        fake_engine_popen(lines=['{"percent": 100}\n'], record=invocations),
+    )
+
+    def _boom(*_a: object, **_k: object) -> object:
+        raise AssertionError("classical apply_denoise must not run when DeepSNR is active")
+
+    monkeypatch.setattr(image_processing.ImageProcessingService, "apply_denoise", _boom)
+
+    steps: list[str] = []
+    original_emit = enhancement._emit
+
+    def spy_emit(job_id: str) -> None:
+        steps.append(enhancement.jobs.get(job_id).current_step)
+        original_emit(job_id)
+
+    monkeypatch.setattr(enhancement, "_emit", spy_emit)
+
+    record = enhancement.sessions.create_session(image_path="")
+    enhancement.storage.save_original(record.session_id, sample_image)
+    job = enhancement.jobs.create(record.session_id)
+
+    enhancement.run(
+        record.session_id,
+        ProcessingParameters(denoise=60, denoise_engine="deepsnr"),
+        job.job_id,
+    )
+
+    assert enhancement.jobs.get(job.job_id).status == "completed"
+    assert len(invocations) == 1
+    assert "--machine-progress" in invocations[0]
+    assert "denoise" in steps  # progress reported it
+
+
+def test_deepsnr_engine_falls_back_to_classical_when_unavailable(
+    enhancement: EnhancementService, sample_image: np.ndarray, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.services import external_engine
+
+    def must_not_run(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("the external binary must not be called when unavailable")
+
+    monkeypatch.setattr(external_engine.subprocess, "run", must_not_run)
+    monkeypatch.setattr(external_engine.subprocess, "Popen", must_not_run)
+
+    record = enhancement.sessions.create_session(image_path="")
+    enhancement.storage.save_original(record.session_id, sample_image)
+    job = enhancement.jobs.create(record.session_id)
+
+    enhancement.run(
+        record.session_id,
+        ProcessingParameters(denoise=50, denoise_engine="deepsnr"),
         job.job_id,
     )
 

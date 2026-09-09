@@ -130,6 +130,7 @@ guard, independent of `max_image_size_mb`'s compressed-byte-size check).
 | clarity | -1.0 | 1.0 | 0.0 | float |
 | vibrance | 0.0 | 2.0 | 1.0 | float |
 | denoise | 0 | 100 | 0 | int |
+| denoise_engine | - | - | `"classic"` | `"classic"` \| `"deepsnr"` |
 | chroma_denoise | 0 | 100 | 0 | int |
 | vignette_correction | 0 | 100 | 0 | int |
 | gradient_reduction | 0 | 100 | 0 | int |
@@ -193,11 +194,13 @@ full strength). Detection reuses `star_sensitivity` / `star_max_size`. `0` (the
 default) is byte-identical to the flat pipeline. See `docs/ALGORITHMS.md`
 "Star removal (starless)".
 
-`star_removal_engine` picks the split backend. `"classic"` (default) is the
-built-in classical split. `"starnet2"` routes it through the operator-installed
-StarNet2 binary when one is configured and working (see "External ML engines"),
-and silently falls back to `"classic"` otherwise - so a client may always request
-it. `star_sensitivity` / `star_max_size` have no effect on the StarNet2 engine.
+`star_removal_engine` / `denoise_engine` pick the backend for the split / the
+`denoise` stage. `"classic"` (default) is the built-in code. `"starnet2"` /
+`"deepsnr"` route through the operator-installed binary when one is configured and
+working (see "External ML engines"), and silently fall back to `"classic"`
+otherwise - so a client may always request them. With `"starnet2"`,
+`star_sensitivity` / `star_max_size` have no effect; with `"deepsnr"`, denoise
+runs early (before the tone stretch) and `chroma_denoise` still runs classically.
 
 The canonical model is `app/models/processing.py`; keep this table in sync with it.
 
@@ -367,16 +370,17 @@ the upload screen's hint and pre-flight check follow.
 `starless_engines` / `denoise_engines` list the processing engines the editor may
 offer. `"classic"` is always present; `"starnet2"` / `"deepsnr"` appear only when
 the operator has configured a working external binary (see "External ML engines"
-below and `initial_plan/13_EXTERNAL_ML_ENGINES.md`).
+below, `docs/DEPLOYMENT.md`, and `THIRD_PARTY.md`).
 
 ## External ML engines
 
 Optional star removal (StarNet2) and denoise (DeepSNR) via an operator-installed
 binary, invoked as a subprocess. **Nothing is bundled** - the operator downloads
 the tool from `starnetastro.com`, mounts it into the API and worker containers,
-and sets `starnet2_path` / `deepsnr_path` (and optional even `starnet2_stride`) in
-Settings. Empty paths (the default) leave the classical engines as the only
-option.
+and sets `starnet2_path` / `deepsnr_path` (and optional `starnet2_stride` /
+`deepsnr_stride`) in Settings. Empty paths (the default) leave the classical
+engines as the only option; a configured, working engine then appears in
+`starless_engines` / `denoise_engines` and as a per-edit picker in the editor.
 
 `GET /admin/engine-status` (gated by `ADMIN_ENABLED`) probes the configured paths
 with `<binary> --version` and drives the status line in Settings:

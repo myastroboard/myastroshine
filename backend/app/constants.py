@@ -58,18 +58,22 @@ GITHUB_RELEASES_URL = "https://api.github.com/repos/myastroboard/myastroshine/re
 VERSION_CHECK_CACHE_TTL_SECONDS = 4 * 60 * 60  # 4 hours
 
 # External ML engines - optional, operator-installed StarNet2 / DeepSNR, invoked as a
-# subprocess (initial_plan/13_EXTERNAL_ML_ENGINES.md). Nothing is bundled. These are the
+# subprocess (docs/DEPLOYMENT.md "External ML engines"). Nothing is bundled. These are the
 # upstream versions this app's CLI invocation has been tested against, as half-open
 # [min, max) ranges: a binary outside the range still runs, with a soft "untested"
-# warning in Settings. Bump deliberately after a real-image test round.
+# warning in Settings. Bump deliberately after a real-image test round. Verified
+# 2026-09-09 on linux-x64: StarNet2 2.6.1 (ORT build 0232), DeepSNR 1.3.1.
 STARNET2_TESTED_VERSIONS = ("2.6.0", "2.7.0")
 DEEPSNR_TESTED_VERSIONS = ("1.3.0", "1.4.0")
 # How long to wait for `<binary> --version` during the capability probe. Generous - a
 # cold start of a self-contained ONNX-Runtime binary can be a few seconds.
 ENGINE_PROBE_TIMEOUT_SECONDS = 15
-# How long a single StarNet2 star-removal pass may take before it is killed and the
-# pipeline falls back to the classical split. A full-resolution CPU pass is minutes.
-STARNET2_RUN_TIMEOUT_SECONDS = 600
-# StarNet2 rejects an input smaller than this on either axis; a smaller image (a tiny
-# preview, a crop) is upscaled to meet it and the result scaled back.
-STARNET2_MIN_DIMENSION = 512
+# How long a single external-engine pass (StarNet2 / DeepSNR) may take before it is
+# killed and the pipeline falls back to the classical stage. Measured: StarNet2
+# ~19 s for 6.6 MP on a fast multi-core box, DeepSNR ~7 s; a 24 MP frame on a
+# 2-core VPS can be several minutes, so this has real headroom - a timeout should
+# mean "hung", not "slow".
+EXTERNAL_ENGINE_TIMEOUT_SECONDS = 900
+# StarNet2 and DeepSNR both reject an input smaller than this on either axis; a
+# smaller image (a tiny preview, a crop) is upscaled to meet it and scaled back.
+EXTERNAL_ENGINE_MIN_DIMENSION = 512

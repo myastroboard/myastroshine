@@ -165,6 +165,10 @@ Applied in this order to minimize artifacts (`apply_parameters`):
    around the high-20px range here); positive sharpens, negative softens.
 14. **Denoise** (0-100) - bilateral filter; map to diameter 5-20 and
    sigma_color / sigma_space 75-150. Above 50, add a 3x3 morphological close.
+   With `denoise_engine = "deepsnr"` this stage instead runs the DeepSNR model
+   **early**, right after the sky/optics corrections (see "Quality path" below);
+   the classical filter here becomes a no-op and the 0-100 value blends DeepSNR's
+   output back.
 15. **Chroma denoise** (`chroma_denoise`, 0-100) - the same bilateral filter as
    Denoise, applied only to the Cr/Cb channels (`COLOR_BGR2YCrCb`), leaving
    luma untouched. Colour speckle is usually more objectionable than luma
@@ -294,37 +298,44 @@ from the neighbourhood and has no model of what a star sits on top of; this is
 exactly where a trained model wins, and why the ONNX path (below) stays on the
 list.
 
-**Quality path - StarNet2 as an optional external engine.** The roadmap paired the
-classical path with "an ONNX StarNet-style model (quality path)". Bundling a model
-was ruled out on licensing: the canonical StarNet (`nekitmm/starnet`) is MIT for
-code but its **weights are CC BY-NC-SA 4.0 - non-commercial**, and the official
-`starnetastro.com` StarNet2 / DeepSNR binaries are "all rights reserved" with no
-redistribution grant. Nothing from that lineage can ship in a public image.
+**Quality path - StarNet2 / DeepSNR as optional external engines.** The roadmap
+paired the classical path with "an ONNX StarNet-style model (quality path)".
+Bundling a model was ruled out on licensing (the canonical `nekitmm/starnet`
+weights are CC BY-NC-SA, and the `starnetastro.com` builds are not
+redistributable). Instead the operator installs the tool themselves and
+MyAstroShine shells out to it - arm's-length, never bundled. Setup and licensing:
+`docs/DEPLOYMENT.md` "External ML engines" and `THIRD_PARTY.md`.
 
-The way in (see `initial_plan/13_EXTERNAL_ML_ENGINES.md`): the operator installs
-StarNet2 themselves and MyAstroShine shells out to it - arm's-length, never
-bundled. `star_removal_engine` (`"classic"` default, `"starnet2"`) picks the
-backend per edit; `"starnet2"` is honoured only when
-`AppSettings.starnet2_path` points at a working binary (probed by
-`app.services.engine_probe`), and any failure - missing binary, timeout, bad
-output - logs and falls back to the classical split.
+`star_removal_engine` (`"classic"` / `"starnet2"`) and `denoise_engine`
+(`"classic"` / `"deepsnr"`) pick the backend per edit; the ML choice is honoured
+only when the matching `AppSettings` path points at a working binary (probed by
+`app.services.engine_probe`), and any failure - missing binary, non-zero exit,
+timeout, bad output - logs and falls back to the classical code.
 
-- `ExternalStarlessService` (`app/services/external_starless.py`) writes a TIFF,
-  runs `starnet2 -i … -o … -q [-s stride]`, reads the star-free estimate back.
-  `blend_starless` then applies `star_removal` exactly as the classical
-  `StarlessService.split` does, so the 0-100 control means the same on both
-  engines and changing only its strength never re-invokes the binary.
-- A pass is minutes, so it streams: `--machine-progress` JSON lines are read off
-  stdout as they arrive and forwarded to the job's `on_step`, which drives the
-  progress bar across a wide band (`_STARNET2_PROGRESS_BAND`, 20-80%). Job
-  progress is made monotonic so the fixed per-stage percentages of the later
-  creative stages can't pull the bar back afterwards.
-- `StarlessModelCache` keeps that estimate per session, keyed on the pixels fed to
-  the split (which fold in every upstream stage) plus the engine settings - a
-  full-resolution StarNet2 pass is minutes, and the editor re-runs the pipeline on
-  every slider move, so a creative-only edit must reuse it.
-- No new Python dependency: the StarNet2 CLI is self-contained (its own ONNX
-  Runtime). `DeepSNR` (denoise) is the same story, deferred to a later phase.
+- The shared machinery is `app.services.external_engine`: `run_cli` writes a
+  TIFF, runs `<tool> -i … -o … -q [-s stride] --machine-progress`, reads the
+  result back (BGR round-trips through `cv2` unchanged); `ModelEstimateCache`
+  stores the output per session, keyed on the pixels fed to the stage plus the
+  engine settings (the editor re-runs the pipeline on every slider move, so an
+  edit that doesn't touch those must reuse the estimate).
+- **StarNet2** (`external_starless`): `apply_parameters` takes a `starless_split`
+  override at the existing split point; `blend_starless` applies `star_removal`
+  exactly as the classical split, and the recombine step is unchanged.
+- **DeepSNR** (`external_denoise`): `apply_parameters` takes a `denoise_stage`
+  override that runs **right after the background corrections**, before any tone
+  work - a NAFNet restoration model wants linear-ish data, and keying the cache
+  on the pre-stretch image means creative edits don't re-invoke it. The classical
+  `denoise` creative stage is dropped when this is active; `blend_denoise`
+  applies the 0-100 strength.
+- A pass is seconds to minutes, so it streams. Both tools emit `--machine-progress`
+  JSON Lines on **stderr**
+  (`{"schema":"starnetastro.cli.progress.v1","event":"progress",…,"percent":P}`,
+  `P` 0-100); `_run_streaming` reads them off a merged pipe, `_parse_progress`
+  pulls `percent`, and each is forwarded to the job's `on_step` across a band
+  (`_DEEPSNR_PROGRESS_BAND` 12-40, `_STARNET2_PROGRESS_BAND` 20-80); job progress
+  is made monotonic so later stages can't pull the bar back.
+- No new Python dependency: each CLI is self-contained (its own ONNX Runtime).
+  Verified against StarNet2 2.6.1 / DeepSNR 1.3.1 (linux-x64) on the Debian-13 image.
 
 ## Auto Astro (one-click adaptive enhancement)
 

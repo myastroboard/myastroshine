@@ -101,8 +101,7 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   now runs in float32 internally and quantises only at the encode boundary, which
   also benefits single-image FITS/RAW edits. Only the field-rotation crop is
   baked into the saved composite; background extraction and colour calibration
-  moved out of the one-shot cleanup and into the Stack step. See
-  `initial_plan/12_STACKING_REBUILD.md`.
+  moved out of the one-shot cleanup and into the Stack step. 
 - Stacking scale & UX: the progress bar now shows which frame each step is on
   ("Aligning 340 / 1066"), not just a percentage. The register / align / combine
   passes run on a **thread pool** (auto-sized to the CPU count, capped at 4,

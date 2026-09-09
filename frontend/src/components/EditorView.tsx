@@ -67,6 +67,7 @@ export function EditorView({ session, astrodexContext, onExit }: EditorViewProps
     previewVersion,
     updateParameter,
     updateStarRemovalEngine,
+    updateDenoiseEngine,
     updateStackParameter,
     updateChannelCurve,
     applyGeometry,
@@ -381,6 +382,11 @@ export function EditorView({ session, astrodexContext, onExit }: EditorViewProps
           engines: serverConfig.starlessEngines,
           engine: parameters.starRemovalEngine,
           onEngineChange: updateStarRemovalEngine,
+        }}
+        denoise={{
+          engines: serverConfig.denoiseEngines,
+          engine: parameters.denoiseEngine,
+          onEngineChange: updateDenoiseEngine,
         }}
         depth={{
           focalPoint,

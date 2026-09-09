@@ -567,6 +567,7 @@ class ImageProcessingService:
         *,
         linear_composite: bool = False,
         starless_split: StarlessSplitFn | None = None,
+        denoise_stage: Callable[[np.ndarray], np.ndarray] | None = None,
     ) -> np.ndarray:
         """Run the full pipeline in the recommended order.
 
@@ -583,6 +584,12 @@ class ImageProcessingService:
         ``app.services.external_starless``), which the caller has already vetted
         and wrapped with its own fallback.
 
+        ``denoise_stage``: when given (the DeepSNR engine - see
+        ``app.services.external_denoise``), it runs as an extra stage right after
+        the background corrections, before any tone work, and the classical
+        ``denoise`` creative stage is dropped so denoise never runs twice. Like
+        ``starless_split``, the caller has vetted it and wrapped its fallback.
+
         ``linear_composite``: ``image`` is a linear stacked composite (RGB
         planes, ``float32``), not a uint8 upload - prepend the ``stack_base``
         pre-stage (background extraction, colour calibration and the tunable
@@ -596,6 +603,14 @@ class ImageProcessingService:
                 ("stack_base", lambda r: render_stack_base(r, params.stack)),
                 *background,
             ]
+        if denoise_stage is not None:
+            # DeepSNR runs on linear-ish data (before the tone stretch) and takes
+            # over the classical `denoise` slot; drop it so denoise never runs
+            # twice. The stage is uint8-native (the TIFF it round-trips); convert
+            # at this boundary.
+            deepsnr = denoise_stage
+            background = [*background, ("denoise", lambda r: _to_f32(deepsnr(_to_u8(r))))]
+            creative = [(name, stage) for name, stage in creative if name != "denoise"]
 
         if params.star_removal <= 0:
             stages = background + creative

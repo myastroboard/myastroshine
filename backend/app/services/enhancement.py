@@ -7,6 +7,8 @@ and the Celery task call it.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import numpy as np
 from sqlalchemy import select
 
@@ -17,10 +19,10 @@ from app.logging_config import get_logger
 from app.models import ProcessingParameters, ProcessResponse
 from app.services import progress
 from app.services.engine_probe import get_engine_statuses
+from app.services.external_denoise import ExternalDenoiseService, blend_denoise
+from app.services.external_engine import ExternalEngineError, ModelEstimateCache
 from app.services.external_starless import (
-    ExternalStarlessError,
     ExternalStarlessService,
-    StarlessModelCache,
     StarlessSplitFn,
     blend_starless,
 )
@@ -35,9 +37,10 @@ from app.utils.app_settings import get_app_settings
 logger = get_logger(__name__)
 
 _ESTIMATE_SECONDS = {"queued": 8, "processing": 4}
-#: A StarNet2 pass dominates the job's wall time (minutes vs. seconds for every
-#: other stage), so its live progress drives the bar across this whole band
-#: instead of the single ~4-point slice a normal pipeline stage gets.
+#: An external-engine pass dominates the job's wall time (seconds to minutes vs.
+#: milliseconds for a normal stage), so its live progress drives the bar across a
+#: whole band. DeepSNR runs first (early stage), then StarNet2.
+_DEEPSNR_PROGRESS_BAND = (12, 40)
 _STARNET2_PROGRESS_BAND = (20, 80)
 
 
@@ -129,7 +132,7 @@ class EnhancementService:
         engine = ExternalStarlessService(
             settings.starnet2_path, settings.starnet2_stride, progress_cb=report
         )
-        cache = StarlessModelCache(self.storage, session_id)
+        cache = ModelEstimateCache(self.storage, session_id, "starnet2")
         fallback = StarlessService(StarDetectionService())
         key = {"engine": "starnet2", "stride": settings.starnet2_stride}
 
@@ -138,7 +141,7 @@ class EnhancementService:
         ) -> tuple[np.ndarray, np.ndarray]:
             try:
                 estimate = cache.get_or_compute(image, key, lambda: engine.run_model(image))
-            except ExternalStarlessError:
+            except ExternalEngineError:
                 logger.warning(
                     "starnet2 split failed; falling back to classical split",
                     session_id=session_id,
@@ -148,6 +151,51 @@ class EnhancementService:
             return blend_starless(image, estimate, removal_amount)
 
         return split
+
+    def _denoise_stage(
+        self, session_id: str, params: ProcessingParameters, on_step: StepCallback
+    ) -> Callable[[np.ndarray], np.ndarray] | None:
+        """A DeepSNR denoise stage for the pipeline, or ``None`` for the classical filter.
+
+        Same shape as :meth:`_starless_split`: returns ``None`` unless denoise is
+        on, the edit asked for ``"deepsnr"``, and a working binary is configured.
+        The returned fn (BGR ``uint8`` in and out) caches DeepSNR's estimate per
+        session and falls back to the classical bilateral filter if a pass fails.
+        """
+        if params.denoise <= 0 or params.denoise_engine != "deepsnr":
+            return None
+        if not get_engine_statuses()["deepsnr"].found:
+            logger.warning(
+                "deepsnr engine requested but unavailable; using classical denoise",
+                session_id=session_id,
+            )
+            return None
+
+        settings = get_app_settings()
+        low, high = _DEEPSNR_PROGRESS_BAND
+
+        def report(fraction: float) -> None:
+            on_step("denoise", round(low + fraction * (high - low)))
+
+        engine = ExternalDenoiseService(
+            settings.deepsnr_path, settings.deepsnr_stride, progress_cb=report
+        )
+        cache = ModelEstimateCache(self.storage, session_id, "deepsnr")
+        key = {"engine": "deepsnr", "stride": settings.deepsnr_stride}
+
+        def denoise(image: np.ndarray) -> np.ndarray:
+            try:
+                estimate = cache.get_or_compute(image, key, lambda: engine.run_model(image))
+            except ExternalEngineError:
+                logger.warning(
+                    "deepsnr denoise failed; falling back to classical denoise",
+                    session_id=session_id,
+                    exc_info=True,
+                )
+                return self.processing.apply_denoise(image, params.denoise)
+            return blend_denoise(image, estimate, params.denoise)
+
+        return denoise
 
     def run(self, session_id: str, params: ProcessingParameters, job_id: str) -> None:
         """Enhance ``session_id`` with ``params``, tracking ``job_id``."""
@@ -163,8 +211,8 @@ class EnhancementService:
             self.sessions.get_session(session_id)
 
             # Progress only moves forward within a job: the fixed per-stage
-            # percentages would otherwise pull the bar back after a StarNet2 pass
-            # (below) has pushed it deep into the creative stages' range.
+            # percentages would otherwise pull the bar back after an external
+            # engine pass (below) has pushed it deep into a later range.
             progress_floor = 5
 
             def on_step(name: str, percent: int) -> None:
@@ -174,6 +222,7 @@ class EnhancementService:
                 self._emit(job_id)
 
             starless_split = self._starless_split(session_id, params, on_step)
+            denoise_stage = self._denoise_stage(session_id, params, on_step)
             stack_id = self._backing_stack_id(session_id)
             if stack_id is not None:
                 # A stacked-composite session: run the pipeline on the 32-bit
@@ -182,12 +231,21 @@ class EnhancementService:
                 # pre-stretched uint8 upload.
                 composite = self.storage.load_stack_composite(stack_id)
                 result = self.processing.apply_parameters(
-                    composite, params, on_step, linear_composite=True, starless_split=starless_split
+                    composite,
+                    params,
+                    on_step,
+                    linear_composite=True,
+                    starless_split=starless_split,
+                    denoise_stage=denoise_stage,
                 )
             else:
                 original = self.storage.load_original(session_id)
                 result = self.processing.apply_parameters(
-                    original, params, on_step, starless_split=starless_split
+                    original,
+                    params,
+                    on_step,
+                    starless_split=starless_split,
+                    denoise_stage=denoise_stage,
                 )
 
             self.jobs.update(job_id, progress_percent=95, current_step="rendering")

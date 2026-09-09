@@ -2,7 +2,12 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { EditorInspector, type EditorInspectorProps } from '@/components/EditorInspector';
-import { DEFAULT_GEOMETRY, DEFAULT_PARAMETERS, type StarlessEngine } from '@/types';
+import {
+  DEFAULT_GEOMETRY,
+  DEFAULT_PARAMETERS,
+  type DenoiseEngine,
+  type StarlessEngine,
+} from '@/types';
 
 function makeProps(overrides: Partial<EditorInspectorProps> = {}): EditorInspectorProps {
   return {
@@ -43,6 +48,11 @@ function makeProps(overrides: Partial<EditorInspectorProps> = {}): EditorInspect
       loading: false,
       engines: ['classic'] as StarlessEngine[],
       engine: 'classic' as StarlessEngine,
+      onEngineChange: vi.fn(),
+    },
+    denoise: {
+      engines: ['classic'] as DenoiseEngine[],
+      engine: 'classic' as DenoiseEngine,
       onEngineChange: vi.fn(),
     },
     depth: {

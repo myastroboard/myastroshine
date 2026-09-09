@@ -1,6 +1,6 @@
 """External ML engine capability - the Settings panel's view of StarNet2 / DeepSNR.
 
-See initial_plan/13_EXTERNAL_ML_ENGINES.md. These engines are never bundled; the
+See docs/DEPLOYMENT.md "External ML engines". These engines are never bundled; the
 operator installs the binary and points a path at it (``starnet2_path`` /
 ``deepsnr_path`` in :class:`app.utils.app_settings.AppSettings`). This model is
 what a ``--version`` probe of that path produced.

@@ -1,10 +1,10 @@
 """Capability probe for the optional external ML engines.
 
-StarNet2 / DeepSNR are operator-installed binaries (see
-initial_plan/13_EXTERNAL_ML_ENGINES.md) - nothing ships in the image. This module
-answers one question for the Settings panel, the public client config, and the
-pipeline: is the configured path a working binary, and is its version one this app
-has been tested against?
+StarNet2 / DeepSNR are operator-installed binaries (see docs/DEPLOYMENT.md
+"External ML engines") - nothing ships in the image. This module answers one
+question for the Settings panel, the public client config, and the pipeline: is
+the configured path a working binary, and is its version one this app has been
+tested against?
 
 It runs ``<path> --version`` with a short timeout. Every failure mode is a
 structured :class:`~app.models.engines.EngineStatus`, never an exception. Results

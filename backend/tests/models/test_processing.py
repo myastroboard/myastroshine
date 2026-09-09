@@ -40,6 +40,7 @@ _WIRE = {
     "clarity": 0.8,
     "vibrance": 1.1,
     "denoise": 30,
+    "denoise_engine": "deepsnr",
     "chroma_denoise": 25,
     "vignette_correction": 20,
     "gradient_reduction": 15,

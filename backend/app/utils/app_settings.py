@@ -87,27 +87,29 @@ class AppSettings(BaseModel):
     stacking_watch_auto_process: bool = True
 
     # External ML engines - optional, operator-installed StarNet2 / DeepSNR, invoked
-    # as a subprocess (initial_plan/13_EXTERNAL_ML_ENGINES.md). Nothing is bundled:
+    # as a subprocess (docs/DEPLOYMENT.md "External ML engines"). Nothing is bundled:
     # the operator downloads the binary from starnetastro.com, mounts it into the
     # container, and points these at it. Empty (the default) = that engine is off and
     # the classical path is the only star-removal / denoise engine. Both the API and
     # the worker need the binary reachable at the same path.
     starnet2_path: str = ""
     deepsnr_path: str = ""
-    #: StarNet2 -s/--stride; the tool requires an even value in 2-512. 0 = omit the
-    #: flag and let StarNet2 pick its own default.
+    #: -s/--stride for each tool; both require an even value in 2-512. 0 (the
+    #: default) omits the flag so the tool uses its own default (StarNet2 256,
+    #: DeepSNR 480) - forward-compatible if a future version changes that.
     starnet2_stride: int = Field(default=0, ge=0, le=512)
+    deepsnr_stride: int = Field(default=0, ge=0, le=512)
 
     # Logging - file level and console level (changeable at runtime, see #4)
     log_level: str = "info"
     console_log_level: str = "warning"
 
-    @field_validator("starnet2_stride", mode="after")
+    @field_validator("starnet2_stride", "deepsnr_stride", mode="after")
     @classmethod
     def _stride_even(cls, value: int) -> int:
-        """StarNet2 rejects an odd stride outright - fail here, not at run time."""
+        """StarNet2 / DeepSNR reject an odd stride outright - fail here, not at run time."""
         if value and value % 2:
-            raise ValueError("starnet2_stride must be even (or 0 to use the tool default)")
+            raise ValueError("stride must be even (or 0 to use the tool default)")
         return value
 
     @field_validator("cors_origins", "astrodex_callback_urls", mode="after")
