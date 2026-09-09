@@ -6,6 +6,28 @@ routes (`/astrodex/receive`, `/send-to-astrodex`) require a long-lived webhook
 token: `Authorization: Bearer <token>`, created and revoked from the Settings UI
 (`/api/tokens`).
 
+## Contents
+
+- [Rate limiting](#rate-limiting)
+- [Endpoints](#endpoints)
+- [Upload formats](#upload-formats)
+- [Processing parameters](#processing-parameters)
+- [WebSocket messages](#websocket-messages)
+- [Presets](#presets)
+- [Depth shift](#depth-shift)
+- [Star mask](#star-mask)
+- [Auto Astro](#auto-astro)
+- [Client config](#client-config)
+- [External ML engines](#external-ml-engines)
+- [Update check](#update-check)
+- [Webhook tokens](#webhook-tokens)
+- [AstroDex integration](#astrodex-integration)
+- [Stacking](#stacking)
+
+The runtime topology (services, job queue, storage) is in
+[ARCHITECTURE.md](ARCHITECTURE.md); the maths behind the parameters is in
+[ALGORITHMS.md](ALGORITHMS.md).
+
 All error responses share this shape:
 
 ```json
@@ -46,54 +68,55 @@ Both settings, plus a `rate_limit_enabled` switch, are editable from
 restart needed. Over either limit returns `429` with `error_code:
 "RATE_LIMITED"`.
 
-## Status
-
-Every route is implemented and tested end to end: health,
-upload/preview/process/download, presets, depth-shift, webhook tokens, AstroDex
-integration (signed background webhook + retry), the full stacking pipeline, the
-Celery job queue (`PROCESSING_MODE=queue`), and the progress WebSockets.
-
 ## Endpoints
 
-| Method | Path | Purpose | Sprint |
-|--------|------|---------|--------|
-| GET | `/health` | System health | 1 |
-| GET | `/config` | Public runtime limits (upload cap, stacking limits) - no admin gate | v0.3 |
-| GET | `/admin/app-settings` | Current runtime settings (`app_settings.json`) | 1 |
-| POST | `/admin/app-settings` | Replace runtime settings (gated by `ADMIN_ENABLED`) | 1 |
-| GET | `/admin/engine-status` | Probe the configured StarNet2 / DeepSNR paths | v0.3 |
-| GET | `/admin/logs` | Tail the log file, newest first (`limit`, `offset`, `level`) | 1 |
-| GET / POST | `/admin/logs/level` | Read / change the file and console log levels | 1 |
-| POST | `/admin/logs/clear` | Empty `myastroshine.log` | 1 |
-| GET | `/admin/logs/export` | ZIP of the logs (main + rotations + worker) | 1 |
-| POST | `/upload` | Upload an image, open a session | 1 |
-| GET | `/preview/{session_id}` | Session image: `?full=true` full-res result, `?original=true` untouched upload (add `&geometry=true` to apply the session's current crop/rotate/flip/straighten, no colour/tone enhancement - keeps the before/after comparison aligned once geometry has changed the result's frame), default downscaled result | 1 |
-| POST | `/process/{session_id}` | Apply enhancement parameters | 1 / 3 |
-| WS | `/ws/processing-status/{job_id}` | Real-time job progress | 3 |
-| POST | `/download/{session_id}` | Download the processed image | 2 |
-| POST | `/depth-shift/{session_id}` | Generate depth map + parallax layers | 4 |
-| GET | `/depth-shift/{session_id}/metadata` | Depth statistics + layer URLs | 4 |
-| GET | `/depth-shift/{session_id}/depth_map` | Depth map as a grayscale PNG | 4 |
-| GET | `/depth-shift/{session_id}/layer_{index}` | Single BGRA layer PNG | 4 |
-| POST | `/star-mask/{session_id}` | Detect stars in the original image for a mask overlay | v0.2 |
-| POST | `/auto-astro/{session_id}` | Analyse the original image and apply a one-click parameter set | v0.2 |
-| GET | `/tokens` | List webhook tokens (metadata only) | 4 |
-| POST | `/tokens` | Create a webhook token (raw value shown once) | 4 |
-| DELETE | `/tokens/{token_id}` | Revoke a token | 4 |
-| POST | `/astrodex/receive` | Receive an image pushed from AstroDex (bearer auth) | 4 |
-| POST | `/send-to-astrodex` | Send the enhanced image back (bearer auth, signed webhook) | 4 |
-| GET | `/presets` | List presets (5 built-ins + user presets) | 3 |
-| POST | `/presets` | Save a user preset | 3 |
-| DELETE | `/presets/{preset_id}` | Delete a user preset (403 for built-ins) | 3 |
-| POST | `/presets/{preset_id}/apply/{session_id}` | Apply a preset | 3 |
-| POST | `/stack/initiate` | Open a stacking session | 6 |
-| POST | `/stack/{stack_id}/upload-frame` | Upload one frame | 6 |
-| POST | `/stack/{stack_id}/process` | Align + combine frames | 7 |
-| GET | `/stack/{stack_id}` | Stack result and statistics | 7 |
-| GET | `/stack/latest` | The current folder-watch stack, or `null` | 7 |
-| WS | `/ws/stack-status/{job_id}` | Real-time stacking progress | 6 |
-| GET | `/version` | The version this instance is running | v0.2 |
-| GET | `/version/check-updates` | Latest GitHub release, cached ~4h | v0.2 |
+Every route is implemented and tested end to end.
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/health` | System health |
+| GET | `/config` | Public runtime limits (upload cap, stacking limits, engine lists) - no admin gate |
+| GET | `/admin/app-settings` | Current runtime settings (`app_settings.json`) |
+| POST | `/admin/app-settings` | Replace runtime settings (gated by `ADMIN_ENABLED`) |
+| GET | `/admin/engine-status` | Probe the configured StarNet2 / DeepSNR paths |
+| GET | `/admin/logs` | Tail the log file, newest first (`limit`, `offset`, `level`) |
+| GET / POST | `/admin/logs/level` | Read / change the file and console log levels |
+| POST | `/admin/logs/clear` | Empty `myastroshine.log` |
+| GET | `/admin/logs/export` | ZIP of the logs (main + rotations + worker) |
+| POST | `/upload` | Upload an image, open a session |
+| GET | `/preview/{session_id}` | Session image: `?full=true` full-res result, `?original=true` untouched upload (add `&geometry=true` to apply the session's current crop/rotate/flip/straighten, no colour/tone enhancement), default downscaled result. `?v=` cache-buster |
+| POST | `/process/{session_id}` | Apply enhancement parameters |
+| WS | `/ws/processing-status/{job_id}` | Real-time job progress |
+| POST | `/download/{session_id}` | Download the processed image |
+| POST | `/depth-shift/{session_id}` | Generate depth map + parallax layers |
+| GET | `/depth-shift/{session_id}/metadata` | Depth statistics + layer URLs |
+| GET | `/depth-shift/{session_id}/depth_map` | Depth map as a grayscale PNG |
+| GET | `/depth-shift/{session_id}/layer_{index}` | Single BGRA layer PNG |
+| POST | `/star-mask/{session_id}` | Detect stars in the original image for a mask overlay |
+| POST | `/auto-astro/{session_id}` | Analyse the original image and apply a one-click parameter set |
+| GET | `/presets` | List presets (5 built-ins + user presets) |
+| POST | `/presets` | Save a user preset |
+| DELETE | `/presets/{preset_id}` | Delete a user preset (403 for built-ins) |
+| POST | `/presets/{preset_id}/apply/{session_id}` | Apply a preset |
+| POST | `/stack/initiate` | Open a stacking session |
+| POST | `/stack/{stack_id}/upload-frame` | Upload one frame |
+| POST | `/stack/{stack_id}/upload-frames` | Upload a batch of frames in one request |
+| POST | `/stack/{stack_id}/upload-archive` | Upload a `.zip` of frames in one request |
+| POST | `/stack/{stack_id}/frame/{index}/exclude` | Include / exclude a frame (and rescue it from auto-reject) |
+| GET | `/stack/{stack_id}/frame/{index}/thumb` | A frame's ~256 px thumbnail |
+| POST | `/stack/{stack_id}/calibration/{kind}/frames` | Upload `dark` / `flat` / `bias` / `dark_flat` subs |
+| DELETE | `/stack/{stack_id}/calibration/{kind}` | Drop every sub of one calibration kind |
+| POST | `/stack/{stack_id}/process` | Align + combine frames (optional body re-stacks with a changed setting) |
+| GET | `/stack/{stack_id}` | Stack result, statistics, and the frame list |
+| GET | `/stack/latest` | The current folder-watch stack, or `null` |
+| WS | `/ws/stack-status/{job_id}` | Real-time stacking progress |
+| GET | `/tokens` | List webhook tokens (metadata only) |
+| POST | `/tokens` | Create a webhook token (raw value shown once) |
+| DELETE | `/tokens/{token_id}` | Revoke a token |
+| POST | `/astrodex/receive` | Receive an image pushed from AstroDex (bearer auth) |
+| POST | `/send-to-astrodex` | Send the enhanced image back (bearer auth, signed webhook) |
+| GET | `/version` | The version this instance is running |
+| GET | `/version/check-updates` | Latest GitHub release, cached ~4h |
 
 ## Upload formats
 
@@ -358,7 +381,7 @@ which returns the full settings object):
 {
   "max_image_size_mb": 100,
   "stacking_enabled": true,
-  "stacking_max_frames": 100,
+  "stacking_max_frames": 2000,
   "starless_engines": ["classic"],
   "denoise_engines": ["classic"]
 }
@@ -490,14 +513,14 @@ retries `ASTRODEX_MAX_RETRIES` times with exponential backoff; the
 `astrodex_callback_url` must match `ASTRODEX_CALLBACK_URLS` when that allowlist
 is set (else `403`).
 
-## Stacking (linear rebuild)
+## Stacking
 
-Being rebuilt - see `initial_plan/12_STACKING_REBUILD.md`. Frames are ingested as
-linear `float32` (FITS CFA mosaics kept intact, camera RAW demosaiced linearly,
-8-bit previews sRGB-linearised). The pipeline calibrates each frame (master
-dark/flat/bias when uploaded), scores every sub and auto-rejects the worst,
-registers by asterism matching, normalises to the reference, and combines with
-sigma rejection and weighting, all in bounded memory. See docs/ALGORITHMS.md.
+Frames are ingested as linear `float32` (FITS CFA mosaics kept intact, camera RAW
+demosaiced linearly, 8-bit previews sRGB-linearised). The pipeline calibrates
+each frame (master dark/flat/bias when uploaded), scores every sub and
+auto-rejects the worst, registers by asterism matching, normalises to the
+reference, and combines with sigma rejection and weighting, all in bounded
+memory. Full detail: [ALGORITHMS.md](ALGORITHMS.md#stacking).
 
 1. `POST /stack/initiate` `{ frame_count, registration_transform?, combination_method?,
    rejection_algo?, weighting?, cosmetic_correction?, quality_filter?, post_process?,
@@ -540,18 +563,22 @@ sigma rejection and weighting, all in bounded memory. See docs/ALGORITHMS.md.
    and rebuilt when more subs arrive.
 8. `DELETE /stack/{stack_id}/calibration/{kind}` -> the same body. Drops every
    sub of that kind and any master derived from it.
-9. `POST /stack/{stack_id}/process` runs the pipeline synchronously and returns
-   `200`. An optional body `{ registration_transform?, combination_method?,
-   rejection_algo?, weighting?, cosmetic_correction?, quality_filter?, post_process?,
-   drizzle_factor? }` re-stacks with a changed setting - no re-upload, each run
-   makes a fresh composite session. Changing only the combination / rejection /
-   weighting / drizzle resumes from the aligned frames of the previous run
-   (within ~30 min):
+9. `POST /stack/{stack_id}/process` -> `200`. In `PROCESSING_MODE=sync` the
+   pipeline runs in the request and the response is already `completed`; in
+   `queue` it returns `processing` with a `job_id` / `ws_status_url` and the
+   worker runs it (follow `/ws/stack-status/{job_id}`). An optional body
+   `{ registration_transform?, combination_method?, rejection_algo?, weighting?,
+   cosmetic_correction?, quality_filter?, post_process?, drizzle_factor? }`
+   re-stacks with a changed setting - no re-upload, each run makes a fresh
+   composite session. Changing only the combination / rejection / weighting /
+   drizzle resumes from the aligned frames of the previous run (within ~30 min):
 
 ```json
 {
   "stack_id": "...",
   "status": "completed",
+  "job_id": "job-...",
+  "ws_status_url": "/ws/stack-status/job-...",
   "session_id": "<composite session>",
   "stacked_image_url": "/api/preview/<session_id>?full=true",
   "statistics": {

@@ -17,11 +17,21 @@ logs (**Settings -> Logs -> Export**) and open a
 
 ## Processing and the editor
 
-**The preview doesn't update / I have to click twice.**
-Fixed in the current build for preset apply, Auto Astro, and re-stacking (they
-now follow the job to completion). If you still see a stale preview: it is a
-browser cache of the preview URL - a hard refresh (Ctrl/Cmd-Shift-R) clears it.
-The preview URL is cache-busted on every result, so this should not recur.
+**The preview doesn't update / I have to click twice / it froze during a slider
+drag.** Fixed in the current build. Preset apply, Auto Astro and re-stacking now
+follow the job to completion; the editor keeps at most one `/process` in flight
+per session and coalesces the rest; and the progress WebSocket no longer holds a
+pooled DB connection (a burst of sockets used to exhaust the pool - see
+"`QueuePool limit ... connection timed out`" below). If you still see a stale
+preview on an older build, a hard refresh (Ctrl/Cmd-Shift-R) clears the browser's
+cache of the preview URL.
+
+**The API log shows `QueuePool limit of size 5 overflow 10 reached, connection
+timed out` and `/process` returns 500.** The database connection pool was
+exhausted - on older builds the progress WebSocket held a connection open for its
+whole lifetime, so a burst of edits (one socket per queued job) starved every
+other request. Fixed in the current build. If you see it on an older one,
+restarting `api` clears the stuck connections; upgrade to stop it recurring.
 
 **"Too many concurrent processing jobs" (429).**
 The per-IP concurrent-job cap (`max_concurrent_jobs_per_ip`, default 5) was hit -

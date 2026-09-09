@@ -229,6 +229,17 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   follow the job to completion over the WebSocket (the same way a slider edit
   does), and `POST /stack/{id}/process` reports `processing` for the new run
   instead of echoing the previous run's `completed`.
+- A burst of slider edits could wedge the editor: the preview stopped updating,
+  the API log filled with `QueuePool limit ... connection timed out` (a 500 on
+  the next `/process`), and every change then landed at once. The progress
+  WebSocket held a pooled database connection open for its whole lifetime, so a
+  handful of concurrent sockets (one per queued job) exhausted the pool. Fixed
+  on three fronts: the WebSocket now reads the job once with a short-lived
+  session and holds no connection while it streams; the editor keeps at most one
+  `/process` in flight per session and coalesces the rest, so a drag becomes two
+  jobs, not twenty; and a job that a newer edit supersedes now bails out at the
+  next pipeline stage instead of running to completion (and `superseded` is
+  pushed to the socket immediately so it closes).
 - The editor no longer 429s itself ("Too many concurrent processing jobs") when
   you move several sliders quickly: a new `/process` for a session now retires
   any still-pending job for that same session (status `superseded`) before it
@@ -243,6 +254,18 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   coordinates and drifted from the visible seam at any zoom above 100%.
 - The stacking progress-event stream no longer opens a fresh Redis connection
   per event (a thousand-frame stack emits hundreds).
+
+### Known gaps
+
+- `depthShiftIntensity` (a `ProcessingParameters` field with its own slider) is
+  dead - nothing in the enhancement pipeline or `depth_shift.py` reads it, and
+  the Depth Shift viewer keeps its own separate intensity state. Needs a product
+  decision (most likely: wire it as that viewer's starting value), not a copy
+  change.
+- `PROCESSING_MODE=queue` on Docker Desktop runs SQLite without WAL (its
+  shared-memory file does not work over a bind mount), so the API and worker
+  share one lock. Fine for a single operator; set `DATABASE_URL` to Postgres
+  before scaling the worker out.
 
 ## [0.2.0] - 2026-09-06
 
@@ -712,11 +735,13 @@ tagged yet.
 
 ### Known gaps
 
-- Nothing is tagged yet; no published Docker images or GitHub release.
+- Nothing is tagged yet; no published Docker images or GitHub release. *(Resolved
+  in 0.2.0: `v0.2.0` is tagged and images are published to `ghcr.io` and Docker
+  Hub. Current open items are tracked under `[Unreleased]` above.)*
 - `depthShiftIntensity` (a `ProcessingParameters` field with its own slider) is
   dead: nothing in the enhancement pipeline or `depth_shift.py` reads it. The
   actual Depth Shift viewer has its own separate intensity state
   (`useDepthShift`). Found while adding parameter tooltips; not fixed since it
   needs a product decision (most likely: wire it as that viewer's starting
-  value), not a copy change.
+  value), not a copy change. *(Still open.)*
 

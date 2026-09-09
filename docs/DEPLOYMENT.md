@@ -1,5 +1,24 @@
 # Deployment and configuration
 
+## Contents
+
+- [Philosophy](#philosophy)
+- [Services](#services)
+- [Clean-machine quick start (no repo clone)](#clean-machine-quick-start-no-repo-clone)
+- [The data volume](#the-data-volume)
+- [Structural environment variables](#structural-environment-variables)
+- [Runtime settings (edited in the UI)](#runtime-settings-edited-in-the-ui)
+- [External ML engines (optional)](#external-ml-engines-optional)
+- [Frontend environment](#frontend-environment)
+- [Development stack (hot reload)](#development-stack-hot-reload)
+- [Database migrations](#database-migrations)
+- [Logs](#logs)
+- [Backup](#backup)
+- [Reverse proxy](#reverse-proxy)
+- [Health checks](#health-checks)
+
+The runtime topology is in [ARCHITECTURE.md](ARCHITECTURE.md).
+
 ## Philosophy
 
 `docker compose up` works with **no `.env` editing**. The compose file carries
@@ -74,16 +93,19 @@ container):
 ```
 /data/
   db/myastroshine.db      SQLite database
-  images/<session>/       per-session working files
-  stacks/<stack>/         stacking frames (v1.1+)
+  images/<session>/       per-session working files (original / processed / preview / depth layers)
+  stacks/<stack>/         stacking frames, calibration subs, thumbnails, align checkpoint, composite.npy
   cache/                  server-side caches
-  secret_key.txt          auto-generated once; HMAC fallback + session signing
+  secret_key.txt          auto-generated once (0600); HMAC fallback + session signing
   app_settings.json       runtime settings edited in the UI
-  myastroshine.log        rotating application log
+  myastroshine.log        rotating application log (10 MB x 5)
+  worker.log              rotating worker log
+  celerybeat-schedule     beat's persisted schedule state
 ```
 
-Back up this volume. Session images are transient and pruned after the
-configured session lifetime.
+Back up this volume. Session images are transient and pruned after
+`session_expiry_hours`; a stack's frames are kept `stacking_retention_hours`.
+Full layout: [ARCHITECTURE.md](ARCHITECTURE.md#storage-layout).
 
 ## Structural environment variables
 
@@ -117,7 +139,7 @@ after changing it).
 | Webhooks | `astrodex_callback_urls` (allowlist) | empty |
 | Webhooks | `astrodex_max_retries` / `astrodex_retry_delay_seconds` | 3 / 5s |
 | Advanced | `cors_origins` | `http://localhost:3000` |
-| Advanced | `rate_limit_enabled` / `rate_limit_per_minute` / `max_concurrent_jobs_per_ip` | `true` / 120 / 5 |
+| Advanced | `rate_limit_enabled` / `rate_limit_per_minute` / `max_concurrent_jobs_per_ip` | `true` / 600 / 5 |
 | Advanced | `log_level` / `console_log_level` | `info` / `warning` |
 | Advanced | `starnet2_path` / `deepsnr_path` / `starnet2_stride` / `deepsnr_stride` (external ML engines; empty = off) | "" / "" / 0 / 0 |
 
@@ -200,10 +222,23 @@ polling (`VITE_USE_POLLING=1`) so edits are picked up on Windows and macOS.
 
 Alembic is configured in `backend/alembic.ini` / `backend/migrations/`. The URL
 comes from application settings at runtime (`DATABASE_URL`, or the derived SQLite
-path under `DATA_DIR`). The initial revision
-(`606a1e113989_create_core_tables.py`) covers all six tables.
+path under `DATA_DIR`). `606a1e113989_create_core_tables` creates the six tables;
+later revisions add the stacking columns, per-frame quality, calibration,
+drizzle, folder-watch, and the job client IP.
 
-Apply migrations before starting a production instance:
+`init_db()` runs on API startup and worker init and brings the schema to Alembic
+`head` automatically:
+
+- a brand-new database is built entirely from the migrations;
+- a legacy database from an earlier `create_all` (no `alembic_version` table) is
+  filled in and stamped at `head`;
+- a lightweight **schema-drift check** then compares the ORM columns against the
+  live schema. On SQLite it adds any column a migration missed, in place (and
+  logs an error so the migration still gets fixed); on Postgres it raises -
+  migrations must be correct there, and `tests/db/test_migrations.py` keeps them
+  that way.
+
+For a Postgres deployment, apply migrations explicitly before starting:
 
 ```bash
 cd backend
@@ -219,12 +254,7 @@ alembic revision --autogenerate -m "describe the change"
 alembic upgrade head   # apply it locally and eyeball the generated SQL
 ```
 
-For local development and tests, `init_db()` calls `Base.metadata.create_all`
-as a convenience (it only creates tables that don't exist yet, so it is
-harmless to run alongside Alembic); production should rely on
-`alembic upgrade head`. `api` and `worker` share the same SQLite file under
-`DATA_DIR`, so migrations are applied manually and once, not from either
-container's entrypoint.
+`api` and `worker` share the same SQLite file under `DATA_DIR`.
 
 ## Logs
 

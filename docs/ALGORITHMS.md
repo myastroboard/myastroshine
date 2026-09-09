@@ -5,6 +5,16 @@ Reference for the image processing pipeline. Implementations live in
 `app/services/depth_map.py`, and the stacking services. All functions operate on
 BGR `uint8` numpy arrays unless noted.
 
+## Contents
+
+- [Upload ingest: FITS / RAW / 16-bit](#upload-ingest-fits--raw--16-bit)
+- [Single-image pipeline](#single-image-pipeline)
+- [Star removal (starless)](#star-removal-starless)
+- [Auto Astro (one-click adaptive enhancement)](#auto-astro-one-click-adaptive-enhancement)
+- [Depth map (v1, gradient-based)](#depth-map-v1-gradient-based)
+- [Stacking](#stacking)
+- [Performance notes](#performance-notes)
+
 ## Upload ingest: FITS / RAW / 16-bit
 
 `decode_image` (`app/utils/image_utils.py`) is the single place upload bytes
@@ -295,8 +305,8 @@ star field** (thousands of overlapping faint stars, e.g. the Cassiopeia region
 around the Bubble) leaves a soft mottled texture where it was - there is no real
 "between the stars" for the estimate to reconstruct. Classical removal fills
 from the neighbourhood and has no model of what a star sits on top of; this is
-exactly where a trained model wins, and why the ONNX path (below) stays on the
-list.
+exactly where a trained model wins, and why the optional StarNet2 engine (below)
+exists.
 
 **Quality path - StarNet2 / DeepSNR as optional external engines.** The roadmap
 paired the classical path with "an ONNX StarNet-style model (quality path)".
@@ -447,13 +457,14 @@ picked point read as "near" in the parallax, not just whatever happens to be
 detailed. `w=0.5` is a first-pass constant, like other heuristics this
 session, to revisit if real testing shows the centering too strong/weak.
 
-## Stacking (linear rebuild)
+## Stacking
 
-The v1.1 pipeline (ORB/SIFT homography on stretched 8-bit frames, MAD "cosmic
-ray" masking, uint8 combination) was never run on real data and produced a
-near-black composite on a real Seestar set. It is being rebuilt around linear
-`float32` data - see `initial_plan/12_STACKING_REBUILD.md` for the full plan,
-the reference comparison against Siril/DSS/APP/WBPP, and the phased approach.
+The stacking pipeline works entirely in linear `float32` data. (An earlier
+v1.1 attempt - ORB/SIFT homography on stretched 8-bit frames, MAD "cosmic ray"
+masking, uint8 combination - was never run on real data and produced a
+near-black composite on a real Seestar set; it was replaced wholesale.) The
+current pipeline was validated against Siril / DeepSkyStacker / APP / WBPP on
+real sets.
 
 ### Linear ingest (`app/utils/linear_ingest.py`)
 
@@ -676,12 +687,13 @@ tests.
 | Denoise (bilateral) | 100-300 ms |
 | Chroma denoise (bilateral, Cr/Cb only) | ~100 ms |
 | Depth map (Sobel) | 50-100 ms |
-| Stacking, per frame (calibrate + register at half-res + align at full-res debayer + combine) | ~0.4-1 s (3 IO passes; Phase 5 to optimise) |
+| Stacking, per frame (calibrate + register at half-res + align at full-res debayer + combine) | ~0.4-1 s (three IO passes, run across `stacking_workers` threads) |
 
 Whites/blacks and highlights/shadows cost the same shape of work (a full-res
 grayscale conversion + masked blend) but were measured at different times -
 if you see one much cheaper than the other, re-measure both rather than
 trusting either number blindly.
 
-Cache intermediate results, vectorize with numpy, and offload heavy jobs to
-Celery (phase 2+).
+With `PROCESSING_MODE=queue` the whole pipeline runs on the Celery worker, off
+the request path; the editor's 512 px preview keeps slider feedback fast while
+the full-resolution render is produced on demand.

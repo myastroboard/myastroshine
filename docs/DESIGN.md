@@ -1,5 +1,12 @@
 # Design system
 
+## Contents
+
+- [Principles](#principles)
+- [Tokens](#tokens)
+- [Component classes](#component-classes)
+- [Rules of thumb](#rules-of-thumb)
+
 MyAstroShine shares its visual charter with **MyAstroBoard** - the two apps
 should feel like one product family. The language:
 

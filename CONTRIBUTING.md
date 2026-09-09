@@ -198,9 +198,12 @@ own `e2e` CI job.
 
 ## Pull requests
 
-- Describe what changed and why. Link the issue (`Fixes #123`).
+- Use the [PR template](.github/pull_request_template.md). Describe what changed
+  and why; link the issue (`Fixes #123`).
 - Include tests for new behavior.
-- Update `docs/` and `CHANGELOG` for any user-facing or behavioral change.
+- Update the relevant `docs/*.md` ([docs/README.md](docs/README.md) indexes them)
+  and `CHANGELOG.md`'s `[Unreleased]` section for any user-facing or behavioral
+  change.
 - CI must be green before review.
 
 ## Project layout
