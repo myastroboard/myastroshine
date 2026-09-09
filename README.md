@@ -4,6 +4,7 @@
 [![CI](https://github.com/myastroboard/myastroshine/actions/workflows/ci.yml/badge.svg)](https://github.com/myastroboard/myastroshine/actions/workflows/ci.yml)
 [![astropy](https://img.shields.io/badge/powered%20by-AstroPy-orange.svg?style=flat)](https://www.astropy.org/)
 [![Docker Pulls](https://img.shields.io/docker/pulls/myastroboard/myastroshine)](https://hub.docker.com/r/myastroboard/myastroshine)
+[![Docker Image Size](https://img.shields.io/docker/image-size/myastroboard/myastroshine/latest)](https://hub.docker.com/r/myastroboard/myastroshine)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0--or--later-blue.svg)](LICENSE)
 
 **A self-hosted astronomical image processing tool: automatic enhancement,
