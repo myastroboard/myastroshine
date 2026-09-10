@@ -66,6 +66,14 @@ _BG_OBJECT_SIGMA = 1.8
 _BG_REJECT_ITERATIONS = 3
 _BG_POLY_DEGREE = 2
 _BG_MIN_SAMPLES = 10  # below this many object-free tiles, fall back to a flat background
+# The degree-2 surface is a smooth global bowl; a Seestar / alt-az stack often
+# keeps a *sharper* edge/corner falloff in one or more channels that a paraboloid
+# can't bend to (and that the border crop only partly took). After the poly fit,
+# the object-free sky residual is added back - smoothed, and multiplied by a mask
+# that is 0 across the interior and ramps to 1 at the frame edge, so a genuine
+# interior structure (a galaxy halo) is never touched while the edge cast is.
+_BG_BORDER_INNER = 0.62  # residual correction is 0 inside this fraction of the half-width
+_BG_RESIDUAL_SMOOTH_CELLS = 2.2  # Gaussian sigma, in lattice cells, for the residual field
 _BG_FLOOR_PERCENTILE = 10.0  # flatten the sky toward this percentile of the fitted surface
 # Sample + fit the background on a copy no larger than this: the surface is a
 # degree-2 polynomial (low-frequency by construction), so estimating it on a
@@ -242,8 +250,12 @@ def extract_background(composite: np.ndarray, strength: float = 1.0) -> tuple[np
     by their residual to the current fit and refitted, so the surface tracks the
     sky *between* the objects. A degree-2 fit can only be a smooth bowl - it
     cannot carve structure out of a nebula even if a few object tiles slip
-    through. The tile lattice is sampled on a downscaled copy and the fitted
-    surface cubic-resized back to full resolution.
+    through. A frame-edge-only residual correction (:func:`_border_residual`) is
+    then added on top: it bends the surface to a sharper edge/corner falloff a
+    paraboloid can't reach (a Seestar / alt-az stack's rotation-and-vignette
+    footprint), but is masked to zero across the interior so a galaxy halo or a
+    frame-filling nebula is untouched. The tile lattice is sampled on a
+    downscaled copy and the fitted surface cubic-resized back to full resolution.
     """
     height, width = composite.shape[:2]
     scale = _BG_ESTIMATE_MAX_SIZE / max(height, width)
@@ -293,7 +305,10 @@ def extract_background(composite: np.ndarray, strength: float = 1.0) -> tuple[np
             keep = ~_dilate(~keep)  # also drop tiles touching an object (a soft skirt)
             coeffs = _fit_poly2d(grid_x[keep], grid_y[keep], samples[keep], _BG_POLY_DEGREE)
 
-        surface_coarse = _eval_poly2d(grid_x, grid_y, coeffs, _BG_POLY_DEGREE)
+        surface_coarse = _eval_poly2d(grid_x, grid_y, coeffs, _BG_POLY_DEGREE).reshape(
+            samples.shape
+        )
+        surface_coarse = surface_coarse + _border_residual(samples, surface_coarse, keep)
         surface = cv2.resize(
             surface_coarse.astype(np.float32), (width, height), interpolation=cv2.INTER_CUBIC
         )
@@ -305,6 +320,40 @@ def extract_background(composite: np.ndarray, strength: float = 1.0) -> tuple[np
     floor = float(np.percentile(background, _BG_FLOOR_PERCENTILE))
     flattened = composite - strength * (background - floor)
     return np.clip(flattened, 0.0, None), peak * strength
+
+
+def _border_weight(size: int) -> np.ndarray:
+    """A ``size x size`` mask: 0 across the interior, smoothly 1 at the frame edge.
+
+    The ramp starts at ``_BG_BORDER_INNER`` of the half-width (Chebyshev distance,
+    so the rings are square - matching a rectangular sensor). ``smoothstep`` keeps
+    the transition gradient-free.
+    """
+    axis = np.abs(np.linspace(-1.0, 1.0, size, dtype=np.float32))
+    cheb = np.maximum(axis[:, np.newaxis], axis[np.newaxis, :])
+    w = np.clip((cheb - _BG_BORDER_INNER) / (1.0 - _BG_BORDER_INNER), 0.0, 1.0)
+    return (w * w * (3.0 - 2.0 * w)).astype(np.float32)
+
+
+def _border_residual(samples: np.ndarray, surface: np.ndarray, keep: np.ndarray) -> np.ndarray:
+    """The object-free sky residual to the poly fit, smoothed and masked to the edge.
+
+    ``keep`` are the object-free tiles; their residual is normalised-convolution
+    filled across the object tiles, blurred, and multiplied by :func:`_border_weight`
+    so only a frame-edge cast (the field-rotation / vignette footprint) is
+    corrected - never interior structure.
+    """
+    if keep.sum() < _BG_MIN_SAMPLES:
+        return np.zeros_like(samples, dtype=np.float32)
+    mask = keep.astype(np.float32)
+    resid = (samples - surface).astype(np.float32) * mask
+    sigma = _BG_RESIDUAL_SMOOTH_CELLS
+    filled = cv2.GaussianBlur(resid, (0, 0), sigma) / (
+        cv2.GaussianBlur(mask, (0, 0), sigma) + _TINY
+    )
+    smoothed = cv2.GaussianBlur(filled, (0, 0), sigma)
+    correction: np.ndarray = smoothed * _border_weight(samples.shape[0])
+    return correction
 
 
 def _dilate(mask: np.ndarray) -> np.ndarray:

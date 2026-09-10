@@ -143,6 +143,42 @@ def test_low_order_fit_does_not_carve_a_bright_nebula() -> None:
     assert nebula > background * 2.5  # the object still stands well clear of the sky
 
 
+def test_border_residual_removes_an_edge_only_colour_cast() -> None:
+    """A sharp edge/corner cast one channel deep - the kind a paraboloid can't
+    bend to - is taken by the frame-edge residual correction."""
+    comp = _linear_sky(360, 300)
+    yy, xx = np.mgrid[0:360, 0:300]
+    # blue suppressed in a band down the top ~15% and harder in the top corners
+    edge = np.clip(1.0 - yy / (360 * 0.15), 0.0, 1.0).astype(np.float32)
+    corner = edge * np.clip(np.abs(xx / 150 - 1.0), 0.0, 1.0).astype(np.float32)
+    comp[..., 2] -= 0.0015 * edge + 0.003 * corner
+
+    flattened, _ = extract_background(np.clip(comp, 0.0, None))
+
+    def cast(region: np.ndarray) -> float:
+        m = region.reshape(-1, 3).mean(axis=0)
+        return float(m.max() - m.min())
+
+    raw_corner = cast(np.clip(comp, 0.0, None)[:40, :50])
+    fixed_corner = cast(flattened[:40, :50])
+    assert fixed_corner < raw_corner * 0.5  # the corner is much closer to neutral
+
+
+def test_border_residual_leaves_the_interior_alone() -> None:
+    """The residual correction is masked to the frame edge - a big frame-filling
+    object in the centre is not clipped by it."""
+    comp = _linear_sky(320, 320)
+    ny, nx = np.mgrid[0:320, 0:320]
+    halo = np.exp(-(((ny - 160) / 90) ** 2 + ((nx - 160) / 90) ** 2)).astype(np.float32)
+    comp += halo[:, :, np.newaxis] * np.array([0.02, 0.02, 0.02], dtype=np.float32)
+
+    out, _ = extract_background(comp)
+
+    core = float(out[150:170, 150:170].mean())
+    mid = float(out[95:115, 95:115].mean())
+    assert core > mid > 0  # the halo still falls off smoothly, not stepped by a mask edge
+
+
 def test_background_extraction_is_finite_and_non_negative() -> None:
     comp = _linear_sky(160, 200)
     comp[10, 10] = np.nan  # a stray blank pixel

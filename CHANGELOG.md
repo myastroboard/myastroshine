@@ -17,6 +17,12 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (the "red top / marked corners") is detected from the pixels and trimmed on
   ingest. `POST /api/upload` returns `is_stack: true` for these. See
   `docs/ALGORITHMS.md` "Upload ingest" and `app/services/linear_upload.py`.
+- **Background extraction gains a frame-edge residual correction.** After the
+  degree-2 polynomial it adds back the object-free sky residual, smoothed and
+  masked to the frame border, so the sharper edge/corner colour cast a
+  paraboloid can't bend to (a Seestar footprint the crop only partly removes) is
+  taken too - while a galaxy halo or a frame-filling nebula in the interior is
+  left exactly as before.
 - A 3-plane (RGB) FITS that still goes through `decode_image` (an AstroDex
   handoff, say) is stretched with one shared, colour-preserving transform and a
   deep sky target, not three independent per-channel stretches that lifted the

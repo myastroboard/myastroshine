@@ -662,8 +662,15 @@ the enhancement pipeline works on:
    neighbours) are dropped as objects and it is refitted (3 iterations); the
    fitted surface is cubic-resized back to full resolution and `strength`x of it
    subtracted, flattening toward the darkest real sky. Degree 2 by design - a
-   paraboloid can only be a smooth gradient, never a nebula. Estimating on the
-   downscale keeps this ~100 ms so it can re-run per slider move.
+   paraboloid can only be a smooth gradient, never a nebula. A **frame-edge-only
+   residual correction** is then added on top (`_border_residual`): the
+   object-free sky residual to the poly, smoothed and multiplied by a mask that
+   is 0 across the interior and ramps to 1 at the frame edge. This bends the
+   surface to the sharper edge/corner falloff a paraboloid can't reach (a
+   Seestar / alt-az stack's rotation-and-vignette footprint the border crop only
+   partly took), while a galaxy halo or a frame-filling nebula in the interior
+   stays untouched. Estimating on the downscale keeps this ~100 ms so it can
+   re-run per slider move.
 2. **Colour calibration** (`color_calibration`, on/off) - the per-channel sky
    level is equalised (neutral grey background), then the channels are scaled so
    their means match (gains clamped to 0.5-2x).
