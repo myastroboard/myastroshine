@@ -58,6 +58,24 @@ function focusPointsEqual(a: FocusPoint | null, b: FocusPoint | null): boolean {
   return a.x === b.x && a.y === b.y;
 }
 
+/** Drop a trailing image extension (`.jpg`, `.tiff`, `.cr2`, ...) from a name. */
+function stripImageExtension(name: string): string {
+  return name.replace(/\.[A-Za-z0-9]{1,5}$/, '');
+}
+
+/** Default name (no extension) for the exported result: the uploaded file's base
+ * name, or the AstroDex object, with a `_myastroshine` suffix - falling back to a
+ * short session tag when there is no source name (a stacked composite). */
+function defaultExportName(session: EditorSession): string {
+  if (session.originalFilename) {
+    return `${stripImageExtension(session.originalFilename)}_myastroshine`;
+  }
+  if (session.astrodex?.objectName) {
+    return `${session.astrodex.objectName}_myastroshine`;
+  }
+  return `myastroshine_${session.sessionId.slice(0, 8)}`;
+}
+
 /** Main editing surface: workflow rail + step inspector + persistent preview. */
 export function EditorView({ session, onExit }: EditorViewProps) {
   const { t } = useTranslation();
@@ -302,12 +320,13 @@ export function EditorView({ session, onExit }: EditorViewProps) {
     setShowDepthViewer(true);
   }
 
-  async function handleDownload(): Promise<void> {
+  async function handleDownload(filename: string): Promise<void> {
     const blob = await apiClient.downloadImage(session.sessionId);
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `myastroshine_${session.sessionId.slice(0, 8)}.jpg`;
+    const base = stripImageExtension(filename.trim()) || defaultExportName(session);
+    anchor.download = `${base}.jpg`;
     anchor.click();
     URL.revokeObjectURL(url);
   }
@@ -420,7 +439,8 @@ export function EditorView({ session, onExit }: EditorViewProps) {
           astrodexReturning: astrodex.isLoading,
           astrodexReturned: astrodex.success,
           astrodexError: astrodex.error,
-          onDownload: () => void handleDownload(),
+          defaultFilename: defaultExportName(session),
+          onDownload: (filename) => void handleDownload(filename),
           onReturnToAstroDex: () => void handleReturnToAstrodex(),
           onSaveAsPreset: () => setShowSavePreset(true),
         }}

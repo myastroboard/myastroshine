@@ -13,6 +13,7 @@ from app.dependencies import ProcessingServiceDep, RequireRateLimit, SessionServ
 from app.exceptions import SessionNotFoundError, UnsupportedImageError
 from app.logging_config import get_logger
 from app.models import Dimensions, GeometryParameters, HistogramData, UploadResponse
+from app.services.linear_upload import LinearUploadService, is_linear_stack_upload
 from app.utils import image_utils
 from app.utils.validators import (
     is_valid_session_id,
@@ -40,13 +41,22 @@ async def upload_image(
     if file.filename:
         validate_image_extension(file.filename)
 
-    image = image_utils.decode_image(data, file.filename)
-    height, width = image.shape[:2]
-
-    record = sessions.create_session(image_path="", original_filename=file.filename)
-    storage.save_original(record.session_id, image)
-    record.image_path = str(storage.original_path(record.session_id))
-    sessions.db.commit()
+    # Linear stack data (a FITS, a 16-bit export) opens as a composite session so
+    # the editor's linear "Stack" step runs on the 32-bit data instead of a
+    # one-shot 8-bit auto-stretch. An ordinary photo takes the plain path.
+    if is_linear_stack_upload(data, file.filename):
+        record, composite = LinearUploadService(sessions, storage).ingest(data, file.filename)
+        display = storage.load_processed(record.session_id)
+        height, width = composite.shape[:2]
+        is_stack = True
+    else:
+        display = image_utils.decode_image(data, file.filename)
+        height, width = display.shape[:2]
+        record = sessions.create_session(image_path="", original_filename=file.filename)
+        storage.save_original(record.session_id, display)
+        record.image_path = str(storage.original_path(record.session_id))
+        sessions.db.commit()
+        is_stack = False
 
     logger.info(
         "image uploaded",
@@ -54,6 +64,7 @@ async def upload_image(
         width=width,
         height=height,
         bytes=len(data),
+        is_stack=is_stack,
     )
 
     return UploadResponse(
@@ -61,9 +72,10 @@ async def upload_image(
         image_url=f"/api/preview/{record.session_id}",
         dimensions=Dimensions(width=width, height=height),
         file_size_bytes=len(data),
-        histogram=HistogramData(**image_utils.compute_histogram(image)),
+        histogram=HistogramData(**image_utils.compute_histogram(display)),
         upload_timestamp=record.created_at,
         expires_at=record.expires_at,
+        is_stack=is_stack,
     )
 
 

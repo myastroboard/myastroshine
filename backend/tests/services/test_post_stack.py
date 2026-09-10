@@ -9,6 +9,7 @@ from app.models import StackParameters
 from app.services.post_stack import (
     apply_post_stack,
     calibrate_colour,
+    crop_low_signal_border,
     extract_background,
     render_stack_base,
 )
@@ -55,6 +56,53 @@ def test_apply_post_stack_does_not_stretch_or_colour_correct() -> None:
     comp = _linear_sky(200, 260)
     out, _ = apply_post_stack(comp, np.full((200, 260), 50, dtype=np.int32))
     assert np.allclose(out, np.nan_to_num(comp), atol=1e-6)
+
+
+# -- 1b. border crop for a single uploaded stack (no coverage map) --------
+
+
+def _seestar_sky(height: int, width: int, dead: bool) -> np.ndarray:
+    """A faint linear stack over a ~0.16 pedestal, optionally with the two top
+    corners collapsed - the Seestar field-rotation / vignette footprint, where
+    one or more channels drop well below the interior sky. Scale mirrors the
+    real thing (sky sigma ~1.5e-4, a several-hundred-ADU collapse at the edge)."""
+    rng = np.random.default_rng(4)
+    rgb = 0.16 + rng.normal(0, 0.00015, (height, width, 3)).astype(np.float32)
+    if dead:
+        rgb[: height // 6, : width // 8, :] -= 0.005  # top-left corner
+        rgb[: height // 4, -width // 6 :, 1:] -= 0.006  # top-right corner (G/B)
+    return rgb
+
+
+def test_border_crop_trims_a_collapsed_edge() -> None:
+    comp = _seestar_sky(600, 400, dead=True)
+    cropped, box = crop_low_signal_border(comp)
+
+    assert box is not None
+    top, left, height, width = box
+    assert top > 0  # the dead top band is gone
+    assert left > 0 or width < 400  # and at least one collapsed corner's side
+    assert cropped.shape[:2] == (height, width)
+    assert np.isfinite(cropped).all()
+    # the interior is untouched
+    assert cropped.shape[0] > 600 * 0.6 and cropped.shape[1] > 400 * 0.6
+
+
+def test_border_crop_leaves_a_clean_frame_alone() -> None:
+    comp = _seestar_sky(600, 400, dead=False)
+    cropped, box = crop_low_signal_border(comp)
+    assert box is None
+    assert cropped.shape[:2] == (600, 400)
+
+
+def test_border_crop_handles_a_mono_composite() -> None:
+    rng = np.random.default_rng(5)
+    mono = 0.02 + rng.normal(0, 0.0002, (300, 400)).astype(np.float32)
+    mono[:40, :80] -= 0.01  # a dead top-left corner
+    cropped, box = crop_low_signal_border(mono)
+    assert box is not None
+    assert cropped.ndim == 2
+    assert box[0] > 0
 
 
 # -- 2. background extraction (editor pre-stage) --------------------------

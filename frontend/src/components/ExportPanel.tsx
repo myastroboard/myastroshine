@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 import { useTranslation } from '@/hooks/useTranslation';
 
 export interface ExportPanelProps {
@@ -8,7 +10,9 @@ export interface ExportPanelProps {
   astrodexReturning?: boolean;
   astrodexReturned?: boolean;
   astrodexError?: string | null;
-  onDownload: () => void;
+  /** Pre-filled value for the filename field (no extension). */
+  defaultFilename?: string;
+  onDownload: (filename: string) => void;
   onReturnToAstroDex: () => void;
   onSaveAsPreset: () => void;
 }
@@ -22,19 +26,42 @@ export function ExportPanel({
   astrodexReturning = false,
   astrodexReturned = false,
   astrodexError = null,
+  defaultFilename = '',
   onDownload,
   onReturnToAstroDex,
   onSaveAsPreset,
 }: ExportPanelProps) {
   const { t } = useTranslation();
+  const [filename, setFilename] = useState(defaultFilename);
+
+  const trimmed = filename.trim();
+
   return (
     <div className="flex flex-col gap-2.5">
+      <div className="flex flex-col gap-1.5">
+        <span className="label" id="export-filename-label">
+          {t('export_panel.filename_label')}
+        </span>
+        <span className="flex items-stretch">
+          <input
+            className="field min-w-0 flex-1 rounded-r-none"
+            value={filename}
+            spellCheck={false}
+            autoComplete="off"
+            aria-labelledby="export-filename-label"
+            onChange={(event) => setFilename(event.target.value)}
+          />
+          <span className="inline-flex items-center rounded-r-md border border-l-0 border-line bg-overlay px-2 text-xs text-faint">
+            .jpg
+          </span>
+        </span>
+      </div>
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           className="btn btn-primary"
-          disabled={isProcessing}
-          onClick={onDownload}
+          disabled={isProcessing || trimmed === ''}
+          onClick={() => onDownload(trimmed || defaultFilename)}
         >
           {t('export_panel.download')}
         </button>

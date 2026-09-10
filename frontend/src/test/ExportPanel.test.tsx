@@ -4,12 +4,31 @@ import { describe, expect, it, vi } from 'vitest';
 import { ExportPanel } from '@/components/ExportPanel';
 
 const base = {
+  defaultFilename: 'orion_myastroshine',
   onDownload: vi.fn(),
   onReturnToAstroDex: vi.fn(),
   onSaveAsPreset: vi.fn(),
 };
 
 describe('ExportPanel', () => {
+  it('seeds the filename field and downloads with the edited name', () => {
+    const onDownload = vi.fn();
+    render(<ExportPanel {...base} onDownload={onDownload} />);
+
+    const field = screen.getByLabelText('File name');
+    expect(field).toHaveValue('orion_myastroshine');
+
+    fireEvent.change(field, { target: { value: 'orion final' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Download' }));
+    expect(onDownload).toHaveBeenCalledWith('orion final');
+  });
+
+  it('disables Download when the filename field is blank', () => {
+    render(<ExportPanel {...base} defaultFilename="" />);
+
+    expect(screen.getByRole('button', { name: 'Download' })).toBeDisabled();
+  });
+
   it('hides the AstroDex button and its feedback outside an AstroDex session', () => {
     render(<ExportPanel {...base} astrodexReturned astrodexError="boom" />);
 

@@ -17,10 +17,23 @@ BGR `uint8` numpy arrays unless noted.
 
 ## Upload ingest: FITS / RAW / 16-bit
 
-`decode_image` (`app/utils/image_utils.py`) is the single place upload bytes
-become the BGR `uint8` array everything past it (storage, the pipeline below,
-stacking) operates on - the rest of the app never needs to know what format
-was actually uploaded. The file extension picks the decoder:
+**Linear stack data - FITS (any bit depth) and 16-bit PNG/TIFF - opens as a
+composite session**, not through `decode_image`. `POST /api/upload` routes it to
+`app/services/linear_upload.py`: the frame is ingested to linear `float32`
+(`app/utils/linear_ingest.py` - CFA mosaics debayered, a `(3,H,W)`/`(H,W,3)`
+cube read as R/G/B planes, mono left 2D), its field-rotation / vignette border
+is trimmed (`crop_low_signal_border`, below), and it is stored as `composite.npy`
+with a `StackRecord` linking it to the session (`source="single"`). From there it
+is byte-for-byte the stacker's own output: the editor's linear "Stack" step -
+background extraction, colour calibration, a tunable deep stretch, all
+recomputed from the 32-bit data on every render (see "Post-stack" below) - and
+the faint signal never gets quantised to 256 levels on the way in. The response
+carries `is_stack: true`.
+
+`decode_image` (`app/utils/image_utils.py`) is what remains for **ordinary 8-bit
+photos and camera RAW** (and any other `decode_image` caller, e.g. an AstroDex
+handoff that hands in a FITS). It produces the BGR `uint8` array the single-image
+pipeline works on. The file extension picks the decoder:
 
 - **FITS** (`.fits`/`.fit`/`.fts`, `astropy.io.fits`) - scientific/linear data
   (8/16/32-bit int or float; `BSCALE`/`BZERO` header scaling applied
@@ -32,7 +45,9 @@ was actually uploaded. The file extension picks the decoder:
   standard header keyword for a Bayer pattern, and guessing one risks a
   garish checkerboard artifact instead of a real debayer, so a raw one-shot-
   colour sensor frame is out of scope here. A `(3, H, W)` or `(H, W, 3)` cube
-  is read as R/G/B planes.
+  is read as R/G/B planes and stretched with one shared, colour-preserving
+  transform (`stretch_composite_linear`) at a deep sky target - not three
+  independent per-channel stretches.
 - **Camera RAW** (`.cr2`/`.cr3`/`.nef`/`.arw`/`.dng`/`.orf`/`.rw2`/`.pef`/`.raf`,
   `rawpy`/libraw) - demosaiced with the camera's as-shot white balance and
   libraw's default sRGB-ish tone response (`use_camera_wb=True`,
@@ -41,23 +56,20 @@ was actually uploaded. The file extension picks the decoder:
   a normally-exposed starting point to edit further with this app's own
   sliders, not a from-scratch stretch.
 - **Everything else** (including no/unrecognised extension) goes through
-  OpenCV, which sniffs the real format from the bytes. A genuinely 16-bit
-  source (a stacked TIFF/PNG - Siril/DeepSkyStacker/PixInsight all export
-  these) is the same "linear stacked frame" case as FITS in a different
-  container, so it gets the identical auto-stretch rather than a naive
-  `>> 8` bit-shift, which would either crush the background to black or let
-  the single brightest pixel set the ceiling. Decoded via
+  OpenCV, which sniffs the real format from the bytes. Decoded via
   `cv2.IMREAD_UNCHANGED` (not the old `IMREAD_COLOR`, which silently
   truncated any 16-bit source to 8-bit before this) - grayscale sources are
   replicated to BGR, a 4th (alpha) channel is dropped, matching the prior
-  behaviour for ordinary 8-bit images exactly.
+  behaviour for ordinary 8-bit images exactly. A 16-bit source that reaches
+  here (a linear stack that skipped the composite route above, or a
+  `decode_image` caller other than `/upload`) still gets the auto-stretch
+  rather than a naive `>> 8` bit-shift.
 
 **Auto-stretch** (`_auto_stretch_to_uint8`) is the same "screen transfer
 function" auto-stretch used across astro tools (PixInsight's AutoSTF, Siril,
-...), applied per plane (each RGB channel independently, which also
-auto-balances each channel's own black level - a deliberate, simpler choice
-over a single shared transform that would preserve the original file's exact
-colour balance):
+...), applied per plane. A mono FITS uses it directly; a 3-plane cube instead
+gets one shared, colour-preserving transform (`stretch_composite_linear`, the
+stacked-composite core) so the channels are not rebalanced against each other:
 
 1. Percentile-clip to [0.1, 99.9] and normalize to 0-1 - guards against hot
    pixels/cosmic ray hits setting the black or white point off a single
@@ -75,13 +87,10 @@ colour balance):
    percent of the range, and MTF pulls it out non-linearly without blowing
    out the already-bright stars the percentile clip preserved headroom for.
 
-Known limitation: because each channel is stretched independently, a FITS/RAW
-frame that was already colour-calibrated before saving can come out slightly
-rebalanced rather than reproduced exactly - the app's own white balance
-sliders (temperature/tint) are there to correct it afterwards. Likewise, if a
-16-bit TIFF/PNG is already a *finished*, non-linear export (not a linear
-stack), this stretch will over-brighten it - export finished work as 8-bit
-instead.
+Known limitation: if a 16-bit TIFF/PNG is already a *finished*, non-linear
+export (not a linear stack), the composite route's deep stretch will
+over-brighten it - export finished work as 8-bit instead, or pull the "Stretch"
+control down and turn colour calibration off in the editor's Stack step.
 
 ## Single-image pipeline
 
@@ -628,6 +637,19 @@ rotation wedge** - `_combine` emits a per-pixel frame-coverage map, and
 rows/columns where most pixels were reached by fewer than half the frames are
 trimmed (capped at 45% of either axis). That crop defines the canvas, so it is
 baked into the saved `composite.npy` (still linear 32-bit, otherwise untouched).
+
+**`crop_low_signal_border`** is the same idea for a *single uploaded stack*
+(`app/services/linear_upload.py`), which has no coverage map: a Seestar / alt-az
+live stack carries a field-rotation + vignette footprint at the frame edge where
+one or more channels collapse well below the interior sky (the "red top / marked
+corners" a hard stretch exaggerates - a sharp edge falloff `background_extraction`
+can neither model nor fit around). A dead-pixel mask is derived from the pixels
+(any channel more than 5 robust sigma below the interior 40th-percentile sky, on
+a copy downscaled to <=384 px), then the largest centred rectangle that stays
+>=92% live is kept - same logic as the wedge crop, capped at 30% of either axis
+and skipped entirely when the trim would be larger (a mis-detection) or smaller
+than a few pixels. Also baked into `composite.npy`; the box is recorded in
+`quality_report["border_crop"]`.
 
 **`render_stack_base`** runs on every editor render (the "Stack" step, driven by
 `ProcessingParameters.stack`), turning the linear composite into the BGR image

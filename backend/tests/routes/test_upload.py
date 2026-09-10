@@ -121,9 +121,9 @@ def test_preview_original_without_geometry_stays_the_untouched_upload(
 
 
 def test_upload_accepts_a_real_fits_file(client) -> None:
-    """A genuine FITS upload (astropy round-trip) opens a session with a real preview -
-    end-to-end check that the whole route, not just decode_image in isolation, wires
-    the FITS branch correctly (see backend/app/utils/image_utils.py)."""
+    """A genuine FITS upload (astropy round-trip) opens a composite-backed session -
+    end-to-end check that the route routes linear stack data through
+    app.services.linear_upload, not decode_image's one-shot 8-bit stretch."""
     from astropy.io import fits
 
     rng = np.random.default_rng(7)
@@ -140,6 +140,7 @@ def test_upload_accepts_a_real_fits_file(client) -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["dimensions"] == {"width": 80, "height": 50}
+    assert body["is_stack"] is True  # the editor unlocks the linear "Stack" step
 
     preview = client.get(f"/api/preview/{body['session_id']}")
     assert preview.status_code == 200
@@ -147,7 +148,42 @@ def test_upload_accepts_a_real_fits_file(client) -> None:
     decoded = _decode(preview.content)
     assert decoded.shape[:2] == (50, 80)
     # not crushed to black by a naive linear scaling of the raw ADU values
-    assert int(np.median(decoded)) > 20
+    assert int(np.median(decoded)) > 15
+
+
+def test_upload_fits_composite_runs_the_linear_stack_step(client) -> None:
+    """A colour FITS opens as a composite; the editor's Stack controls then drive
+    a render straight off the 32-bit linear data."""
+    from astropy.io import fits
+
+    rng = np.random.default_rng(11)
+    h, w = 120, 90
+    cube = (10_000 + rng.normal(0, 40, (3, h, w))).astype(np.uint16)
+    cube[:, h // 2, w // 2] = 60_000  # a star
+    buffer = io.BytesIO()
+    fits.PrimaryHDU(data=cube).writeto(buffer)
+
+    session_id = client.post(
+        "/api/upload",
+        files={"file": ("Stacked_NGC.fits", buffer.getvalue(), "application/octet-stream")},
+    ).json()
+
+    def render(stretch: float) -> np.ndarray:
+        assert (
+            client.post(
+                f"/api/process/{session_id['session_id']}",
+                json={"parameters": {"stack": {"stretch": stretch, "background_extraction": 100}}},
+            ).status_code
+            == 200
+        )
+        return _decode(
+            client.get(f"/api/preview/{session_id['session_id']}", params={"full": "true"}).content
+        )
+
+    assert session_id["is_stack"] is True
+    subtle, aggressive = render(0.0), render(1.0)
+    # the linear "Stack" stretch control drives the render off composite.npy
+    assert int(np.median(aggressive)) > int(np.median(subtle))
 
 
 def test_preview_original_with_geometry_falls_back_before_any_processing(

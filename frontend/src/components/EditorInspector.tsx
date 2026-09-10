@@ -88,7 +88,9 @@ export interface ExportBundle {
   astrodexReturning: boolean;
   astrodexReturned: boolean;
   astrodexError: string | null;
-  onDownload: () => void;
+  /** Seeds the Export step's editable filename field (no extension). */
+  defaultFilename: string;
+  onDownload: (filename: string) => void;
   onReturnToAstroDex: () => void;
   onSaveAsPreset: () => void;
 }
@@ -138,7 +140,10 @@ export function EditorInspector(props: EditorInspectorProps) {
     sectionResettable || activeStep === 'curves' || (activeStep === 'stack' && stackModified);
 
   return (
-    <div className="panel flex flex-col gap-4">
+    // z-10 lifts this column (and the parameter-hint popovers that spill out of
+    // it) above the preview column, which is later in the DOM and would
+    // otherwise paint over an escaping tooltip.
+    <div className="panel relative z-10 flex flex-col gap-4">
       <div className="flex items-center justify-between gap-2">
         <h2 className="eyebrow">{t(`editor.rail.${step.id}`)}</h2>
         {showHeaderReset && (
@@ -221,12 +226,14 @@ export function EditorInspector(props: EditorInspectorProps) {
 
       {activeStep === 'export' && (
         <ExportPanel
+          key={props.exportActions.defaultFilename}
           isProcessing={props.isProcessing}
           canReturnToAstroDex={props.exportActions.canReturnToAstroDex}
           astrodexObjectName={props.exportActions.astrodexObjectName}
           astrodexReturning={props.exportActions.astrodexReturning}
           astrodexReturned={props.exportActions.astrodexReturned}
           astrodexError={props.exportActions.astrodexError}
+          defaultFilename={props.exportActions.defaultFilename}
           onDownload={props.exportActions.onDownload}
           onReturnToAstroDex={props.exportActions.onReturnToAstroDex}
           onSaveAsPreset={props.exportActions.onSaveAsPreset}

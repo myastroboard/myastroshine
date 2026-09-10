@@ -124,13 +124,14 @@ Every route is implemented and tested end to end.
 `POST /upload` and `POST /stack/{stack_id}/upload-frame` accept:
 
 - **8-bit JPEG/PNG/TIFF** - used as-is.
-- **16-bit PNG/TIFF** (e.g. a stacked frame exported from Siril/DeepSkyStacker/
-  PixInsight) - auto-stretched (see `docs/ALGORITHMS.md` "FITS / RAW / 16-bit
-  ingest"), not truncated to 8-bit by a naive bit-shift.
-- **FITS** (`.fits` / `.fit` / `.fts`, via `astropy`) - scientific/linear data,
-  always auto-stretched regardless of its stored bit depth. 2D data is read as
-  monochrome; a 3-plane array is read as RGB. No Bayer-pattern debayering for
-  a raw one-shot-colour sensor frame - out of scope, see ALGORITHMS.md.
+- **FITS** (`.fits` / `.fit` / `.fts`, via `astropy`) and **16-bit PNG/TIFF**
+  (e.g. a stacked frame exported from Siril/DeepSkyStacker/PixInsight, or a
+  Seestar / ASIAIR live stack) - linear, full-bit-depth data. These open as a
+  **composite session** (`is_stack: true` in the response): the 32-bit data is
+  kept as `composite.npy`, the field-rotation / vignette border is trimmed, and
+  the editor's linear "Stack" step (background extraction, colour calibration,
+  tunable deep stretch - see `docs/ALGORITHMS.md`) drives every render. 2D data
+  is read as monochrome; a 3-plane array as RGB; a CFA mosaic is debayered.
 - **Camera RAW** (`.cr2` `.cr3` `.nef` `.arw` `.dng` `.orf` `.rw2` `.pef`
   `.raf`, via `rawpy`/libraw) - demosaiced with the camera's as-shot white
   balance, standard sRGB-ish tone response (a normal starting point to edit
@@ -139,6 +140,10 @@ Every route is implemented and tested end to end.
 `415 UNSUPPORTED_FORMAT` for anything else, an unreadable file, or a decoded
 pixel count over the configured cap (`MAX_IMAGE_PIXELS` - a decompression-bomb
 guard, independent of `max_image_size_mb`'s compressed-byte-size check).
+
+The `/upload` response is `{ session_id, image_url, dimensions, file_size_bytes,
+histogram, upload_timestamp, expires_at, is_stack }`. `is_stack` is `true` when
+the upload opened as a composite session (linear stack data, above).
 
 ## Processing parameters
 
@@ -188,10 +193,10 @@ straighten -> crop; crop coordinates are fractions of the rotated/flipped image)
 `crop_x + crop_w` and `crop_y + crop_h` must not exceed 1. A crop or a quarter
 turn changes the result's dimensions.
 
-`stack` is a nested object, used **only** for a stacked-composite session (the
-editor's "Stack" step). It runs as a non-destructive pre-stage on the 32-bit
-linear composite, ahead of every other stage; it is ignored for an ordinary
-image upload.
+`stack` is a nested object, used **only** for a composite session - one produced
+by the stacker, or a linear upload (FITS / 16-bit, `is_stack: true`). It runs as
+a non-destructive pre-stage on the 32-bit linear composite, ahead of every other
+stage; it is ignored for an ordinary 8-bit image upload.
 
 | Field | Min | Max | Default | Type |
 |-------|-----|-----|---------|------|

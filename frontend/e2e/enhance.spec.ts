@@ -28,8 +28,13 @@ test('upload, adjust a slider, and download the result', async ({ page }) => {
   const download = page.getByRole('button', { name: 'Download' });
   await expect(download).toBeVisible();
 
+  // The filename field is seeded from the uploaded file plus a "_myastroshine" suffix.
+  const filename = page.getByLabel('File name');
+  await expect(filename).toHaveValue('sample_myastroshine');
+
+  await filename.fill('my orion');
   const [file] = await Promise.all([page.waitForEvent('download'), download.click()]);
-  expect(file.suggestedFilename()).toMatch(/^myastroshine_.*\.jpg$/);
+  expect(file.suggestedFilename()).toBe('my orion.jpg');
 });
 
 test('adjusting a slider refreshes the processed preview', async ({ page }) => {

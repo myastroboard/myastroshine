@@ -6,7 +6,21 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- **A stacked FITS (or a 16-bit PNG/TIFF) now opens as a composite session**, the
+  same as the multi-frame stacker's own output, instead of a one-shot 8-bit
+  auto-stretch on upload. The editor's linear **Stack** step - background
+  extraction, colour calibration, a tunable deep stretch - runs on the 32-bit
+  data on every render, and the faint signal is never quantised to 256 levels on
+  the way in. A Seestar / alt-az live stack's field-rotation + vignette border
+  (the "red top / marked corners") is detected from the pixels and trimmed on
+  ingest. `POST /api/upload` returns `is_stack: true` for these. See
+  `docs/ALGORITHMS.md` "Upload ingest" and `app/services/linear_upload.py`.
+- A 3-plane (RGB) FITS that still goes through `decode_image` (an AstroDex
+  handoff, say) is stretched with one shared, colour-preserving transform and a
+  deep sky target, not three independent per-channel stretches that lifted the
+  sky to a milky grey and rebalanced the colour.
 
 ## [0.4.0] - 2026-09-09
 

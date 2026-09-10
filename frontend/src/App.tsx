@@ -106,7 +106,7 @@ export default function App() {
       const uploaded = await apiClient.uploadImage(file, (fraction) => {
         setUploadProgress(fraction < 1 ? fraction : null);
       });
-      setSession(uploaded);
+      setSession({ ...uploaded, originalFilename: file.name });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
     } finally {

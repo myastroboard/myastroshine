@@ -184,11 +184,16 @@ def _decode_fits(data: bytes) -> np.ndarray:
     treated as monochrome: there's no reliable, standard header keyword for a
     Bayer pattern to safely debayer a raw one-shot-colour sensor frame, so
     guessing one risks a garish checkerboard artifact instead - out of scope
-    here. A leading or trailing 3-plane axis is read as RGB, each plane
-    stretched independently (this also auto-balances each channel's own black
-    level, not just overall brightness - a deliberate, simple choice over a
-    single shared transform that would preserve the FITS file's original
-    colour balance exactly).
+    here. A leading or trailing 3-plane axis is read as RGB and stretched with
+    one shared, colour-preserving transform (:func:`stretch_composite_linear`,
+    the same core the stacked-composite editor uses) and a deep sky target -
+    three independent per-channel stretches fight the colour balance and lift
+    the sky to a milky grey, which a faint deep-sky stack can't recover from.
+
+    (A direct upload no longer reaches this: ``POST /api/upload`` opens a FITS as
+    a linear composite session - see :mod:`app.services.linear_upload`. This
+    stays the path for an AstroDex handoff and any other ``decode_image`` caller
+    that hands in a FITS.)
     """
     from astropy.io import fits  # noqa: PLC0415 - heavy, only imported for an actual FITS upload
 
@@ -223,11 +228,10 @@ def _decode_fits(data: bytes) -> np.ndarray:
     else:
         raise UnsupportedImageError(f"Unsupported FITS data shape {array.shape}")
 
-    stretched = [_auto_stretch_to_uint8(plane) for plane in planes]
-    if len(stretched) == 1:
-        return cv2.cvtColor(stretched[0], cv2.COLOR_GRAY2BGR)
-    red, green, blue = stretched
-    return cv2.merge([blue, green, red])
+    if len(planes) == 1:
+        return cv2.cvtColor(_auto_stretch_to_uint8(planes[0]), cv2.COLOR_GRAY2BGR)
+    rgb = np.stack([p.astype(np.float32) for p in planes], axis=-1)
+    return np.clip(stretch_composite_linear(rgb) * 255.0, 0.0, 255.0).astype(np.uint8)
 
 
 def _decode_raw(data: bytes) -> np.ndarray:

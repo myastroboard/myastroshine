@@ -32,3 +32,7 @@ class UploadResponse(BaseModel):
     histogram: HistogramData
     upload_timestamp: datetime
     expires_at: datetime
+    #: The upload was linear stack data (a FITS, a 16-bit export) and opened as a
+    #: composite session - the editor shows the linear "Stack" step and works on
+    #: the 32-bit composite. ``False`` for an ordinary photo.
+    is_stack: bool = False

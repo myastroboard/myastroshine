@@ -42,6 +42,19 @@ _COVERAGE_WELL_COVERED = 0.5  # "well covered" = >= this fraction of the max fra
 _MAX_CROP_FRACTION = 0.45  # never crop away more than this much of either axis
 _MIN_CROP_MARGIN = 4  # px - ignore a crop smaller than this (not worth the reframe)
 
+# A single uploaded stack (a Seestar / alt-az live stack) has no per-pixel
+# coverage array, so :func:`crop_low_signal_border` derives one from the pixels:
+# the field-rotation / vignette footprint collapses one or more channels at the
+# frame edge (the classic "red top / marked corners"), dropping them well below
+# the interior sky level. A row/column is trimmed while too little of it stays
+# above that floor - the same largest-centred-rectangle logic as the wedge crop.
+_BORDER_ESTIMATE_MAX_SIZE = 384
+_BORDER_INTERIOR = (0.35, 0.65)  # central box taken as the reference "good sky"
+_BORDER_SKY_PERCENTILE = 40.0
+_BORDER_SIGMA = 5.0  # a pixel is "dead" this many robust sigma below the interior sky
+_BORDER_KEEP_FRACTION = 0.92  # keep a row/column while at least this much of it is live
+_BORDER_MAX_CROP_FRACTION = 0.30  # a bigger trim than this means the detector is wrong - skip it
+
 # The background is sampled on a GRID x GRID lattice; each tile's sky level is a
 # low percentile of its pixels (the sky between the stars). A tile whose residual
 # to the current fit is > OBJECT_SIGMA robust sigma holds an object and is
@@ -136,6 +149,82 @@ def _crop_to_coverage(
         return composite, None  # would remove too much - something is off, leave it
     if trimmed < _MIN_CROP_MARGIN:
         return composite, None  # nothing meaningful to trim
+
+    return (
+        np.ascontiguousarray(composite[top:bottom, left:right]),
+        (top, left, kept_height, kept_width),
+    )
+
+
+def crop_low_signal_border(
+    composite: np.ndarray,
+) -> tuple[np.ndarray, tuple[int, int, int, int] | None]:
+    """Trim a dead border off a single uploaded stack - no coverage map needed.
+
+    A Seestar / alt-az live stack carries a field-rotation + vignette footprint
+    at the frame edge: the outer rows/columns are built from far fewer sub-frames
+    (and the telescope's own background subtraction over-corrects there), so one
+    or more channels collapse well below the real sky level - the "red top /
+    marked corners" a hard stretch then exaggerates. It is a sharp edge falloff,
+    not a smooth gradient, so :func:`extract_background`'s degree-2 surface can
+    neither model it nor fit cleanly around it; cropping it first is what lets
+    the rest of the pre-stage work.
+
+    The dead-pixel mask is derived from the pixels themselves (a pixel many
+    robust sigma below the interior sky, in any channel), then the largest
+    centred rectangle that stays mostly live is kept - the same logic as
+    :func:`_crop_to_coverage`. Conservative by design: a legitimately dark or
+    mildly vignetted edge is left alone, and an implausibly large trim is
+    treated as a mis-detection and skipped. Returns ``(cropped, (top, left,
+    height, width))`` or ``(composite, None)`` when nothing is trimmed.
+    """
+    linear = np.nan_to_num(composite.astype(np.float32, copy=False))
+    planes = linear if linear.ndim == _COLOR_NDIM else linear[:, :, np.newaxis]
+    height, width, channels = planes.shape
+
+    scale = _BORDER_ESTIMATE_MAX_SIZE / max(height, width)
+    small = (
+        cv2.resize(
+            planes,
+            (max(round(width * scale), 16), max(round(height * scale), 16)),
+            interpolation=cv2.INTER_AREA,
+        )
+        if scale < 1.0
+        else planes
+    )
+    small = small if small.ndim == _COLOR_NDIM else small[:, :, np.newaxis]
+    small_h, small_w = small.shape[:2]
+
+    lo, hi = _BORDER_INTERIOR
+    interior = small[
+        round(small_h * lo) : round(small_h * hi), round(small_w * lo) : round(small_w * hi)
+    ].reshape(-1, channels)
+    sky = np.percentile(interior, _BORDER_SKY_PERCENTILE, axis=0)
+    mad = np.median(np.abs(interior - np.median(interior, axis=0)), axis=0) * 1.4826
+    floor = sky - _BORDER_SIGMA * mad - _TINY
+
+    live = (small >= floor).all(axis=2)
+    rows = live.mean(axis=1) >= _BORDER_KEEP_FRACTION
+    cols = live.mean(axis=0) >= _BORDER_KEEP_FRACTION
+    if not rows.any() or not cols.any():
+        return composite, None
+
+    inv = max(height, width) / max(small_h, small_w)
+    top = round(int(np.argmax(rows)) * inv)
+    bottom = height - round(int(np.argmax(rows[::-1])) * inv)
+    left = round(int(np.argmax(cols)) * inv)
+    right = width - round(int(np.argmax(cols[::-1])) * inv)
+    top, left = max(top, 0), max(left, 0)
+    bottom, right = min(bottom, height), min(right, width)
+    kept_height, kept_width = bottom - top, right - left
+
+    if (
+        height - kept_height > _BORDER_MAX_CROP_FRACTION * height
+        or width - kept_width > _BORDER_MAX_CROP_FRACTION * width
+    ):
+        return composite, None
+    if (height - kept_height) + (width - kept_width) < _MIN_CROP_MARGIN:
+        return composite, None
 
     return (
         np.ascontiguousarray(composite[top:bottom, left:right]),

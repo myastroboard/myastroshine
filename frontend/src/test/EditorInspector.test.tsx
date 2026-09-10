@@ -69,6 +69,7 @@ function makeProps(overrides: Partial<EditorInspectorProps> = {}): EditorInspect
       astrodexReturning: false,
       astrodexReturned: false,
       astrodexError: null,
+      defaultFilename: 'photo_myastroshine',
       onDownload: vi.fn(),
       onReturnToAstroDex: vi.fn(),
       onSaveAsPreset: vi.fn(),

@@ -372,6 +372,9 @@ export interface UploadResponse {
   histogram: HistogramData;
   uploadTimestamp: string;
   expiresAt: string;
+  /** The upload was linear stack data (FITS / 16-bit export) and opened as a
+   * composite session - the editor shows the linear "Stack" step. */
+  isStack: boolean;
 }
 
 export interface ProcessResponse {
@@ -396,6 +399,9 @@ export interface EditorSession {
   sessionId: string;
   histogram?: HistogramData;
   dimensions?: Dimensions;
+  /** Name of the uploaded file, when the session started from an upload - seeds
+   * the Export step's filename field. Absent for stacks and AstroDex handoffs. */
+  originalFilename?: string;
   /** True when the session is a stacked composite - unlocks the "Stack" step. */
   isStack?: boolean;
   /** Set when the session was opened from an AstroDex handoff - unlocks the

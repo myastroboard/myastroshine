@@ -140,6 +140,7 @@
     }
   },
   "export_panel": {
+    "filename_label": "File name",
     "download": "Download",
     "return_to_astrodex": "Send back to AstroDex",
     "returning": "Sending...",
