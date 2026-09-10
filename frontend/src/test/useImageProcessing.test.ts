@@ -225,6 +225,63 @@ describe('useImageProcessing.trackJob', () => {
     }
   });
 
+  it('updateParameter updates the value live but defers the render until release', async () => {
+    mocked.processImage.mockResolvedValue({
+      sessionId: 's1',
+      jobId: 'job-1',
+      status: 'queued',
+      previewUrl: '/api/preview/s1',
+      estimatedTimeSeconds: 8,
+      wsStatusUrl: '/ws/processing-status/job-1',
+    });
+
+    const { result } = renderHook(() => useImageProcessing('s1'));
+
+    act(() => result.current.updateParameter('contrast', 1.5));
+    act(() => result.current.updateParameter('contrast', 1.9));
+
+    expect(result.current.parameters.contrast).toBe(1.9); // the slider tracks live
+    expect(mocked.processImage).not.toHaveBeenCalled(); // ...but nothing rendered
+
+    await act(async () => {
+      document.dispatchEvent(new Event('pointerup'));
+    });
+
+    await waitFor(() => expect(mocked.processImage).toHaveBeenCalledTimes(1));
+    expect(mocked.processImage).toHaveBeenCalledWith(
+      's1',
+      expect.objectContaining({ contrast: 1.9 }),
+    );
+  });
+
+  it('falls back to a timer when no release event ever arrives', async () => {
+    vi.useFakeTimers();
+    try {
+      mocked.processImage.mockResolvedValue({
+        sessionId: 's1',
+        jobId: 'job-1',
+        status: 'queued',
+        previewUrl: '/api/preview/s1',
+        estimatedTimeSeconds: 8,
+        wsStatusUrl: '/ws/processing-status/job-1',
+      });
+
+      const { result } = renderHook(() => useImageProcessing('s1'));
+      act(() => result.current.updateParameter('exposure', 0.4));
+      expect(mocked.processImage).not.toHaveBeenCalled();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1200);
+      });
+      expect(mocked.processImage).toHaveBeenCalledWith(
+        's1',
+        expect.objectContaining({ exposure: 0.4 }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('a superseded job releases the slot and flushes the pending edit', async () => {
     let n = 0;
     mocked.processImage.mockImplementation(() =>

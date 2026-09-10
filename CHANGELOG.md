@@ -42,6 +42,10 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   origin never carries one and the allowlist is checked against a slash-stripped
   `callback_base`. The allowlist match also now enforces a path boundary, so
   `https://board.example` no longer also authorises `https://board.example.evil`.
+- **Editor sliders and tone curves now render on release, not on a timer.**
+  Dragging slowly, or pausing mid-drag, no longer kicks off a render before you
+  let go - the value tracks live and the pipeline runs on pointer-up / key-up
+  (with a 1.2 s fallback if a release event never arrives).
 
 ## [0.4.0] - 2026-09-09
 

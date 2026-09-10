@@ -54,6 +54,30 @@ test('adjusting a slider refreshes the processed preview', async ({ page }) => {
   expect(await page.locator('img[alt="Original"]').getAttribute('src')).toContain('original=true');
 });
 
+test('a slider renders when released, not mid-drag', async ({ page }) => {
+  await openEditor(page);
+  await openStep(page, 'Light');
+
+  let renders = 0;
+  page.on('request', (r) => {
+    if (r.url().includes('/api/process/') && r.method() === 'POST') renders += 1;
+  });
+
+  const slider = page.getByRole('slider', { name: 'Contrast' });
+  const box = (await slider.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  for (const frac of [0.6, 0.75, 0.9]) {
+    await page.mouse.move(box.x + box.width * frac, box.y + box.height / 2);
+    await page.waitForTimeout(700); // a pause a time-based debounce would have fired on
+  }
+  expect(renders).toBe(0);
+
+  await page.mouse.up();
+  await page.waitForResponse((r) => r.url().includes('/api/process/') && r.ok());
+  expect(renders).toBe(1);
+});
+
 test('the before/after divider drags without selecting content', async ({ page }) => {
   await openEditor(page);
 

@@ -19,11 +19,17 @@ import {
   type StarlessEngine,
 } from '@/types';
 
-const DEBOUNCE_MS = 500;
+// A slider / curve edit renders when the control is *released* (pointer up, key
+// up), not on a timer - so dragging slowly, or pausing mid-drag, never kicks off
+// a render before you let go. This fallback only fires if no release event ever
+// arrives (e.g. the pointer was released outside the window).
+const SETTLE_FALLBACK_MS = 1200;
 
 /**
- * Owns the parameter state for a session and pushes debounced updates to the
- * backend, tracking job status over the WebSocket.
+ * Owns the parameter state for a session and pushes updates to the backend,
+ * tracking job status over the WebSocket. Slider / curve edits update the value
+ * live but defer the render until the control is released; everything else
+ * (presets, resets, geometry, engine switches) renders at once.
  *
  * `previewVersion` increments every time a result finishes; callers append it to
  * the preview URL so the browser re-fetches the (same-URL) processed image.
@@ -37,6 +43,10 @@ export function useImageProcessing(sessionId: string) {
   const [previewVersion, setPreviewVersion] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // The latest value from a slider / curve the user is still holding. Rendered
+  // by `flushHeld` when they release (see the pointerup / keyup effect), or by
+  // the `SETTLE_FALLBACK_MS` timer if no release event arrives.
+  const heldRef = useRef<ProcessingParameters | null>(null);
   const wsRef = useRef<ReturnType<typeof processingStatusClient> | null>(null);
   // Only one job is followed at a time. `busy` is set the moment a /process
   // starts and cleared when its job reaches a terminal state; params that arrive
@@ -125,6 +135,10 @@ export function useImageProcessing(sessionId: string) {
 
   const applyParameters = useCallback(
     async (next: ProcessingParameters) => {
+      // This `next` supersedes anything a slider was still holding, and lands
+      // before any fallback timer.
+      heldRef.current = null;
+      clearTimeout(debounceRef.current);
       // A job is already in flight - remember the latest state and let `settle`
       // send it when that job finishes. Unless that job has gone quiet for too
       // long (socket never connected, worker died): then proceed and let the
@@ -157,16 +171,44 @@ export function useImageProcessing(sessionId: string) {
 
   applyRef.current = (next: ProcessingParameters) => void applyParameters(next);
 
+  /** Render the value a slider / curve was holding, if any (called on release). */
+  const flushHeld = useCallback(() => {
+    const held = heldRef.current;
+    if (!held) {
+      return;
+    }
+    heldRef.current = null;
+    clearTimeout(debounceRef.current);
+    void applyParameters(held);
+  }, [applyParameters]);
+
+  // A slider / curve renders when the control commits. The native `change` event
+  // of a range input fires exactly then - on pointer release after a drag, on
+  // keyboard change, on blur - unlike React's `onChange` (the `input` event,
+  // which fires all through a drag). `flushHeld` no-ops when nothing is held, so
+  // a `change` from any other control is harmless. `pointerup` is a belt for a
+  // drag released outside the element before `change` fires.
+  useEffect(() => {
+    const commit = () => flushHeld();
+    document.addEventListener('change', commit, true);
+    document.addEventListener('pointerup', commit);
+    return () => {
+      document.removeEventListener('change', commit, true);
+      document.removeEventListener('pointerup', commit);
+    };
+  }, [flushHeld]);
+
   const updateParameter = useCallback(
     (key: SliderParameterKey, value: number) => {
       setParameters((prev) => {
         const next = { ...prev, [key]: value };
+        heldRef.current = next; // rendered on release, or by the fallback timer
         clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(() => void applyParameters(next), DEBOUNCE_MS);
+        debounceRef.current = setTimeout(flushHeld, SETTLE_FALLBACK_MS);
         return next;
       });
     },
-    [applyParameters],
+    [flushHeld],
   );
 
   /** Switch the star-removal / denoise backend. Applied at once, not debounced -
@@ -200,12 +242,13 @@ export function useImageProcessing(sessionId: string) {
     <K extends keyof StackParameters>(key: K, value: StackParameters[K]) => {
       setParameters((prev) => {
         const next = { ...prev, stack: { ...prev.stack, [key]: value } };
+        heldRef.current = next; // rendered on release, or by the fallback timer
         clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(() => void applyParameters(next), DEBOUNCE_MS);
+        debounceRef.current = setTimeout(flushHeld, SETTLE_FALLBACK_MS);
         return next;
       });
     },
-    [applyParameters],
+    [flushHeld],
   );
 
   /** `channel` picks which curve field (see CURVE_CHANNEL_FIELD) gets the new points. */
@@ -214,12 +257,13 @@ export function useImageProcessing(sessionId: string) {
       const field = CURVE_CHANNEL_FIELD[channel];
       setParameters((prev) => {
         const next = { ...prev, [field]: points };
+        heldRef.current = next; // rendered when the curve point is dropped
         clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(() => void applyParameters(next), DEBOUNCE_MS);
+        debounceRef.current = setTimeout(flushHeld, SETTLE_FALLBACK_MS);
         return next;
       });
     },
-    [applyParameters],
+    [flushHeld],
   );
 
   /** Commit a new framing (crop tool "Done") - processed immediately. */
@@ -287,6 +331,7 @@ export function useImageProcessing(sessionId: string) {
    * (e.g. a preset the backend ran) - state only, no processing call.
    */
   const syncParameters = useCallback((next: ProcessingParameters) => {
+    heldRef.current = null;
     clearTimeout(debounceRef.current);
     setParameters(next);
   }, []);
