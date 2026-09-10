@@ -150,17 +150,19 @@ class ImageProcessingService:
 
     @_dtype_flexible
     def apply_vignette_correction(self, image: np.ndarray, amount: int) -> np.ndarray:
-        """Brighten toward the corners to counteract lens vignetting (0-100).
+        """Brighten (``+``) or darken (``-``) toward the corners (-100..100).
 
         A generic radial gain model, not a per-lens calibrated profile -
-        nothing here knows what lens took the shot. Gain grows with squared
-        distance from the image centre, capped so even at full strength the
-        corners gain at most 80%. The gain map depends only on position, not
-        image content, so (like `apply_gradient_reduction`) it's computed on a
-        small downscaled grid and resized up - full-resolution precision
-        would be wasted work for a smooth analytic function.
+        nothing here knows what lens took the shot. The gain departs from 1 with
+        squared distance from the image centre: ``+100`` lifts the corners by
+        80% (counteracting lens vignetting), ``-100`` drops them to 20%
+        (deepening a vignette for effect, or taming an over-corrected stack).
+        The gain map depends only on position, not image content, so (like
+        `apply_gradient_reduction`) it's computed on a small downscaled grid and
+        resized up - full-resolution precision would be wasted work for a smooth
+        analytic function.
         """
-        if amount <= 0:
+        if amount == 0:
             return image
         strength = amount / 100.0
         height, width = image.shape[:2]

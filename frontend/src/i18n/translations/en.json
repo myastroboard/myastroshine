@@ -218,6 +218,8 @@
     "show_star_mask": "Show star mask",
     "sources_count": "{count} sources",
     "about_param_aria": "About {label}",
+    "revert_aria": "Revert {label} to its previous value",
+    "revert_title": "Back to {value}",
     "params": {
       "contrast": {
         "label": "Contrast",
@@ -244,8 +246,8 @@
         "hint": "Pushes the black clipping point - narrower and more aggressive than Shadows, only the near-black tail."
       },
       "vignetteCorrection": {
-        "label": "Vignette correction",
-        "hint": "Brightens the corners to counteract lens vignetting."
+        "label": "Vignette",
+        "hint": "Positive brightens the corners (counteracts lens vignetting); negative darkens them (deepen a vignette, or tame an over-corrected stack)."
       },
       "gradientReduction": {
         "label": "Gradient reduction",

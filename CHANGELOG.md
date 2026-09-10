@@ -33,6 +33,13 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   warms the image, higher K cools it - the hint said the opposite and is fixed.
   The backend still accepts any value in range; an older preset's off-stop value
   shows verbatim with the thumb on the nearest stop.
+- **Each editor slider gets a one-step revert.** The value a slider held before
+  your current run of edits is remembered, and a small back-arrow appears next
+  to that slider (only the one you're adjusting) to put it straight back. Cleared
+  by a preset, a section reset, or a milestone restore.
+- **Vignette is now signed (-100..100).** Positive still brightens the corners
+  (lens-vignetting correction); negative darkens them - to deepen a vignette for
+  effect, or tame an over-corrected stack.
 
 ### Fixed
 

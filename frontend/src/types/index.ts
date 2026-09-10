@@ -275,7 +275,7 @@ const PARAMETER_BOUNDS: ParameterBound[] = [
   { key: 'shadows', min: -1.0, max: 1.0, step: 0.01 },
   { key: 'whites', min: -1.0, max: 1.0, step: 0.01 },
   { key: 'blacks', min: -1.0, max: 1.0, step: 0.01 },
-  { key: 'vignetteCorrection', min: 0, max: 100, step: 1 },
+  { key: 'vignetteCorrection', min: -100, max: 100, step: 1 },
   { key: 'gradientReduction', min: 0, max: 100, step: 1 },
   { key: 'dehaze', min: 0, max: 100, step: 1 },
   { key: 'clarity', min: -1.0, max: 1.0, step: 0.01 },

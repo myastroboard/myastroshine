@@ -282,6 +282,48 @@ describe('useImageProcessing.trackJob', () => {
     }
   });
 
+  it('remembers a slider value before an edit run and reverts to it', async () => {
+    mocked.processImage.mockResolvedValue({
+      sessionId: 's1',
+      jobId: 'job-1',
+      status: 'queued',
+      previewUrl: '/api/preview/s1',
+      estimatedTimeSeconds: 8,
+      wsStatusUrl: '/ws/processing-status/job-1',
+    });
+
+    const { result } = renderHook(() => useImageProcessing('s1'));
+    expect(result.current.sliderRevert).toBeNull();
+
+    act(() => result.current.updateParameter('contrast', 1.5));
+    act(() => result.current.updateParameter('contrast', 1.8));
+    // captured once, at the value before the run (DEFAULT contrast is 1.0)
+    expect(result.current.sliderRevert).toEqual({ key: 'contrast', value: 1.0 });
+
+    await act(async () => {
+      result.current.revertSlider();
+    });
+    expect(result.current.parameters.contrast).toBe(1.0);
+    expect(result.current.sliderRevert).toBeNull();
+    await waitFor(() =>
+      expect(mocked.processImage).toHaveBeenCalledWith(
+        's1',
+        expect.objectContaining({ contrast: 1.0 }),
+      ),
+    );
+  });
+
+  it('moves the revert target to whichever slider is touched, and a reset clears it', () => {
+    const { result } = renderHook(() => useImageProcessing('s1'));
+
+    act(() => result.current.updateParameter('contrast', 1.5));
+    act(() => result.current.updateParameter('exposure', 0.3));
+    expect(result.current.sliderRevert).toEqual({ key: 'exposure', value: 0 });
+
+    act(() => result.current.resetParameters());
+    expect(result.current.sliderRevert).toBeNull();
+  });
+
   it('a superseded job releases the slot and flushes the pending edit', async () => {
     let n = 0;
     mocked.processImage.mockImplementation(() =>

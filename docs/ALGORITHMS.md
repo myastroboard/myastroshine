@@ -102,13 +102,15 @@ Applied in this order to minimize artifacts (`apply_parameters`):
    crop rectangle. Runs first; it changes the working dimensions.
 1. **White balance** (`temperature`, `tint`) - per-channel gain in linear RGB;
    6500K is neutral. Warm shifts reduce blue, cool shifts boost blue.
-2. **Vignette correction** (`vignette_correction`, 0-100) - a generic radial
-   gain model (not a per-lens calibrated profile), `gain = 1 + amount *
+2. **Vignette** (`vignette_correction`, -100..100) - a generic radial gain
+   model (not a per-lens calibrated profile), `gain = 1 + (amount/100) *
    dist^2 * 0.8` where `dist` is the normalized distance from centre (0 at
-   centre, 1 at the corners). Purely geometric - depends on position, not
-   image content - so the gain map is computed on a small downscaled grid
-   (128px) and resized up; full-resolution precision would be wasted work for
-   a smooth analytic function.
+   centre, 1 at the corners). `+100` lifts the corners by 80% (counteracts lens
+   vignetting), `-100` drops them to 20% (deepen a vignette for effect, or tame
+   an over-corrected stack). Purely geometric - depends on position, not image
+   content - so the gain map is computed on a small downscaled grid (128px) and
+   resized up; full-resolution precision would be wasted work for a smooth
+   analytic function.
 3. **Gradient reduction** (`gradient_reduction`, 0-100) - flattens smooth
    background gradients (light pollution, sky glow). A very large Gaussian
    blur approximates the background; genuine DSO structure is

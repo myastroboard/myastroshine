@@ -3,6 +3,7 @@ import { FramingControls } from '@/components/FramingControls';
 import { PresetButtons } from '@/components/PresetButtons';
 import { SliderGroup } from '@/components/SliderGroup';
 import { ToneCurveEditor } from '@/components/ToneCurveEditor';
+import type { SliderRevert } from '@/hooks/useImageProcessing';
 import { useTranslation } from '@/hooks/useTranslation';
 import {
   DEFAULT_STACK_PARAMETERS,
@@ -100,6 +101,9 @@ export interface EditorInspectorProps {
   onStepChange: (step: EditorStepId) => void;
   parameters: ProcessingParameters;
   onParameterChange: (key: SliderParameterKey, value: number) => void;
+  /** The active slider + its pre-edit value, for the one-step revert arrow. */
+  sliderRevert: SliderRevert | null;
+  onSliderRevert: () => void;
   onResetSection: (keys: SliderParameterKey[]) => void;
   onCurveChange: (channel: CurveChannel, points: CurvePoint[]) => void;
   onResetCurves: () => void;
@@ -188,6 +192,8 @@ export function EditorInspector(props: EditorInspectorProps) {
           parameters={parameters}
           onParameterChange={props.onParameterChange}
           isProcessing={props.isProcessing}
+          revert={props.sliderRevert}
+          onRevert={props.onSliderRevert}
         />
       )}
 
@@ -196,6 +202,8 @@ export function EditorInspector(props: EditorInspectorProps) {
           parameters={parameters}
           onParameterChange={props.onParameterChange}
           isProcessing={props.isProcessing}
+          revert={props.sliderRevert}
+          onRevert={props.onSliderRevert}
           stars={props.stars}
         />
       )}
@@ -205,6 +213,8 @@ export function EditorInspector(props: EditorInspectorProps) {
           parameters={parameters}
           onParameterChange={props.onParameterChange}
           isProcessing={props.isProcessing}
+          revert={props.sliderRevert}
+          onRevert={props.onSliderRevert}
           denoise={props.denoise}
         />
       )}
@@ -398,11 +408,15 @@ function StarsPanel({
   parameters,
   onParameterChange,
   isProcessing,
+  revert,
+  onRevert,
   stars,
 }: {
   parameters: ProcessingParameters;
   onParameterChange: (key: SliderParameterKey, value: number) => void;
   isProcessing: boolean;
+  revert: SliderRevert | null;
+  onRevert: () => void;
   stars: StarsBundle;
 }) {
   const { t } = useTranslation();
@@ -415,6 +429,8 @@ function StarsPanel({
         parameters={parameters}
         onParameterChange={onParameterChange}
         isProcessing={isProcessing}
+        revert={revert}
+        onRevert={onRevert}
       />
     </div>
   );
@@ -439,6 +455,8 @@ function StarsPanel({
           parameters={parameters}
           onParameterChange={onParameterChange}
           isProcessing={isProcessing}
+          revert={revert}
+          onRevert={onRevert}
         />
       </div>
       <div className="flex flex-col gap-2">
@@ -451,6 +469,8 @@ function StarsPanel({
           parameters={parameters}
           onParameterChange={onParameterChange}
           isProcessing={isProcessing}
+          revert={revert}
+          onRevert={onRevert}
         />
         <StarMaskToggle {...stars} />
       </div>
@@ -506,11 +526,15 @@ function DetailPanel({
   parameters,
   onParameterChange,
   isProcessing,
+  revert,
+  onRevert,
   denoise,
 }: {
   parameters: ProcessingParameters;
   onParameterChange: (key: SliderParameterKey, value: number) => void;
   isProcessing: boolean;
+  revert: SliderRevert | null;
+  onRevert: () => void;
   denoise: DenoiseBundle;
 }) {
   const { t } = useTranslation();
@@ -521,6 +545,8 @@ function DetailPanel({
         parameters={parameters}
         onParameterChange={onParameterChange}
         isProcessing={isProcessing}
+        revert={revert}
+        onRevert={onRevert}
       />
       <div className="flex flex-col gap-2">
         <span className="text-xs font-medium text-ink">{t('detail_panel.denoise.heading')}</span>
@@ -539,6 +565,8 @@ function DetailPanel({
           parameters={parameters}
           onParameterChange={onParameterChange}
           isProcessing={isProcessing}
+          revert={revert}
+          onRevert={onRevert}
         />
       </div>
       <SliderGroup
@@ -546,6 +574,8 @@ function DetailPanel({
         parameters={parameters}
         onParameterChange={onParameterChange}
         isProcessing={isProcessing}
+        revert={revert}
+        onRevert={onRevert}
       />
     </div>
   );

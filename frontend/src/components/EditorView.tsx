@@ -85,6 +85,8 @@ export function EditorView({ session, onExit }: EditorViewProps) {
     progress,
     currentStep,
     previewVersion,
+    sliderRevert,
+    revertSlider,
     updateParameter,
     updateStarRemovalEngine,
     updateDenoiseEngine,
@@ -269,6 +271,11 @@ export function EditorView({ session, onExit }: EditorViewProps) {
     updateParameter(key, value);
   }
 
+  function handleSliderRevert(): void {
+    clearActivePreset();
+    revertSlider();
+  }
+
   function handleResetAll(): void {
     clearActivePreset();
     resetParameters();
@@ -375,6 +382,8 @@ export function EditorView({ session, onExit }: EditorViewProps) {
         onStepChange={handleStepChange}
         parameters={parameters}
         onParameterChange={handleParameterChange}
+        sliderRevert={sliderRevert}
+        onSliderRevert={handleSliderRevert}
         onResetSection={handleResetSection}
         onCurveChange={handleCurveChange}
         onResetCurves={handleResetCurves}

@@ -78,6 +78,27 @@ test('a slider renders when released, not mid-drag', async ({ page }) => {
   expect(renders).toBe(1);
 });
 
+test('a per-slider revert arrow undoes the last edit to that slider', async ({ page }) => {
+  await openEditor(page);
+  await openStep(page, 'Light');
+
+  const contrast = page.getByRole('slider', { name: 'Contrast' });
+  await contrast.focus();
+  await contrast.press('ArrowRight');
+  await contrast.press('ArrowRight');
+
+  const revert = page.getByRole('button', { name: /revert contrast/i });
+  await expect(revert).toBeVisible();
+  await expect(page.getByRole('button', { name: /revert exposure/i })).toHaveCount(0);
+
+  await Promise.all([
+    page.waitForResponse((r) => r.url().includes('/api/process/') && r.ok()),
+    revert.click(),
+  ]);
+  await expect(contrast).toHaveValue('1'); // back to the default it held before
+  await expect(revert).toHaveCount(0); // and the arrow is gone
+});
+
 test('the before/after divider drags without selecting content', async ({ page }) => {
   await openEditor(page);
 

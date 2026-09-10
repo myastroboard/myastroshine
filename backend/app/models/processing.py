@@ -120,7 +120,7 @@ class ProcessingParameters(BaseModel):
     #: runs. Ignored when ``denoise == 0``. ``chroma_denoise`` is always classical.
     denoise_engine: DenoiseEngine = "classic"
     chroma_denoise: int = Field(default=0, ge=0, le=100)
-    vignette_correction: int = Field(default=0, ge=0, le=100)
+    vignette_correction: int = Field(default=0, ge=-100, le=100)
     gradient_reduction: int = Field(default=0, ge=0, le=100)
     dehaze: int = Field(default=0, ge=0, le=100)
     star_reduction: int = Field(default=0, ge=0, le=100)

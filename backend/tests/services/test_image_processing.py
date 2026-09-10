@@ -109,6 +109,18 @@ def test_vignette_correction_brightens_corners_more_than_centre(
     assert centre == pytest.approx(100.0, abs=1.0)  # centre gain is ~1.0
 
 
+def test_negative_vignette_darkens_the_corners(service: ImageProcessingService) -> None:
+    flat = np.full((200, 200, 3), 180, dtype=np.uint8)
+    dark = service.apply_vignette_correction(flat, -100)
+    mild = service.apply_vignette_correction(flat, -40)
+
+    centre = dark[100, 100].astype(np.float32).mean()
+    assert centre == pytest.approx(180.0, abs=1.0)  # centre is untouched
+    assert dark[5, 5].astype(np.float32).mean() < centre * 0.4  # corners clearly crushed
+    # strength scales: -40 darkens the corner less than -100
+    assert mild[5, 5].astype(np.float32).mean() > dark[5, 5].astype(np.float32).mean()
+
+
 def test_gradient_reduction_off_is_identity(
     service: ImageProcessingService, sample_image: np.ndarray
 ) -> None:

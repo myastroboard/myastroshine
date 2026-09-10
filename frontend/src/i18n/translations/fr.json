@@ -218,6 +218,8 @@
     "show_star_mask": "Afficher le masque d'étoiles",
     "sources_count": "{count} sources",
     "about_param_aria": "À propos de {label}",
+    "revert_aria": "Rétablir {label} à sa valeur précédente",
+    "revert_title": "Revenir à {value}",
     "params": {
       "contrast": {
         "label": "Contraste",
@@ -244,8 +246,8 @@
         "hint": "Déplace le point de coupure des noirs - plus étroit et plus marqué que Ombres, seulement la frange proche du noir pur."
       },
       "vignetteCorrection": {
-        "label": "Correction du vignetage",
-        "hint": "Éclaircit les coins pour contrer le vignetage de l'objectif."
+        "label": "Vignetage",
+        "hint": "Positif éclaircit les coins (contre le vignetage de l'objectif) ; négatif les assombrit (accentuer un vignetage, ou rattraper un stack sur-corrigé)."
       },
       "gradientReduction": {
         "label": "Réduction du gradient",

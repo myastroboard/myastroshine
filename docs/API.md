@@ -161,7 +161,7 @@ the upload opened as a composite session (linear stack data, above).
 | denoise | 0 | 100 | 0 | int |
 | denoise_engine | - | - | `"classic"` | `"classic"` \| `"deepsnr"` |
 | chroma_denoise | 0 | 100 | 0 | int |
-| vignette_correction | 0 | 100 | 0 | int |
+| vignette_correction | -100 | 100 | 0 | int (+brightens corners, -darkens) |
 | gradient_reduction | 0 | 100 | 0 | int |
 | dehaze | 0 | 100 | 0 | int |
 | star_reduction | 0 | 100 | 0 | int |

@@ -92,4 +92,34 @@ describe('SliderGroup', () => {
     expect(screen.getByLabelText('Temperature')).toHaveValue('4'); // nearest: 6000 K
     expect(screen.getByText(/Warm · 6200 K/)).toBeInTheDocument(); // shows the real value
   });
+
+  it('shows the revert arrow only next to the active slider and calls onRevert', () => {
+    const onRevert = vi.fn();
+    const { rerender } = render(
+      <SliderGroup
+        keys={['contrast', 'exposure']}
+        parameters={{ ...DEFAULT_PARAMETERS, contrast: 1.6 }}
+        revert={{ key: 'contrast', value: 1 }}
+        onRevert={onRevert}
+        onParameterChange={vi.fn()}
+      />,
+    );
+
+    const revert = screen.getByRole('button', { name: /revert contrast/i });
+    expect(screen.queryByRole('button', { name: /revert exposure/i })).not.toBeInTheDocument();
+    fireEvent.click(revert);
+    expect(onRevert).toHaveBeenCalledTimes(1);
+
+    // gone once the value is back at the revert target
+    rerender(
+      <SliderGroup
+        keys={['contrast']}
+        parameters={DEFAULT_PARAMETERS}
+        revert={{ key: 'contrast', value: 1 }}
+        onRevert={onRevert}
+        onParameterChange={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /revert contrast/i })).not.toBeInTheDocument();
+  });
 });

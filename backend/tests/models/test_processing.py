@@ -145,6 +145,12 @@ def test_new_percentage_fields_out_of_range_is_rejected() -> None:
     for field in ("chroma_denoise", "vignette_correction", "gradient_reduction", "dehaze"):
         with pytest.raises(ValidationError):
             ProcessingParameters(**{field: 150})
+    # vignette_correction is signed (-100..100 - darken or brighten the corners)
+    assert ProcessingParameters(vignette_correction=-100).vignette_correction == -100
+    with pytest.raises(ValidationError):
+        ProcessingParameters(vignette_correction=-150)
+    with pytest.raises(ValidationError):
+        ProcessingParameters(gradient_reduction=-1)  # the others stay 0..100
 
 
 def test_starless_fields_default_off_and_reject_out_of_range() -> None:

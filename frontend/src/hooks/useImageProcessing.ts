@@ -34,6 +34,13 @@ const SETTLE_FALLBACK_MS = 1200;
  * `previewVersion` increments every time a result finishes; callers append it to
  * the preview URL so the browser re-fetches the (same-URL) processed image.
  */
+/** The value a slider held before the user's current run of edits to it - drives
+ * the one-step "revert" arrow that shows next to whichever slider is active. */
+export interface SliderRevert {
+  key: SliderParameterKey;
+  value: number;
+}
+
 export function useImageProcessing(sessionId: string) {
   const { t } = useTranslation();
   const [parameters, setParameters] = useState<ProcessingParameters>(DEFAULT_PARAMETERS);
@@ -42,6 +49,12 @@ export function useImageProcessing(sessionId: string) {
   const [currentStep, setCurrentStep] = useState('');
   const [previewVersion, setPreviewVersion] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  // The slider currently being edited + its value before this edit run, or null.
+  // `sliderRevertRef` mirrors it so the updaters can read/set it without a dep.
+  const [sliderRevert, setSliderRevert] = useState<SliderRevert | null>(null);
+  const sliderRevertRef = useRef<SliderRevert | null>(null);
+  const parametersRef = useRef(parameters);
+  parametersRef.current = parameters;
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // The latest value from a slider / curve the user is still holding. Rendered
   // by `flushHeld` when they release (see the pointerup / keyup effect), or by
@@ -198,8 +211,21 @@ export function useImageProcessing(sessionId: string) {
     };
   }, [flushHeld]);
 
+  const forgetSliderRevert = useCallback(() => {
+    if (sliderRevertRef.current !== null) {
+      sliderRevertRef.current = null;
+      setSliderRevert(null);
+    }
+  }, []);
+
   const updateParameter = useCallback(
     (key: SliderParameterKey, value: number) => {
+      // First touch of this slider in the current run: remember where it was, so
+      // the revert arrow next to it can put it back in one click.
+      if (sliderRevertRef.current?.key !== key) {
+        sliderRevertRef.current = { key, value: parametersRef.current[key] as number };
+        setSliderRevert(sliderRevertRef.current);
+      }
       setParameters((prev) => {
         const next = { ...prev, [key]: value };
         heldRef.current = next; // rendered on release, or by the fallback timer
@@ -210,6 +236,21 @@ export function useImageProcessing(sessionId: string) {
     },
     [flushHeld],
   );
+
+  /** Put the active slider back to the value it held before this edit run. */
+  const revertSlider = useCallback(() => {
+    const target = sliderRevertRef.current;
+    if (!target) {
+      return;
+    }
+    sliderRevertRef.current = null;
+    setSliderRevert(null);
+    heldRef.current = null;
+    clearTimeout(debounceRef.current);
+    const next = { ...parametersRef.current, [target.key]: target.value };
+    setParameters(next);
+    void applyParameters(next);
+  }, [applyParameters]);
 
   /** Switch the star-removal / denoise backend. Applied at once, not debounced -
    * it's a deliberate choice and an ML pass is long; there's nothing to coalesce. */
@@ -280,9 +321,10 @@ export function useImageProcessing(sessionId: string) {
   );
 
   const resetParameters = useCallback(() => {
+    forgetSliderRevert();
     setParameters(DEFAULT_PARAMETERS);
     void applyParameters(DEFAULT_PARAMETERS);
-  }, [applyParameters]);
+  }, [applyParameters, forgetSliderRevert]);
 
   /** Reset the "Stack" step (stretch / background extraction / colour) to defaults. */
   const resetStack = useCallback(() => {
@@ -313,6 +355,7 @@ export function useImageProcessing(sessionId: string) {
   /** Reset just the given parameters (e.g. one section's sliders) to default. */
   const resetKeys = useCallback(
     (keys: SliderParameterKey[]) => {
+      forgetSliderRevert();
       setParameters((prev) => {
         const next = { ...prev };
         for (const key of keys) {
@@ -323,18 +366,22 @@ export function useImageProcessing(sessionId: string) {
         return next;
       });
     },
-    [applyParameters],
+    [applyParameters, forgetSliderRevert],
   );
 
   /**
    * Sync the sliders to parameters that were already applied elsewhere
    * (e.g. a preset the backend ran) - state only, no processing call.
    */
-  const syncParameters = useCallback((next: ProcessingParameters) => {
-    heldRef.current = null;
-    clearTimeout(debounceRef.current);
-    setParameters(next);
-  }, []);
+  const syncParameters = useCallback(
+    (next: ProcessingParameters) => {
+      forgetSliderRevert();
+      heldRef.current = null;
+      clearTimeout(debounceRef.current);
+      setParameters(next);
+    },
+    [forgetSliderRevert],
+  );
 
   /**
    * Restore a full parameter snapshot (an edit milestone) - like
@@ -343,11 +390,12 @@ export function useImageProcessing(sessionId: string) {
    */
   const restoreParameters = useCallback(
     (next: ProcessingParameters) => {
+      forgetSliderRevert();
       clearTimeout(debounceRef.current);
       setParameters(next);
       void applyParameters(next);
     },
-    [applyParameters],
+    [applyParameters, forgetSliderRevert],
   );
 
   useEffect(
@@ -365,6 +413,8 @@ export function useImageProcessing(sessionId: string) {
     currentStep,
     previewVersion,
     error,
+    sliderRevert,
+    revertSlider,
     updateParameter,
     updateStarRemovalEngine,
     updateDenoiseEngine,

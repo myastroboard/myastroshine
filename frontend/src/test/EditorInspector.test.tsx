@@ -15,6 +15,8 @@ function makeProps(overrides: Partial<EditorInspectorProps> = {}): EditorInspect
     onStepChange: vi.fn(),
     parameters: DEFAULT_PARAMETERS,
     onParameterChange: vi.fn(),
+    sliderRevert: null,
+    onSliderRevert: vi.fn(),
     onResetSection: vi.fn(),
     onCurveChange: vi.fn(),
     onResetCurves: vi.fn(),

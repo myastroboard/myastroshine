@@ -1,4 +1,5 @@
 import { useTranslation } from '@/hooks/useTranslation';
+import type { SliderRevert } from '@/hooks/useImageProcessing';
 import {
   NEUTRAL_TEMPERATURE,
   PARAMETER_BOUND_BY_KEY,
@@ -14,6 +15,10 @@ export interface SliderGroupProps {
   parameters: ProcessingParameters;
   onParameterChange: (key: SliderParameterKey, value: number) => void;
   isProcessing?: boolean;
+  /** The active slider + the value it held before the current edit run - the
+   * "revert" arrow shows next to that one slider only. */
+  revert?: SliderRevert | null;
+  onRevert?: () => void;
 }
 
 /** How many decimals a value at this step should display - 0.01 -> 2, 1 -> 0. */
@@ -29,8 +34,14 @@ export function SliderGroup({
   parameters,
   onParameterChange,
   isProcessing = false,
+  revert = null,
+  onRevert,
 }: SliderGroupProps) {
   const { t } = useTranslation();
+
+  /** The value the revert arrow for `key` would restore, or null (no arrow). */
+  const revertValue = (key: SliderParameterKey): number | null =>
+    revert && revert.key === key && revert.value !== parameters[key] ? revert.value : null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -42,6 +53,8 @@ export function SliderGroup({
               value={parameters.temperature}
               isProcessing={isProcessing}
               onChange={(value) => onParameterChange('temperature', value)}
+              revertValue={revertValue('temperature')}
+              onRevert={onRevert}
             />
           );
         }
@@ -51,6 +64,7 @@ export function SliderGroup({
         }
         const label = t(`slider_panel.params.${key}.label`);
         const hint = t(`slider_panel.params.${key}.hint`);
+        const undoTo = revertValue(key);
         return (
           <div key={key} className="flex flex-col gap-1.5 text-sm">
             <span className="flex items-baseline justify-between">
@@ -58,7 +72,15 @@ export function SliderGroup({
                 <label htmlFor={`param-${key}`}>{label}</label>
                 <ParameterHint paramKey={key} label={label} hint={hint} />
               </span>
-              <span className="text-xs tabular-nums text-faint">
+              <span className="flex items-center gap-1.5 text-xs tabular-nums text-faint">
+                {undoTo !== null && (
+                  <RevertButton
+                    label={label}
+                    previous={undoTo.toFixed(decimalPlaces(bound.step))}
+                    disabled={isProcessing}
+                    onClick={onRevert}
+                  />
+                )}
                 {parameters[key].toFixed(decimalPlaces(bound.step))}
               </span>
             </span>
@@ -80,6 +102,42 @@ export function SliderGroup({
   );
 }
 
+/** One-step "undo" for the slider being adjusted: back to its value before this
+ * run of edits. Only rendered next to the active slider (see `SliderGroup`). */
+function RevertButton({
+  label,
+  previous,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  previous: string;
+  disabled: boolean;
+  onClick?: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={t('slider_panel.revert_aria', { label })}
+      title={t('slider_panel.revert_title', { value: previous })}
+      className="grid h-4 w-4 shrink-0 place-items-center rounded text-muted outline-none transition-colors hover:text-accent focus-visible:text-accent disabled:opacity-40"
+    >
+      <svg viewBox="0 0 12 12" className="h-3.5 w-3.5" fill="none" aria-hidden>
+        <path
+          d="M3.4 4.6h3.35a2.75 2.75 0 1 1 0 5.5H4M3.4 4.6 5.3 2.7M3.4 4.6l1.9 1.9"
+          stroke="currentColor"
+          strokeWidth="1.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </button>
+  );
+}
+
 /**
  * White balance: a slider that snaps to the standard Kelvin stops
  * ({@link STANDARD_TEMPERATURES}) instead of a free ramp. The value stays in
@@ -91,10 +149,14 @@ function TemperatureRow({
   value,
   isProcessing,
   onChange,
+  revertValue,
+  onRevert,
 }: {
   value: number;
   isProcessing: boolean;
   onChange: (value: number) => void;
+  revertValue: number | null;
+  onRevert?: () => void;
 }) {
   const { t } = useTranslation();
   const label = t('slider_panel.params.temperature.label');
@@ -108,7 +170,15 @@ function TemperatureRow({
           <label htmlFor="param-temperature">{label}</label>
           <ParameterHint paramKey="temperature" label={label} hint={hint} />
         </span>
-        <span className="text-xs tabular-nums text-faint">
+        <span className="flex items-center gap-1.5 text-xs tabular-nums text-faint">
+          {revertValue !== null && (
+            <RevertButton
+              label={label}
+              previous={`${revertValue} K`}
+              disabled={isProcessing}
+              onClick={onRevert}
+            />
+          )}
           {t(`slider_panel.params.temperature.tone.${tone}`)} · {value} K
         </span>
       </span>
