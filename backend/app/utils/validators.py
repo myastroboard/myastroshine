@@ -48,8 +48,15 @@ def validate_image_extension(filename: str) -> str:
 def is_allowed_callback_url(url: str) -> bool:
     """True if ``url`` is on the AstroDex callback allowlist.
 
-    An empty allowlist allows nothing (fail closed) - configure at least one
-    entry in Settings before enabling AstroDex webhook delivery.
+    The match is on a path boundary: ``url`` must equal an allowlist entry or sit
+    directly beneath it (``entry`` then ``"/"``), so an entry ``https://board.example``
+    authorises ``https://board.example/api/...`` but never ``https://board.example.evil``.
+    Both sides are compared without a trailing slash (allowlist entries are already
+    normalised - see ``AppSettings._clean_url_list``).
+
+    An empty allowlist allows nothing (fail closed) - configure at least one entry
+    in Settings before enabling AstroDex webhook delivery.
     """
+    candidate = url.rstrip("/")
     allowlist = get_app_settings().astrodex_callback_urls
-    return bool(allowlist) and any(url.startswith(allowed) for allowed in allowlist)
+    return any(candidate == allowed or candidate.startswith(f"{allowed}/") for allowed in allowlist)

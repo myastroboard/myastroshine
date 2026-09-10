@@ -115,8 +115,16 @@ class AppSettings(BaseModel):
     @field_validator("cors_origins", "astrodex_callback_urls", mode="after")
     @classmethod
     def _clean_url_list(cls, value: list[str]) -> list[str]:
-        """Trim entries and drop blanks - an empty prefix would match every URL."""
-        return [item.strip() for item in value if item and item.strip()]
+        """Trim whitespace and any trailing slash, and drop blank entries.
+
+        A trailing slash is the usual copy-paste artefact and never what is meant
+        here: a CORS ``Origin`` header carries none, and the AstroDex allowlist is
+        matched against a slash-stripped ``callback_base`` (see
+        ``is_allowed_callback_url``), so ``https://host/`` would silently match
+        nothing. An empty entry is dropped - an empty prefix would match every URL.
+        """
+        cleaned = (item.strip().rstrip("/") for item in value)
+        return [item for item in cleaned if item]
 
     @field_validator("cors_origins", mode="after")
     @classmethod

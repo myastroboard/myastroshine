@@ -28,6 +28,15 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   deep sky target, not three independent per-channel stretches that lifted the
   sky to a milky grey and rebalanced the colour.
 
+### Fixed
+
+- A trailing slash on a **CORS origin** or **AstroDex callback allowlist** entry
+  in Settings is now stripped on save (`https://host/` -> `https://host`). A
+  pasted slash previously made the entry silently match nothing - the CORS
+  origin never carries one and the allowlist is checked against a slash-stripped
+  `callback_base`. The allowlist match also now enforces a path boundary, so
+  `https://board.example` no longer also authorises `https://board.example.evil`.
+
 ## [0.4.0] - 2026-09-09
 
 ### Changed

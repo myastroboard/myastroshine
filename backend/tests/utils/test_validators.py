@@ -64,3 +64,17 @@ def test_is_allowed_callback_url_matches_configured_prefix() -> None:
     save_app_settings({"astrodex_callback_urls": ["http://astrodex.test/"]})
     assert is_allowed_callback_url("http://astrodex.test/api/webhooks/enhanced-images")
     assert not is_allowed_callback_url("http://evil.test/x")
+
+
+def test_allowlist_entry_trailing_slash_is_normalised() -> None:
+    """A pasted ``https://host/`` still matches the slash-stripped callback_base."""
+    saved = save_app_settings({"astrodex_callback_urls": ["  https://board.example/  "]})
+    assert saved.astrodex_callback_urls == ["https://board.example"]
+    assert is_allowed_callback_url("https://board.example")
+    assert is_allowed_callback_url("https://board.example/api/astrodex/integration/source")
+
+
+def test_is_allowed_callback_url_enforces_a_path_boundary() -> None:
+    """An entry authorises its own subtree only - not a look-alike host."""
+    save_app_settings({"astrodex_callback_urls": ["https://board.example"]})
+    assert not is_allowed_callback_url("https://board.example.evil.test/x")
