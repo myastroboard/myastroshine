@@ -1,6 +1,9 @@
 import { useTranslation } from '@/hooks/useTranslation';
 import {
+  NEUTRAL_TEMPERATURE,
   PARAMETER_BOUND_BY_KEY,
+  STANDARD_TEMPERATURES,
+  temperatureIndex,
   type ProcessingParameters,
   type SliderParameterKey,
 } from '@/types';
@@ -32,6 +35,16 @@ export function SliderGroup({
   return (
     <div className="flex flex-col gap-3">
       {keys.map((key) => {
+        if (key === 'temperature') {
+          return (
+            <TemperatureRow
+              key={key}
+              value={parameters.temperature}
+              isProcessing={isProcessing}
+              onChange={(value) => onParameterChange('temperature', value)}
+            />
+          );
+        }
         const bound = PARAMETER_BOUND_BY_KEY[key];
         if (!bound) {
           return null;
@@ -63,6 +76,59 @@ export function SliderGroup({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * White balance: a slider that snaps to the standard Kelvin stops
+ * ({@link STANDARD_TEMPERATURES}) instead of a free ramp. The value stays in
+ * Kelvin (the backend contract is unchanged); the slider is a discrete index and
+ * the readout names the tone. A non-standard value from an older preset shows
+ * verbatim with the thumb parked on the nearest stop.
+ */
+function TemperatureRow({
+  value,
+  isProcessing,
+  onChange,
+}: {
+  value: number;
+  isProcessing: boolean;
+  onChange: (value: number) => void;
+}) {
+  const { t } = useTranslation();
+  const label = t('slider_panel.params.temperature.label');
+  const hint = t('slider_panel.params.temperature.hint');
+  const tone =
+    value < NEUTRAL_TEMPERATURE ? 'warm' : value > NEUTRAL_TEMPERATURE ? 'cool' : 'neutral';
+  return (
+    <div className="flex flex-col gap-1.5 text-sm">
+      <span className="flex items-baseline justify-between">
+        <span className="inline-flex items-center gap-1 text-muted">
+          <label htmlFor="param-temperature">{label}</label>
+          <ParameterHint paramKey="temperature" label={label} hint={hint} />
+        </span>
+        <span className="text-xs tabular-nums text-faint">
+          {t(`slider_panel.params.temperature.tone.${tone}`)} · {value} K
+        </span>
+      </span>
+      <input
+        id="param-temperature"
+        type="range"
+        className="slider"
+        min={0}
+        max={STANDARD_TEMPERATURES.length - 1}
+        step={1}
+        list="temperature-stops"
+        value={temperatureIndex(value)}
+        disabled={isProcessing}
+        onChange={(event) => onChange(STANDARD_TEMPERATURES[Number(event.target.value)])}
+      />
+      <datalist id="temperature-stops">
+        {STANDARD_TEMPERATURES.map((kelvin, index) => (
+          <option key={kelvin} value={index} label={`${kelvin} K`} />
+        ))}
+      </datalist>
     </div>
   );
 }

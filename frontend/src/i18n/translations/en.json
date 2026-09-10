@@ -301,7 +301,12 @@
       },
       "temperature": {
         "label": "Temperature",
-        "hint": "White balance: cooler (blue) toward 2000K, warmer (amber) toward 8000K."
+        "hint": "White balance: lower K warms the image (amber), higher K cools it (blue). 6500 K is neutral. Snaps to standard values.",
+        "tone": {
+          "warm": "Warm",
+          "neutral": "Neutral",
+          "cool": "Cool"
+        }
       },
       "tint": {
         "label": "Tint",

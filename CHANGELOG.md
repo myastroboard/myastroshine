@@ -27,6 +27,12 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   handoff, say) is stretched with one shared, colour-preserving transform and a
   deep sky target, not three independent per-channel stretches that lifted the
   sky to a milky grey and rebalanced the colour.
+- **The white-balance Temperature slider snaps to standard Kelvin stops**
+  (2000 / 3200 / 4500 / 5500 / 6000 / 6500 / 7000 / 7500 / 8000 K) instead of a
+  free 50 K ramp, and the readout names the tone ("Neutral · 6500 K"). Lower K
+  warms the image, higher K cools it - the hint said the opposite and is fixed.
+  The backend still accepts any value in range; an older preset's off-stop value
+  shows verbatim with the thumb on the nearest stop.
 
 ### Fixed
 

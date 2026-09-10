@@ -39,7 +39,7 @@ _DEFAULTS: list[JsonDict] = [
             "vibrance": 1.2,
             "denoise": 20,
             "sharpness": 1.2,
-            "temperature": 6200,
+            "temperature": 6000,
         },
     },
     {

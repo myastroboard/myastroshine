@@ -297,6 +297,30 @@ export const PARAMETER_BOUND_BY_KEY: Partial<Record<SliderParameterKey, Paramete
   Object.fromEntries(PARAMETER_BOUNDS.map((bound) => [bound.key, bound]));
 
 /**
+ * White-balance temperature snaps to these standard Kelvin values - the slider
+ * is a discrete index over them rather than a free 2000-8000 K ramp. Lower K
+ * warms the image (amber), higher K cools it (blue); {@link NEUTRAL_TEMPERATURE}
+ * is the no-op. The backend still accepts any value in range (an older preset,
+ * a direct API call), so {@link temperatureIndex} maps one to the nearest stop.
+ */
+export const STANDARD_TEMPERATURES = [
+  2000, 3200, 4500, 5500, 6000, 6500, 7000, 7500, 8000,
+] as const;
+
+export const NEUTRAL_TEMPERATURE = 6500;
+
+/** Index of the standard value nearest `kelvin` (ties resolve to the warmer stop). */
+export function temperatureIndex(kelvin: number): number {
+  let best = 0;
+  for (let i = 1; i < STANDARD_TEMPERATURES.length; i += 1) {
+    if (Math.abs(STANDARD_TEMPERATURES[i] - kelvin) < Math.abs(STANDARD_TEMPERATURES[best] - kelvin)) {
+      best = i;
+    }
+  }
+  return best;
+}
+
+/**
  * The editor workflow, in retouching order. This mirrors the backend pipeline
  * order in `app/services/image_processing.py::apply_parameters`: geometry first,
  * then white balance and background corrections, then tone, curves, colour,

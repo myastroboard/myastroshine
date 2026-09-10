@@ -301,7 +301,12 @@
       },
       "temperature": {
         "label": "Température",
-        "hint": "Balance des blancs : plus froid (bleu) vers 2000K, plus chaud (ambre) vers 8000K."
+        "hint": "Balance des blancs : un K plus bas réchauffe l'image (ambré), un K plus haut la refroidit (bleu). 6500 K est neutre. Se cale sur des valeurs standard.",
+        "tone": {
+          "warm": "Chaud",
+          "neutral": "Neutre",
+          "cool": "Froid"
+        }
       },
       "tint": {
         "label": "Teinte",
