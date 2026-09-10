@@ -6,6 +6,10 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.4.1] - 2026-09-10
+
 ### Changed
 
 - **A stacked FITS (or a 16-bit PNG/TIFF) now opens as a composite session**, the
