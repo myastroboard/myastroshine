@@ -605,7 +605,6 @@ export interface JobSummary {
   progressPercent: number;
   currentStep: string | null;
   error: string | null;
-  clientIp: string | null;
   createdAt: string;
   updatedAt: string;
 }

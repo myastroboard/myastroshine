@@ -210,7 +210,6 @@ async def list_jobs(
                 progress_percent=row.progress_percent,
                 current_step=row.current_step,
                 error=row.error,
-                client_ip=row.client_ip,
                 created_at=row.created_at,
                 updated_at=row.updated_at,
             )

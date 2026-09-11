@@ -166,7 +166,6 @@ describe('SettingsView', () => {
           progressPercent: 40,
           currentStep: 'denoise',
           error: 'boom',
-          clientIp: '1.2.3.4',
           createdAt: '2026-09-11T10:00:00Z',
           updatedAt: '2026-09-11T10:00:01Z',
         },
