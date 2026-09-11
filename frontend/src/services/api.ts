@@ -10,6 +10,8 @@ import type {
   CalibrationKind,
   CalibrationSummary,
   CaptureInfo,
+  ConfigExport,
+  ConfigImportResult,
   CreatedToken,
   DepthShiftResult,
   DiskUsage,
@@ -277,6 +279,15 @@ export const apiClient = {
 
   getDiskUsage(): Promise<DiskUsage> {
     return request<DiskUsage>('/admin/disk-usage');
+  },
+
+  // --- Backup / restore: settings + user presets (Settings -> Advanced) ---
+  exportConfig(): Promise<ConfigExport> {
+    return request<ConfigExport>('/admin/config-export');
+  },
+
+  importConfig(config: ConfigExport): Promise<ConfigImportResult> {
+    return request<ConfigImportResult>('/admin/config-import', { method: 'POST', json: config });
   },
 
   // --- Webhook tokens (created from Settings) ---

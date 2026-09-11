@@ -259,7 +259,8 @@ export function EditorView({ session, onExit }: EditorViewProps) {
     clearActivePreset();
     const result = await autoAstro.apply();
     if (result) {
-      // Auto Astro proposes tone/star settings only - carry the framing over.
+      // Auto Astro proposes tone/star/gradient/white-balance/denoise settings
+      // only - carry the framing over.
       syncParameters({
         ...DEFAULT_PARAMETERS,
         ...result.parameters,

@@ -7,6 +7,12 @@ from app.models.astrodex import (
     HandoffReturnResponse,
 )
 from app.models.auto_astro import AutoAstroResponse
+from app.models.config_export import (
+    ConfigExportPreset,
+    ConfigExportResponse,
+    ConfigImportRequest,
+    ConfigImportResponse,
+)
 from app.models.depth_shift import (
     DepthLayerInfo,
     DepthMetadataResponse,
@@ -64,6 +70,10 @@ __all__ = [
     "CalibrationFrameCounts",
     "CalibrationSummary",
     "CaptureInfo",
+    "ConfigExportPreset",
+    "ConfigExportResponse",
+    "ConfigImportRequest",
+    "ConfigImportResponse",
     "CreateTokenRequest",
     "CreatedTokenResponse",
     "CurvePoint",

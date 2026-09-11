@@ -107,6 +107,7 @@ def test_engine_status_probes_a_configured_path(client) -> None:
         ("GET", "/api/admin/logs/export"),
         ("GET", "/api/admin/jobs"),
         ("GET", "/api/admin/disk-usage"),
+        ("GET", "/api/admin/config-export"),
     ],
 )
 def test_reads_403_when_admin_disabled(
@@ -228,3 +229,71 @@ def test_disk_usage_reports_bytes(client) -> None:
     assert body["total_bytes"] > 0
     for key in ("images_bytes", "stacks_bytes", "db_bytes", "logs_bytes"):
         assert body[key] >= 0
+
+
+# --- backup / restore -------------------------------------------------------
+
+
+def test_config_export_includes_user_presets_but_not_builtins(client) -> None:
+    client.post("/api/presets", json={"name": "My Andromeda", "parameters": {"contrast": 1.4}})
+
+    response = client.get("/api/admin/config-export")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["format_version"] == 1
+    names = {p["name"] for p in body["presets"]}
+    assert names == {"My Andromeda"}  # the 5 built-ins are never included
+    assert body["settings"]["stacking_max_frames"] == 2000
+
+
+def test_config_import_applies_settings_and_creates_presets(client) -> None:
+    exported = client.get("/api/admin/config-export").json()
+    exported["settings"]["max_image_size_mb"] = 321
+    exported["presets"] = [
+        {"name": "Imported One", "category": "astronomy", "parameters": {"contrast": 1.2}}
+    ]
+
+    response = client.post("/api/admin/config-import", json=exported)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body == {"presets_imported": 1, "presets_skipped": []}
+    assert client.get("/api/admin/app-settings").json()["max_image_size_mb"] == 321
+    names = {p["name"] for p in client.get("/api/presets").json()["presets"]}
+    assert "Imported One" in names
+
+
+def test_config_import_skips_presets_with_a_colliding_name(client) -> None:
+    client.post("/api/presets", json={"name": "Mine", "parameters": {"contrast": 1.1}})
+    exported = client.get("/api/admin/config-export").json()
+    exported["presets"] = [{"name": "Mine", "parameters": {"contrast": 1.9}}]
+
+    response = client.post("/api/admin/config-import", json=exported)
+
+    assert response.status_code == 200
+    assert response.json() == {"presets_imported": 0, "presets_skipped": ["Mine"]}
+    # the existing preset is untouched, not overwritten
+    listing = client.get("/api/presets").json()["presets"]
+    mine = next(p for p in listing if p["name"] == "Mine")
+    assert mine["parameters"]["contrast"] == 1.1
+
+
+def test_config_import_rejects_a_future_format_version(client) -> None:
+    exported = client.get("/api/admin/config-export").json()
+    exported["format_version"] = 99
+
+    response = client.post("/api/admin/config-import", json=exported)
+
+    assert response.status_code == 400
+
+
+def test_config_import_403_when_admin_disabled(client, monkeypatch: pytest.MonkeyPatch) -> None:
+    exported = client.get("/api/admin/config-export").json()
+    monkeypatch.setenv("ADMIN_ENABLED", "false")
+    get_settings.cache_clear()
+
+    response = client.post("/api/admin/config-import", json=exported)
+
+    assert response.status_code == 403
+    get_settings.cache_clear()

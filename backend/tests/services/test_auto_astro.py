@@ -99,3 +99,108 @@ def test_flat_degenerate_frame_skips_tone_changes(service: AutoAstroService) -> 
     assert params.exposure == 0.0
     assert params.highlights == 0.0
     assert params.shadows == 0.0
+    assert params.gradient_reduction == 0
+    assert params.temperature == 6500
+    assert params.denoise == 0
+    assert params.chroma_denoise == 0
+
+
+def test_smooth_gradient_background_suggests_reduction(service: AutoAstroService) -> None:
+    """A smooth left-to-right brightness ramp is exactly what light pollution /
+    vignetting looks like - the same quantity `apply_gradient_reduction`
+    itself subtracts deviations from should read as clearly non-flat."""
+    height, width = 200, 200
+    _y, x = np.mgrid[0:height, 0:width]
+    ramp = (80 + 60 * (x / width)).astype(np.uint8)
+    image = np.stack([ramp, ramp, ramp], axis=-1)
+
+    params = service.suggest_parameters(image)
+
+    assert params.gradient_reduction > 0
+
+
+def test_flat_background_with_signal_suggests_no_gradient_reduction(
+    service: AutoAstroService,
+) -> None:
+    """A real but uniform background (no spatial gradient) shouldn't trigger
+    gradient reduction just because a bright object sits in the frame."""
+    image = np.full((200, 200, 3), 60, dtype=np.uint8)
+    cv2.circle(image, (100, 100), 30, (200, 200, 200), -1)
+
+    params = service.suggest_parameters(image)
+
+    assert params.gradient_reduction == 0
+
+
+def test_warm_cast_background_suggests_a_cooler_temperature(service: AutoAstroService) -> None:
+    """An orange/warm sky cast (blue starved relative to red) needs a cooler
+    setting to boost blue back toward neutral."""
+    image = np.zeros((200, 200, 3), dtype=np.uint8)
+    image[:, :] = (50, 100, 150)  # BGR: warm background, minority bright DSO below
+    cv2.circle(image, (100, 100), 30, (220, 220, 220), -1)
+
+    params = service.suggest_parameters(image)
+
+    assert params.temperature > 6500
+
+
+def test_cool_cast_background_suggests_a_warmer_temperature(service: AutoAstroService) -> None:
+    """A blue-cast sky needs a warmer setting to pull blue back down."""
+    image = np.zeros((200, 200, 3), dtype=np.uint8)
+    image[:, :] = (150, 100, 50)  # BGR: blue-heavy background
+    cv2.circle(image, (100, 100), 30, (220, 220, 220), -1)
+
+    params = service.suggest_parameters(image)
+
+    assert params.temperature < 6500
+
+
+def test_neutral_background_suggests_no_white_balance_change(
+    service: AutoAstroService,
+) -> None:
+    image = np.full((200, 200, 3), 90, dtype=np.uint8)  # B == G == R already
+
+    params = service.suggest_parameters(image)
+
+    assert params.temperature == 6500
+
+
+def test_noisy_background_suggests_denoise(service: AutoAstroService) -> None:
+    rng = np.random.default_rng(5)
+    image = np.full((200, 200, 3), 80, dtype=np.uint8)
+    noise = rng.integers(-25, 25, image.shape, dtype=np.int16)
+    image = np.clip(image.astype(np.int16) + noise, 0, 255).astype(np.uint8)
+
+    params = service.suggest_parameters(image)
+
+    assert params.denoise > 0
+
+
+def test_clean_background_suggests_no_denoise(service: AutoAstroService) -> None:
+    image = np.full((200, 200, 3), 80, dtype=np.uint8)
+
+    params = service.suggest_parameters(image)
+
+    assert params.denoise == 0
+
+
+def test_noisy_background_suggests_chroma_denoise(service: AutoAstroService) -> None:
+    """Independent per-channel noise (roughly what real sensor read noise
+    looks like before/after debayering) shows up as colour speckle too, not
+    just luma noise."""
+    rng = np.random.default_rng(9)
+    image = np.full((200, 200, 3), 80, dtype=np.uint8)
+    noise = rng.integers(-25, 25, image.shape, dtype=np.int16)
+    image = np.clip(image.astype(np.int16) + noise, 0, 255).astype(np.uint8)
+
+    params = service.suggest_parameters(image)
+
+    assert params.chroma_denoise > 0
+
+
+def test_clean_background_suggests_no_chroma_denoise(service: AutoAstroService) -> None:
+    image = np.full((200, 200, 3), 80, dtype=np.uint8)
+
+    params = service.suggest_parameters(image)
+
+    assert params.chroma_denoise == 0

@@ -39,9 +39,34 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   reachable. It now runs a real query, pings Redis when
   `PROCESSING_MODE=queue` (skipped entirely in `sync` mode, where nothing uses
   Redis), and reports the data volume's disk usage.
+- **Settings -> Advanced gains a Backup & restore block.** Exports the runtime
+  settings and every *user* preset (never the 5 built-ins - each instance
+  seeds those itself) as one downloadable JSON file, and restores them from
+  one - for moving to a new machine or sharing a preset library. Not sessions
+  or images: those are transient by design (`session_expiry_hours`) and the
+  actual deliverable is the downloaded picture, not the working session - the
+  whole data volume is already the backup unit for everything else. An
+  imported preset whose name already exists on the target instance is skipped,
+  never overwritten or renamed. New `GET /api/admin/config-export`,
+  `POST /api/admin/config-import`.
 
 ### Changed
 
+- **Auto Astro now also measures light pollution, colour cast, and noise.**
+  Previously scoped to tone (contrast/exposure/highlights/shadows) and star
+  density; it now additionally proposes `gradient_reduction` (a plane fitted
+  to a heavily blurred copy of the frame - deliberately the fitted *trend*,
+  not raw deviation from flat, so a centred DSO doesn't get mistaken for a
+  light-pollution gradient), `temperature` (from the background sky's own
+  blue-vs-red balance, damped to half the measured cast so a genuinely
+  coloured target isn't washed out - the same caveat as the Colour
+  calibration hint below), and `denoise` / `chroma_denoise` (from the sky
+  background's own luma and Cr/Cb noise level - colour speckle is usually
+  more objectionable than luma noise in a stacked frame). Each stays at its
+  default when the measurement is inconclusive or the frame is already close
+  to neutral/flat/clean; `tint`, saturation, sharpness, and colour grading
+  remain manual - confidence-limited choices a heuristic has no business
+  making. See `docs/ALGORITHMS.md` "Auto Astro".
 - **The Colour calibration hint now says what it can get wrong.** It neutralises
   the sky and balances the channels toward a white star field - the right call
   for a sensor colour cast, but it can't tell that apart from a target's own

@@ -412,7 +412,8 @@
       "rate_limiting": "Limitation de débit",
       "logging": "Journalisation",
       "external_engines": "Moteurs ML externes",
-      "job_history": "Historique des tâches"
+      "job_history": "Historique des tâches",
+      "backup_restore": "Sauvegarde et restauration"
     },
     "general": {
       "max_upload": {
@@ -512,7 +513,13 @@
         "label": "Pas (stride) DeepSNR",
         "hint": "Pas de tuilage, pair, 2-512. 0 = valeur par défaut de DeepSNR (480)."
       },
-      "recheck_engines": "Revérifier les moteurs"
+      "recheck_engines": "Revérifier les moteurs",
+      "backup": {
+        "blurb": "Téléchargez vos paramètres et vos presets personnalisés dans un seul fichier, ou restaurez-les depuis un export précédent - pas les sessions ni les images, faites pour expirer.",
+        "export": "Exporter la configuration",
+        "import": "Importer la configuration",
+        "import_result": "{imported} preset(s) importé(s), {skipped} ignoré(s) (nom déjà utilisé)."
+      }
     },
     "logs": {
       "level_label": "Niveau",

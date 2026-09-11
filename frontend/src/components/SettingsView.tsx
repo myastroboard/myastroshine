@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 
 import { TokenManager } from '@/components/TokenManager';
 import { useAppSettings } from '@/hooks/useAppSettings';
@@ -6,7 +6,14 @@ import { useJobs } from '@/hooks/useJobs';
 import { useLogs } from '@/hooks/useLogs';
 import { useTranslation } from '@/hooks/useTranslation';
 import { apiClient } from '@/services/api';
-import type { AppSettings, DiskUsage, EngineStatus, EngineStatusResponse, LogLevel } from '@/types';
+import type {
+  AppSettings,
+  ConfigExport,
+  DiskUsage,
+  EngineStatus,
+  EngineStatusResponse,
+  LogLevel,
+} from '@/types';
 
 type Section = 'general' | 'webhooks' | 'advanced' | 'logs' | 'operations';
 
@@ -26,7 +33,8 @@ interface SectionProps {
  */
 export function SettingsView({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
-  const { draft, patch, reset, save, dirty, isLoading, isSaving, error } = useAppSettings();
+  const { draft, patch, reset, save, refresh, dirty, isLoading, isSaving, error } =
+    useAppSettings();
   const [section, setSection] = useState<Section>('general');
 
   return (
@@ -86,7 +94,9 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
             <>
               {section === 'general' && <GeneralSection draft={draft} patch={patch} />}
               {section === 'webhooks' && <WebhooksSection draft={draft} patch={patch} />}
-              {section === 'advanced' && <AdvancedSection draft={draft} patch={patch} />}
+              {section === 'advanced' && (
+                <AdvancedSection draft={draft} patch={patch} onConfigImported={refresh} />
+              )}
             </>
           )}
 
@@ -262,7 +272,11 @@ function WebhooksSection({ draft, patch }: SectionProps) {
   );
 }
 
-function AdvancedSection({ draft, patch }: SectionProps) {
+function AdvancedSection({
+  draft,
+  patch,
+  onConfigImported,
+}: SectionProps & { onConfigImported: () => void }) {
   const { t } = useTranslation();
   return (
     <div className="flex flex-col">
@@ -322,7 +336,102 @@ function AdvancedSection({ draft, patch }: SectionProps) {
       />
 
       <ExternalEnginesGroup draft={draft} patch={patch} />
+      <BackupRestoreGroup onImported={onConfigImported} />
     </div>
+  );
+}
+
+/** Download settings + user presets (never the 5 built-ins) as one JSON file,
+ * or restore them from a previous export - see `app/models/config_export.py`.
+ * Not sessions or images: those are transient by design and the actual
+ * deliverable is the downloaded picture, not the working session. */
+function BackupRestoreGroup({ onImported }: { onImported: () => void }) {
+  const { t } = useTranslation();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleExport = useCallback(async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const config = await apiClient.exportConfig();
+      const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = 'myastroshine-config.json';
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Export failed');
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
+  const handleImportFile = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      event.target.value = ''; // let the same file be picked again after a fix
+      if (!file) {
+        return;
+      }
+      setBusy(true);
+      setError(null);
+      setResult(null);
+      try {
+        const config = JSON.parse(await file.text()) as ConfigExport;
+        const outcome = await apiClient.importConfig(config);
+        setResult(
+          t('settings.advanced.backup.import_result', {
+            imported: outcome.presetsImported,
+            skipped: outcome.presetsSkipped.length,
+          }),
+        );
+        onImported();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Import failed');
+      } finally {
+        setBusy(false);
+      }
+    },
+    [onImported, t],
+  );
+
+  return (
+    <>
+      <GroupLabel>{t('settings.groups.backup_restore')}</GroupLabel>
+      <p className="-mt-0.5 mb-2 text-xs text-muted">{t('settings.advanced.backup.blurb')}</p>
+      {error && <p className="mb-2 text-xs text-danger">{error}</p>}
+      {result && <p className="mb-2 text-xs text-success">{result}</p>}
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          className="btn btn-outline btn-sm"
+          onClick={() => void handleExport()}
+          disabled={busy}
+        >
+          {t('settings.advanced.backup.export')}
+        </button>
+        <button
+          type="button"
+          className="btn btn-outline btn-sm"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={busy}
+        >
+          {t('settings.advanced.backup.import')}
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/json"
+          className="hidden"
+          onChange={(event) => void handleImportFile(event)}
+        />
+      </div>
+    </>
   );
 }
 

@@ -16,6 +16,10 @@ Operations:
     GET  /api/admin/jobs             - recent processing jobs, newest first
     GET  /api/admin/disk-usage       - the data volume, broken down by what put bytes there
 
+Backup / restore (settings + user presets - see app/models/config_export.py):
+    GET  /api/admin/config-export    - the two, bundled into one downloadable file
+    POST /api/admin/config-import    - restore them on a (usually different) instance
+
 Every route here is gated by ``ADMIN_ENABLED`` (on by default for single-user
 local deployments) and rate-limited. Changing ``cors_origins`` takes effect on
 the next restart (the CORS middleware reads it once at startup); every other
@@ -32,12 +36,18 @@ from pathlib import Path
 
 from fastapi import APIRouter, Query, Response
 
+from app import __version__
 from app.config import get_settings
-from app.dependencies import JobServiceDep, RequireAdmin, RequireRateLimit
+from app.dependencies import JobServiceDep, PresetServiceDep, RequireAdmin, RequireRateLimit
+from app.exceptions import DuplicateResourceError, InvalidParameterError
 from app.logging_config import apply_runtime_log_levels, get_logger, truncate_main_log
 from app.models import (
     AppSettingsResponse,
     AppSettingsUpdate,
+    ConfigExportPreset,
+    ConfigExportResponse,
+    ConfigImportRequest,
+    ConfigImportResponse,
     DiskUsageResponse,
     EngineStatusResponse,
     JobListResponse,
@@ -46,6 +56,7 @@ from app.models import (
     LogLevelUpdate,
     LogTailResponse,
 )
+from app.models.config_export import CONFIG_EXPORT_FORMAT_VERSION
 from app.services.engine_probe import get_engine_statuses
 from app.utils import disk_usage
 from app.utils.app_settings import get_app_settings, save_app_settings
@@ -218,3 +229,65 @@ async def read_disk_usage(_admin: RequireAdmin, _rate_limit: RequireRateLimit) -
     folder-watch stacking mode runs unattended, so this should be visible in
     Settings before a filling disk becomes an outage."""
     return DiskUsageResponse(**disk_usage.volume_usage(), **disk_usage.data_breakdown())
+
+
+# --- backup / restore -------------------------------------------------------
+
+
+@router.get("/config-export", response_model=ConfigExportResponse)
+async def export_config(
+    presets: PresetServiceDep, _admin: RequireAdmin, _rate_limit: RequireRateLimit
+) -> ConfigExportResponse:
+    """Bundle the runtime settings and every *user* preset (never the 5
+    built-ins - each instance seeds those itself) into one downloadable file,
+    for moving to a new machine or sharing a preset library."""
+    user_presets = [preset for preset in presets.list_presets() if preset.author == "user"]
+    return ConfigExportResponse(
+        app_version=__version__,
+        exported_at=datetime.now(UTC),
+        settings=get_app_settings(),
+        presets=[
+            ConfigExportPreset(
+                name=preset.name,
+                description=preset.description,
+                category=preset.category,
+                parameters=preset.parameters,
+            )
+            for preset in user_presets
+        ],
+    )
+
+
+@router.post("/config-import", response_model=ConfigImportResponse)
+async def import_config(
+    body: ConfigImportRequest,
+    presets: PresetServiceDep,
+    _admin: RequireAdmin,
+    _rate_limit: RequireRateLimit,
+) -> ConfigImportResponse:
+    """Restore settings and presets from a ``config-export`` file.
+
+    Settings are replaced wholesale, same as ``POST /app-settings``. A preset
+    whose name already exists on this instance is left untouched and skipped
+    - never overwritten, never renamed.
+    """
+    if body.format_version > CONFIG_EXPORT_FORMAT_VERSION:
+        raise InvalidParameterError(
+            f"Unsupported config export format_version {body.format_version} "
+            f"(this instance supports up to {CONFIG_EXPORT_FORMAT_VERSION})"
+        )
+
+    save_app_settings(body.settings.model_dump())
+    apply_runtime_log_levels()
+
+    imported = 0
+    skipped: list[str] = []
+    for preset in body.presets:
+        try:
+            presets.save_preset(preset.name, preset.parameters, preset.description, preset.category)
+            imported += 1
+        except DuplicateResourceError:
+            skipped.append(preset.name)
+
+    logger.info("config imported", presets_imported=imported, presets_skipped=len(skipped))
+    return ConfigImportResponse(presets_imported=imported, presets_skipped=skipped)

@@ -629,6 +629,35 @@ export interface DiskUsage {
   logsBytes: number;
 }
 
+// --- Backup / restore (Settings -> Advanced) --------------------------------
+
+/** A user preset in export/import shape - no `presetId` / `author` /
+ * `isFavorite`; a fresh id is minted on import. */
+export interface ConfigExportPreset {
+  name: string;
+  description: string | null;
+  category: string;
+  parameters: ProcessingParameters;
+}
+
+/** `GET /api/admin/config-export` - settings + every *user* preset (never the
+ * 5 built-ins), bundled into one downloadable file. */
+export interface ConfigExport {
+  formatVersion: number;
+  appVersion: string;
+  exportedAt: string;
+  settings: AppSettings;
+  presets: ConfigExportPreset[];
+}
+
+/** `POST /api/admin/config-import` result. */
+export interface ConfigImportResult {
+  presetsImported: number;
+  /** Names skipped because a preset with that name already existed - never
+   * overwritten, never renamed. */
+  presetsSkipped: string[];
+}
+
 // --- Depth shift -----------------------------------------------------------
 
 /** Normalised (0-1) point in image space, e.g. where Depth Shift centers. */
