@@ -1,4 +1,4 @@
-"""Admin routes - runtime configuration and logs.
+"""Admin routes - runtime configuration, logs, and job history.
 
 Settings:
     GET  /api/admin/app-settings     - the live runtime settings
@@ -11,6 +11,10 @@ Logs (see app/logging_config.py):
     POST /api/admin/logs/level       - change them at runtime (persisted)
     POST /api/admin/logs/clear       - empty myastroshine.log
     GET  /api/admin/logs/export      - ZIP: myastroshine.log + rotations + worker.log
+
+Operations:
+    GET  /api/admin/jobs             - recent processing jobs, newest first
+    GET  /api/admin/disk-usage       - the data volume, broken down by what put bytes there
 
 Every route here is gated by ``ADMIN_ENABLED`` (on by default for single-user
 local deployments) and rate-limited. Changing ``cors_origins`` takes effect on
@@ -29,17 +33,21 @@ from pathlib import Path
 from fastapi import APIRouter, Query, Response
 
 from app.config import get_settings
-from app.dependencies import RequireAdmin, RequireRateLimit
+from app.dependencies import JobServiceDep, RequireAdmin, RequireRateLimit
 from app.logging_config import apply_runtime_log_levels, get_logger, truncate_main_log
 from app.models import (
     AppSettingsResponse,
     AppSettingsUpdate,
+    DiskUsageResponse,
     EngineStatusResponse,
+    JobListResponse,
+    JobSummary,
     LogLevels,
     LogLevelUpdate,
     LogTailResponse,
 )
 from app.services.engine_probe import get_engine_statuses
+from app.utils import disk_usage
 from app.utils.app_settings import get_app_settings, save_app_settings
 
 logger = get_logger(__name__)
@@ -161,3 +169,52 @@ async def export_logs(_admin: RequireAdmin, _rate_limit: RequireRateLimit) -> Re
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="myastroshine-logs-{stamp}.zip"'},
     )
+
+
+# --- operations ------------------------------------------------------------
+
+
+@router.get("/jobs", response_model=JobListResponse)
+async def list_jobs(
+    jobs: JobServiceDep,
+    _admin: RequireAdmin,
+    _rate_limit: RequireRateLimit,
+    status: str | None = Query(None, description="e.g. failed, processing, superseded"),
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+) -> JobListResponse:
+    """Recent processing jobs, newest first.
+
+    With no ``status`` filter, ``superseded`` rows are hidden by default - one
+    is created for every debounced slider edit that got pre-empted by the
+    next, so an unfiltered view is mostly noise.
+    """
+    rows, total = jobs.list_recent(status=status, limit=limit, offset=offset)
+    return JobListResponse(
+        jobs=[
+            JobSummary(
+                job_id=row.job_id,
+                session_id=row.session_id,
+                status=row.status,
+                progress_percent=row.progress_percent,
+                current_step=row.current_step,
+                error=row.error,
+                client_ip=row.client_ip,
+                created_at=row.created_at,
+                updated_at=row.updated_at,
+            )
+            for row in rows
+        ],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/disk-usage", response_model=DiskUsageResponse)
+async def read_disk_usage(_admin: RequireAdmin, _rate_limit: RequireRateLimit) -> DiskUsageResponse:
+    """The data volume's filesystem total/used/free, plus how ``DATA_DIR``'s
+    own bytes split across images, stacks, the database, and log files - the
+    folder-watch stacking mode runs unattended, so this should be visible in
+    Settings before a filling disk becomes an outage."""
+    return DiskUsageResponse(**disk_usage.volume_usage(), **disk_usage.data_breakdown())

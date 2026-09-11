@@ -219,8 +219,10 @@ Back up the whole volume. Session images are transient and pruned after
 The `worker` runs Celery beat in-process (`-B`). Hourly:
 
 - `task_cleanup_sessions` - deletes expired sessions and stacks (and their
-  files), and fails jobs left stuck by a crash. Runs regardless of
-  `PROCESSING_MODE` (drop the worker and you lose this).
+  files), fails jobs left stuck by a crash, and prunes finished job rows past
+  `job_history_retention_hours` (the admin Settings -> Operations job-history
+  view, otherwise unbounded - every debounced slider edit inserts a row).
+  Runs regardless of `PROCESSING_MODE` (drop the worker and you lose this).
 - `task_watch_stacking_folder` - a no-op unless `stacking_watch_dir` is set; when
   it is, it ingests new frames dropped into that folder and (optionally)
   auto-stacks once the folder goes idle.

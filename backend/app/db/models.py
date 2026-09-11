@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from app.types import JsonDict
@@ -43,6 +43,8 @@ class JobRecord(Base):
     """An async processing job (direct or Celery-backed)."""
 
     __tablename__ = "jobs"
+    #: the admin job-history view filters by status and orders by created_at.
+    __table_args__ = (Index("ix_jobs_status_created_at", "status", "created_at"),)
 
     job_id: Mapped[str] = mapped_column(String(36), primary_key=True)
     session_id: Mapped[str | None] = mapped_column(String(36))

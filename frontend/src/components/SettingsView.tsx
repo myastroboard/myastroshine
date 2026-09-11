@@ -2,14 +2,15 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 
 import { TokenManager } from '@/components/TokenManager';
 import { useAppSettings } from '@/hooks/useAppSettings';
+import { useJobs } from '@/hooks/useJobs';
 import { useLogs } from '@/hooks/useLogs';
 import { useTranslation } from '@/hooks/useTranslation';
 import { apiClient } from '@/services/api';
-import type { AppSettings, EngineStatus, EngineStatusResponse, LogLevel } from '@/types';
+import type { AppSettings, DiskUsage, EngineStatus, EngineStatusResponse, LogLevel } from '@/types';
 
-type Section = 'general' | 'webhooks' | 'advanced' | 'logs';
+type Section = 'general' | 'webhooks' | 'advanced' | 'logs' | 'operations';
 
-const SECTIONS: Section[] = ['general', 'webhooks', 'advanced', 'logs'];
+const SECTIONS: Section[] = ['general', 'webhooks', 'advanced', 'logs', 'operations'];
 
 const LOG_LEVELS: LogLevel[] = ['debug', 'info', 'warning', 'error', 'critical'];
 
@@ -81,12 +82,16 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
 
           {section === 'logs' && <LogsSection />}
 
-          {draft && section !== 'logs' && (
+          {draft && section !== 'logs' && section !== 'operations' && (
             <>
               {section === 'general' && <GeneralSection draft={draft} patch={patch} />}
               {section === 'webhooks' && <WebhooksSection draft={draft} patch={patch} />}
               {section === 'advanced' && <AdvancedSection draft={draft} patch={patch} />}
             </>
+          )}
+
+          {draft && section === 'operations' && (
+            <OperationsSection draft={draft} patch={patch} />
           )}
         </div>
       </div>
@@ -478,6 +483,156 @@ function LogsSection() {
             ? t('settings.logs.no_lines')
             : lines.join('\n')}
       </pre>
+    </div>
+  );
+}
+
+/** "48.2 GB" / "912 MB" / "3 KB" - human-scale up to the size a data volume
+ * actually is, unlike `ImageUpload.tsx`'s upload-sized (MB/KB-only) formatter. */
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 ** 3) {
+    return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
+  }
+  if (bytes >= 1024 ** 2) {
+    return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+  }
+  return `${Math.max(0, Math.round(bytes / 1024))} KB`;
+}
+
+function DiskUsagePanel({ usage }: { usage: DiskUsage }) {
+  const { t } = useTranslation();
+  const rows: [string, number][] = [
+    [t('settings.operations.disk.images'), usage.imagesBytes],
+    [t('settings.operations.disk.stacks'), usage.stacksBytes],
+    [t('settings.operations.disk.database'), usage.dbBytes],
+    [t('settings.operations.disk.logs'), usage.logsBytes],
+  ];
+  return (
+    <div className="mb-6">
+      <GroupLabel>{t('settings.operations.disk.heading')}</GroupLabel>
+      <p className="text-sm text-ink">
+        {t('settings.operations.disk.volume')}:{' '}
+        <span className="font-medium">
+          {formatBytes(usage.usedBytes)} / {formatBytes(usage.totalBytes)}
+        </span>
+      </p>
+      <dl className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-muted sm:grid-cols-4">
+        {rows.map(([label, value]) => (
+          <div key={label} className="flex items-baseline justify-between gap-2">
+            <dt>{label}</dt>
+            <dd className="font-medium text-ink tabular-nums">{formatBytes(value)}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
+const JOB_STATUSES = ['queued', 'processing', 'completed', 'failed', 'superseded'] as const;
+
+function OperationsSection({ draft, patch }: SectionProps) {
+  const { t } = useTranslation();
+  const { jobs, total, offset, setOffset, status, setStatus, pageSize, diskUsage, isLoading, error } =
+    useJobs();
+
+  return (
+    <div className="flex flex-col">
+      <GroupLabel>{t('settings.groups.job_history')}</GroupLabel>
+      <NumberRow
+        id="job-history-retention"
+        label={t('settings.operations.retention.label')}
+        hint={t('settings.operations.retention.hint')}
+        value={draft.jobHistoryRetentionHours}
+        min={1}
+        max={8760}
+        onChange={(jobHistoryRetentionHours) => patch({ jobHistoryRetentionHours })}
+      />
+
+      {diskUsage && <DiskUsagePanel usage={diskUsage} />}
+
+      <GroupLabel>{t('settings.operations.jobs.heading')}</GroupLabel>
+      {error && <p className="mb-2 text-xs text-danger">{error}</p>}
+
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-2 text-xs text-muted">
+          {t('settings.operations.jobs.status_label')}
+          <select
+            className="field w-44 py-1.5"
+            value={status}
+            onChange={(event) => setStatus(event.target.value)}
+          >
+            <option value="">{t('settings.operations.jobs.status_all_option')}</option>
+            {JOB_STATUSES.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {isLoading && jobs.length === 0 ? (
+        <p className="text-xs text-faint">{t('common.loading')}</p>
+      ) : jobs.length === 0 ? (
+        <p className="text-xs text-faint">{t('settings.operations.jobs.no_jobs')}</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="text-faint">
+              <tr>
+                <th className="py-1.5 pr-3 font-medium">{t('settings.operations.jobs.column_status')}</th>
+                <th className="py-1.5 pr-3 font-medium">
+                  {t('settings.operations.jobs.column_session')}
+                </th>
+                <th className="py-1.5 pr-3 font-medium">
+                  {t('settings.operations.jobs.column_created')}
+                </th>
+                <th className="py-1.5 font-medium">{t('settings.operations.jobs.column_error')}</th>
+              </tr>
+            </thead>
+            <tbody className="text-muted">
+              {jobs.map((job) => (
+                <tr key={job.jobId} className="border-t border-hairline">
+                  <td className="py-1.5 pr-3">{job.status}</td>
+                  <td className="py-1.5 pr-3 font-mono">{job.sessionId ?? '-'}</td>
+                  <td className="py-1.5 pr-3 tabular-nums">
+                    {new Date(job.createdAt).toLocaleString()}
+                  </td>
+                  <td className="py-1.5 text-danger">{job.error ?? ''}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {total > pageSize && (
+        <div className="mt-3 flex items-center gap-3 text-xs text-muted">
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            disabled={offset === 0}
+            onClick={() => setOffset(Math.max(0, offset - pageSize))}
+          >
+            {t('settings.operations.jobs.previous_page')}
+          </button>
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            disabled={offset + pageSize >= total}
+            onClick={() => setOffset(offset + pageSize)}
+          >
+            {t('settings.operations.jobs.next_page')}
+          </button>
+          <span>
+            {t('settings.operations.jobs.page_info', {
+              from: offset + 1,
+              to: Math.min(offset + pageSize, total),
+              total,
+            })}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

@@ -105,6 +105,8 @@ def test_engine_status_probes_a_configured_path(client) -> None:
         ("GET", "/api/admin/logs"),
         ("GET", "/api/admin/logs/level"),
         ("GET", "/api/admin/logs/export"),
+        ("GET", "/api/admin/jobs"),
+        ("GET", "/api/admin/disk-usage"),
     ],
 )
 def test_reads_403_when_admin_disabled(
@@ -180,3 +182,49 @@ def test_export_logs_returns_a_zip_of_the_present_files(client) -> None:
     with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
         assert set(archive.namelist()) == {"myastroshine.log", "myastroshine.log.1"}
         assert archive.read("myastroshine.log") == b"main log\n"
+
+
+# --- operations -----------------------------------------------------------
+
+
+def test_list_jobs_hides_superseded_by_default(client, db_session) -> None:
+    from app.services.job import JobService
+
+    jobs = JobService(db_session)
+    kept = jobs.create("sess-1")
+    superseded = jobs.create("sess-1")
+    jobs.update(superseded.job_id, status="superseded")
+
+    response = client.get("/api/admin/jobs")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 1
+    assert [j["job_id"] for j in body["jobs"]] == [kept.job_id]
+    assert body["limit"] == 50
+    assert body["offset"] == 0
+
+
+def test_list_jobs_filters_by_status(client, db_session) -> None:
+    from app.services.job import JobService
+
+    jobs = JobService(db_session)
+    failed = jobs.create("sess-1")
+    jobs.update(failed.job_id, status="failed", error="boom")
+    jobs.create("sess-2")
+
+    response = client.get("/api/admin/jobs", params={"status": "failed"})
+
+    body = response.json()
+    assert body["total"] == 1
+    assert body["jobs"][0]["error"] == "boom"
+
+
+def test_disk_usage_reports_bytes(client) -> None:
+    response = client.get("/api/admin/disk-usage")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total_bytes"] > 0
+    for key in ("images_bytes", "stacks_bytes", "db_bytes", "logs_bytes"):
+        assert body[key] >= 0

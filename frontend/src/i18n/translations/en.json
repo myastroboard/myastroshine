@@ -398,6 +398,10 @@
       "logs": {
         "label": "Logs",
         "blurb": "Tail, clear, and export the application log."
+      },
+      "operations": {
+        "label": "Operations",
+        "blurb": "Recent processing jobs and disk usage."
       }
     },
     "groups": {
@@ -407,7 +411,8 @@
       "network": "Network",
       "rate_limiting": "Rate limiting",
       "logging": "Logging",
-      "external_engines": "External ML engines"
+      "external_engines": "External ML engines",
+      "job_history": "Job history"
     },
     "general": {
       "max_upload": {
@@ -518,6 +523,34 @@
       "clear": "Clear",
       "levels_hint": "Levels - file: {file}, console: {console}. Change them on the Advanced tab.",
       "no_lines": "No log lines."
+    },
+    "operations": {
+      "retention": {
+        "label": "Job history retention",
+        "hint": "How long a finished job is kept before the hourly cleanup removes it. Hours."
+      },
+      "disk": {
+        "heading": "Disk usage",
+        "volume": "Data volume",
+        "images": "Images",
+        "stacks": "Stacks",
+        "database": "Database",
+        "logs": "Logs"
+      },
+      "jobs": {
+        "heading": "Recent jobs",
+        "status_label": "Status",
+        "status_all_option": "all (excl. superseded)",
+        "refresh": "Refresh",
+        "no_jobs": "No jobs.",
+        "column_status": "Status",
+        "column_session": "Session / stack",
+        "column_created": "Created",
+        "column_error": "Error",
+        "previous_page": "Previous",
+        "next_page": "Next",
+        "page_info": "{from}-{to} of {total}"
+      }
     }
   },
   "stacking": {

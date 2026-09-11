@@ -398,6 +398,10 @@
       "logs": {
         "label": "Journaux",
         "blurb": "Consulter, vider et exporter le journal de l'application."
+      },
+      "operations": {
+        "label": "Opérations",
+        "blurb": "Tâches de traitement récentes et espace disque."
       }
     },
     "groups": {
@@ -407,7 +411,8 @@
       "network": "Réseau",
       "rate_limiting": "Limitation de débit",
       "logging": "Journalisation",
-      "external_engines": "Moteurs ML externes"
+      "external_engines": "Moteurs ML externes",
+      "job_history": "Historique des tâches"
     },
     "general": {
       "max_upload": {
@@ -518,6 +523,34 @@
       "clear": "Vider",
       "levels_hint": "Niveaux - fichier : {file}, console : {console}. Modifiez-les dans l'onglet Avancé.",
       "no_lines": "Aucune ligne de journal."
+    },
+    "operations": {
+      "retention": {
+        "label": "Conservation de l'historique des tâches",
+        "hint": "Durée de conservation d'une tâche terminée avant suppression par le nettoyage horaire. Heures."
+      },
+      "disk": {
+        "heading": "Espace disque",
+        "volume": "Volume de données",
+        "images": "Images",
+        "stacks": "Empilements",
+        "database": "Base de données",
+        "logs": "Journaux"
+      },
+      "jobs": {
+        "heading": "Tâches récentes",
+        "status_label": "Statut",
+        "status_all_option": "tous (hors remplacées)",
+        "refresh": "Actualiser",
+        "no_jobs": "Aucune tâche.",
+        "column_status": "Statut",
+        "column_session": "Session / empilement",
+        "column_created": "Créée",
+        "column_error": "Erreur",
+        "previous_page": "Précédent",
+        "next_page": "Suivant",
+        "page_info": "{from}-{to} sur {total}"
+      }
     }
   },
   "stacking": {

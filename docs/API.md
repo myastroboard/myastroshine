@@ -75,7 +75,7 @@ Every route is implemented and tested end to end.
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/health` | System health |
+| GET | `/health` | System health: DB connectivity, Redis (queue mode only), data-volume disk usage |
 | GET | `/config` | Public runtime limits (upload cap, stacking limits, engine lists) - no admin gate |
 | GET | `/admin/app-settings` | Current runtime settings (`app_settings.json`) |
 | POST | `/admin/app-settings` | Replace runtime settings (gated by `ADMIN_ENABLED`) |
@@ -84,6 +84,8 @@ Every route is implemented and tested end to end.
 | GET / POST | `/admin/logs/level` | Read / change the file and console log levels |
 | POST | `/admin/logs/clear` | Empty `myastroshine.log` |
 | GET | `/admin/logs/export` | ZIP of the logs (main + rotations + worker) |
+| GET | `/admin/jobs` | Recent processing jobs, newest first (`status`, `limit`, `offset`) - hides `superseded` unless `status` asks for it explicitly |
+| GET | `/admin/disk-usage` | The data volume's total/used/free bytes, plus a breakdown by images / stacks / database / logs |
 | POST | `/upload` | Upload an image, open a session |
 | GET | `/preview/{session_id}` | Session image: `?full=true` full-res result, `?original=true` untouched upload (add `&geometry=true` to apply the session's current crop/rotate/flip/straighten, no colour/tone enhancement), default downscaled result. `?v=` cache-buster |
 | POST | `/process/{session_id}` | Apply enhancement parameters |

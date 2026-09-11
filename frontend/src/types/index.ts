@@ -545,6 +545,9 @@ export interface AppSettings {
   deepsnrStride: number;
   logLevel: LogLevel;
   consoleLogLevel: LogLevel;
+  /** How long a finished job (completed / failed / superseded) is kept before
+   * the hourly cleanup prunes it. Hours. */
+  jobHistoryRetentionHours: number;
 }
 
 /** Result of probing one configured engine path (`GET /api/admin/engine-status`).
@@ -590,6 +593,40 @@ export interface LogTail {
   lines: string[];
   returned: number;
   filteredLevel: LogLevel | null;
+}
+
+// --- Job history / disk usage (Settings -> Operations) ---------------------
+
+/** One row of `GET /api/admin/jobs`. */
+export interface JobSummary {
+  jobId: string;
+  sessionId: string | null;
+  status: string;
+  progressPercent: number;
+  currentStep: string | null;
+  error: string | null;
+  clientIp: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JobListResult {
+  jobs: JobSummary[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+/** `GET /api/admin/disk-usage` - filesystem totals plus how the app's own
+ * data splits across images, stacks, the database, and log files. */
+export interface DiskUsage {
+  totalBytes: number;
+  usedBytes: number;
+  freeBytes: number;
+  imagesBytes: number;
+  stacksBytes: number;
+  dbBytes: number;
+  logsBytes: number;
 }
 
 // --- Depth shift -----------------------------------------------------------

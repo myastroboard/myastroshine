@@ -164,3 +164,60 @@ def test_concurrency_limit_respects_the_disabled_flag(
     service.create("sess-2", client_ip="1.2.3.4")
 
     service.assert_under_concurrency_limit("1.2.3.4")  # must not raise
+
+
+def test_list_recent_hides_superseded_by_default(db_session) -> None:
+    service = JobService(db_session)
+    kept = service.create("sess-1")
+    superseded = service.create("sess-1")
+    service.update(superseded.job_id, status="superseded")
+
+    rows, total = service.list_recent()
+
+    assert total == 1
+    assert [row.job_id for row in rows] == [kept.job_id]
+
+
+def test_list_recent_can_filter_to_superseded_explicitly(db_session) -> None:
+    service = JobService(db_session)
+    service.create("sess-1")
+    superseded = service.create("sess-1")
+    service.update(superseded.job_id, status="superseded")
+
+    rows, total = service.list_recent(status="superseded")
+
+    assert total == 1
+    assert [row.job_id for row in rows] == [superseded.job_id]
+
+
+def test_list_recent_orders_newest_first_and_paginates(db_session) -> None:
+    service = JobService(db_session)
+    older = service.create("sess-1")
+    _age_job(db_session, older.job_id, 120)
+    newer = service.create("sess-2")
+
+    rows, total = service.list_recent(limit=1)
+    assert total == 2
+    assert [row.job_id for row in rows] == [newer.job_id]
+
+    rows, total = service.list_recent(limit=1, offset=1)
+    assert total == 2
+    assert [row.job_id for row in rows] == [older.job_id]
+
+
+def test_prune_old_jobs_deletes_only_old_terminal_rows(db_session) -> None:
+    service = JobService(db_session)
+    recent_done = service.create("sess-1")
+    service.update(recent_done.job_id, status="completed")
+
+    old_done = service.create("sess-2")
+    service.update(old_done.job_id, status="completed")
+    _age_job(db_session, old_done.job_id, 8 * 3600)
+
+    old_running = service.create("sess-3")
+    _age_job(db_session, old_running.job_id, 8 * 3600)
+
+    assert service.prune_old_jobs(retention_hours=1) == 1
+    assert service.get_or_none(old_done.job_id) is None
+    assert service.get(recent_done.job_id).status == "completed"  # too recent to prune
+    assert service.get(old_running.job_id).status == "queued"  # not terminal - never pruned
