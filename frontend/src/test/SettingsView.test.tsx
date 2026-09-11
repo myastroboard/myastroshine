@@ -19,6 +19,8 @@ vi.mock('@/services/api', () => ({
     exportLogs: vi.fn(),
     getJobs: vi.fn(),
     getDiskUsage: vi.fn(),
+    exportConfig: vi.fn(),
+    importConfig: vi.fn(),
   },
 }));
 
@@ -197,6 +199,43 @@ describe('SettingsView', () => {
         expect.objectContaining({ status: 'failed' }),
       ),
     );
+  });
+
+  it('imports a config file under the Advanced section and reports the result', async () => {
+    mocked.importConfig.mockResolvedValue({ presetsImported: 2, presetsSkipped: ['Mine'] });
+    renderView();
+    await screen.findByLabelText('Maximum upload size');
+    fireEvent.click(screen.getByRole('button', { name: 'Advanced' }));
+    await screen.findByRole('button', { name: 'Import configuration' });
+
+    const file = new File(
+      [JSON.stringify({ formatVersion: 1, settings: SETTINGS, presets: [] })],
+      'config.json',
+      { type: 'application/json' },
+    );
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+
+    expect(await screen.findByText(/2 preset\(s\) imported, 1 skipped/)).toBeInTheDocument();
+    expect(mocked.importConfig).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(mocked.getAppSettings).toHaveBeenCalledTimes(2)); // initial load + refresh
+  });
+
+  it('exports the config as a downloadable file under the Advanced section', async () => {
+    mocked.exportConfig.mockResolvedValue({
+      formatVersion: 1,
+      appVersion: '0.4.1',
+      exportedAt: '2026-09-11T00:00:00Z',
+      settings: SETTINGS,
+      presets: [],
+    });
+    renderView();
+    await screen.findByLabelText('Maximum upload size');
+    fireEvent.click(screen.getByRole('button', { name: 'Advanced' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Export configuration' }));
+
+    await waitFor(() => expect(mocked.exportConfig).toHaveBeenCalledTimes(1));
   });
 
   it('probes the external engine paths under the Advanced section', async () => {

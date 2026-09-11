@@ -86,6 +86,8 @@ Every route is implemented and tested end to end.
 | GET | `/admin/logs/export` | ZIP of the logs (main + rotations + worker) |
 | GET | `/admin/jobs` | Recent processing jobs, newest first (`status`, `limit`, `offset`) - hides `superseded` unless `status` asks for it explicitly |
 | GET | `/admin/disk-usage` | The data volume's total/used/free bytes, plus a breakdown by images / stacks / database / logs |
+| GET | `/admin/config-export` | Settings + user presets (never the 5 built-ins), bundled for backup or moving to a new instance |
+| POST | `/admin/config-import` | Restore settings + presets from a `config-export` file - a name collision is skipped, never overwritten |
 | POST | `/upload` | Upload an image, open a session |
 | GET | `/preview/{session_id}` | Session image: `?full=true` full-res result, `?original=true` untouched upload (add `&geometry=true` to apply the session's current crop/rotate/flip/straighten, no colour/tone enhancement), default downscaled result. `?v=` cache-buster |
 | POST | `/process/{session_id}` | Apply enhancement parameters |
@@ -356,10 +358,11 @@ image's pixel dimensions.
 ## Auto Astro
 
 `POST /auto-astro/{session_id}` takes no body. It analyses the session's
-original image (histogram black/white point, star density) and applies a
-computed parameter set - a dynamic alternative to a fixed preset. Returns the
-same shape as `POST /process/{session_id}` plus the computed `parameters`, so
-the frontend can sync its sliders in one round trip:
+original image (histogram black/white point, star density, background
+gradient, colour cast, noise level) and applies a computed parameter set - a
+dynamic alternative to a fixed preset. Returns the same shape as
+`POST /process/{session_id}` plus the computed `parameters`, so the frontend
+can sync its sliders in one round trip:
 
 ```json
 {
@@ -373,9 +376,12 @@ the frontend can sync its sliders in one round trip:
 }
 ```
 
-Scope is deliberately limited to what histogram/black-point/star-density can
-drive with confidence: `contrast`, `exposure`, `highlights`, `shadows`, and
-`star_reduction`. Everything else stays at its `ProcessingParameters` default.
+Scope is deliberately limited to what a single frame's own statistics can
+drive with confidence: `contrast`, `exposure`, `highlights`, `shadows`,
+`star_reduction`, `gradient_reduction`, `temperature`, `denoise`, and
+`chroma_denoise`. Everything else (saturation, sharpness, colour grading,
+geometry) stays at its `ProcessingParameters` default - see
+`docs/ALGORITHMS.md` "Auto Astro".
 See `docs/ALGORITHMS.md` "Auto Astro" for the heuristic.
 
 ## Client config

@@ -412,7 +412,8 @@
       "rate_limiting": "Rate limiting",
       "logging": "Logging",
       "external_engines": "External ML engines",
-      "job_history": "Job history"
+      "job_history": "Job history",
+      "backup_restore": "Backup & restore"
     },
     "general": {
       "max_upload": {
@@ -512,7 +513,13 @@
         "label": "DeepSNR stride",
         "hint": "Tile stride, even, 2-512. 0 = use DeepSNR's own default (480)."
       },
-      "recheck_engines": "Re-check engines"
+      "recheck_engines": "Re-check engines",
+      "backup": {
+        "blurb": "Download your settings and custom presets as one file, or restore them from a previous export - not sessions or images, which are meant to expire.",
+        "export": "Export configuration",
+        "import": "Import configuration",
+        "import_result": "{imported} preset(s) imported, {skipped} skipped (name already existed)."
+      }
     },
     "logs": {
       "level_label": "Level",

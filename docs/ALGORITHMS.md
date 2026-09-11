@@ -362,8 +362,18 @@ timeout, bad output - logs and falls back to the classical code.
 
 `AutoAstroService.suggest_parameters(image)` (`app/services/auto_astro.py`)
 analyses the session's original image and proposes a `ProcessingParameters`
-set - deliberately scoped to what histogram/black-point/star-density can
-drive with confidence; everything else stays at its default.
+set - deliberately scoped to what a single frame's own statistics can drive
+with confidence (tone, star density, background gradient, colour cast,
+noise); saturation, sharpness, colour grading, and geometry stay at their
+default - creative choices a heuristic has no business making.
+
+Three of the five measurements below (white balance, gradient reduction,
+denoise) first need to tell "background sky" apart from "the DSO/stars own
+real signal" - `_sky_mask(gray)` stands in for that split as the darker half
+of the frame (`gray <= percentile(gray, 50)`), true on a typical deep-sky
+frame where the object occupies a minority of pixels. Each of those three
+bails out to "no change" below `_MIN_SKY_PIXELS` (400) sky pixels, rather than
+measure anything on too small or unrepresentative a sample.
 
 **Tone stretch** (grayscale luminance percentiles, robust to a few hot/cold
 pixels) is deliberately not a single uniform curve: the goal is *separation*
@@ -408,6 +418,53 @@ field, defeating "gentle starting point" - a first version (`density * 0.8`)
 hit its cap of 60 on a real ~1000/MP deep-stack photo just as readily as on a
 merely-busy one. Capped at 50 (not 100) regardless - Auto Astro is meant as a
 starting point, not a maxed-out edit.
+
+**Gradient reduction** (light pollution / vignetting): a heavily blurred copy
+of the frame (same downscale + large-sigma Gaussian estimate
+`apply_gradient_reduction` itself uses) gets a plane fitted to it by least
+squares over normalised `(-1..1, -1..1)` coordinates; the fitted plane's own
+corner-to-corner amplitude (`|slope_x| + |slope_y|`), relative to the tone
+stretch's own `usable_range`, is the severity. `gradient_reduction =
+clip(round(severity * 300), 0, 60)`, or 0 below a `0.02` severity floor.
+Deliberately a fitted *linear trend*, not the blurred frame's raw standard
+deviation: a centred, radially-symmetric DSO also strays from flat under a
+heavy blur just as much as a real gradient would, but contributes almost
+nothing to a best-fit plane - a symmetric bump's slope cancels out around the
+centre, where a genuine corner-brighter-than-corner gradient does not. An
+earlier std-based version suggested `gradient_reduction=42` on a perfectly
+flat background with nothing but a centred bright circle on it; the
+plane-fit version correctly reads that as flat.
+
+**White balance**: only `temperature` (blue/orange) is proposed, from the sky
+mask's own mean blue-vs-red balance - `tint`'s green/magenta axis is left
+alone, harder to tell apart from a real nebula's own colour with one frame's
+confidence than a broad orange/blue cast (light pollution, the sensor's own
+response) is. The correction is *damped* to half the measured cast
+(`target_blue_gain = 1 + (red/blue - 1) * 0.5`) before being inverted through
+`kelvin_to_rgb_gain`'s own blue-channel slope (`0.3` per 2000K step) back into
+a Kelvin value - the same reasoning as the "Colour calibration" hint's own
+caveat: a full neutralisation can't tell a sensor cast apart from the
+target's own real colour (a blue reflection nebula, a red emission nebula),
+so it risks washing either out; a starting nudge doesn't carry that risk as
+sharply. A cast under `3%` (`abs(red/blue - 1) < 0.03`) is left at the neutral
+6500K default - more likely noise than a real tint.
+
+**Denoise**: the sky mask's Laplacian response, via its median absolute
+deviation (`sigma = median(abs(laplacian)) / 0.6745` - a standard,
+outlier-robust noise estimator, robust to the handful of real star-point
+edges that still fall inside the mask), maps to `denoise = clip(round(sigma *
+4.5), 0, 60)`, or 0 below a `1.5` sigma floor (a stack, or a clean low-ISO
+frame, is left untouched rather than softened for a marginal reading).
+
+**Chroma denoise**: colour speckle is usually more objectionable than luma
+noise in a stacked frame (see `apply_chroma_denoise`) - the exact same
+Laplacian-MAD estimator as denoise above, run on the Cr and Cb planes
+(`cv2.COLOR_BGR2YCrCb`) instead of luma, taking whichever of the two reads
+noisier. No separately-calibrated threshold/scale/cap of its own: it reuses
+denoise's `1.5` floor, `4.5` scale, and `60` cap verbatim, on the same
+reasoning `apply_chroma_denoise` itself is built on (chroma noise behaves
+like luma noise, just measured on a different plane) - not a claim the two
+are identical in practice.
 
 **A note on very bright stars**: any meaningful contrast stretch pushes
 already-bright pixels further toward clipping, including a photo's brightest
