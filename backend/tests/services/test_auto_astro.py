@@ -99,33 +99,22 @@ def test_flat_degenerate_frame_skips_tone_changes(service: AutoAstroService) -> 
     assert params.exposure == 0.0
     assert params.highlights == 0.0
     assert params.shadows == 0.0
-    assert params.gradient_reduction == 0
     assert params.temperature == 6500
     assert params.denoise == 0
     assert params.chroma_denoise == 0
 
 
-def test_smooth_gradient_background_suggests_reduction(service: AutoAstroService) -> None:
-    """A smooth left-to-right brightness ramp is exactly what light pollution /
-    vignetting looks like - the same quantity `apply_gradient_reduction`
-    itself subtracts deviations from should read as clearly non-flat."""
+def test_never_suggests_gradient_reduction(service: AutoAstroService) -> None:
+    """Tried and removed: a linear-trend fit looked clean against synthetic,
+    perfectly-symmetric test images, but real captures proved it can't
+    reliably tell a real light-pollution gradient apart from an ordinary
+    asymmetric bright subject (confirmed against real lunar photos - see
+    docs/ALGORITHMS.md). `gradient_reduction` is manual-only now; Auto Astro
+    must never touch it, on any input."""
     height, width = 200, 200
     _y, x = np.mgrid[0:height, 0:width]
     ramp = (80 + 60 * (x / width)).astype(np.uint8)
     image = np.stack([ramp, ramp, ramp], axis=-1)
-
-    params = service.suggest_parameters(image)
-
-    assert params.gradient_reduction > 0
-
-
-def test_flat_background_with_signal_suggests_no_gradient_reduction(
-    service: AutoAstroService,
-) -> None:
-    """A real but uniform background (no spatial gradient) shouldn't trigger
-    gradient reduction just because a bright object sits in the frame."""
-    image = np.full((200, 200, 3), 60, dtype=np.uint8)
-    cv2.circle(image, (100, 100), 30, (200, 200, 200), -1)
 
     params = service.suggest_parameters(image)
 

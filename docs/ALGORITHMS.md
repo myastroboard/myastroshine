@@ -363,17 +363,27 @@ timeout, bad output - logs and falls back to the classical code.
 `AutoAstroService.suggest_parameters(image)` (`app/services/auto_astro.py`)
 analyses the session's original image and proposes a `ProcessingParameters`
 set - deliberately scoped to what a single frame's own statistics can drive
-with confidence (tone, star density, background gradient, colour cast,
-noise); saturation, sharpness, colour grading, and geometry stay at their
-default - creative choices a heuristic has no business making.
+with confidence (tone, star density, colour cast, noise); saturation,
+sharpness, colour grading, and geometry stay at their default - creative
+choices a heuristic has no business making.
 
-Three of the five measurements below (white balance, gradient reduction,
-denoise) first need to tell "background sky" apart from "the DSO/stars own
-real signal" - `_sky_mask(gray)` stands in for that split as the darker half
-of the frame (`gray <= percentile(gray, 50)`), true on a typical deep-sky
-frame where the object occupies a minority of pixels. Each of those three
-bails out to "no change" below `_MIN_SKY_PIXELS` (400) sky pixels, rather than
-measure anything on too small or unrepresentative a sample.
+Two of the measurements below (white balance, denoise) first need to tell
+"background sky" apart from "the DSO/stars own real signal" -
+`_sky_mask(gray)` stands in for that split as the darker half of the frame
+(`gray <= percentile(gray, 50)`), true on a typical deep-sky frame where the
+object occupies a minority of pixels. Both bail out to "no change" below
+`_MIN_SKY_PIXELS` (400) sky pixels, rather than measure anything on too
+small or unrepresentative a sample.
+
+**Every constant below was checked against a real library of stacked FITS
+composites and real lunar photos, not just synthetic test images** - not a
+formality: the first cut of `denoise`/`chroma_denoise` and an earlier
+`gradient_reduction` heuristic both looked reasonable against synthetic
+noise/gradients and were wrong on real captures (see "Gradient reduction"
+and "Denoise" below). Synthetic tests still guard the *shape* of each
+heuristic (does noisier make `denoise` go up, does a neutral sky leave
+`temperature` alone); they cannot substitute for checking real output ranges
+before shipping a number that runs unsupervised.
 
 **Tone stretch** (grayscale luminance percentiles, robust to a few hot/cold
 pixels) is deliberately not a single uniform curve: the goal is *separation*
@@ -419,21 +429,31 @@ hit its cap of 60 on a real ~1000/MP deep-stack photo just as readily as on a
 merely-busy one. Capped at 50 (not 100) regardless - Auto Astro is meant as a
 starting point, not a maxed-out edit.
 
-**Gradient reduction** (light pollution / vignetting): a heavily blurred copy
-of the frame (same downscale + large-sigma Gaussian estimate
-`apply_gradient_reduction` itself uses) gets a plane fitted to it by least
-squares over normalised `(-1..1, -1..1)` coordinates; the fitted plane's own
-corner-to-corner amplitude (`|slope_x| + |slope_y|`), relative to the tone
-stretch's own `usable_range`, is the severity. `gradient_reduction =
-clip(round(severity * 300), 0, 60)`, or 0 below a `0.02` severity floor.
-Deliberately a fitted *linear trend*, not the blurred frame's raw standard
-deviation: a centred, radially-symmetric DSO also strays from flat under a
-heavy blur just as much as a real gradient would, but contributes almost
-nothing to a best-fit plane - a symmetric bump's slope cancels out around the
-centre, where a genuine corner-brighter-than-corner gradient does not. An
-earlier std-based version suggested `gradient_reduction=42` on a perfectly
-flat background with nothing but a centred bright circle on it; the
-plane-fit version correctly reads that as flat.
+**Gradient reduction (tried, removed)**: light pollution / vignetting shows up
+as a broad brightness trend across the frame, so the first version fitted a
+plane (least squares) to a heavily blurred copy of the frame and used the
+fitted plane's corner-to-corner amplitude as severity - deliberately not the
+blurred frame's raw standard deviation, since a centred, radially-symmetric
+DSO also strays from flat under a heavy blur just as much as a real gradient
+would, but contributes almost nothing to a best-fit *linear* plane (a
+symmetric bump's slope cancels out around the centre). That fix genuinely
+worked against a synthetic centred-circle test (an earlier std-based version
+had suggested `gradient_reduction=42` on a perfectly flat background with
+nothing but a centred bright circle on it; the plane-fit version correctly
+read that as flat).
+
+It failed against real photos anyway. Checked against a library of real
+stacked FITS composites and real lunar photos: an ordinary, uncropped lunar
+shot - no light pollution gradient to correct, nothing subtle about it - measured
+a severity of 0.049-0.071, landing squarely inside the same range several
+legitimate-looking real deep-sky corrections measured (0.02-0.16). A real
+photo is essentially never perfectly symmetric (off-centre framing, a
+lunar terminator, an elongated galaxy), so the false-positive rate in
+practice was too high to trust unsupervised - the same structural confound
+that already ruled out an auto vignette-correction heuristic (a real vignette
+and a centred bright object produce the identical centre-bright/edge-dim
+radial signature; no single-frame trick tells them apart). `gradient_reduction`
+is manual-only; `AutoAstroService` never sets it.
 
 **White balance**: only `temperature` (blue/orange) is proposed, from the sky
 mask's own mean blue-vs-red balance - `tint`'s green/magenta axis is left
@@ -453,15 +473,29 @@ sharply. A cast under `3%` (`abs(red/blue - 1) < 0.03`) is left at the neutral
 deviation (`sigma = median(abs(laplacian)) / 0.6745` - a standard,
 outlier-robust noise estimator, robust to the handful of real star-point
 edges that still fall inside the mask), maps to `denoise = clip(round(sigma *
-4.5), 0, 60)`, or 0 below a `1.5` sigma floor (a stack, or a clean low-ISO
+1.2), 0, 50)`, or 0 below a `1.5` sigma floor (a stack, or a clean low-ISO
 frame, is left untouched rather than softened for a marginal reading).
+
+The `1.2` scale is calibrated against real stacked composites, not just
+synthetic noise. A first version used `4.5`, tuned only against synthetic
+per-pixel noise injected into a flat test image; checked against a library
+of real stacked FITS (M31, several nebulae, several star clusters), every
+one of them read a sky sigma of 15-22, which `4.5` mapped to 70-100+ -
+capping at the (then) `60` ceiling on nearly every real capture tested, and
+`apply_denoise` runs on the *whole frame*, not just the sky, so that also
+meant smoothing away genuine DSO detail (dust lanes, resolved star clusters)
+along with the sky noise it was aimed at. `1.2` maps that same real 15-22
+range to a gentle ~20-25; a single very noisy raw sub-frame (sigma 50+,
+i.e. an unstacked light frame opened directly rather than through the
+multi-frame stacker) still reaches the new, lower `50` cap - appropriately,
+since that case usually is genuinely that noisy.
 
 **Chroma denoise**: colour speckle is usually more objectionable than luma
 noise in a stacked frame (see `apply_chroma_denoise`) - the exact same
 Laplacian-MAD estimator as denoise above, run on the Cr and Cb planes
 (`cv2.COLOR_BGR2YCrCb`) instead of luma, taking whichever of the two reads
 noisier. No separately-calibrated threshold/scale/cap of its own: it reuses
-denoise's `1.5` floor, `4.5` scale, and `60` cap verbatim, on the same
+denoise's `1.5` floor, `1.2` scale, and `50` cap verbatim, on the same
 reasoning `apply_chroma_denoise` itself is built on (chroma noise behaves
 like luma noise, just measured on a different plane) - not a claim the two
 are identical in practice.

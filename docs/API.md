@@ -378,10 +378,11 @@ can sync its sliders in one round trip:
 
 Scope is deliberately limited to what a single frame's own statistics can
 drive with confidence: `contrast`, `exposure`, `highlights`, `shadows`,
-`star_reduction`, `gradient_reduction`, `temperature`, `denoise`, and
-`chroma_denoise`. Everything else (saturation, sharpness, colour grading,
-geometry) stays at its `ProcessingParameters` default - see
-`docs/ALGORITHMS.md` "Auto Astro".
+`star_reduction`, `temperature`, `denoise`, and `chroma_denoise`. Everything
+else (saturation, sharpness, colour grading, geometry, `gradient_reduction`,
+`vignette_correction`) stays at its `ProcessingParameters` default - see
+`docs/ALGORITHMS.md` "Auto Astro" for why gradient reduction specifically was
+tried and reverted.
 See `docs/ALGORITHMS.md` "Auto Astro" for the heuristic.
 
 ## Client config
