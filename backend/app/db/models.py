@@ -137,6 +137,10 @@ class StackRecord(Base):
     included_frames: Mapped[list[int]] = mapped_column(JSON, default=list)
     #: reference frame, per-frame quality metrics, registration residuals.
     quality_report: Mapped[JsonDict | None] = mapped_column(JSON)
+    #: acquisition info read off the source FITS headers (object, telescope,
+    #: filter, frame count, exposure) - for the editor's capture info panel.
+    #: None for a plain (non-FITS) upload, or a FITS with no usable header.
+    capture_info: Mapped[JsonDict | None] = mapped_column(JSON)
     #: "upload" (the UI) or "watch" (the folder-watch ingest task).
     source: Mapped[str] = mapped_column(String(12), default="upload")
     #: drizzle output scale: 1 = off, 2 or 3 = variable-pixel super-resolution.

@@ -41,7 +41,7 @@ from app.services.post_stack import PostStackReport, apply_post_stack, render_st
 from app.services.session import SessionService
 from app.services.storage import PreparedFrame, StorageService
 from app.utils.app_settings import get_app_settings
-from app.utils.linear_ingest import LinearFrame, ingest_frame
+from app.utils.linear_ingest import LinearFrame, ingest_frame, summarize_capture
 
 logger = get_logger(__name__)
 
@@ -65,6 +65,17 @@ class StackingService:
         if record is None:
             raise ResourceNotFoundError(f"Stack {stack_id} not found")
         return record
+
+    def get_capture_info(self, session_id: str) -> dict[str, Any] | None:
+        """The capture info for the stack behind ``session_id``, if any.
+
+        ``None`` for a session with no linked stack (an ordinary photo) or one
+        whose source FITS had no usable header.
+        """
+        record = self.db.scalars(
+            select(StackRecord).where(StackRecord.session_id == session_id)
+        ).first()
+        return record.capture_info if record else None
 
     def initiate(self, config: InitiateStackRequest, *, source: str = "upload") -> StackRecord:
         app_settings = get_app_settings()
@@ -229,6 +240,10 @@ class StackingService:
         record.session_id = session.session_id
         record.status = "completed"
         record.result = stats.model_dump()
+        # Cheap: reads each frame's small JSON metadata sidecar, no pixel data.
+        record.capture_info = summarize_capture(
+            [self.storage.load_frame_acquisition(stack_id, i).get("acquisition", {}) for i in kept]
+        )
         self.db.commit()
         self.db.refresh(record)
         self._emit(job_id, stack_id, "done", 100, status="completed")

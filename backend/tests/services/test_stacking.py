@@ -157,6 +157,33 @@ def test_process_produces_an_enhanceable_session(
     assert done.result["snr_improvement"] == pytest.approx(2.0, abs=0.4)
 
 
+def test_process_summarizes_capture_info_from_the_kept_frames(
+    stacking: StackingService, star_field: np.ndarray
+) -> None:
+    """Each sub's FITS metadata sidecar rolls up into the stack's capture info -
+    the editor's info panel reads this off the completed StackRecord."""
+    record = stacking.initiate(InitiateStackRequest(frame_count=4))
+    for i, frame in enumerate(_shifted_frames(star_field, 4)):
+        with_meta = LinearFrame(
+            data=frame.data,
+            already_stretched=frame.already_stretched,
+            source_bit_depth=frame.source_bit_depth,
+            metadata={"object": "NGC 7000", "filter": "LP", "exposure_s": "10.0"},
+        )
+        stacking.add_frame(record.stack_id, i, with_meta)
+    stacking.set_frame_excluded(record.stack_id, 3, excluded=True)  # kept: 3 of 4
+
+    done = stacking.process(record.stack_id)
+
+    assert done.capture_info == {
+        "object_name": "NGC 7000",
+        "filter": "LP",
+        "frame_count": 3,
+        "exposure_s": 10.0,
+        "total_exposure_s": 30.0,
+    }
+
+
 def test_excluded_frames_are_left_out_of_the_composite(
     stacking: StackingService, star_field: np.ndarray
 ) -> None:

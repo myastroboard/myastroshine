@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { CaptureInfoPanel } from '@/components/CaptureInfoPanel';
 import { DepthShiftViewer } from '@/components/DepthShiftViewer';
 import { EditorInspector } from '@/components/EditorInspector';
 import { EditorRail } from '@/components/EditorRail';
@@ -8,6 +9,7 @@ import { MilestoneTimeline } from '@/components/MilestoneTimeline';
 import { SavePresetDialog } from '@/components/SavePresetDialog';
 import { useAstroDexIntegration } from '@/hooks/useAstroDexIntegration';
 import { useAutoAstro } from '@/hooks/useAutoAstro';
+import { useCaptureInfo } from '@/hooks/useCaptureInfo';
 import { useDepthShift } from '@/hooks/useDepthShift';
 import { useImageProcessing } from '@/hooks/useImageProcessing';
 import { useMilestones, type Milestone } from '@/hooks/useMilestones';
@@ -107,6 +109,7 @@ export function EditorView({ session, onExit }: EditorViewProps) {
   const serverConfig = useServerConfig();
   const starMask = useStarMask(session.sessionId);
   const autoAstro = useAutoAstro(session.sessionId);
+  const captureInfo = useCaptureInfo(session.sessionId, Boolean(session.isStack));
   const astrodex = useAstroDexIntegration();
   const { detect: detectStars } = starMask;
 
@@ -375,6 +378,7 @@ export function EditorView({ session, onExit }: EditorViewProps) {
           focalPoint={focalPoint}
           isStack={Boolean(session.isStack)}
         />
+        {captureInfo && <CaptureInfoPanel info={captureInfo} />}
       </div>
 
       <EditorInspector

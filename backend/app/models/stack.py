@@ -145,3 +145,22 @@ class StackResultResponse(BaseModel):
     frames: list[StackFrameInfo] = Field(default_factory=list)
     calibration: CalibrationSummary | None = None
     error: str | None = None
+
+
+class CaptureInfo(BaseModel):
+    """Acquisition info read off the source FITS header(s), for the editor's
+    capture info panel - see :func:`app.utils.linear_ingest.summarize_capture`.
+    Every field is best-effort: a source with a sparse or absent header (an
+    ordinary photo never reaches this model at all) simply omits what it
+    didn't have.
+    """
+
+    object_name: str | None = None
+    telescope: str | None = None
+    filter: str | None = None
+    frame_count: int | None = None
+    exposure_s: float | None = None
+    total_exposure_s: float | None = None
+    date_obs: str | None = None
+    gain: float | None = None
+    sensor_temp_c: float | None = None

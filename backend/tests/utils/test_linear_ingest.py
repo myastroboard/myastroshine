@@ -16,6 +16,7 @@ from app.utils.linear_ingest import (
     debayer_rgb,
     ingest_frame,
     stretch_composite_bgr,
+    summarize_capture,
     to_display_bgr,
 )
 
@@ -110,6 +111,55 @@ def test_fits_metadata_is_extracted() -> None:
     assert frame.metadata["object"] == "C 11"
     assert frame.metadata["filter"] == "IRCUT"
     assert frame.metadata["instrument"] == "Seestar S50"
+
+
+def test_summarize_capture_trusts_an_already_stacked_source_header() -> None:
+    """A single already-stacked FITS (Seestar/ASIAIR) totals its own run in the
+    header - STACKCNT/TOTALEXP are used as-is, not recomputed from one frame."""
+    data = np.zeros((8, 8), dtype=np.uint16)
+    frame = ingest_frame(
+        _fits_bytes(
+            data,
+            OBJECT="M 31",
+            TELESCOP="S50 Pro",
+            FILTER="IRCUT",
+            STACKCNT=1406,
+            EXPOSURE=10.0,
+            TOTALEXP=14060.0,
+            **{"DATE-OBS": "2026-09-11T04:29:33"},
+        ),
+        "stack.fit",
+    )
+
+    info = summarize_capture([frame.metadata])
+
+    assert info == {
+        "object_name": "M 31",
+        "telescope": "S50 Pro",
+        "filter": "IRCUT",
+        "date_obs": "2026-09-11T04:29:33",
+        "frame_count": 1406,
+        "exposure_s": 10.0,
+        "total_exposure_s": 14060.0,
+    }
+
+
+def test_summarize_capture_sums_raw_subs_with_no_stack_total_in_the_header() -> None:
+    """Many raw subs (the in-app multi-frame stacker) have no STACKCNT/TOTALEXP -
+    the frame count and total exposure are derived from how many were passed."""
+    acquisition = {"object": "NGC 7000", "exposure_s": "10.0"}
+
+    info = summarize_capture([acquisition, acquisition, acquisition])
+
+    assert info is not None
+    assert info["frame_count"] == 3
+    assert info["exposure_s"] == 10.0
+    assert info["total_exposure_s"] == 30.0
+
+
+def test_summarize_capture_handles_nothing_usable() -> None:
+    assert summarize_capture([]) is None
+    assert summarize_capture([{}]) is None
 
 
 def test_fits_bottom_up_row_order_is_flipped() -> None:

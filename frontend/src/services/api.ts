@@ -9,6 +9,7 @@ import type {
   AutoAstroResult,
   CalibrationKind,
   CalibrationSummary,
+  CaptureInfo,
   CreatedToken,
   DepthShiftResult,
   EngineStatusResponse,
@@ -430,6 +431,12 @@ export const apiClient = {
   /** Public runtime limits (upload size cap, stacking limits). */
   getConfig(): Promise<PublicConfig> {
     return request<PublicConfig>('/config');
+  },
+
+  /** The session's capture info (object, telescope, filter, frame count,
+   * exposure) read off its source FITS header(s), or `null` if it has none. */
+  getCaptureInfo(sessionId: string): Promise<CaptureInfo | null> {
+    return request<CaptureInfo | null>(`/session/${sessionId}/capture-info`);
   },
 };
 

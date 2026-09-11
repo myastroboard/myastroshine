@@ -37,6 +37,7 @@ from app.models.settings import AppSettingsResponse, AppSettingsUpdate
 from app.models.stack import (
     CalibrationFrameCounts,
     CalibrationSummary,
+    CaptureInfo,
     ExcludeFrameRequest,
     FrameQualityInfo,
     InitiateStackRequest,
@@ -61,6 +62,7 @@ __all__ = [
     "AutoAstroResponse",
     "CalibrationFrameCounts",
     "CalibrationSummary",
+    "CaptureInfo",
     "CreateTokenRequest",
     "CreatedTokenResponse",
     "CurvePoint",

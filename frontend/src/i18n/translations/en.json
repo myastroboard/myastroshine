@@ -137,6 +137,17 @@
       "origin": "Original",
       "point": "Milestone {n}",
       "restore_aria": "Restore {label}"
+    },
+    "capture_info": {
+      "title": "Capture",
+      "object": "Object",
+      "telescope": "Telescope",
+      "filter": "Filter",
+      "frames": "Frames",
+      "total_exposure": "Total exposure",
+      "date": "Date",
+      "gain": "Gain",
+      "sensor_temp": "Sensor temp"
     }
   },
   "export_panel": {
@@ -327,7 +338,7 @@
     },
     "color_calibration": {
       "label": "Colour calibration",
-      "hint": "Neutralises the sky background to grey and balances the channels so the star field reads roughly white."
+      "hint": "Neutralises the sky background to grey and balances the channels so the star field reads roughly white. Fixes a sensor colour cast (a stack coming out uniformly yellow, say) - but it cannot tell that apart from a target's own real colour, so turn it off for a genuinely strongly-coloured object (a blue reflection nebula like the Pleiades, a red emission nebula) if it looks washed out."
     }
   },
   "stars_panel": {

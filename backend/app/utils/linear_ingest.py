@@ -75,6 +75,11 @@ _FITS_META_KEYS = {
     "IMAGETYP": "image_type",
     "XPIXSZ": "pixel_size_um",
     "FOCALLEN": "focal_length_mm",
+    # An already-stacked source (a Seestar / ASIAIR live stack) totals its own
+    # run in the header - trusted as-is by summarize_capture below, instead of
+    # recomputing from a single frame's own exposure.
+    "STACKCNT": "stack_frame_count",
+    "TOTALEXP": "total_exposure_s",
 }
 
 _FLOAT_ALREADY_NORMALIZED_MAX = 2.0  # a float FITS above this is treated as raw ADU counts
@@ -127,6 +132,60 @@ class LinearFrame:
     @property
     def shape(self) -> tuple[int, int]:
         return (self.data.shape[0], self.data.shape[1])
+
+
+def _first_present(acquisitions: list[dict[str, str]], key: str) -> str | None:
+    return next((value for a in acquisitions if (value := a.get(key))), None)
+
+
+def _as_float(value: str | None) -> float | None:
+    try:
+        return float(value) if value is not None else None
+    except ValueError:
+        return None
+
+
+def summarize_capture(acquisitions: list[dict[str, str]]) -> dict[str, str | int | float] | None:
+    """Roll up one or more frames' FITS metadata into the editor's capture info panel.
+
+    A single already-stacked source (a Seestar / ASIAIR live stack) totals its
+    own run in the header - ``stack_frame_count``/``total_exposure_s`` (see
+    ``_FITS_META_KEYS``) are trusted as-is. Otherwise - a lone raw sub, or many
+    of them from the in-app multi-frame stacker - the frame count is simply how
+    many acquisitions were passed, and the total exposure is the sum of each
+    one's own ``exposure_s``.
+    """
+    acquisitions = [a for a in acquisitions if a]
+    if not acquisitions:
+        return None
+
+    info: dict[str, str | int | float] = {}
+    if object_name := _first_present(acquisitions, "object"):
+        info["object_name"] = object_name
+    for key in ("telescope", "filter"):
+        if value := _first_present(acquisitions, key):
+            info[key] = value
+    if date_obs := sorted(v for a in acquisitions if (v := a.get("date_obs"))):
+        info["date_obs"] = date_obs[0]
+    if (gain := _as_float(_first_present(acquisitions, "gain"))) is not None:
+        info["gain"] = gain
+    if (temp := _as_float(_first_present(acquisitions, "sensor_temp_c"))) is not None:
+        info["sensor_temp_c"] = temp
+
+    stack_total = len(acquisitions) == 1
+    frame_count = _as_float(acquisitions[0].get("stack_frame_count")) if stack_total else None
+    info["frame_count"] = int(frame_count) if frame_count else len(acquisitions)
+
+    exposures = [e for a in acquisitions if (e := _as_float(a.get("exposure_s"))) is not None]
+    if exposures:
+        info["exposure_s"] = exposures[0]
+    total_exposure = _as_float(acquisitions[0].get("total_exposure_s")) if stack_total else None
+    if total_exposure is not None:
+        info["total_exposure_s"] = total_exposure
+    elif exposures:
+        info["total_exposure_s"] = sum(exposures)
+
+    return info
 
 
 def ingest_frame(data: bytes, filename: str | None = None) -> LinearFrame:

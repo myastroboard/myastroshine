@@ -77,6 +77,41 @@ def test_ingest_opens_a_composite_backed_session(
     assert linear_upload.storage.processed_path(session.session_id).exists()
 
 
+def test_ingest_records_capture_info_from_the_fits_header(
+    linear_upload: LinearUploadService, db_session
+) -> None:
+    rng = np.random.default_rng(5)
+    cube = (10_000 + rng.normal(0, 40, (3, 240, 180))).astype(np.uint16)
+    hdu = fits.PrimaryHDU(data=cube)
+    hdu.header["OBJECT"] = "M 31"
+    hdu.header["FILTER"] = "IRCUT"
+    hdu.header["STACKCNT"] = 1406
+    hdu.header["EXPOSURE"] = 10.0
+    hdu.header["TOTALEXP"] = 14060.0
+    buffer = io.BytesIO()
+    hdu.writeto(buffer)
+
+    session, _ = linear_upload.ingest(buffer.getvalue(), "Stacked_M31.fits")
+
+    record = db_session.query(StackRecord).filter_by(session_id=session.session_id).one()
+    assert record.capture_info == {
+        "object_name": "M 31",
+        "filter": "IRCUT",
+        "frame_count": 1406,
+        "exposure_s": 10.0,
+        "total_exposure_s": 14060.0,
+    }
+
+
+def test_ingest_leaves_capture_info_empty_for_a_headerless_source(
+    linear_upload: LinearUploadService, db_session
+) -> None:
+    session, _ = linear_upload.ingest(_png16(), "stack.png")
+
+    record = db_session.query(StackRecord).filter_by(session_id=session.session_id).one()
+    assert record.capture_info is None
+
+
 def _crop_box(service: LinearUploadService, db, session_id: str):
     record = db.query(StackRecord).filter_by(session_id=session_id).one()
     return record.quality_report["border_crop"]

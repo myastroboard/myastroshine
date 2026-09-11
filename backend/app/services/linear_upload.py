@@ -28,7 +28,7 @@ from app.services.session import SessionService
 from app.services.storage import StorageService
 from app.utils.app_settings import get_app_settings
 from app.utils.image_utils import FITS_FORMATS, extension_of
-from app.utils.linear_ingest import LinearFrame, debayer_rgb, ingest_frame
+from app.utils.linear_ingest import LinearFrame, debayer_rgb, ingest_frame, summarize_capture
 
 logger = get_logger(__name__)
 
@@ -103,6 +103,7 @@ class LinearUploadService:
                 received_frames=1,
                 status="completed",
                 source="single",
+                capture_info=summarize_capture([frame.metadata]),
                 session_id=session.session_id,
                 post_process=False,
                 cosmetic_correction=False,

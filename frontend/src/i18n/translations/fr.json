@@ -137,6 +137,17 @@
       "origin": "Origine",
       "point": "Jalon {n}",
       "restore_aria": "Restaurer {label}"
+    },
+    "capture_info": {
+      "title": "Prise de vue",
+      "object": "Objet",
+      "telescope": "Télescope",
+      "filter": "Filtre",
+      "frames": "Images",
+      "total_exposure": "Exposition totale",
+      "date": "Date",
+      "gain": "Gain",
+      "sensor_temp": "Température capteur"
     }
   },
   "export_panel": {
@@ -327,7 +338,7 @@
     },
     "color_calibration": {
       "label": "Calibration des couleurs",
-      "hint": "Neutralise le fond de ciel vers le gris et équilibre les canaux pour que le champ d'étoiles paraisse à peu près blanc."
+      "hint": "Neutralise le fond de ciel vers le gris et équilibre les canaux pour que le champ d'étoiles paraisse à peu près blanc. Corrige une dominante due au capteur (une prise qui sort uniformément jaune, par exemple) - mais ne peut pas distinguer ça de la vraie couleur de l'objet, donc désactivez-la pour un objet réellement très coloré (une nébuleuse par réflexion bleue comme les Pléiades, une nébuleuse en émission rouge) si le résultat paraît délavé."
     }
   },
   "stars_panel": {

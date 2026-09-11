@@ -405,6 +405,21 @@ export interface UploadResponse {
   isStack: boolean;
 }
 
+/** Acquisition info read off the source FITS header(s) - every field is
+ * best-effort and may be absent. `null` when the session has none (an
+ * ordinary photo, or a FITS with no usable header). */
+export interface CaptureInfo {
+  objectName?: string;
+  telescope?: string;
+  filter?: string;
+  frameCount?: number;
+  exposureS?: number;
+  totalExposureS?: number;
+  dateObs?: string;
+  gain?: number;
+  sensorTempC?: number;
+}
+
 export interface ProcessResponse {
   sessionId: string;
   jobId: string;

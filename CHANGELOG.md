@@ -6,7 +6,27 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **A capture info panel for a stacked composite session.** Below the workflow
+  rail, a small "Capture" card shows what's read off the source FITS
+  header(s) - object, telescope, filter, frame count x exposure, total
+  exposure, date, gain, sensor temperature - for both an in-app multi-frame
+  stack and a single already-stacked upload (a Seestar / ASIAIR live stack).
+  An already-stacked source's own frame count / total exposure (`STACKCNT` /
+  `TOTALEXP`) are trusted as-is; the in-app stacker sums each kept sub's own
+  exposure instead. Every field is best-effort and simply omitted if absent;
+  the whole card stays hidden for an ordinary photo. New
+  `GET /api/session/{id}/capture-info`.
+
+### Changed
+
+- **The Colour calibration hint now says what it can get wrong.** It neutralises
+  the sky and balances the channels toward a white star field - the right call
+  for a sensor colour cast, but it can't tell that apart from a target's own
+  real colour, so it can wash out a genuinely blue reflection nebula (the
+  Pleiades) or a red emission nebula. The hint now says to turn it off for
+  those.
 
 ## [0.4.1] - 2026-09-10
 
