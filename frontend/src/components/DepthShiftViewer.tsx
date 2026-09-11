@@ -98,6 +98,7 @@ export function DepthShiftViewer({
             className="slider w-40"
             min={0}
             max={100}
+            step={1}
             value={intensity}
             aria-label={t('depth_shift_viewer.intensity_aria_label')}
             onChange={(event) => onIntensityChange(Number(event.target.value))}

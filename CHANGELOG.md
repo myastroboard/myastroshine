@@ -27,6 +27,15 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   real colour, so it can wash out a genuinely blue reflection nebula (the
   Pleiades) or a red emission nebula. The hint now says to turn it off for
   those.
+- **The tone/colour/detail sliders step by 0.1, not 0.01.** Contrast, exposure,
+  highlights, shadows, whites, blacks, clarity, sharpness, vibrance and
+  saturation showed a spurious second decimal (`1.23`) no one could aim for by
+  hand - a coarser step (matching the crop tool's straighten slider, already
+  0.1) lands on the same clean numbers with a fifth as many stops and reads
+  simpler at a glance. Every default (1.0, 0.0, ...) still falls exactly on
+  the new grid. The 0-100-range sliders (denoise, star reduction, vignette,
+  ...) were already stepping by 1 and are unchanged - this is purely a slider
+  granularity change, the stored values are still plain floats.
 
 ## [0.4.1] - 2026-09-10
 
