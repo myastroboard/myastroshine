@@ -19,6 +19,29 @@ def test_ensure_defaults_is_idempotent(db_session) -> None:
     assert {p.name for p in built_in} == {"Nebula", "Galaxy", "Deep Field", "Lunar", "Cluster"}
 
 
+def test_ensure_defaults_self_heals_a_drifted_builtin(db_session) -> None:
+    """A built-in row that drifted from the current spec (e.g. saved before a
+    ProcessingParameters field was renamed) is overwritten, not preserved -
+    built-ins are fully code-defined and never user-edited."""
+    from app.db.models import PresetRecord
+
+    service = PresetService(db_session)
+    service.ensure_defaults()
+
+    drifted = db_session.get(PresetRecord, "system_nebula")
+    drifted.name = "Old Name"
+    drifted.description = "Stale description"
+    drifted.parameters = {"contrast": 999.0}
+    db_session.commit()
+
+    service.ensure_defaults()
+
+    healed = db_session.get(PresetRecord, "system_nebula")
+    assert healed.name == "Nebula"
+    assert healed.description != "Stale description"
+    assert healed.parameters["contrast"] == pytest.approx(1.5)
+
+
 def test_list_presets_orders_system_first(db_session) -> None:
     """User presets come after the built-ins."""
     service = PresetService(db_session)

@@ -31,6 +31,76 @@ def test_secret_key_generated_once_and_persisted() -> None:
     assert load_or_generate_secret_key() == key
 
 
+def test_secret_key_second_call_returns_the_cached_value_without_touching_disk() -> None:
+    """Back-to-back calls (no reset in between) hit the in-memory cache."""
+    app_settings._cache.secret_key = None
+    first = load_or_generate_secret_key()
+    second = load_or_generate_secret_key()  # cache hit, no lock/disk round trip
+    assert second == first
+
+
+def test_secret_key_double_checked_lock_returns_the_value_set_by_a_racing_caller(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The outer check races another thread that fills the cache between the
+    outer read and acquiring the lock - the inner check inside the lock
+    catches that instead of generating (and writing) a second key."""
+
+    class _RaceCache:
+        settings = None
+
+        def __init__(self) -> None:
+            self._reads = 0
+
+        @property
+        def secret_key(self) -> str | None:
+            self._reads += 1
+            return None if self._reads == 1 else "raced-in-by-another-thread"
+
+        @secret_key.setter
+        def secret_key(self, _value: str) -> None:
+            pass  # the real function's own assignment is a no-op here
+
+    monkeypatch.setattr(app_settings, "_cache", _RaceCache())
+
+    assert load_or_generate_secret_key() == "raced-in-by-another-thread"
+
+
+def test_get_app_settings_double_checked_lock_returns_the_value_set_by_a_racing_caller(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sentinel = AppSettings(max_image_size_mb=42)
+
+    class _RaceCache:
+        secret_key = None
+
+        def __init__(self) -> None:
+            self._reads = 0
+
+        @property
+        def settings(self) -> AppSettings | None:
+            self._reads += 1
+            return None if self._reads == 1 else sentinel
+
+        @settings.setter
+        def settings(self, _value: AppSettings | None) -> None:
+            pass
+
+    monkeypatch.setattr(app_settings, "_cache", _RaceCache())
+
+    assert get_app_settings() is sentinel
+
+
+def test_a_corrupt_settings_file_falls_back_to_defaults() -> None:
+    path = get_settings().app_settings_file
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("not valid json {", encoding="utf-8")
+
+    reload_app_settings()
+
+    assert get_app_settings().max_image_size_mb == AppSettings().max_image_size_mb
+
+
 def test_defaults_when_no_file() -> None:
     """A missing app_settings.json yields the shipped defaults."""
     get_settings().app_settings_file.unlink(missing_ok=True)

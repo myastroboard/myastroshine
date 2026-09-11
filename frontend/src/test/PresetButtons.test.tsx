@@ -55,4 +55,30 @@ describe('PresetButtons', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Nebula' }));
     expect(onPresetApply).toHaveBeenCalledWith('system_nebula');
   });
+
+  it('marks the active preset as pressed and highlighted', () => {
+    render(
+      <PresetButtons
+        presets={[preset({})]}
+        activePreset="system_nebula"
+        onPresetApply={vi.fn()}
+      />,
+    );
+
+    const chip = screen.getByRole('button', { name: 'Nebula' });
+    expect(chip).toHaveAttribute('aria-pressed', 'true');
+    expect(chip).toHaveClass('chip-active');
+  });
+
+  it('does not offer a delete affordance for a built-in preset even with a handler', () => {
+    render(
+      <PresetButtons
+        presets={[preset({})]}
+        onPresetApply={vi.fn()}
+        onPresetDelete={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /delete preset/i })).not.toBeInTheDocument();
+  });
 });

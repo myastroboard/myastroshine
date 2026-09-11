@@ -27,6 +27,17 @@ def test_valid_session_id_rejects_junk(bad: str) -> None:
     assert not is_valid_session_id(bad)
 
 
+def test_valid_session_id_rejects_a_regex_match_that_uuid_parsing_still_refuses() -> None:
+    """36 hex characters with no dashes matches the regex shape but isn't a
+    parseable UUID (uuid.UUID wants exactly 32 hex digits) - covers the
+    ValueError branch the regex alone can't rule out."""
+    candidate = "a" * 36
+    assert len(candidate) == 36
+    with pytest.raises(ValueError):
+        uuid.UUID(candidate)
+    assert not is_valid_session_id(candidate)
+
+
 def test_validate_image_extension_rejects_unsupported() -> None:
     """A .bmp upload is rejected; a .jpg upload returns its extension."""
     assert validate_image_extension("photo.JPG") == ".jpg"

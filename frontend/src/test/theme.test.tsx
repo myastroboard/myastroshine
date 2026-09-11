@@ -2,21 +2,28 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { THEME_STORAGE_KEY } from '@/theme/config';
-import { detectThemePreference, resolveTheme } from '@/theme/context';
+import { detectThemePreference, prefersDark, resolveTheme } from '@/theme/context';
 import { ThemeProvider } from '@/theme/ThemeContext';
 import { useTheme } from '@/hooks/useTheme';
 
-function mockMatchMedia(matches: boolean): void {
+let lastMediaListeners: Array<() => void> = [];
+
+function mockMatchMedia(matches: boolean, { resetListeners = true } = {}): void {
+  if (resetListeners) {
+    lastMediaListeners = [];
+  }
   window.matchMedia = ((query: string) => ({
     matches,
     media: query,
     onchange: null,
-    addEventListener: () => {},
+    addEventListener: (_type: string, listener: () => void) => {
+      lastMediaListeners.push(listener);
+    },
     removeEventListener: () => {},
     addListener: () => {},
     removeListener: () => {},
     dispatchEvent: () => false,
-  })) as typeof window.matchMedia;
+  })) as unknown as typeof window.matchMedia;
 }
 
 function Probe() {
@@ -76,6 +83,16 @@ describe('theme', () => {
     });
   });
 
+  describe('prefersDark', () => {
+    it('defaults to false when matchMedia throws (unsupported browser)', () => {
+      window.matchMedia = (() => {
+        throw new Error('matchMedia unsupported');
+      }) as unknown as typeof window.matchMedia;
+
+      expect(prefersDark()).toBe(false);
+    });
+  });
+
   describe('ThemeProvider', () => {
     it('defaults to system, resolving to light on a light OS', () => {
       render(
@@ -126,6 +143,63 @@ describe('theme', () => {
 
       expect(screen.getByTestId('preference')).toHaveTextContent('system');
       expect(screen.getByTestId('resolved')).toHaveTextContent('light');
+    });
+
+    it('the default context value is a harmless no-op setPreference', () => {
+      render(<Probe />);
+      // No ThemeProvider - the default context's setPreference does nothing.
+      expect(() => fireEvent.click(screen.getByRole('button', { name: 'go dark' }))).not.toThrow();
+      expect(screen.getByTestId('preference')).toHaveTextContent('system');
+    });
+
+    it('re-applies the resolved theme when the OS preference flips while following system', () => {
+      mockMatchMedia(false);
+      render(
+        <ThemeProvider>
+          <Probe />
+        </ThemeProvider>,
+      );
+      expect(document.documentElement.classList.contains('dark')).toBe(false);
+
+      // OS flips to dark; resolveTheme('system') will now read dark. Keep the
+      // already-registered listener array so the mount-time subscription fires.
+      mockMatchMedia(true, { resetListeners: false });
+      lastMediaListeners.forEach((listener) => listener());
+
+      expect(document.documentElement.classList.contains('dark')).toBe(true);
+    });
+
+    it('does not crash subscribing to OS changes when matchMedia throws', () => {
+      window.matchMedia = (() => {
+        throw new Error('matchMedia unsupported');
+      }) as unknown as typeof window.matchMedia;
+
+      render(
+        <ThemeProvider>
+          <Probe />
+        </ThemeProvider>,
+      );
+
+      expect(screen.getByTestId('resolved')).toHaveTextContent('light');
+    });
+
+    it('setPreference still updates state when localStorage.setItem throws', () => {
+      const setItem = vi
+        .spyOn(Object.getPrototypeOf(window.localStorage) as Storage, 'setItem')
+        .mockImplementation(() => {
+          throw new Error('storage unavailable');
+        });
+
+      render(
+        <ThemeProvider>
+          <Probe />
+        </ThemeProvider>,
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'go dark' }));
+
+      expect(screen.getByTestId('preference')).toHaveTextContent('dark');
+      setItem.mockRestore();
     });
   });
 });

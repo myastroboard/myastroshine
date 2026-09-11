@@ -61,3 +61,9 @@ def test_capture_info_for_an_unknown_session_is_404(client) -> None:
     response = client.get("/api/session/00000000-0000-0000-0000-000000000000/capture-info")
 
     assert response.status_code == 404
+
+
+def test_capture_info_for_a_malformed_session_id_is_404(client) -> None:
+    response = client.get("/api/session/not-a-valid-id/capture-info")
+
+    assert response.status_code == 404

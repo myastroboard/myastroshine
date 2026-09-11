@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from typing import Any
 
 import pytest
+from fastapi import WebSocketDisconnect
 
 from app.services.job import JobService
 
@@ -71,6 +73,65 @@ def test_idle_tick_reconciles_a_missed_terminal_event(client, db_session, monkey
     with client.websocket_connect(f"/ws/processing-status/{job.job_id}") as sock:
         assert sock.receive_json()["status"] == "processing"  # catch-up
         assert sock.receive_json()["status"] == "completed"  # reconciled on an idle tick
+
+
+def test_a_real_progress_update_is_relayed_until_terminal(client, db_session, monkeypatch) -> None:
+    """A genuine pub/sub update (not an idle None tick) is forwarded as-is, and
+    a terminal status in that update ends the stream."""
+    from app.routes import websockets as ws_mod
+
+    service = JobService(db_session)
+    job = service.create("sess-live")
+    service.update(job.job_id, status="processing", progress_percent=10)
+
+    async def fake_subscribe(
+        _job_id: str, *, idle_timeout: float = 3.0
+    ) -> AsyncIterator[dict[str, Any]]:
+        yield {"job_id": job.job_id, "status": "processing", "progress_percent": 55}
+        yield {"job_id": job.job_id, "status": "completed", "progress_percent": 100}
+
+    monkeypatch.setattr(ws_mod.progress, "subscribe", fake_subscribe)
+
+    with client.websocket_connect(f"/ws/processing-status/{job.job_id}") as sock:
+        assert sock.receive_json()["status"] == "processing"  # catch-up
+        assert sock.receive_json()["progress_percent"] == 55  # relayed update
+        assert sock.receive_json()["status"] == "completed"  # terminal -> stream ends
+
+
+def test_a_client_disconnect_mid_stream_ends_quietly(client, db_session, monkeypatch) -> None:
+    from app.routes import websockets as ws_mod
+
+    service = JobService(db_session)
+    job = service.create("sess-disconnect")
+    service.update(job.job_id, status="processing", progress_percent=10)
+
+    async def fake_subscribe(_job_id: str, *, idle_timeout: float = 3.0) -> AsyncIterator[None]:
+        raise WebSocketDisconnect
+        yield  # pragma: no cover - unreachable, satisfies the async generator shape
+
+    monkeypatch.setattr(ws_mod.progress, "subscribe", fake_subscribe)
+
+    with client.websocket_connect(f"/ws/processing-status/{job.job_id}") as sock:
+        assert sock.receive_json()["status"] == "processing"  # catch-up only
+
+
+def test_an_unexpected_error_mid_stream_closes_the_socket(client, db_session, monkeypatch) -> None:
+    """A non-disconnect error while relaying is logged and the socket is
+    closed cleanly rather than propagating out of the endpoint."""
+    from app.routes import websockets as ws_mod
+
+    service = JobService(db_session)
+    job = service.create("sess-error")
+    service.update(job.job_id, status="processing", progress_percent=10)
+
+    async def fake_subscribe(_job_id: str, *, idle_timeout: float = 3.0) -> AsyncIterator[None]:
+        raise RuntimeError("redis blew up")
+        yield  # pragma: no cover - unreachable, satisfies the async generator shape
+
+    monkeypatch.setattr(ws_mod.progress, "subscribe", fake_subscribe)
+
+    with client.websocket_connect(f"/ws/processing-status/{job.job_id}") as sock:
+        assert sock.receive_json()["status"] == "processing"  # catch-up only
 
 
 @pytest.mark.asyncio

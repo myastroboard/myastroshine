@@ -87,6 +87,32 @@ def test_fits_rgb_cube_reads_as_rgb_channel_order() -> None:
     assert frame.data[8, 8, 2] > frame.data[8, 8, 0]  # blue spot in channel 2
 
 
+def test_fits_rgb_cube_trailing_axis_reads_as_rgb_channel_order() -> None:
+    """A (H, W, 3) FITS cube (trailing colour axis) is also read as R, G, B."""
+    base = np.full((10, 10), 5000.0, dtype=np.float32)
+    red, green, blue = base.copy(), base.copy(), base.copy()
+    red[1, 1] = 50000
+    green[5, 5] = 50000
+    blue[8, 8] = 50000
+
+    frame = ingest_frame(_fits_bytes(np.stack([red, green, blue], axis=-1)), "rgb.fit")
+
+    assert frame.data.shape == (10, 10, 3)
+    assert frame.data[1, 1, 0] > frame.data[1, 1, 2]
+    assert frame.data[5, 5, 1] > frame.data[5, 5, 0]
+    assert frame.data[8, 8, 2] > frame.data[8, 8, 0]
+
+
+def test_fits_rgb_cube_bottom_up_is_flipped() -> None:
+    top = np.full((10, 10), 5000.0, dtype=np.float32)
+    top[0, :] = 40000.0  # bright first row, in file order
+    cube = np.stack([top, top, top])  # same bright-top pattern on every channel
+
+    frame = ingest_frame(_fits_bytes(cube, ROWORDER="BOTTOM-UP"), "rgb.fit")
+
+    assert frame.data[-1, 0, 0] > frame.data[0, 0, 0]  # the bright row is now at the bottom
+
+
 def test_fits_metadata_is_extracted() -> None:
     """Acquisition keywords are copied into LinearFrame.metadata under stable names."""
     data = np.zeros((8, 8), dtype=np.uint16)
@@ -160,6 +186,44 @@ def test_summarize_capture_sums_raw_subs_with_no_stack_total_in_the_header() -> 
 def test_summarize_capture_handles_nothing_usable() -> None:
     assert summarize_capture([]) is None
     assert summarize_capture([{}]) is None
+
+
+def test_summarize_capture_includes_gain_and_sensor_temp_when_present() -> None:
+    info = summarize_capture([{"object": "M 42", "gain": "80", "sensor_temp_c": "-10.5"}])
+    assert info is not None
+    assert info["gain"] == 80.0
+    assert info["sensor_temp_c"] == -10.5
+
+
+def test_summarize_capture_ignores_an_unparseable_gain() -> None:
+    """A malformed numeric field (corrupt header, non-numeric text) is dropped
+    rather than raising - the rest of the capture info still comes through."""
+    info = summarize_capture([{"object": "M 42", "gain": "not-a-number"}])
+    assert info is not None
+    assert "gain" not in info
+    assert info["object_name"] == "M 42"
+
+
+def test_summarize_capture_omits_date_obs_when_no_acquisition_has_one() -> None:
+    info = summarize_capture([{"object": "M 42"}])
+    assert info is not None
+    assert "date_obs" not in info
+
+
+def test_summarize_capture_omits_object_name_when_no_acquisition_has_one() -> None:
+    info = summarize_capture([{"telescope": "S50 Pro"}])
+    assert info is not None
+    assert "object_name" not in info
+    assert info["telescope"] == "S50 Pro"
+
+
+def test_summarize_capture_omits_exposure_fields_when_none_is_known() -> None:
+    """No acquisition carries exposure_s or total_exposure_s at all - neither
+    key is set (nothing to sum, nothing trusted from a stack header)."""
+    info = summarize_capture([{"object": "M 42"}])
+    assert info is not None
+    assert "exposure_s" not in info
+    assert "total_exposure_s" not in info
 
 
 def test_fits_bottom_up_row_order_is_flipped() -> None:
@@ -304,11 +368,40 @@ def test_garbage_bytes_are_rejected() -> None:
         ingest_frame(b"not an image", "x.png")
 
 
+def test_standard_ingest_handles_a_gray_plus_alpha_source(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A 2-channel (gray + alpha) decode keeps the luminance plane and drops
+    alpha, mirroring the BGRA-drop path for colour."""
+    fake_decoded = np.zeros((10, 12, 2), dtype=np.uint8)
+    fake_decoded[..., 0] = 100
+    monkeypatch.setattr(linear_ingest.cv2, "imdecode", lambda *_a, **_k: fake_decoded)
+
+    frame = ingest_frame(b"pretend png bytes", "gray_alpha.png")
+
+    assert frame.data.ndim == 2
+    assert not frame.is_color
+
+
 def test_frame_over_the_pixel_cap_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     data = np.zeros((40, 40), dtype=np.uint16)
     monkeypatch.setattr(linear_ingest, "MAX_IMAGE_PIXELS", 100)
     with pytest.raises(UnsupportedImageError, match="exceeding"):
         ingest_frame(_fits_bytes(data), "big.fit")
+
+
+def test_a_standard_format_frame_over_the_pixel_cap_is_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The generic post-decode size guard in ingest_frame (not any
+    format-specific pre-check like FITS's header guard above)."""
+    gray = np.full((40, 40), 100, dtype=np.uint8)
+    ok, buffer = cv2.imencode(".png", gray)
+    assert ok
+    monkeypatch.setattr(linear_ingest, "MAX_IMAGE_PIXELS", 100)
+
+    with pytest.raises(UnsupportedImageError, match="exceeding"):
+        ingest_frame(buffer.tobytes(), "big.png")
 
 
 def test_raw_dispatches_through_rawpy_to_linear_rgb(monkeypatch: pytest.MonkeyPatch) -> None:

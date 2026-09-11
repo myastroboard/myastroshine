@@ -36,6 +36,11 @@ def test_detect_unknown_session_is_404(client) -> None:
     assert response.status_code == 404
 
 
+def test_detect_malformed_session_id_is_404(client) -> None:
+    response = client.post("/api/star-mask/not-a-valid-id", json={})
+    assert response.status_code == 404
+
+
 def test_detect_out_of_range_sensitivity_is_400(client, sample_jpeg: bytes) -> None:
     session_id = _upload(client, sample_jpeg)
     response = client.post(f"/api/star-mask/{session_id}", json={"sensitivity": 500})

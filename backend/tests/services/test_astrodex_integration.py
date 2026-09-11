@@ -9,6 +9,8 @@ import pytest
 
 from app.exceptions import UnauthorizedError
 from app.services.astrodex_integration import (
+    _b64url_decode,
+    _b64url_encode,
     canonical_json,
     decode_handoff_claims,
     enhanced_signing_input,
@@ -82,6 +84,28 @@ def test_decode_claims_does_not_verify_but_reads_routing_fields() -> None:
     claims = decode_handoff_claims(token)
     assert claims["kid"] == "mas_1wZcTkdO"
     assert claims["callback_base"] == "https://astro.example.test"
+
+
+def test_decode_claims_rejects_a_token_with_no_separator() -> None:
+    with pytest.raises(UnauthorizedError, match="Malformed"):
+        decode_handoff_claims("no-dot-here")
+
+
+def test_decode_claims_rejects_a_payload_that_is_not_valid_json() -> None:
+    bad_payload = _b64url_encode(b"not json {")
+    with pytest.raises(UnauthorizedError, match="Malformed"):
+        decode_handoff_claims(f"{bad_payload}.sig")
+
+
+def test_decode_claims_rejects_a_payload_that_is_not_a_json_object() -> None:
+    array_payload = _b64url_encode(b"[1, 2, 3]")
+    with pytest.raises(UnauthorizedError, match="Malformed"):
+        decode_handoff_claims(f"{array_payload}.sig")
+
+
+def test_b64url_decode_rejects_invalid_base64() -> None:
+    with pytest.raises(UnauthorizedError, match="Malformed"):
+        _b64url_decode("!!!not-base64!!!")
 
 
 def test_enhanced_signature_is_hex_and_covers_the_image() -> None:

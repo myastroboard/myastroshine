@@ -82,6 +82,34 @@ def test_limiter_resets_after_the_window_elapses(monkeypatch: pytest.MonkeyPatch
     limiter.check("1.2.3.4", limit=10)  # must not raise
 
 
+def test_limiter_resets_the_window_if_the_clock_moves_backwards(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A prior request recorded a later window than the current one (e.g. the
+    host clock was adjusted) - the counter resets instead of staying stale."""
+    limiter = InMemoryRateLimiter(window_seconds=60)
+    clock = [1_000_120.0]
+    monkeypatch.setattr("app.utils.rate_limit.time.time", lambda: clock[0])
+    limiter.check("1.2.3.4", limit=10)  # records the later window
+
+    clock[0] = 1_000_000.0  # clock stepped backwards into an earlier window
+    limiter.check("1.2.3.4", limit=10)  # must not raise: the count is reset
+
+    window_index, count = limiter._counts["1.2.3.4"]
+    assert window_index == int(1_000_000.0 // 60)
+    assert count == 1
+
+
+def test_enforce_dependency_is_a_noop_when_the_client_ip_is_unknown(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("app.utils.rate_limit.get_settings", _NotTestEnv)
+    app_settings.save_app_settings({"rate_limit_enabled": True, "rate_limit_per_minute": 1})
+    request = _fake_request(None)
+    for _ in range(5):
+        enforce_request_rate_limit(request)  # must not raise: nothing to key the count on
+
+
 def test_enforce_dependency_is_a_noop_under_app_env_test() -> None:
     """The default test env bypasses enforcement so the suite doesn't need to
     special-case every route that hits a rate-limited endpoint."""

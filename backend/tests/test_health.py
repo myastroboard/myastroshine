@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 import pytest
+
+from app.routes.health import _database_status, _redis_status
 
 
 def test_health_returns_ok(client) -> None:
@@ -36,5 +40,27 @@ def test_health_reports_redis_unreachable_in_queue_mode(
     try:
         response = client.get("/api/health")
         assert response.json()["redis"] == "unreachable"
+    finally:
+        get_settings.cache_clear()
+
+
+def test_database_status_reports_unreachable_when_the_query_raises() -> None:
+    db = MagicMock()
+    db.execute.side_effect = RuntimeError("connection refused")
+    assert _database_status(db) == "unreachable"
+
+
+def test_redis_status_reports_connected_when_the_ping_succeeds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PROCESSING_MODE", "queue")
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    fake_client = MagicMock()
+    fake_client.ping.return_value = True
+    monkeypatch.setattr("app.routes.health.redis.Redis.from_url", lambda *a, **k: fake_client)
+    try:
+        assert _redis_status() == "connected"
     finally:
         get_settings.cache_clear()

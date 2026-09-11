@@ -46,3 +46,8 @@ def test_apply_preserves_the_session_geometry(client, sample_jpeg: bytes) -> Non
 def test_apply_unknown_session_is_404(client) -> None:
     response = client.post("/api/auto-astro/00000000-0000-0000-0000-000000000000")
     assert response.status_code == 404
+
+
+def test_apply_malformed_session_id_is_404(client) -> None:
+    response = client.post("/api/auto-astro/not-a-valid-id")
+    assert response.status_code == 404

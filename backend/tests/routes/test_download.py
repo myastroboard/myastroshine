@@ -38,6 +38,12 @@ def test_download_unknown_session_is_404(client) -> None:
     assert response.status_code == 404
 
 
+def test_download_malformed_session_id_is_404(client) -> None:
+    """A syntactically invalid id is rejected before ever hitting storage."""
+    response = client.post("/api/download/not-a-valid-id", json={})
+    assert response.status_code == 404
+
+
 def test_download_rejects_bad_format(client, sample_jpeg: bytes) -> None:
     """An unsupported format string fails request validation (400)."""
     session_id = _upload(client, sample_jpeg)

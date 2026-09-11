@@ -28,6 +28,23 @@ describe('SavePresetDialog', () => {
     expect(onSave).toHaveBeenCalledWith('Deep sky', '');
   });
 
+  it('includes an edited description when saving', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(<SavePresetDialog onSave={onSave} onClose={vi.fn()} />);
+
+    fireEvent.change(screen.getByPlaceholderText('My nebula look'), {
+      target: { value: 'Deep sky' },
+    });
+    fireEvent.change(screen.getByLabelText(/description/i), {
+      target: { value: '  A wide-field shot  ' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(onSave).toHaveBeenCalledWith('Deep sky', 'A wide-field shot'),
+    );
+  });
+
   it('keeps the dialog open and shows the error when saving fails', async () => {
     const onSave = vi.fn().mockRejectedValue(new Error('Preset name already exists'));
     const onClose = vi.fn();

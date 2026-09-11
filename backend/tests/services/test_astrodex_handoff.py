@@ -15,7 +15,7 @@ from app.exceptions import (
     UnauthorizedError,
     UpstreamError,
 )
-from app.services.astrodex_handoff import AstroDexHandoffService
+from app.services.astrodex_handoff import AstroDexHandoffService, _dig
 from app.services.astrodex_integration import sign_handoff
 from app.services.session import SessionService
 from app.services.storage import StorageService
@@ -189,3 +189,95 @@ async def test_return_enhanced_without_a_link_is_not_found(
     service = _service(db_session, httpx.MockTransport(lambda _r: httpx.Response(200)))
     with pytest.raises(ResourceNotFoundError):
         await service.return_enhanced(record.session_id)
+
+
+def test_dig_stops_at_the_first_non_dict_node() -> None:
+    assert _dig({"object": "not-a-dict"}, "object", "name") is None
+    assert _dig({"a": {"b": "value"}}, "a", "b") == "value"
+    assert _dig({"a": {"b": ""}}, "a", "b") is None  # empty string is not truthy
+
+
+async def test_resume_rejects_a_handoff_missing_the_picture_reference(
+    db_session, webhook_token
+) -> None:
+    record, raw = webhook_token
+    service = _service(db_session, httpx.MockTransport(lambda _r: httpx.Response(404)))
+    token = _handoff(raw[:12], record.signing_secret, item_id="", picture_id="")
+    with pytest.raises(UnauthorizedError, match="missing the picture reference"):
+        await service.resume(token)
+
+
+async def test_resume_rejects_a_handoff_with_no_key_id(db_session) -> None:
+    service = _service(db_session, httpx.MockTransport(lambda _r: httpx.Response(404)))
+    token = _handoff("", "whatever-secret")
+    with pytest.raises(UnauthorizedError, match="no key id"):
+        await service.resume(token)
+
+
+async def test_resume_surfaces_a_network_error_reaching_astrodex(db_session, webhook_token) -> None:
+    record, raw = webhook_token
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("connection refused")
+
+    service = _service(db_session, httpx.MockTransport(handler))
+    with pytest.raises(UpstreamError, match="Could not reach AstroDex"):
+        await service.resume(_handoff(raw[:12], record.signing_secret))
+
+
+async def test_resume_rejects_an_unusable_source_response(db_session, webhook_token) -> None:
+    """The source endpoint returns 200 but with no usable image bytes."""
+    record, raw = webhook_token
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/integration/source"):
+            return httpx.Response(200, json={"object": {}, "image": {"filename": "x.jpg"}})
+        return httpx.Response(200, content=b"")  # empty image body
+
+    service = _service(db_session, httpx.MockTransport(handler))
+    with pytest.raises(UpstreamError, match="unusable source response"):
+        await service.resume(_handoff(raw[:12], record.signing_secret))
+
+
+async def test_return_enhanced_retries_past_a_network_error_then_succeeds(
+    db_session, webhook_token, sample_jpeg: bytes
+) -> None:
+    record, raw = webhook_token
+    service = _service(db_session, _source_transport(sample_jpeg))
+    session, _ = await service.resume(_handoff(raw[:12], record.signing_secret))
+
+    attempts = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        attempts["n"] += 1
+        if attempts["n"] == 1:
+            raise httpx.ConnectError("connection reset")
+        return httpx.Response(201, json={"status": "created"})
+
+    service._transport = httpx.MockTransport(handler)
+    result = await service.return_enhanced(session.session_id)
+
+    assert result.webhook_status == "sent"
+    assert attempts["n"] == 2
+
+
+async def test_return_enhanced_stops_retrying_on_a_non_retryable_status(
+    db_session, webhook_token, sample_jpeg: bytes
+) -> None:
+    """A 400 (bad request, not a transient server error) fails immediately
+    instead of burning through every retry attempt."""
+    record, raw = webhook_token
+    service = _service(db_session, _source_transport(sample_jpeg))
+    session, _ = await service.resume(_handoff(raw[:12], record.signing_secret))
+
+    attempts = {"n": 0}
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        attempts["n"] += 1
+        return httpx.Response(400, json={"error": "malformed payload"})
+
+    service._transport = httpx.MockTransport(handler)
+    with pytest.raises(UpstreamError, match="rejected the enhanced image"):
+        await service.return_enhanced(session.session_id)
+
+    assert attempts["n"] == 1  # no retries for a non-transient rejection

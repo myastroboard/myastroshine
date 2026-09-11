@@ -80,6 +80,18 @@ describe('SliderGroup', () => {
     expect(onParameterChange).toHaveBeenCalledWith('temperature', 6000);
   });
 
+  it('reads the tone as cool above the neutral temperature', () => {
+    render(
+      <SliderGroup
+        keys={['temperature']}
+        parameters={{ ...DEFAULT_PARAMETERS, temperature: 7000 }}
+        onParameterChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/Cool · 7000 K/)).toBeInTheDocument();
+  });
+
   it('parks the temperature thumb on the nearest stop for a non-standard value', () => {
     render(
       <SliderGroup

@@ -35,4 +35,21 @@ describe('LanguageSwitcher', () => {
 
     expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('fr');
   });
+
+  it('ignores a change event carrying an unsupported language code', () => {
+    render(
+      <I18nProvider>
+        <LanguageSwitcher />
+      </I18nProvider>,
+    );
+
+    const select = screen.getByRole('combobox', { name: 'Language' });
+    // Setting a <select>'s value to something with no matching <option> leaves
+    // it unselected (value reads back as ''), which is itself unsupported -
+    // this exercises the guard's false branch without needing to bypass the DOM.
+    fireEvent.change(select, { target: { value: 'zz' } });
+
+    expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBeNull();
+    expect(select).toHaveValue('en');
+  });
 });

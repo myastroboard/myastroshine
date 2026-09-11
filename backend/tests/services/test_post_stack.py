@@ -7,6 +7,7 @@ import numpy as np
 
 from app.models import StackParameters
 from app.services.post_stack import (
+    _border_residual,
     apply_post_stack,
     calibrate_colour,
     crop_low_signal_border,
@@ -49,6 +50,41 @@ def test_full_coverage_is_not_cropped() -> None:
     out, report = apply_post_stack(comp, coverage)
     assert report.cropped is None
     assert out.shape[:2] == (200, 200)
+
+
+def test_crop_skips_when_at_most_one_frame_covers_any_pixel() -> None:
+    """peak <= 1: there is no rotation wedge to speak of - single-frame coverage
+    everywhere means nothing to trim."""
+    comp = _linear_sky(50, 60)
+    coverage = np.ones((50, 60), dtype=np.int32)
+    out, report = apply_post_stack(comp, coverage)
+    assert report.cropped is None
+    assert out.shape[:2] == (50, 60)
+
+
+def test_crop_skips_when_no_row_or_column_is_well_covered() -> None:
+    """A scattered (non-rectangular) coverage pattern where every row and every
+    column falls under the keep-fraction threshold - nothing qualifies to crop to."""
+    height, width = 40, 40
+    coverage = np.zeros((height, width), dtype=np.int32)
+    coverage[:, ::2] = 10  # every other column covered; every row is only 50% covered
+    comp = _linear_sky(height, width)
+    out, report = apply_post_stack(comp, coverage)
+    assert report.cropped is None
+    assert out.shape[:2] == (height, width)
+
+
+def test_crop_skips_when_the_well_covered_region_is_too_small() -> None:
+    """rows/cols each qualify somewhere, but the resulting kept rectangle would
+    remove more than _MAX_CROP_FRACTION of an axis - treated as a mis-detection."""
+    height, width = 100, 100
+    coverage = np.zeros((height, width), dtype=np.int32)
+    coverage[:, :10] = 10  # a narrow strip, fully covered top-to-bottom
+    coverage[:50, 10:] = 10  # the rest of the frame covered only in its top half
+    comp = _linear_sky(height, width)
+    out, report = apply_post_stack(comp, coverage)
+    assert report.cropped is None
+    assert out.shape[:2] == (height, width)
 
 
 def test_apply_post_stack_does_not_stretch_or_colour_correct() -> None:
@@ -103,6 +139,46 @@ def test_border_crop_handles_a_mono_composite() -> None:
     assert box is not None
     assert cropped.ndim == 2
     assert box[0] > 0
+
+
+def test_border_crop_returns_none_when_almost_nothing_is_live() -> None:
+    """The interior reference box reads as good sky, but almost the whole
+    frame sits far below it - no row or column stays live enough to keep."""
+    height, width = 120, 160
+    comp = np.full((height, width, 3), -10.0, dtype=np.float32)
+    lo, hi = 0.35, 0.65
+    comp[round(height * lo) : round(height * hi), round(width * lo) : round(width * hi), :] = 0.16
+    cropped, box = crop_low_signal_border(comp)
+    assert box is None
+    np.testing.assert_array_equal(cropped, comp)
+
+
+def test_border_crop_skips_when_the_live_region_is_too_small() -> None:
+    """Rows qualify only within a narrow band and columns only within a narrow
+    stripe (a cross shape) - both axes would need to crop away more than
+    _BORDER_MAX_CROP_FRACTION, so the detector treats it as unreliable."""
+    height, width = 120, 160
+    comp = np.full((height, width, 3), -10.0, dtype=np.float32)
+    band_lo, band_hi = round(height * 0.40), round(height * 0.60)
+    stripe_lo, stripe_hi = round(width * 0.45), round(width * 0.55)
+    comp[band_lo:band_hi, :, :] = 0.16  # a horizontal band, full width
+    comp[:, stripe_lo:stripe_hi, :] = 0.16  # a vertical stripe, full height
+    cropped, box = crop_low_signal_border(comp)
+    assert box is None
+    np.testing.assert_array_equal(cropped, comp)
+
+
+def test_border_residual_returns_zero_with_too_few_object_free_tiles() -> None:
+    """Fewer than _BG_MIN_SAMPLES tiles survived rejection - too little signal
+    to trust an edge-residual correction, so it is skipped outright."""
+    samples = np.random.default_rng(0).random((22, 22)).astype(np.float32)
+    surface = np.zeros((22, 22), dtype=np.float32)
+    keep = np.zeros((22, 22), dtype=bool)
+    keep[0, 0] = True  # a single object-free tile, well under _BG_MIN_SAMPLES
+
+    result = _border_residual(samples, surface, keep)
+
+    np.testing.assert_array_equal(result, np.zeros_like(samples, dtype=np.float32))
 
 
 # -- 2. background extraction (editor pre-stage) --------------------------
@@ -247,6 +323,15 @@ def test_render_stack_base_stretch_control_lifts_the_background() -> None:
     subtle = render_stack_base(comp, StackParameters(stretch=0.0))
     aggressive = render_stack_base(comp, StackParameters(stretch=1.0))
     assert float(aggressive.mean()) > float(subtle.mean())
+
+
+def test_render_stack_base_can_skip_background_extraction_and_colour_calibration() -> None:
+    """Both pre-stages are individually optional - off (0 / False) skips the
+    corresponding call, only the stretch always runs."""
+    comp = _linear_sky(120, 160)
+    out = render_stack_base(comp, StackParameters(background_extraction=0, color_calibration=False))
+    assert out.shape == (120, 160, 3)
+    assert np.isfinite(out).all()
 
 
 def test_render_stack_base_handles_a_mono_composite() -> None:

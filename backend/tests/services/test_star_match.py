@@ -7,7 +7,8 @@ import math
 import numpy as np
 import pytest
 
-from app.services.star_match import StarMatchService
+from app.services import star_match
+from app.services.star_match import StarMatchService, _fit
 
 
 def _star_field(n: int = 40, size: int = 1000, seed: int = 1) -> np.ndarray:
@@ -73,3 +74,43 @@ def test_too_few_stars_fails_cleanly(matcher: StarMatchService) -> None:
     result = matcher.align(np.array([[1.0, 2.0], [3.0, 4.0]]), _star_field(), "similarity")
     assert not result.ok
     assert result.matrix is None
+
+
+def test_extremely_unevenly_spaced_stars_form_no_usable_triangle(
+    matcher: StarMatchService,
+) -> None:
+    """Enough stars to pass the count check (exactly 3, one possible triangle),
+    but so unevenly spaced (near-collinear by the side-length-ratio heuristic)
+    that it is filtered as degenerate - nothing left to match on at all."""
+    sliver = np.array([[0.0, 0.0], [1.0, 0.0], [1000.0, 0.0]], dtype=np.float64)
+
+    result = matcher.align(sliver, sliver, transform="similarity")
+
+    assert not result.ok
+    assert result.candidates == 0
+
+
+def test_too_few_candidate_correspondences_fails_cleanly(matcher: StarMatchService) -> None:
+    """Exactly 3 stars form at most one triangle -> at most 3 point
+    correspondences, always below _MIN_INLIERS - never enough to even attempt
+    a RANSAC fit."""
+    triangle = np.array([[0.0, 0.0], [100.0, 0.0], [40.0, 80.0]])
+
+    result = matcher.align(triangle, triangle, transform="similarity")
+
+    assert not result.ok
+    assert result.candidates < 6
+
+
+def test_fit_reports_no_alignment_when_the_cv2_estimator_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """cv2's RANSAC estimator can itself return (None, None) on a degenerate
+    input - the fit is reported as failed rather than raising."""
+    monkeypatch.setattr(star_match.cv2, "estimateAffinePartial2D", lambda *_a, **_k: (None, None))
+    points = np.array([[0.0, 0.0], [1.0, 1.0], [2.0, 2.0], [3.0, 3.0], [4.0, 4.0], [5.0, 5.0]])
+
+    result = _fit(points, points.copy(), "similarity")
+
+    assert not result.ok
+    assert result.candidates == 6

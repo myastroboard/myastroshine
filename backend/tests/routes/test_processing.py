@@ -60,6 +60,11 @@ def test_process_unknown_session_is_404(client) -> None:
     assert response.status_code == 404
 
 
+def test_process_malformed_session_id_is_404(client) -> None:
+    response = client.post("/api/process/not-a-valid-id", json={"parameters": {}})
+    assert response.status_code == 404
+
+
 def test_process_rejects_out_of_range_parameter(client, sample_jpeg: bytes) -> None:
     """A contrast above the allowed maximum is a 400 with INVALID_PARAMETER."""
     session_id = _upload(client, sample_jpeg)

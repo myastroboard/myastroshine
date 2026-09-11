@@ -60,6 +60,11 @@ def test_generate_unknown_session_is_404(client) -> None:
     assert response.status_code == 404
 
 
+def test_generate_malformed_session_id_is_404(client) -> None:
+    response = client.post("/api/depth-shift/not-a-valid-id", json={})
+    assert response.status_code == 404
+
+
 def test_num_layers_out_of_range_is_400(client, sample_jpeg: bytes) -> None:
     session_id = _upload(client, sample_jpeg)
     response = client.post(f"/api/depth-shift/{session_id}", json={"num_layers": 99})

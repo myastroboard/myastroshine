@@ -117,6 +117,33 @@ def test_decode_fits_rgb_planes_map_to_correct_bgr_channels() -> None:
     assert image[9, 9, 0] > 200  # blue plane's bright spot -> BGR channel 0 (B)
 
 
+def test_decode_fits_trailing_axis_rgb_cube_maps_to_correct_bgr_channels() -> None:
+    """A (H, W, 3) FITS cube (trailing colour axis) is also read as R/G/B."""
+    background = np.full((12, 12), 500.0, dtype=np.float32)
+    red, green, blue = background.copy(), background.copy(), background.copy()
+    red[2, 2] = 50000
+    green[6, 6] = 50000
+    blue[9, 9] = 50000
+    cube = np.stack([red, green, blue], axis=-1)
+
+    image = image_utils.decode_image(_fits_bytes(cube), "frame.fits")
+
+    assert image.shape == (12, 12, 3)
+    assert image[2, 2, 2] > 200
+    assert image[6, 6, 1] > 200
+    assert image[9, 9, 0] > 200
+
+
+def test_decode_fits_with_no_image_data_is_rejected() -> None:
+    from astropy.io import fits
+
+    buffer = io.BytesIO()
+    fits.PrimaryHDU(data=None).writeto(buffer)
+
+    with pytest.raises(UnsupportedImageError, match="no image data"):
+        image_utils.decode_image(buffer.getvalue(), "empty.fits")
+
+
 def test_decode_fits_rejects_garbage() -> None:
     """Non-FITS bytes with a .fits extension raise UnsupportedImageError, not a crash."""
     with pytest.raises(UnsupportedImageError):
@@ -213,6 +240,96 @@ def test_decode_rejects_images_over_the_pixel_cap(
     monkeypatch.setattr(image_utils, "MAX_IMAGE_PIXELS", 100)
     with pytest.raises(UnsupportedImageError, match="exceeding"):
         image_utils.decode_image(sample_jpeg)
+
+
+def test_to_bgr_uint8_handles_a_mono_non_uint8_plane() -> None:
+    """A single-channel (ndim==2) non-uint8 decode is auto-stretched, not
+    just the multi-channel path exercised by the 16-bit PNG test above."""
+    rng = np.random.default_rng(9)
+    mono16 = np.clip(rng.normal(3000, 200, size=(20, 24)), 0, 65535).astype(np.uint16)
+
+    out = image_utils._to_bgr_uint8(mono16)
+
+    assert out.shape == (20, 24, 3)
+    assert out.dtype == np.uint8
+
+
+def test_to_bgr_uint8_handles_a_gray_plus_alpha_source() -> None:
+    """A 2-channel (gray + alpha) decode uses the luminance plane and drops
+    alpha, the same as the BGRA case does for colour."""
+    decoded = np.zeros((10, 12, 2), dtype=np.uint8)
+    decoded[..., 0] = 128
+
+    out = image_utils._to_bgr_uint8(decoded)
+
+    assert out.shape == (10, 12, 3)
+    assert np.all(out == 128)
+
+
+def test_solve_midtone_balance_falls_back_when_the_solve_is_degenerate() -> None:
+    """background == target == 1.0 makes the solve's denominator exactly 0."""
+    assert image_utils._solve_midtone_balance(1.0, 1.0) == image_utils._MTF_NEUTRAL_MIDTONE
+
+
+def test_stretch_params_is_none_for_an_all_nan_plane() -> None:
+    assert image_utils._stretch_params(np.full((5, 5), np.nan)) is None
+
+
+def test_stretch_composite_linear_handles_a_mono_composite() -> None:
+    rng = np.random.default_rng(2)
+    mono = rng.random((30, 40)).astype(np.float32) * 0.02 + 0.01
+
+    out = image_utils.stretch_composite_linear(mono)
+
+    assert out.shape == (30, 40, 3)
+
+
+def test_stretch_composite_linear_all_non_finite_is_black() -> None:
+    """No finite pixel anywhere - background can't be estimated and the
+    luminance stretch has nothing to work with either; returns black rather
+    than raising."""
+    composite = np.full((10, 12, 3), np.nan, dtype=np.float32)
+
+    out = image_utils.stretch_composite_linear(composite)
+
+    assert out.shape == (10, 12, 3)
+    assert np.all(out == 0.0)
+
+
+def test_load_image_gray_rejects_an_unreadable_file(tmp_path: Path) -> None:
+    bad = tmp_path / "not-an-image.bin"
+    bad.write_bytes(b"definitely not an image")
+    with pytest.raises(UnsupportedImageError):
+        image_utils.load_image_gray(bad)
+
+
+def test_save_image_with_an_unrecognised_suffix_uses_default_params(
+    tmp_path: Path, sample_image: np.ndarray
+) -> None:
+    path = tmp_path / "out.tif"
+    image_utils.save_image(sample_image, path)
+    assert path.exists()
+
+
+def test_save_image_raises_when_imwrite_fails(
+    tmp_path: Path, sample_image: np.ndarray, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(image_utils.cv2, "imwrite", lambda *_a, **_k: False)
+    with pytest.raises(OSError, match="Failed to write"):
+        image_utils.save_image(sample_image, tmp_path / "out.jpg")
+
+
+def test_encode_image_rejects_an_unknown_format(sample_image: np.ndarray) -> None:
+    with pytest.raises(UnsupportedImageError, match="Cannot encode"):
+        image_utils.encode_image(sample_image, "gif")
+
+
+def test_encode_image_raises_when_imencode_fails(
+    sample_image: np.ndarray, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(image_utils.cv2, "imencode", lambda *_a, **_k: (False, None))
+    with pytest.raises(OSError, match="Failed to encode"):
+        image_utils.encode_image(sample_image, "jpeg")
 
 
 def test_save_and_load(tmp_path: Path, sample_image: np.ndarray) -> None:

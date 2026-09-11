@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { LANGUAGE_STORAGE_KEY } from '@/i18n/config';
 import { I18nProvider } from '@/i18n/I18nContext';
@@ -13,6 +13,7 @@ function Probe() {
       <span data-testid="cancel">{t('common.cancel')}</span>
       <span data-testid="sources">{t('slider_panel.sources_count', { count: 7 })}</span>
       <span data-testid="missing">{t('nothing.here')}</span>
+      <span data-testid="branch-not-leaf">{t('common')}</span>
       <button type="button" onClick={() => setLanguage('fr')}>
         switch
       </button>
@@ -30,6 +31,18 @@ describe('i18n', () => {
 
     expect(screen.getByTestId('language')).toHaveTextContent('en');
     expect(screen.getByTestId('cancel')).toHaveTextContent('Cancel');
+  });
+
+  it('the default context value is a harmless no-op setLanguage', () => {
+    render(<Probe />);
+    expect(() => fireEvent.click(screen.getByRole('button', { name: 'switch' }))).not.toThrow();
+    expect(screen.getByTestId('language')).toHaveTextContent('en');
+  });
+
+  it('returns the key itself when a path resolves to a branch, not a leaf string', () => {
+    render(<Probe />);
+    // "common" is an object (it contains "cancel" etc.), not a translatable string.
+    expect(screen.getByTestId('branch-not-leaf')).toHaveTextContent('common');
   });
 
   it('interpolates placeholders', () => {
@@ -55,6 +68,19 @@ describe('i18n', () => {
 
     expect(screen.getByTestId('language')).toHaveTextContent('fr');
     expect(screen.getByTestId('cancel')).toHaveTextContent('Annuler');
+  });
+
+  it('falls back to the default language when the browser language is unsupported', () => {
+    const nav = vi.spyOn(window.navigator, 'language', 'get').mockReturnValue('zz-ZZ');
+
+    render(
+      <I18nProvider>
+        <Probe />
+      </I18nProvider>,
+    );
+
+    expect(screen.getByTestId('language')).toHaveTextContent('en');
+    nav.mockRestore();
   });
 
   it('switches language and persists the choice', () => {

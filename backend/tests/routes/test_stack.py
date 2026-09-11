@@ -322,3 +322,104 @@ def test_upload_frame_unknown_stack_is_404(client, star_field: np.ndarray) -> No
 
 def test_get_unknown_stack_is_404(client) -> None:
     assert client.get("/api/stack/nope").status_code == 404
+
+
+def test_upload_archive_rejects_a_corrupt_zip(client) -> None:
+    init = client.post("/api/stack/initiate", json={"frame_count": 2})
+    stack_id = init.json()["stack_id"]
+
+    response = client.post(
+        f"/api/stack/{stack_id}/upload-archive",
+        files={"file": ("frames.zip", b"not actually a zip file", "application/zip")},
+    )
+
+    assert response.status_code == 415
+
+
+def test_upload_archive_rejects_too_many_members(client) -> None:
+    from app.routes.stack import _ARCHIVE_MEMBER_CAP
+
+    init = client.post("/api/stack/initiate", json={"frame_count": 2})
+    stack_id = init.json()["stack_id"]
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        for i in range(_ARCHIVE_MEMBER_CAP + 1):
+            archive.writestr(f"f{i}.txt", b"")
+
+    response = client.post(
+        f"/api/stack/{stack_id}/upload-archive",
+        files={"file": ("frames.zip", buffer.getvalue(), "application/zip")},
+    )
+
+    assert response.status_code == 400
+
+
+def test_upload_archive_rejects_a_zip_with_no_images(client) -> None:
+    init = client.post("/api/stack/initiate", json={"frame_count": 2})
+    stack_id = init.json()["stack_id"]
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("readme.txt", "no images here")
+
+    response = client.post(
+        f"/api/stack/{stack_id}/upload-archive",
+        files={"file": ("frames.zip", buffer.getvalue(), "application/zip")},
+    )
+
+    assert response.status_code == 415
+
+
+def test_upload_archive_stops_at_the_frame_count_ceiling(
+    client, star_field: np.ndarray, monkeypatch
+) -> None:
+    """A stack whose frame_count is smaller than the archive's image members
+    stops ingesting once it reaches that ceiling instead of overfilling it."""
+    from app.utils import app_settings
+
+    app_settings.save_app_settings({"stacking_max_frames": 2})
+    init = client.post("/api/stack/initiate", json={"frame_count": 2})
+    stack_id = init.json()["stack_id"]
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        for i in range(4):
+            archive.writestr(f"frame_{i}.png", png_bytes(translate(star_field, i, -i)))
+
+    response = client.post(
+        f"/api/stack/{stack_id}/upload-archive",
+        files={"file": ("frames.zip", buffer.getvalue(), "application/zip")},
+    )
+
+    assert response.status_code == 202
+    assert response.json()["received_frames"] == 2  # capped at the ceiling, not 4
+
+
+def test_latest_watch_stack_is_null_with_no_watch_session(client) -> None:
+    response = client.get("/api/stack/latest")
+
+    assert response.status_code == 200
+    assert response.json() is None
+
+
+def test_latest_watch_stack_reports_the_most_recent_watch_session(client, db_session) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from app.db.models import StackRecord
+
+    record = StackRecord(
+        stack_id="watch-stack-1",
+        status="ready",
+        frame_count=3,
+        received_frames=3,
+        source="watch",
+        expires_at=datetime.now(UTC) + timedelta(hours=1),
+    )
+    db_session.add(record)
+    db_session.commit()
+
+    response = client.get("/api/stack/latest")
+
+    assert response.status_code == 200
+    assert response.json()["stack_id"] == "watch-stack-1"

@@ -10,8 +10,12 @@ from __future__ import annotations
 
 from datetime import timedelta
 from pathlib import Path
+from unittest.mock import MagicMock
+
+import pytest
 
 from app.constants import SESSION_CLEANUP_INTERVAL_SECONDS
+from app.tasks import celery_app as celery_app_module
 from app.tasks.celery_app import celery_app
 
 
@@ -23,3 +27,24 @@ def test_cleanup_sessions_task_is_scheduled() -> None:
 
 def test_beat_schedule_file_lives_under_a_data_dir() -> None:
     assert Path(celery_app.conf.beat_schedule_filename).name == "celerybeat-schedule"
+
+
+def test_configure_worker_logging_sets_up_the_worker_role(monkeypatch: pytest.MonkeyPatch) -> None:
+    configure_logging = MagicMock()
+    apply_runtime_log_levels = MagicMock()
+    monkeypatch.setattr(celery_app_module, "configure_logging", configure_logging)
+    monkeypatch.setattr(celery_app_module, "apply_runtime_log_levels", apply_runtime_log_levels)
+
+    celery_app_module._configure_worker_logging()
+
+    configure_logging.assert_called_once_with(role="worker", force=True)
+    apply_runtime_log_levels.assert_called_once_with()
+
+
+def test_migrate_on_worker_start_runs_init_db(monkeypatch: pytest.MonkeyPatch) -> None:
+    init_db = MagicMock()
+    monkeypatch.setattr("app.db.database.init_db", init_db)
+
+    celery_app_module._migrate_on_worker_start()
+
+    init_db.assert_called_once_with()

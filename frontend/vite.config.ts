@@ -47,5 +47,23 @@ export default defineConfig({
     globals: true,
     // Playwright specs under e2e/ are run by `npm run test:e2e`, not vitest.
     exclude: [...configDefaults.exclude, 'e2e/**'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json-summary'],
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: [
+        'src/test/**',
+        'src/**/*.d.ts',
+        'src/main.tsx',
+        'src/vite-env.d.ts',
+      ],
+      thresholds: {
+        statements: 95,
+        branches: 95,
+        functions: 95,
+        lines: 95,
+        perFile: true,
+      },
+    },
   },
 });

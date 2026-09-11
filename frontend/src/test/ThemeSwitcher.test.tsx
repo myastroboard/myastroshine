@@ -38,4 +38,21 @@ describe('ThemeSwitcher', () => {
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark');
     expect(document.documentElement.classList.contains('dark')).toBe(true);
   });
+
+  it('ignores a change event carrying an unsupported preference', () => {
+    render(
+      <ThemeProvider>
+        <ThemeSwitcher />
+      </ThemeProvider>,
+    );
+
+    const select = screen.getByRole('combobox', { name: 'Theme' });
+    // Setting a <select>'s value to something with no matching <option> leaves
+    // it unselected (value reads back as ''), which is itself unsupported -
+    // this exercises the guard's false branch without needing to bypass the DOM.
+    fireEvent.change(select, { target: { value: 'zz' } });
+
+    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBeNull();
+    expect(select).toHaveValue('system');
+  });
 });

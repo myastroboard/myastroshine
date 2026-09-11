@@ -61,6 +61,53 @@ describe('useMilestones', () => {
     expect(result.current.activeId).toBe(result.current.milestones[0].id);
   });
 
+  it('matches a milestone with a non-null focal point when x and y both match', () => {
+    const focal = { x: 5, y: 5 };
+    const { result, rerender } = renderHook(
+      ({ f }) => useMilestones('s1', DEFAULT_PARAMETERS, f),
+      { initialProps: { f: focal as { x: number; y: number } | null } },
+    );
+
+    act(() => result.current.capture());
+    rerender({ f: { x: 5, y: 5 } }); // a new object, same coordinates
+
+    expect(result.current.activeId).toBe(result.current.milestones[1].id);
+  });
+
+  it('does not match a non-null focal point milestone when the coordinates differ', () => {
+    const { result, rerender } = renderHook(
+      ({ f }) => useMilestones('s1', DEFAULT_PARAMETERS, f),
+      { initialProps: { f: { x: 1, y: 1 } as { x: number; y: number } | null } },
+    );
+
+    act(() => result.current.capture());
+    rerender({ f: { x: 1, y: 2 } });
+
+    expect(result.current.activeId).toBeNull();
+  });
+
+  it('does not match when the milestone focal point is null but the current one is not', () => {
+    // The origin milestone always has a null focalPoint.
+    const { result } = renderHook(() => useMilestones('s1', DEFAULT_PARAMETERS, { x: 1, y: 1 }));
+
+    expect(result.current.activeId).toBeNull();
+  });
+
+  it('does not match when the current focal point is null but the milestone one is not', () => {
+    // Use a non-default parameter set too, so the origin milestone (whose
+    // parameters are always DEFAULT_PARAMETERS) can't accidentally match once
+    // the focal point is cleared.
+    const edited: ProcessingParameters = { ...DEFAULT_PARAMETERS, exposure: 0.5 };
+    const { result, rerender } = renderHook(({ f }) => useMilestones('s1', edited, f), {
+      initialProps: { f: { x: 1, y: 1 } as { x: number; y: number } | null },
+    });
+
+    act(() => result.current.capture()); // milestone 1 has focalPoint {x:1, y:1}
+    rerender({ f: null });
+
+    expect(result.current.activeId).toBeNull();
+  });
+
   it('resets to just the origin when the session changes', () => {
     const { result, rerender } = renderHook(
       ({ s }) => useMilestones(s, DEFAULT_PARAMETERS, null),

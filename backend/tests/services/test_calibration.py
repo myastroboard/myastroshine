@@ -6,7 +6,12 @@ import numpy as np
 import pytest
 
 from app.exceptions import InvalidParameterError
-from app.services.calibration import CalibrationService
+from app.services.calibration import (
+    CalibrationMasters,
+    CalibrationService,
+    _combine_block,
+    _flat_field,
+)
 from app.services.storage import StorageService
 from app.utils.linear_ingest import LinearFrame
 
@@ -138,6 +143,93 @@ def test_master_is_cached_and_rebuilt_when_more_subs_arrive(
     rebuilt = calibration.build_masters("s", (8, 8))
     assert rebuilt.bias is not None
     assert float(rebuilt.bias.mean()) == pytest.approx(0.06, abs=0.01)  # median of 0.02 and 0.10
+
+
+def test_master_and_bad_pixel_map_load_from_cache_on_a_second_call(
+    storage: StorageService, calibration: CalibrationService
+) -> None:
+    """Building masters twice with the same source frames hits the on-disk
+    cache instead of recombining (both the master itself and its bad-pixel
+    map are keyed on the unchanged source frame count)."""
+    darks = [np.full((10, 10), 0.05, np.float32) for _ in range(4)]
+    darks[0][3, 3] = 0.9  # a defect so a bad-pixel map actually gets built
+
+    _save(storage, "s", "dark", darks)
+    first = calibration.build_masters("s", (10, 10))
+    second = calibration.build_masters("s", (10, 10))  # no new frames: cache hit both times
+
+    assert first.dark is not None
+    assert second.dark is not None
+    np.testing.assert_array_equal(first.dark, second.dark)
+    np.testing.assert_array_equal(first.bad_pixels, second.bad_pixels)
+
+
+def test_calibrate_rejects_a_light_frame_shaped_differently_than_a_master(
+    storage: StorageService, calibration: CalibrationService
+) -> None:
+    _save(storage, "s", "bias", [np.full((10, 10), 0.02, np.float32)] * 3)
+    masters = calibration.build_masters("s", (10, 10))
+
+    light = np.full((20, 20), 0.4, np.float32)
+    with pytest.raises(InvalidParameterError, match="bias master"):
+        calibration.calibrate(light, masters)
+
+
+def test_dark_is_not_rescaled_when_the_exposure_ratio_is_already_one(
+    storage: StorageService, calibration: CalibrationService
+) -> None:
+    """light_exposure_s equal to the dark's own exposure - no rescaling math,
+    the raw master dark is subtracted as-is."""
+    bias = np.full((16, 16), 0.02, np.float32)
+    dark = np.full((16, 16), 0.02 + 0.06, np.float32)
+
+    _save(storage, "s", "bias", [bias] * 4)
+    _save(storage, "s", "dark", [dark] * 4, exposure_s="120")
+    masters = calibration.build_masters("s", (16, 16))
+
+    light = np.full((16, 16), 0.5, np.float32)
+    out = calibration.calibrate(light, masters, light_exposure_s=120.0)  # same as dark's exposure
+
+    assert float(out.mean()) == pytest.approx(0.5 - 0.08, abs=1e-3)  # 0.5 - (bias+thermal)
+
+
+def test_flat_field_subtracts_its_own_dark_flat_before_normalising() -> None:
+    flat = np.full((8, 8), 0.5, np.float32)
+    dark_flat = np.full((8, 8), 0.1, np.float32)
+    masters = CalibrationMasters(flat=flat, dark_flat=dark_flat)
+
+    field = _flat_field(masters)
+
+    # (0.5 - 0.1) normalised to a mean of 1 is uniformly 1.0 everywhere.
+    assert float(field.mean()) == pytest.approx(1.0, abs=1e-4)
+
+
+def test_flat_field_skips_normalisation_when_the_mean_is_near_zero() -> None:
+    """A degenerate flat whose mean is ~0 is left un-normalised (dividing by
+    ~0 would blow it up) rather than raising - callers see the raw (clamped)
+    field instead of a division artefact."""
+    flat = np.array([[1e-10, -1e-10], [1e-10, -1e-10]], dtype=np.float32)
+    masters = CalibrationMasters(flat=flat)
+
+    field = _flat_field(masters)
+
+    # normalisation skipped -> only the floor clamp applied, not a /mean rescale
+    np.testing.assert_array_equal(field, np.maximum(flat, 0.05))
+
+
+def test_combine_block_runs_the_winsorized_sigma_reduction_path() -> None:
+    """_master always passes method="median" (the module constant) - this is
+    the only way the non-median, iterative sigma-clip branch gets exercised."""
+    rng = np.random.default_rng(3)
+    block = np.full((5, 10, 10), 0.1, np.float32) + rng.normal(0, 0.001, (5, 10, 10)).astype(
+        np.float32
+    )
+
+    combined = _combine_block(block, "winsorized_sigma")
+
+    assert combined.shape == (10, 10)
+    assert combined.dtype == np.float32
+    assert float(combined.mean()) == pytest.approx(0.1, abs=0.01)
 
 
 def test_cfa_bad_pixels_are_judged_per_bayer_phase(

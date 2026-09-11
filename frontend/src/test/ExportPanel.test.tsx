@@ -50,6 +50,28 @@ describe('ExportPanel', () => {
     expect(screen.getByRole('button', { name: 'Sending...' })).toBeDisabled();
   });
 
+  it('disables every action while processing', () => {
+    render(<ExportPanel {...base} isProcessing canReturnToAstroDex />);
+
+    expect(screen.getByRole('button', { name: 'Download' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Send back to AstroDex' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save as preset' })).toBeDisabled();
+  });
+
+  it('calls onSaveAsPreset when the save-as-preset button is clicked', () => {
+    const onSaveAsPreset = vi.fn();
+    render(<ExportPanel {...base} onSaveAsPreset={onSaveAsPreset} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save as preset' }));
+    expect(onSaveAsPreset).toHaveBeenCalledTimes(1);
+  });
+
+  it('names the AstroDex object in the return hint when known', () => {
+    render(<ExportPanel {...base} canReturnToAstroDex astrodexObjectName="M 31" />);
+
+    expect(screen.getByText(/Adds a copy to 'M 31' in the AstroDex/)).toBeInTheDocument();
+  });
+
   it('confirms a successful return and surfaces a failure', () => {
     const { rerender } = render(<ExportPanel {...base} canReturnToAstroDex astrodexReturned />);
     expect(screen.getByText('Added to the AstroDex object as a new picture.')).toBeInTheDocument();

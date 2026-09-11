@@ -45,6 +45,17 @@ def test_upload_rejects_non_image(client) -> None:
     assert response.json()["error_code"] == "UNSUPPORTED_FORMAT"
 
 
+def test_upload_rejects_an_empty_file(client) -> None:
+    """A zero-byte upload is rejected before any decode attempt."""
+    response = client.post(
+        "/api/upload",
+        files={"file": ("empty.jpg", b"", "image/jpeg")},
+    )
+
+    assert response.status_code == 415
+    assert response.json()["error_code"] == "UNSUPPORTED_FORMAT"
+
+
 def test_upload_rejects_unsupported_extension(client, sample_jpeg: bytes) -> None:
     """A .bmp filename is rejected before decoding."""
     response = client.post(
@@ -74,6 +85,26 @@ def test_preview_unknown_session_is_404(client) -> None:
 
     assert response.status_code == 404
     assert response.json()["error_code"] == "SESSION_NOT_FOUND"
+
+
+def test_preview_malformed_session_id_is_404(client) -> None:
+    response = client.get("/api/preview/not-a-valid-id")
+
+    assert response.status_code == 404
+    assert response.json()["error_code"] == "SESSION_NOT_FOUND"
+
+
+def test_preview_missing_file_on_disk_is_404(client, sample_jpeg: bytes) -> None:
+    """A live session whose file was removed from disk (not just never
+    generated) still 404s instead of leaking a FileResponse error."""
+    from app.services.storage import StorageService
+
+    session_id = _upload(client, sample_jpeg).json()["session_id"]
+    StorageService().original_path(session_id).unlink()
+
+    response = client.get(f"/api/preview/{session_id}", params={"original": "true"})
+
+    assert response.status_code == 404
 
 
 def test_preview_original_with_geometry_matches_the_cropped_result(

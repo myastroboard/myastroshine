@@ -30,6 +30,34 @@ def test_a_single_drop_lands_at_the_transformed_location() -> None:
     assert weight[:-1, :-1].min() > 0
 
 
+def test_a_frame_entirely_outside_the_canvas_is_a_noop() -> None:
+    """The whole frame maps outside the output grid - nothing to accumulate."""
+    frame = np.ones((4, 4, 3), dtype=np.float32)
+    flux = np.zeros((8, 8, 3), dtype=np.float32)
+    weight = np.zeros((8, 8), dtype=np.float32)
+    far_away = np.array([[1.0, 0.0, 1000.0], [0.0, 1.0, 1000.0]])
+
+    drizzle_accumulate(frame, far_away, 2, 1.0, flux, weight)
+
+    assert not weight.any()
+    assert not flux.any()
+
+
+def test_a_drop_on_a_single_pixel_canvas_skips_the_out_of_range_cells() -> None:
+    """A 1x1 output canvas only has a valid (0, 0) cell - the other three
+    (d_row, d_col) offsets the splat considers are out of range and hit the
+    early `continue` instead of indexing past the array."""
+    frame = np.zeros((1, 1, 3), dtype=np.float32)
+    frame[0, 0] = [1.0, 1.0, 1.0]
+    flux = np.zeros((1, 1, 3), dtype=np.float32)
+    weight = np.zeros((1, 1), dtype=np.float32)
+
+    drizzle_accumulate(frame, _IDENTITY, 1, 1.0, flux, weight)
+
+    assert weight[0, 0] > 0
+    assert flux[0, 0, 0] > 0
+
+
 def test_finalise_divides_flux_by_weight() -> None:
     flux = np.full((4, 4, 3), 6.0, dtype=np.float32)
     weight = np.full((4, 4), 2.0, dtype=np.float32)

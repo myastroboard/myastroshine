@@ -150,6 +150,127 @@ describe('ImagePreview', () => {
     expect(onGeometryChange).toHaveBeenCalled();
   });
 
+  it('drags the divider across multiple pointer moves and stops on pointer up', () => {
+    mockContainerRect();
+    const { container } = render(<ImagePreview originalUrl="/a" processedUrl="/b" />);
+
+    const stage = container.querySelector('.cursor-ew-resize')!;
+    fireEvent.pointerDown(stage, { clientX: 50, clientY: 50, pointerId: 1 });
+
+    const divider = container.querySelector('.bg-white\\/70') as HTMLElement;
+    expect(divider.style.left).toBe('25%');
+    // While dragging, the handle grows (scale-110).
+    expect(divider.querySelector('span')).toHaveClass('scale-110');
+
+    fireEvent.pointerMove(stage, { clientX: 150, clientY: 50, pointerId: 1 });
+    expect(divider.style.left).toBe('75%');
+
+    fireEvent.pointerUp(stage, { pointerId: 1 });
+    expect(divider.querySelector('span')).not.toHaveClass('scale-110');
+
+    // Once released, further pointer moves no longer affect the split.
+    fireEvent.pointerMove(stage, { clientX: 0, clientY: 50, pointerId: 1 });
+    expect(divider.style.left).toBe('75%');
+  });
+
+  it('ends the drag on pointer cancel too', () => {
+    mockContainerRect();
+    const { container } = render(<ImagePreview originalUrl="/a" processedUrl="/b" />);
+
+    const stage = container.querySelector('.cursor-ew-resize')!;
+    fireEvent.pointerDown(stage, { clientX: 50, clientY: 50, pointerId: 1 });
+    const divider = container.querySelector('.bg-white\\/70') as HTMLElement;
+    expect(divider.querySelector('span')).toHaveClass('scale-110');
+
+    fireEvent.pointerCancel(stage, { pointerId: 1 });
+    expect(divider.querySelector('span')).not.toHaveClass('scale-110');
+  });
+
+  it('does nothing when picking a focal point without a handler', () => {
+    mockContainerRect();
+    const { container } = render(
+      <ImagePreview originalUrl="/a" processedUrl="/b" pickingFocalPoint />,
+    );
+
+    const stage = container.querySelector('.cursor-crosshair')!;
+    expect(() => fireEvent.pointerDown(stage, { clientX: 50, clientY: 25 })).not.toThrow();
+  });
+
+  it('shows the picking-focal-point hint banner', () => {
+    render(<ImagePreview originalUrl="/a" processedUrl="/b" pickingFocalPoint />);
+    expect(screen.getByText(/click.*focal point/i)).toBeInTheDocument();
+  });
+
+  it('treats an explicit empty star mask overlay the same as no overlay', () => {
+    const { container } = render(
+      <ImagePreview originalUrl="/a" processedUrl="/b" starMaskOverlay={[]} />,
+    );
+    expect(container.querySelectorAll('svg circle')).toHaveLength(0);
+  });
+
+  it('renders the histogram panel when data is supplied', () => {
+    const { container } = render(
+      <ImagePreview
+        originalUrl="/a"
+        processedUrl="/b"
+        histogram={{ r: [1, 2], g: [1, 2], b: [1, 2] }}
+      />,
+    );
+    expect(container.querySelector('.panel-inset')).toBeInTheDocument();
+  });
+
+  it('uses an explicit aspect ratio when given', () => {
+    const { container } = render(
+      <ImagePreview originalUrl="/a" processedUrl="/b" aspectRatio={1.5} />,
+    );
+    const stage = container.querySelector('.cursor-ew-resize') as HTMLElement;
+    expect(stage.style.aspectRatio).toBe('1.5 / 1');
+    expect(stage.style.maxWidth).toBe('100%');
+  });
+
+  it('caps the width of a portrait frame instead of letterboxing', () => {
+    const { container } = render(
+      <ImagePreview originalUrl="/a" processedUrl="/b" aspectRatio={0.5} />,
+    );
+    const stage = container.querySelector('.cursor-ew-resize') as HTMLElement;
+    expect(stage.style.aspectRatio).toBe('0.5 / 1');
+    // jsdom's CSS parser folds the constant multiplication.
+    expect(stage.style.maxWidth).toBe('calc(35vh)');
+  });
+
+  it('falls back to the processed image natural ratio once it loads', () => {
+    const { container } = render(<ImagePreview originalUrl="/a" processedUrl="/b" />);
+    const processedImg = screen.getByAltText('Processed') as HTMLImageElement;
+
+    Object.defineProperty(processedImg, 'naturalWidth', { value: 800, configurable: true });
+    Object.defineProperty(processedImg, 'naturalHeight', { value: 400, configurable: true });
+    fireEvent.load(processedImg);
+
+    const stage = container.querySelector('.cursor-ew-resize') as HTMLElement;
+    expect(stage.style.aspectRatio).toBe('2 / 1');
+  });
+
+  it('ignores a zero-size natural image load', () => {
+    const { container } = render(<ImagePreview originalUrl="/a" processedUrl="/b" />);
+    const processedImg = screen.getByAltText('Processed') as HTMLImageElement;
+
+    fireEvent.load(processedImg); // jsdom defaults naturalWidth/Height to 0
+
+    const stage = container.querySelector('.cursor-ew-resize') as HTMLElement;
+    expect(stage.style.aspectRatio).toBe(`${16 / 9} / 1`);
+  });
+
+  it('stops a pointer-down on the zoom controls from starting a divider drag', () => {
+    mockContainerRect();
+    const { container } = render(<ImagePreview originalUrl="/a" processedUrl="/b" />);
+
+    const controls = container.querySelector('.cursor-default') as HTMLElement;
+    fireEvent.pointerDown(controls, { clientX: 100, clientY: 50, pointerId: 1, bubbles: true });
+
+    const divider = container.querySelector('.bg-white\\/70') as HTMLElement;
+    expect(divider.querySelector('span')).not.toHaveClass('scale-110');
+  });
+
   it('shows a determinate progress bar and a custom label while a long pass runs', () => {
     const { rerender } = render(
       <ImagePreview originalUrl="/a" processedUrl="/b" isLoading progress={0} />,

@@ -10,7 +10,8 @@ import pytest
 
 from app.db.models import StackRecord
 from app.exceptions import InvalidParameterError, ResourceNotFoundError
-from app.models import InitiateStackRequest
+from app.models import InitiateStackRequest, ProcessStackRequest
+from app.services.integration import IntegrationResult
 from app.services.job import JobService
 from app.services.session import SessionService
 from app.services.stacking import StackingService
@@ -46,6 +47,73 @@ def test_initiate_then_upload_marks_ready(
         record = stacking.add_frame(record.stack_id, i, _frame(star_field))
     assert record.received_frames == 3
     assert record.status == "ready"
+
+
+def test_initiate_rejects_too_many_frames(stacking: StackingService) -> None:
+    from app.utils import app_settings
+
+    app_settings.save_app_settings({"stacking_max_frames": 5})
+    with pytest.raises(InvalidParameterError, match="Too many frames"):
+        stacking.initiate(InitiateStackRequest(frame_count=6))
+
+
+def test_add_frame_rejects_once_the_stack_is_no_longer_accepting_frames(
+    stacking: StackingService, star_field: np.ndarray
+) -> None:
+    record = stacking.initiate(InitiateStackRequest(frame_count=2))
+    stacking.add_frame(record.stack_id, 0, _frame(star_field))
+    stacking.add_frame(record.stack_id, 1, _frame(star_field))
+    stacking.process(record.stack_id)  # -> status "completed"
+
+    with pytest.raises(InvalidParameterError, match="not accepting"):
+        stacking.add_frame(record.stack_id, 2, _frame(star_field))
+
+
+def test_re_uploading_the_same_frame_index_does_not_double_count(
+    stacking: StackingService, star_field: np.ndarray
+) -> None:
+    record = stacking.initiate(InitiateStackRequest(frame_count=3))
+    record = stacking.add_frame(record.stack_id, 0, _frame(star_field))
+    assert record.received_frames == 1
+    record = stacking.add_frame(record.stack_id, 0, _frame(star_field))  # same index again
+    assert record.received_frames == 1
+
+
+def test_add_frames_batch_rejects_once_the_stack_is_no_longer_accepting_frames(
+    stacking: StackingService, star_field: np.ndarray
+) -> None:
+    record = stacking.initiate(InitiateStackRequest(frame_count=2))
+    stacking.add_frame(record.stack_id, 0, _frame(star_field))
+    stacking.add_frame(record.stack_id, 1, _frame(star_field))
+    stacking.process(record.stack_id)
+
+    prepared = [stacking.prepare_frame(cv2.imencode(".png", star_field)[1].tobytes(), "f.png")]
+    with pytest.raises(InvalidParameterError, match="not accepting"):
+        stacking.add_frames(record.stack_id, 2, prepared)
+
+
+def test_add_frames_batch_rejects_an_index_past_the_instance_cap(
+    stacking: StackingService, star_field: np.ndarray
+) -> None:
+    from app.utils import app_settings
+
+    app_settings.save_app_settings({"stacking_max_frames": 3})
+    record = stacking.initiate(InitiateStackRequest(frame_count=2))
+    prepared = [stacking.prepare_frame(cv2.imencode(".png", star_field)[1].tobytes(), "f.png")]
+    with pytest.raises(InvalidParameterError, match="frame_index"):
+        stacking.add_frames(record.stack_id, 5, prepared)
+
+
+def test_add_frames_batch_does_not_double_count_an_existing_index(
+    stacking: StackingService, star_field: np.ndarray
+) -> None:
+    record = stacking.initiate(InitiateStackRequest(frame_count=3))
+    record = stacking.add_frame(record.stack_id, 0, _frame(star_field))
+    assert record.received_frames == 1
+
+    prepared = [stacking.prepare_frame(cv2.imencode(".png", star_field)[1].tobytes(), "f.png")]
+    record = stacking.add_frames(record.stack_id, 0, prepared)  # index 0 again, in a batch
+    assert record.received_frames == 1
 
 
 def test_uploading_a_frame_writes_the_npy_plus_a_thumbnail(
@@ -135,6 +203,37 @@ def test_cleanup_removes_a_directory_with_no_record(stacking: StackingService) -
     stacking.cleanup_old_stacks()
 
     assert not stacking.storage.stack_dir("ghost-stack").exists()
+
+
+def test_cleanup_sweeps_a_stale_memmap_without_relabeling_a_finished_stack(
+    stacking: StackingService, star_field: np.ndarray
+) -> None:
+    """The align-memmap is reclaimed regardless, but only a genuinely-stuck
+    'processing' stack gets relabeled 'failed' - a finished one is left alone."""
+    import os
+
+    from app.constants import STALE_STACK_WORK_SECONDS
+
+    record = stacking.initiate(InitiateStackRequest(frame_count=2))
+    stacking.add_frame(record.stack_id, 0, _frame(star_field))
+    record.status = "completed"  # a leftover accum dir from an earlier run, stack is done
+    stacking.db.commit()
+    accum = stacking.storage.stack_accum_dir(record.stack_id, create=True)
+    memmap = accum / "aligned.npy"
+    memmap.write_bytes(b"x" * 1024)
+    old = datetime.now().timestamp() - STALE_STACK_WORK_SECONDS - 60
+    os.utime(memmap, (old, old))
+
+    removed = stacking.cleanup_old_stacks()
+
+    assert removed == 1
+    assert not accum.exists()
+    refreshed = stacking.db.get(StackRecord, record.stack_id)
+    assert refreshed is not None and refreshed.status == "completed"
+
+
+def test_cleanup_is_a_noop_with_nothing_to_clean(stacking: StackingService) -> None:
+    assert stacking.cleanup_old_stacks() == 0
 
 
 def test_process_produces_an_enhanceable_session(
@@ -346,6 +445,22 @@ def test_add_calibration_frames_rejects_an_unknown_kind(stacking: StackingServic
         stacking.add_calibration_frames(record.stack_id, "sky", [])
 
 
+def test_add_calibration_frames_rejects_more_than_the_instance_cap(
+    stacking: StackingService, star_field: np.ndarray, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    record = stacking.initiate(InitiateStackRequest(frame_count=2))
+    monkeypatch.setattr(stacking.storage, "cal_frame_indices", lambda *_a, **_k: list(range(256)))
+
+    with pytest.raises(InvalidParameterError, match="Too many"):
+        stacking.add_calibration_frames(record.stack_id, "dark", [_frame(star_field)])
+
+
+def test_clear_calibration_rejects_an_unknown_kind(stacking: StackingService) -> None:
+    record = stacking.initiate(InitiateStackRequest(frame_count=2))
+    with pytest.raises(InvalidParameterError, match="kind"):
+        stacking.clear_calibration(record.stack_id, "sky")
+
+
 def test_clear_calibration_drops_the_subs_and_master(
     stacking: StackingService, star_field: np.ndarray
 ) -> None:
@@ -373,3 +488,99 @@ def test_dispatch_drives_the_job_to_a_terminal_state_in_sync_mode(
 
     assert jobs.get(job_id).status == "completed"
     assert jobs.count_active_for_ip("1.2.3.4") == 0
+
+
+def test_dispatch_with_an_all_default_overrides_body_skips_the_extra_commit(
+    stacking: StackingService, star_field: np.ndarray
+) -> None:
+    """overrides is not None, but every field is unset - nothing to change."""
+    jobs = JobService(stacking.db)
+    record = stacking.initiate(InitiateStackRequest(frame_count=3))
+    for i, frame in enumerate(_shifted_frames(star_field, 3)):
+        stacking.add_frame(record.stack_id, i, frame)
+
+    _done, job_id = stacking.dispatch(record.stack_id, jobs, overrides=ProcessStackRequest())
+
+    assert jobs.get(job_id).status == "completed"
+
+
+def test_dispatch_marks_the_job_failed_when_processing_raises(
+    stacking: StackingService, star_field: np.ndarray, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    jobs = JobService(stacking.db)
+    record = stacking.initiate(InitiateStackRequest(frame_count=3))
+    for i, frame in enumerate(_shifted_frames(star_field, 3)):
+        stacking.add_frame(record.stack_id, i, frame)
+
+    created: dict[str, str] = {}
+    original_create = jobs.create
+
+    def spy_create(*args: object, **kwargs: object):  # type: ignore[no-untyped-def]
+        job = original_create(*args, **kwargs)
+        created["id"] = job.job_id
+        return job
+
+    monkeypatch.setattr(jobs, "create", spy_create)
+    monkeypatch.setattr(
+        stacking,
+        "process",
+        lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("integration exploded")),
+    )
+
+    with pytest.raises(RuntimeError, match="integration exploded"):
+        stacking.dispatch(record.stack_id, jobs)
+
+    assert jobs.get(created["id"]).status == "failed"
+
+
+def _fake_integration_result(reference_noise: float, composite: np.ndarray) -> IntegrationResult:
+    return IntegrationResult(
+        composite=composite,
+        coverage=np.ones(composite.shape[:2], dtype=np.int32),
+        frames_stacked=2,
+        registration_failures=0,
+        reference_index=0,
+        rejected_samples=0,
+        registration_rms=0.1,
+        reference_noise=reference_noise,
+        aligned=True,
+        quality_rejected=0,
+        frame_quality=[],
+        weights=[1.0, 1.0],
+    )
+
+
+def test_process_skips_noise_measurement_when_the_reference_had_none(
+    stacking: StackingService, star_field: np.ndarray, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    record = stacking.initiate(InitiateStackRequest(frame_count=2))
+    for i, frame in enumerate(_shifted_frames(star_field, 2)):
+        stacking.add_frame(record.stack_id, i, frame)
+    composite = np.random.default_rng(1).random((*star_field.shape[:2], 3)).astype(np.float32)
+    monkeypatch.setattr(
+        stacking._integration,
+        "integrate",
+        lambda *_a, **_k: _fake_integration_result(0.0, composite),
+    )
+
+    done = stacking.process(record.stack_id)
+
+    assert done.result["measured_noise_reduction"] is None
+
+
+def test_process_skips_noise_measurement_when_the_composite_is_perfectly_flat(
+    stacking: StackingService, star_field: np.ndarray, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A flat (zero-variance) composite has zero measured noise - dividing by
+    it would be meaningless, so the ratio is skipped rather than computed."""
+    record = stacking.initiate(InitiateStackRequest(frame_count=2))
+    for i, frame in enumerate(_shifted_frames(star_field, 2)):
+        stacking.add_frame(record.stack_id, i, frame)
+    flat = np.full((*star_field.shape[:2], 3), 0.5, dtype=np.float32)
+    monkeypatch.setattr(
+        stacking._integration, "integrate", lambda *_a, **_k: _fake_integration_result(5.0, flat)
+    )
+
+    done = stacking.process(record.stack_id)
+
+    assert done.result["measured_noise_reduction"] is None

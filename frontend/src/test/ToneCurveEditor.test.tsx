@@ -119,6 +119,37 @@ describe('ToneCurveEditor', () => {
     expect(onChange).toHaveBeenCalledWith('rgb', []);
   });
 
+  it('ignores a pointer move when no point is being dragged', () => {
+    mockGraphRect();
+    const onChange = vi.fn();
+    render(<ToneCurveEditor curves={EMPTY_CURVES} onChange={onChange} />);
+
+    const svg = screen.getByRole('img', { name: 'Tone curve' });
+    fireEvent.pointerMove(svg, { clientX: 100, clientY: 100, pointerId: 1 });
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('does not add a point too close to an existing one', () => {
+    mockGraphRect();
+    const onChange = vi.fn();
+    render(<ToneCurveEditor curves={EMPTY_CURVES} onChange={onChange} />);
+
+    const svg = screen.getByRole('img', { name: 'Tone curve' });
+    // The identity curve already has an endpoint at x=0; this double-click
+    // lands within MIN_GAP (4) of it, so it should be rejected as degenerate.
+    fireEvent.doubleClick(svg, { clientX: 2, clientY: 200 });
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('drops the panel chrome and reset button in bare mode', () => {
+    render(<ToneCurveEditor curves={EMPTY_CURVES} onChange={vi.fn()} bare />);
+
+    expect(screen.queryByRole('button', { name: 'Reset' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument();
+  });
+
   it('switching channel tabs edits and reports that channel independently', () => {
     const onChange = vi.fn();
     const curves = {

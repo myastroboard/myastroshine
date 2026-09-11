@@ -285,6 +285,88 @@ def test_deepsnr_engine_denoises_early_and_drops_the_classical_stage(
     assert "denoise" in steps  # progress reported it
 
 
+def test_starnet2_engine_failure_mid_run_falls_back_to_classical_split(
+    enhancement: EnhancementService, sample_image: np.ndarray, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The binary is configured and found, but the pass itself fails - the
+    pipeline still completes via the classical split rather than erroring out."""
+    from app.services import enhancement as enh_module
+    from app.services.external_engine import ExternalEngineError
+    from app.services.external_starless import ExternalStarlessService
+    from app.utils.app_settings import save_app_settings
+
+    save_app_settings({"starnet2_path": "/opt/starnet2"})
+    monkeypatch.setattr(enh_module, "get_engine_statuses", _all_engines_found)
+
+    def boom(self, image: np.ndarray) -> np.ndarray:
+        raise ExternalEngineError("starnet2 crashed")
+
+    monkeypatch.setattr(ExternalStarlessService, "run_model", boom)
+
+    record = enhancement.sessions.create_session(image_path="")
+    enhancement.storage.save_original(record.session_id, sample_image)
+    job = enhancement.jobs.create(record.session_id)
+
+    enhancement.run(
+        record.session_id,
+        ProcessingParameters(star_removal=80, star_removal_engine="starnet2"),
+        job.job_id,
+    )
+
+    assert enhancement.jobs.get(job.job_id).status == "completed"
+
+
+def test_deepsnr_engine_failure_mid_run_falls_back_to_classical_denoise(
+    enhancement: EnhancementService, sample_image: np.ndarray, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.services import enhancement as enh_module
+    from app.services.external_denoise import ExternalDenoiseService
+    from app.services.external_engine import ExternalEngineError
+    from app.utils.app_settings import save_app_settings
+
+    save_app_settings({"deepsnr_path": "/opt/deepsnr"})
+    monkeypatch.setattr(enh_module, "get_engine_statuses", _all_engines_found)
+
+    def boom(self, image: np.ndarray) -> np.ndarray:
+        raise ExternalEngineError("deepsnr crashed")
+
+    monkeypatch.setattr(ExternalDenoiseService, "run_model", boom)
+
+    record = enhancement.sessions.create_session(image_path="")
+    enhancement.storage.save_original(record.session_id, sample_image)
+    job = enhancement.jobs.create(record.session_id)
+
+    enhancement.run(
+        record.session_id,
+        ProcessingParameters(denoise=60, denoise_engine="deepsnr"),
+        job.job_id,
+    )
+
+    assert enhancement.jobs.get(job.job_id).status == "completed"
+
+
+def test_run_marks_job_failed_on_an_unexpected_error(
+    enhancement: EnhancementService, sample_image: np.ndarray, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A non-AppError exception mid-pipeline still fails the job and re-raises
+    as a generic ImageProcessingError (the client never sees a raw traceback)."""
+    from app.exceptions import ImageProcessingError
+
+    record = enhancement.sessions.create_session(image_path="")
+    enhancement.storage.save_original(record.session_id, sample_image)
+    job = enhancement.jobs.create(record.session_id)
+
+    def boom(*_a: object, **_k: object) -> object:
+        raise RuntimeError("totally unexpected")
+
+    monkeypatch.setattr(enhancement.processing, "apply_parameters", boom)
+
+    with pytest.raises(ImageProcessingError):
+        enhancement.run(record.session_id, ProcessingParameters(), job.job_id)
+
+    assert enhancement.jobs.get(job.job_id).status == "failed"
+
+
 def test_deepsnr_engine_falls_back_to_classical_when_unavailable(
     enhancement: EnhancementService, sample_image: np.ndarray, monkeypatch: pytest.MonkeyPatch
 ) -> None:

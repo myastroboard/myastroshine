@@ -40,4 +40,36 @@ describe('CaptureInfoPanel', () => {
 
     expect(container).toBeEmptyDOMElement();
   });
+
+  it('formats a duration under an hour as minutes only', () => {
+    render(<CaptureInfoPanel info={{ totalExposureS: 900 }} />);
+
+    expect(screen.getByText('15min')).toBeInTheDocument();
+  });
+
+  it('formats a whole-hour duration without a minutes suffix', () => {
+    render(<CaptureInfoPanel info={{ totalExposureS: 7200 }} />);
+
+    expect(screen.getByText('2h')).toBeInTheDocument();
+  });
+
+  it('shows the frame count alone when no per-frame exposure is known', () => {
+    render(<CaptureInfoPanel info={{ frameCount: 42 }} />);
+
+    expect(screen.getByText('42')).toBeInTheDocument();
+  });
+
+  it('formats a valid capture date', () => {
+    render(<CaptureInfoPanel info={{ dateObs: '2024-05-01T00:00:00Z' }} />);
+
+    const expected = new Date('2024-05-01T00:00:00Z').toLocaleDateString();
+    expect(screen.getByText(expected)).toBeInTheDocument();
+  });
+
+  it('omits an unparsable capture date', () => {
+    render(<CaptureInfoPanel info={{ dateObs: 'not-a-date', objectName: 'M 42' }} />);
+
+    expect(screen.getByText('M 42')).toBeInTheDocument();
+    expect(screen.queryByText(/Date/)).not.toBeInTheDocument();
+  });
 });

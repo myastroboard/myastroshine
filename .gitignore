@@ -38,6 +38,9 @@ frontend/playwright/.cache/
 .e2e-tmp/
 backend/.e2e-tmp/
 
+# vitest coverage output
+frontend/coverage/
+
 # ---------------------------------------------------------------------------
 # Environment / secrets
 # ---------------------------------------------------------------------------

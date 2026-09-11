@@ -49,6 +49,22 @@ def test_tint_gain_neutral_at_zero() -> None:
     assert tint_to_rgb_gain(0) == (1.0, 1.0, 1.0)
 
 
+def test_tint_gain_positive_is_magenta() -> None:
+    """Positive tint lifts red and blue (magenta)."""
+    r, g, b = tint_to_rgb_gain(50)
+    assert r > 1.0
+    assert g == 1.0
+    assert b > 1.0
+
+
+def test_tint_gain_negative_is_green() -> None:
+    """Negative tint lifts green only."""
+    r, g, b = tint_to_rgb_gain(-50)
+    assert r == 1.0
+    assert g > 1.0
+    assert b == 1.0
+
+
 def test_curve_lut_empty_is_identity() -> None:
     """No control points -> every level maps to itself."""
     lut = curve_points_to_lut([])
@@ -84,6 +100,19 @@ def test_curve_lut_is_monotone_for_an_s_curve() -> None:
     lut = curve_points_to_lut(points)
     diffs = np.diff(lut.astype(np.int32))
     assert np.all(diffs >= 0)
+
+
+def test_curve_lut_handles_a_flat_segment() -> None:
+    """Two consecutive control points with the same output (zero delta) hit the
+    Fritsch-Carlson flat-segment special case instead of dividing by zero."""
+    points = [(0, 50), (100, 50), (255, 255)]
+    lut = curve_points_to_lut(points)
+    assert lut[0] == 50
+    assert lut[100] == 50
+    assert lut[255] == 255
+    # The flat run between the first two points stays flat (no over/undershoot),
+    # modulo +/-1 from the uint8 truncation of a float that lands just under 50.
+    assert np.all(np.abs(lut[:101].astype(np.int16) - 50) <= 1)
 
 
 def test_curve_lut_stays_in_bounds() -> None:

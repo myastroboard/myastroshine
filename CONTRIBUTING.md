@@ -68,43 +68,6 @@ Docker image gets it baked in via a build arg). To tag a release:
    that section under `## [0.2.0] - <date>` and resets `[Unreleased]` to
    empty (`scripts/changelog_release.py`) - review and merge it.
 
-**One-time setup, before the first release:**
-
-- **`packages: write` for GitHub Actions** - `release.yml` needs this to push
-  images to `ghcr.io`. Repo Settings -> Actions -> General -> Workflow
-  permissions -> "Read and write permissions". No secret to create; this
-  unlocks what the automatic `GITHUB_TOKEN` is allowed to do for this repo.
-- **`DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` secrets** - for the Docker Hub
-  push. 1. Create the `myastroboard/myastroshine` repository on
-  hub.docker.com if it doesn't exist yet (Docker Hub -> **Create Repository**,
-  under the `myastroboard` org). 2. hub.docker.com -> your avatar ->
-  **Account Settings** -> **Security** -> **New Access Token**, scope
-  **Read & Write**. 3. In `myastroshine`'s repo Settings -> **Secrets and
-  variables** -> **Actions**, add `DOCKERHUB_USERNAME` (your Docker Hub
-  username) and `DOCKERHUB_TOKEN` (the token from step 2).
-- **`GH_PAT` secret** - `post-release-cleanup.yml` pushes a branch and opens a
-  PR after a release. Using the automatic `GITHUB_TOKEN` for that would work,
-  but GitHub deliberately does not trigger CI on pushes/PRs made with that
-  token (to avoid a workflow triggering itself in a loop), so the cleanup PR
-  would sit there without a green check. A personal access token isn't
-  subject to that restriction, so CI runs on the PR like any other - same
-  pattern as myastroboard's `GH_PAT`. To create one:
-  1. github.com -> your avatar -> **Settings** -> **Developer settings** ->
-     **Personal access tokens** -> **Fine-grained tokens** -> **Generate new
-     token**.
-  2. Resource owner: `myastroboard`. Repository access: **Only select
-     repositories** -> `myastroshine`.
-  3. Permissions: **Contents** - Read and write, **Pull requests** - Read and
-     write. Nothing else needed.
-  4. Set an expiration (GitHub caps fine-grained tokens at 1 year; put a
-     calendar reminder to rotate it).
-  5. Copy the generated token, then in `myastroshine`'s repo Settings ->
-     **Secrets and variables** -> **Actions** -> **New repository secret** ->
-     name it `GH_PAT`, paste the value.
-  - If you skip this, the cleanup PR still gets created - you'll just need to
-    trigger CI on it yourself (push an empty commit, or re-run via the Actions
-    tab) before merging.
-
 **Docker Hub description**: `.github/workflows/dockerhub-description.yml`
 pushes `DOCKER_HUB.md` as the repo's long description and a short tagline to
 `hub.docker.com/r/myastroboard/myastroshine`. It's `workflow_dispatch`-only
