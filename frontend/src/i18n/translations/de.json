@@ -1,0 +1,715 @@
+{
+  "common": {
+    "cancel": "Abbrechen",
+    "reset": "Zurücksetzen",
+    "loading": "Wird geladen...",
+    "saving": "Wird gespeichert...",
+    "name": "Name",
+    "close": "Schließen"
+  },
+  "errors": {
+    "busy": "Der Server ist ausgelastet - warten Sie einen Moment und versuchen Sie es erneut.",
+    "unavailable": "Der Server ist vorübergehend nicht verfügbar - versuchen Sie es in Kürze erneut.",
+    "server": "Auf dem Server ist ein Fehler aufgetreten. Versuchen Sie es in einem Moment erneut."
+  },
+  "presets": {
+    "builtin": {
+      "system_nebula": {
+        "name": "Nebel",
+        "description": "Starker Kontrast und Klarheit für Emissionsnebel."
+      },
+      "system_galaxy": {
+        "name": "Galaxie",
+        "description": "Ausgewogene Tonwertwiederherstellung für Spiral- und elliptische Galaxien."
+      },
+      "system_deep_field": {
+        "name": "Deep Field",
+        "description": "Starke Schattenanhebung und Rauschunterdrückung für schwache Weitfeldaufnahmen."
+      },
+      "system_lunar": {
+        "name": "Mond",
+        "description": "Hoher Mikrokontrast und Schärfe, gedämpfte Farbe für den Mond."
+      },
+      "system_cluster": {
+        "name": "Sternhaufen",
+        "description": "Scharfe Sterne für offene und Kugelsternhaufen."
+      }
+    }
+  },
+  "language_switcher": {
+    "aria_label": "Sprache"
+  },
+  "theme_switcher": {
+    "aria_label": "Thema",
+    "system": "System",
+    "light": "Hell",
+    "dark": "Dunkel"
+  },
+  "update_banner": {
+    "available": "Eine neue Version ist verfügbar: v{version}",
+    "view_on_github": "Auf GitHub ansehen",
+    "whats_new": "Was ist neu"
+  },
+  "app": {
+    "nav_settings": "Einstellungen",
+    "opening_from_astrodex": "Ihr Bild wird aus AstroDex geöffnet..."
+  },
+  "image_upload": {
+    "format_not_supported": "Format {ext} wird nicht unterstützt",
+    "file_too_large": "Die Datei überschreitet das Limit von {mb} MB",
+    "drop_hint": "Astronomisches Bild hier ablegen",
+    "choose_file_hint": "oder wählen Sie eine Datei, um zu beginnen",
+    "choose_file_button": "Datei auswählen",
+    "uploading_percent": "Wird hochgeladen… {percent}%",
+    "processing": "Ihr Bild wird vorbereitet…",
+    "accepted_formats": "JPEG, PNG, TIFF, FITS oder Kamera-RAW",
+    "max_size": "bis zu {mb} MB"
+  },
+  "editor": {
+    "depth_shift_failed": "Tiefenverschiebung fehlgeschlagen: {error}",
+    "generating_depth_map": "Tiefenkarte wird erstellt...",
+    "presets_heading": "Voreinstellungen",
+    "auto_astro_button": "Auto Astro",
+    "auto_astro_analyzing": "Analyse läuft...",
+    "auto_astro_failed": "Auto Astro fehlgeschlagen: {error}",
+    "save_as_preset": "Als Voreinstellung speichern",
+    "reset_all": "Alle Anpassungen zurücksetzen",
+    "next_step": "Weiter: {step}",
+    "new_photo": "Neues Foto",
+    "discard_title": "Änderungen verwerfen?",
+    "discard_body": "Wenn Sie ein anderes Foto laden, gehen die an diesem vorgenommenen Anpassungen verloren.",
+    "discard_confirm": "Verwerfen und fortfahren",
+    "rail": {
+      "aria_label": "Bearbeitungsablauf",
+      "modified": "vom Standard geändert",
+      "start": "Start",
+      "stack": "Stapel",
+      "frame": "Ausschnitt",
+      "sky": "Hintergrund",
+      "light": "Licht",
+      "curves": "Kurven",
+      "colour": "Farbe",
+      "detail": "Detail",
+      "stars": "Sterne",
+      "depth": "Tiefe",
+      "export": "Export"
+    },
+    "steps": {
+      "start": {
+        "help": "Hier beginnen: ein Ein-Klick-Startpunkt mit Auto Astro, oder eine gespeicherte Voreinstellung anwenden. Dann die Schritte der Reihe nach durchgehen."
+      },
+      "stack": {
+        "help": "Das lineare Stapelkomposit, vor jeder kreativen Bearbeitung: das schwache Signal strecken, den Himmelsgradienten abziehen, die Farbe neutralisieren. Zerstörungsfrei - alles wird aus den 32-Bit-Daten neu berechnet."
+      },
+      "frame": {
+        "help": "Legen Sie zuerst den Ausschnitt fest - zuschneiden, Horizont begradigen, drehen oder spiegeln. Alles danach arbeitet mit dem zugeschnittenen Bild.",
+        "unavailable": "Für den Ausschnitt werden die ursprünglichen Bildabmessungen benötigt, die bei einem gestapelten Komposit nicht verfügbar sind."
+      },
+      "sky": {
+        "help": "Bereinigen Sie das Rohsignal vor jeder kreativen Bearbeitung: Weißabgleich, Objektivvignettierung, Lichtverschmutzungsgradienten und Dunst."
+      },
+      "light": {
+        "help": "Gesamtbelichtung und Tonwertbalance - wie hell, kontrastreich und detailreich Schatten und Lichter im Bild erscheinen."
+      },
+      "curves": {
+        "help": "Feinabstimmung von Tonwert und Farbe mit einer Hauptkurve, dann kanalweise Rot-/Grün-/Blaukurven für die Farbgebung."
+      },
+      "colour": {
+        "help": "Wie kräftig die Farben sind. Dynamik schützt bereits gesättigte Bereiche; Sättigung wirkt auf alles gleichermaßen."
+      },
+      "detail": {
+        "help": "Lokale Textur: Mikrokontrast, Rauschunterdrückung und Schärfung. Erst durchführen, wenn Tonwert und Farbe feststehen."
+      },
+      "stars": {
+        "help": "Zwei Wege, Sterne zu behandeln: sie an Ort und Stelle verkleinern, oder sie vollständig entfernen, damit der Rest Ihrer Bearbeitung nur den Nebel betrifft."
+      },
+      "depth": {
+        "help": "Wählen Sie den Brennpunkt, dann öffnen Sie den Depth-Shift-Betrachter für eine interaktive Parallaxenvorschau."
+      },
+      "export": {
+        "help": "Holen Sie das Ergebnis heraus: herunterladen, an AstroDex übergeben, oder die aktuellen Einstellungen als wiederverwendbare Voreinstellung speichern."
+      }
+    },
+    "milestones": {
+      "title": "Meilensteine",
+      "help": "Speichern Sie die aktuellen Anpassungen, um zu diesem Punkt zurückzukehren, falls Sie einen Regler zu weit verschieben. Nur für dieses Bild aufbewahrt.",
+      "add": "Meilenstein speichern",
+      "origin": "Original",
+      "point": "Meilenstein {n}",
+      "restore_aria": "{label} wiederherstellen"
+    },
+    "capture_info": {
+      "title": "Aufnahme",
+      "object": "Objekt",
+      "telescope": "Teleskop",
+      "filter": "Filter",
+      "frames": "Bilder",
+      "total_exposure": "Gesamtbelichtung",
+      "date": "Datum",
+      "gain": "Gain",
+      "sensor_temp": "Sensortemperatur"
+    }
+  },
+  "export_panel": {
+    "filename_label": "Dateiname",
+    "download": "Herunterladen",
+    "return_to_astrodex": "An AstroDex zurücksenden",
+    "returning": "Wird gesendet...",
+    "returned": "Als neues Bild zum AstroDex-Objekt hinzugefügt.",
+    "return_hint": "Fügt dem AstroDex-Objekt eine Kopie mit Ihrem verbesserten Bild hinzu - das Original bleibt erhalten.",
+    "return_hint_named": "Fügt zu '{object}' im AstroDex eine Kopie mit Ihrem verbesserten Bild hinzu - das Original bleibt erhalten.",
+    "return_failed": "Rücksendung an AstroDex fehlgeschlagen: {error}"
+  },
+  "image_preview": {
+    "processed_alt": "Bearbeitet",
+    "original_alt": "Original",
+    "click_to_set_focal_point": "Klicken Sie auf das Bild, um den Brennpunkt festzulegen",
+    "zoom_out": "Verkleinern",
+    "reset_zoom": "Zoom zurücksetzen",
+    "zoom_in": "Vergrößern",
+    "processing": "Wird verarbeitet",
+    "removing_stars_starnet2": "Sterne werden entfernt (StarNet2)",
+    "before_after": "Vorher / Nachher",
+    "open_depth_shift": "Depth-Shift-Betrachter öffnen",
+    "change_focal_point": "Brennpunkt ändern",
+    "set_focal_point": "Brennpunkt festlegen",
+    "clear_focal_point": "Brennpunkt löschen"
+  },
+  "preset_buttons": {
+    "confirm_delete_aria": "Löschen der Voreinstellung {name} bestätigen",
+    "delete_aria": "Voreinstellung {name} löschen",
+    "click_again_to_delete": "Zum Löschen erneut klicken",
+    "delete_preset_title": "Voreinstellung löschen"
+  },
+  "save_preset_dialog": {
+    "title": "Als Voreinstellung speichern",
+    "name_placeholder": "Mein Nebel-Look",
+    "description_label": "Beschreibung (optional)",
+    "name_required_error": "Ein Name ist erforderlich",
+    "save": "Speichern"
+  },
+  "token_manager": {
+    "heading": "AstroDex-Webhook-Tokens",
+    "copy_now_warning": "Kopieren Sie diese jetzt, sie werden nicht erneut angezeigt.",
+    "done": "Fertig",
+    "name_placeholder": "AstroDex prod",
+    "expires_label": "Läuft ab (Tage, optional)",
+    "create_button": "Token erstellen",
+    "revoke_button": "Widerrufen",
+    "expires_on": "läuft ab am {date}"
+  },
+  "depth_shift_viewer": {
+    "dialog_aria_label": "Depth-Shift-Betrachter",
+    "layer_alt": "Tiefenebene {index}",
+    "intensity_label": "Intensität",
+    "intensity_aria_label": "Intensität der Tiefenverschiebung"
+  },
+  "tone_curve": {
+    "title": "Tonwertkurve",
+    "help": "Ziehen Sie einen Punkt, um die Kurve zu verändern, doppelklicken Sie auf eine leere Stelle, um einen hinzuzufügen, doppelklicken Sie auf einen Punkt, um ihn zu entfernen.",
+    "channel_tabs_aria_label": "Kurvenkanal",
+    "channels": {
+      "rgb": "RGB",
+      "red": "Rot",
+      "green": "Grün",
+      "blue": "Blau"
+    }
+  },
+  "crop_tool": {
+    "free": "Frei",
+    "original": "Original",
+    "apply": "Ausschnitt anwenden",
+    "straighten_label": "Begradigen",
+    "rotate_90": "90° drehen",
+    "flip_h": "H spiegeln",
+    "flip_v": "V spiegeln",
+    "crop_source_alt": "Zuschnittquelle"
+  },
+  "slider_panel": {
+    "show_star_mask": "Sternmaske anzeigen",
+    "sources_count": "{count} Quellen",
+    "about_param_aria": "Über {label}",
+    "revert_aria": "{label} auf den vorherigen Wert zurücksetzen",
+    "revert_title": "Zurück zu {value}",
+    "params": {
+      "contrast": {
+        "label": "Kontrast",
+        "hint": "Streckt den Tonwertbereich um den Mittelpunkt des Bildes und trennt schwache Details von hellen."
+      },
+      "exposure": {
+        "label": "Belichtung",
+        "hint": "Verschiebt die Gesamthelligkeit nach oben oder unten."
+      },
+      "highlights": {
+        "label": "Lichter",
+        "hint": "Stellt helle Details wieder her oder verstärkt sie - gewichtet nur zu den hellsten Pixeln hin."
+      },
+      "shadows": {
+        "label": "Schatten",
+        "hint": "Hellt dunkle Details auf oder vertieft sie - gewichtet nur zu den dunkelsten Pixeln hin."
+      },
+      "whites": {
+        "label": "Weiß",
+        "hint": "Verschiebt den Weißabschneidepunkt - enger und stärker als Lichter, nur der weißnahe Bereich."
+      },
+      "blacks": {
+        "label": "Schwarz",
+        "hint": "Verschiebt den Schwarzabschneidepunkt - enger und stärker als Schatten, nur der schwarznahe Bereich."
+      },
+      "vignetteCorrection": {
+        "label": "Vignettierung",
+        "hint": "Positiv hellt die Ecken auf (wirkt Objektivvignettierung entgegen); negativ verdunkelt sie (Vignette verstärken oder einen übermäßig korrigierten Stapel zähmen)."
+      },
+      "gradientReduction": {
+        "label": "Gradientenreduzierung",
+        "hint": "Glättet sanfte Hintergrundgradienten - Lichtverschmutzung, Himmelsaufhellung."
+      },
+      "dehaze": {
+        "label": "Dunst entfernen",
+        "hint": "Stellt Kontrast und Farbe wieder her, die durch verschleiernden Dunst oder Lichtverschmutzung verloren gingen."
+      },
+      "clarity": {
+        "label": "Klarheit",
+        "hint": "Lokaler Kontrast durch Unscharfmaskierung. Negative Werte weichen das Bild stattdessen auf."
+      },
+      "denoise": {
+        "label": "Entrauschen",
+        "hint": "Kantenschonende Glättung. Höhere Werte tauschen feine Details gegen einen saubereren Hintergrund."
+      },
+      "chromaDenoise": {
+        "label": "Farbrauschreduzierung",
+        "hint": "Glättet nur Farbrauschen, lässt die Helligkeitsdetails unberührt."
+      },
+      "starReduction": {
+        "label": "Sternreduzierung",
+        "hint": "Verkleinert und dämpft Sternpunkte, damit schwache Nebelstrukturen stärker hervortreten."
+      },
+      "starSensitivity": {
+        "label": "Sternempfindlichkeit",
+        "hint": "Wie schwach ein Punkt sein darf und trotzdem als Stern zählt. Höher findet mehr, schwächere Sterne."
+      },
+      "starMaxSize": {
+        "label": "Max. Sterngröße",
+        "hint": "Begrenzt, wie groß ein heller Fleck sein darf und trotzdem als Stern zählt, damit helle Kerne nicht verkleinert werden."
+      },
+      "starRemoval": {
+        "label": "Sterne entfernen",
+        "hint": "Entfernt die Sterne, damit alle anderen Anpassungen nur auf den Nebel wirken."
+      },
+      "starRecombine": {
+        "label": "Sterne zurückholen",
+        "hint": "Blendet die entfernten Sterne am Ende per Aufhellen-Modus wieder ein: 0 hält das Bild sternenlos, 100 stellt sie in voller Stärke wieder her."
+      },
+      "sharpness": {
+        "label": "Schärfe",
+        "hint": "Weichzeichnung unter 100%, Schärfung darüber durch Kantenverstärkung."
+      },
+      "vibrance": {
+        "label": "Dynamik",
+        "hint": "Verstärkt die Sättigung, gewichtet zugunsten bereits blasser Farben, damit kräftige Bereiche natürlich bleiben."
+      },
+      "saturation": {
+        "label": "Sättigung",
+        "hint": "Skaliert die Farbintensität gleichmäßig über das gesamte Bild."
+      },
+      "temperature": {
+        "label": "Farbtemperatur",
+        "hint": "Weißabgleich: niedrigeres K wärmt das Bild (bernsteinfarben), höheres K kühlt es ab (blau). 6500 K ist neutral. Rastet auf Standardwerte ein.",
+        "tone": {
+          "warm": "Warm",
+          "neutral": "Neutral",
+          "cool": "Kühl"
+        }
+      },
+      "tint": {
+        "label": "Farbstich",
+        "hint": "Weißabgleich: verschiebt den Farbstich zwischen Grün und Magenta."
+      }
+    }
+  },
+  "stack_panel": {
+    "stretch": {
+      "label": "Streckung",
+      "hint": "Wie stark das schwache Signal aus dem Hintergrund herausgehoben wird. Niedrig hält den Himmel dunkel und dezent; hoch hebt schwache Nebelstrukturen hervor, auf Kosten eines helleren, rauscheren Hintergrunds."
+    },
+    "background_extraction": {
+      "label": "Hintergrundextraktion",
+      "hint": "Entfernt einen sanften Lichtverschmutzungs-/Himmelsaufhellungsgradienten, indem eine Fläche niedriger Ordnung an den Himmel zwischen den Objekten angepasst wird. 0 lässt den Gradienten bestehen; 100 zieht ihn vollständig ab."
+    },
+    "color_calibration": {
+      "label": "Farbkalibrierung",
+      "hint": "Neutralisiert den Himmelshintergrund zu Grau und gleicht die Kanäle so ab, dass das Sternfeld annähernd weiß erscheint. Behebt einen Farbstich des Sensors (z. B. ein Stapel, der einheitlich gelb ausfällt) - kann das aber nicht von der tatsächlichen Farbe des Objekts unterscheiden. Schalten Sie sie daher bei einem wirklich stark farbigen Objekt (ein blauer Reflexionsnebel wie die Plejaden, ein roter Emissionsnebel) aus, falls es ausgewaschen wirkt."
+    }
+  },
+  "stars_panel": {
+    "reduce": {
+      "heading": "Reduzieren",
+      "help": "Verkleinert jeden Stern an Ort und Stelle. Schnell, alle Sterne bleiben erhalten - dafür geeignet, wenn Sie einfach ein kompakteres Feld möchten."
+    },
+    "remove": {
+      "heading": "Entfernen (sternenlos)",
+      "help": "Entfernt die Sterne, damit alle anderen Schritte nur den Nebel betreffen, dann blendet Sterne zurückholen sie am Ende ein (0 = Bild bleibt sternenlos). Langsamer, erlaubt aber, den Nebel zu strecken und zu schärfen, ohne die Sterne aufzublähen.",
+      "engine": {
+        "aria": "Sternentfernungs-Engine",
+        "classic": "Klassisch",
+        "starnet2": "StarNet2",
+        "hint": "Verwendet das auf dem Server installierte StarNet2-Modell. Der erste Durchlauf bei einem neuen Bild kann eine Weile dauern; die unten stehenden Erkennungseinstellungen gelten dann nicht."
+      }
+    },
+    "detection": {
+      "heading": "Erkennung",
+      "help": "Was als Stern zählt. Sowohl Reduzieren als auch Entfernen nutzen diese Einstellungen. Aktivieren Sie die Maske, um vor der Anwendung zu prüfen."
+    }
+  },
+  "detail_panel": {
+    "denoise": {
+      "heading": "Rauschunterdrückung",
+      "engine": {
+        "aria": "Entrauschungs-Engine",
+        "classic": "Klassisch",
+        "deepsnr": "DeepSNR",
+        "hint": "Verwendet das auf dem Server installierte DeepSNR-Modell, früh angewendet (vor der Tonwertstreckung). Der erste Durchlauf bei einem neuen Bild kann eine Weile dauern."
+      }
+    }
+  },
+  "histogram": {
+    "aria_label": "RGB-Histogramm"
+  },
+  "settings": {
+    "back_to_editor": "Zurück zum Editor",
+    "heading": "Einstellungen",
+    "subheading": "Laufzeitkonfiguration. Im Datenvolume gespeichert, ohne erneutes Deployment angewendet.",
+    "unsaved_changes": "Nicht gespeicherte Änderungen",
+    "save_changes": "Änderungen speichern",
+    "sections_aria_label": "Einstellungsbereiche",
+    "sections": {
+      "general": {
+        "label": "Allgemein",
+        "blurb": "Uploads und Stapel-Standardwerte."
+      },
+      "webhooks": {
+        "label": "Webhooks",
+        "blurb": "AstroDex-Tokens und Callback-Zustellung."
+      },
+      "advanced": {
+        "label": "Erweitert",
+        "blurb": "Netzwerk und Protokollierungsstufen."
+      },
+      "logs": {
+        "label": "Protokolle",
+        "blurb": "Anwendungsprotokoll ansehen, leeren und exportieren."
+      },
+      "operations": {
+        "label": "Betrieb",
+        "blurb": "Aktuelle Verarbeitungsaufgaben und Speicherplatznutzung."
+      }
+    },
+    "groups": {
+      "uploads_and_sessions": "Uploads und Sitzungen",
+      "stacking_defaults": "Stapel-Standardwerte",
+      "callback_delivery": "Callback-Zustellung",
+      "network": "Netzwerk",
+      "rate_limiting": "Ratenbegrenzung",
+      "logging": "Protokollierung",
+      "external_engines": "Externe ML-Engines",
+      "job_history": "Aufgabenverlauf",
+      "backup_restore": "Sicherung & Wiederherstellung"
+    },
+    "general": {
+      "max_upload": {
+        "label": "Maximale Uploadgröße",
+        "hint": "Größere Uploads werden abgelehnt. Megabyte."
+      },
+      "session_ttl": {
+        "label": "Sitzungslebensdauer",
+        "hint": "Wie lange eine Sitzung und ihre Arbeitsdateien aufbewahrt werden. Stunden."
+      },
+      "preview_size": {
+        "label": "Vorschaugröße",
+        "hint": "Längste Kante des schnell dargestellten Vorschaubilds. Pixel."
+      },
+      "stacking_enabled": {
+        "label": "Stapelung aktiviert",
+        "hint": "Den Mehrbild-Stapelmodus anzeigen."
+      },
+      "stacking_max": {
+        "label": "Maximale Bildanzahl",
+        "hint": "Obergrenze der für einen Stapel akzeptierten Bilder."
+      },
+      "stacking_retention": {
+        "label": "Stapel-Aufbewahrung",
+        "hint": "Wie lange die hochgeladenen Bilder eines Stapels zum erneuten Stapeln aufbewahrt werden. Das Komposit behält die Sitzungslebensdauer. Stunden."
+      },
+      "stacking_workers": {
+        "label": "Stapel-Threads",
+        "hint": "Parallele Threads für die Ausrichtungs-/Kombinationsdurchläufe. 0 = automatisch (Anzahl CPU-Kerne, begrenzt auf 4); 1 = sequenziell. Auf einer Maschine mit vielen Kernen erhöhen."
+      },
+      "stacking_watch_dir": {
+        "label": "Überwachter Ordner",
+        "hint": "Ein Serverpfad, den der Worker auf neue Bilder abfragt (leer = deaktiviert). Neue Bilder werden in einen fortlaufenden Stapel aufgenommen, den Sie vom Stapel-Bildschirm aus öffnen können."
+      },
+      "stacking_watch_idle": {
+        "label": "Automatisch stapeln nach",
+        "hint": "Verarbeitet den überwachten Stapel, sobald diese Minutenzahl lang kein neues Bild eingetroffen ist."
+      },
+      "stacking_watch_auto": {
+        "label": "Überwachten Ordner automatisch stapeln",
+        "hint": "Wenn deaktiviert, werden überwachte Bilder nur aufgenommen - starten Sie den Stapel selbst vom Stapel-Bildschirm aus."
+      }
+    },
+    "webhooks": {
+      "allowlist": {
+        "label": "AstroDex-Ursprungs-Positivliste",
+        "hint": "Ein URL-Präfix pro Zeile - der/die MyAstroBoard-Ursprung(e), von dem/denen eine Übergabe kommen darf, z. B. https://astro.example.com. Leer bedeutet, dass jede AstroDex-Übergabe abgelehnt wird."
+      },
+      "max_retries": {
+        "label": "Maximale Wiederholungen",
+        "hint": "Zustellversuche, bevor die Rücksendung an AstroDex als fehlgeschlagen markiert wird."
+      },
+      "retry_delay": {
+        "label": "Wiederholungsverzögerung",
+        "hint": "Basisverzögerung zwischen Versuchen. Sekunden."
+      }
+    },
+    "advanced": {
+      "cors_origins": {
+        "label": "CORS-Ursprünge",
+        "hint": "Ein Ursprung pro Zeile. Wird nach einem Neustart des API-Dienstes wirksam."
+      },
+      "rate_limit_enabled": {
+        "label": "Ratenbegrenzung",
+        "hint": "Begrenzt, wie oft eine IP Bilder hochladen, verarbeiten oder stapeln darf."
+      },
+      "rate_limit_per_minute": {
+        "label": "Anfragen pro Minute",
+        "hint": "Pro IP, gemeinsam über die Endpunkte Upload/Verarbeitung/Stapelung."
+      },
+      "max_concurrent_jobs": {
+        "label": "Gleichzeitige Aufgaben",
+        "hint": "Maximale Anzahl gleichzeitig laufender Verbesserungs-/Stapelaufgaben, pro IP."
+      },
+      "log_file_level": {
+        "label": "Dateiprotokoll-Stufe",
+        "hint": "Stufe, die in die rotierende Protokolldatei geschrieben wird."
+      },
+      "log_console_level": {
+        "label": "Konsolenprotokoll-Stufe",
+        "hint": "Stufe, die in den Container-Protokollen ausgegeben wird."
+      },
+      "external_engines_blurb": "Optionale Sternentfernung (StarNet2) und Entrauschung (DeepSNR). Nichts davon ist mitgeliefert: Installieren Sie die Binärdatei von starnetastro.com, binden Sie sie in die API- und Worker-Container ein und tragen Sie hier den Pfad ein. Sie sind selbst für die Lizenzbedingungen des Tools verantwortlich. Leer lassen, um die klassischen Engines beizubehalten.",
+      "starnet2_path": {
+        "label": "Pfad zur StarNet2-Binärdatei",
+        "hint": "Absoluter Pfad im Container, z. B. /opt/engines/starnet2/starnet2."
+      },
+      "starnet2_stride": {
+        "label": "StarNet2-Schrittweite",
+        "hint": "Kachel-Schrittweite, gerade, 2-512. 0 = StarNet2-Standardwert (256). Größer ist schneller und gröber; kleiner ist langsamer mit weniger Nahtstellen."
+      },
+      "deepsnr_path": {
+        "label": "Pfad zur DeepSNR-Binärdatei",
+        "hint": "Absoluter Pfad im Container. Fügt der Entrauschungssteuerung im Schritt Detail eine DeepSNR-Option hinzu, früh in der Pipeline angewendet."
+      },
+      "deepsnr_stride": {
+        "label": "DeepSNR-Schrittweite",
+        "hint": "Kachel-Schrittweite, gerade, 2-512. 0 = DeepSNR-Standardwert (480)."
+      },
+      "recheck_engines": "Engines erneut prüfen",
+      "backup": {
+        "blurb": "Laden Sie Ihre Einstellungen und benutzerdefinierten Voreinstellungen als eine Datei herunter, oder stellen Sie sie aus einem früheren Export wieder her - nicht Sitzungen oder Bilder, die ohnehin ablaufen sollen.",
+        "export": "Konfiguration exportieren",
+        "import": "Konfiguration importieren",
+        "import_result": "{imported} Voreinstellung(en) importiert, {skipped} übersprungen (Name bereits vorhanden)."
+      }
+    },
+    "logs": {
+      "level_label": "Stufe",
+      "level_all_option": "alle",
+      "refresh": "Aktualisieren",
+      "export_zip": "Als ZIP exportieren",
+      "confirm_clear": "Leeren bestätigen",
+      "clear": "Leeren",
+      "levels_hint": "Stufen - Datei: {file}, Konsole: {console}. Ändern Sie diese im Tab Erweitert.",
+      "no_lines": "Keine Protokollzeilen."
+    },
+    "operations": {
+      "retention": {
+        "label": "Aufbewahrung des Aufgabenverlaufs",
+        "hint": "Wie lange eine abgeschlossene Aufgabe aufbewahrt wird, bevor die stündliche Bereinigung sie entfernt. Stunden."
+      },
+      "disk": {
+        "heading": "Speicherplatznutzung",
+        "volume": "Datenvolume",
+        "images": "Bilder",
+        "stacks": "Stapel",
+        "database": "Datenbank",
+        "logs": "Protokolle"
+      },
+      "jobs": {
+        "heading": "Aktuelle Aufgaben",
+        "status_label": "Status",
+        "status_all_option": "alle (ohne ersetzte)",
+        "refresh": "Aktualisieren",
+        "no_jobs": "Keine Aufgaben.",
+        "column_status": "Status",
+        "column_session": "Sitzung / Stapel",
+        "column_created": "Erstellt",
+        "column_error": "Fehler",
+        "previous_page": "Zurück",
+        "next_page": "Weiter",
+        "page_info": "{from}-{to} von {total}"
+      }
+    }
+  },
+  "stacking": {
+    "combination_label": "Kombination",
+    "mode": {
+      "single": "Einzelbild",
+      "stack": "Mehrbild-Stapel"
+    },
+    "progress": {
+      "heading": "Stapelung"
+    },
+    "watch": {
+      "title": "Überwachter Ordner",
+      "open": "Öffnen",
+      "status": {
+        "waiting_for_frames": "{count} Bilder aufgenommen, warte auf weitere",
+        "ready": "{count} Bilder aufgenommen, warte auf weitere",
+        "processing": "{count} Bilder werden gestapelt…",
+        "completed": "Fertig - {count} Bilder gestapelt",
+        "failed": "Stapelung fehlgeschlagen"
+      }
+    },
+    "steps": {
+      "registration": "Ausrichtung",
+      "normalization": "Normalisierung",
+      "integration": "Integration",
+      "upload": "Bilder werden hochgeladen",
+      "calibration": "Kalibrierung"
+    },
+    "results": {
+      "failed": "Stapelung fehlgeschlagen: {error}",
+      "status_ellipsis": "Stapel {status}...",
+      "composite_alt": "Gestapeltes Komposit",
+      "frames_stacked": "Gestapelte Bilder",
+      "frames_excluded": "Ausgeschlossene Bilder",
+      "snr_improvement": "SNR-Verbesserung",
+      "measured_noise_reduction": "Gemessene Rauschreduzierung",
+      "enhance_composite": "Komposit verbessern",
+      "download_composite": "Komposit herunterladen",
+      "alignment_rms": "Ausrichtungsabweichung",
+      "calibrated": "Kalibrierung",
+      "calibrated_yes": "Angewendet",
+      "frames_auto_rejected": "Automatisch abgelehnt",
+      "post_processed": "Bereinigt",
+      "drizzle": "Drizzle"
+    },
+    "settings": {
+      "transform_label": "Ausrichtung",
+      "transform": {
+        "translation": "Nur Verschiebung",
+        "similarity": "Verschiebung + Rotation + Skalierung",
+        "affine": "Affin"
+      },
+      "combination": {
+        "average": "Mittelwert",
+        "median": "Median"
+      },
+      "rejection_label": "Pixel-Ablehnung",
+      "rejection": {
+        "none": "Keine",
+        "sigma": "Sigma-Clipping",
+        "winsorized_sigma": "Winsorisiertes Sigma"
+      },
+      "weighting_label": "Bildgewichtung",
+      "weighting": {
+        "none": "Gleich",
+        "noise": "Nach Rauschen",
+        "quality": "Nach Qualität"
+      },
+      "quality_label": "Schlechte Bilder automatisch ablehnen",
+      "quality_hint": "Bewertet jedes Einzelbild (Sterne, Schärfe, Rundheit, Himmel) und verwirft automatisch die schlechtesten. Sie können jedes Bild anschließend zurückholen.",
+      "quality": {
+        "off": "Aus",
+        "lenient": "Nachsichtig",
+        "moderate": "Moderat",
+        "strict": "Streng"
+      },
+      "post_process_label": "Komposit bereinigen",
+      "post_process_hint": "Schneidet die Feldrotationsränder zu, glättet den Himmelsgradienten und neutralisiert die Farbe vor dem Editor.",
+      "drizzle_label": "Drizzle",
+      "drizzle_hint": "Rekonstruiert auf einem feineren Raster für einen echten Auflösungsgewinn aus einem gut geditherten Stapel. Langsamer, korreliert Rauschen - deaktiviert lassen, außer bei Hunderten von Einzelbildern.",
+      "drizzle": {
+        "1": "Aus",
+        "2": "2x",
+        "3": "3x"
+      }
+    },
+    "upload_zone": {
+      "add_frames": "Bilder hinzufügen",
+      "select_multiple_hint": "Mehrere Dateien gleichzeitig auswählen",
+      "status": {
+        "queued": "wartend",
+        "uploading": "wird hochgeladen",
+        "done": "fertig",
+        "error": "Fehler"
+      },
+      "drop_hint": "Ihre Light-Frames hier ablegen",
+      "choose_files_button": "Dateien auswählen",
+      "accepted_formats": "JPEG, PNG, TIFF, FITS oder Kamera-RAW",
+      "max_size": "bis zu {mb} MB je Datei"
+    },
+    "view": {
+      "stacking_button": "Wird gestapelt...",
+      "stack_n_frames": "{count} Bilder stapeln",
+      "upload_n_frames": "{count} Bilder hochladen",
+      "review_hint": "{total} Bilder hochgeladen, {excluded} ausgeschlossen. Klicken Sie auf eine Miniaturansicht zur Vorschau; nutzen Sie das Kontrollkästchen, um ein verzogenes oder bewölktes Bild zu entfernen.",
+      "new_stack": "Neuer Stapel",
+      "back_to_composite": "Zurück zum Komposit",
+      "restack_n_frames": "{count} Bilder neu stapeln",
+      "upload_more": "{count} weitere hochladen",
+      "frames_summary": "{total} Bilder · {excluded} ausgeschlossen",
+      "result_pending": "Starten Sie die Stapelung, um das Ergebnis zu sehen."
+    },
+    "errors": {
+      "too_few": "Fügen Sie mindestens {min} Bilder zum Stapeln hinzu.",
+      "too_many": "{count} Bilder ausgewählt - diese Instanz erlaubt höchstens {max} pro Stapel (in den Einstellungen erhöhbar).",
+      "failed": "Stapelung fehlgeschlagen."
+    },
+    "grid": {
+      "frame_aria": "Bild {n}",
+      "exclude": "Dieses Bild vom Stapel ausschließen",
+      "remove": "{name} entfernen",
+      "quality_title": "{stars} Sterne · FWHM {fwhm}",
+      "reject": {
+        "clouds": "Wolken",
+        "soft": "unscharf",
+        "trailed": "verzogen",
+        "bright_sky": "heller Himmel",
+        "other": "abgelehnt"
+      }
+    },
+    "calibration": {
+      "title": "Kalibrierungsbilder",
+      "hint": "Optionale Master-Dark-, -Flat- und -Bias-Frames. Sie werden vor dem Debayering in jedes Light-Frame eingerechnet, um thermisches Signal, Vignettierung und Sensordefekte zu entfernen.",
+      "count": "{n} Bilder",
+      "add": "Hinzufügen",
+      "clear": "Leeren",
+      "cosmetic_label": "Heiße & tote Pixel reparieren",
+      "masters_note": "Master-Frames werden beim Stapeln erstellt.",
+      "kinds": {
+        "dark": "Darks",
+        "flat": "Flats",
+        "bias": "Bias / Offset",
+        "dark_flat": "Dark-Flats"
+      }
+    },
+    "rail": {
+      "aria_label": "Stapelablauf",
+      "frames": "Bilder",
+      "calibration": "Kalibrierung",
+      "settings": "Einstellungen",
+      "result": "Ergebnis"
+    }
+  }
+}

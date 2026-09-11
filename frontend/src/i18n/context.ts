@@ -1,14 +1,18 @@
 import { createContext } from 'react';
 
+import de from '@/i18n/translations/de.json';
 import en from '@/i18n/translations/en.json';
+import es from '@/i18n/translations/es.json';
 import fr from '@/i18n/translations/fr.json';
+import it from '@/i18n/translations/it.json';
+import pt from '@/i18n/translations/pt.json';
 import { DEFAULT_LANGUAGE, LANGUAGE_STORAGE_KEY, isSupportedLanguage, type Language } from '@/i18n/config';
 
 type TranslationTree = { [key: string]: string | TranslationTree };
 
-const TRANSLATIONS: Record<Language, TranslationTree> = { en, fr };
+const TRANSLATIONS: Record<Language, TranslationTree> = { de, en, es, fr, it, pt };
 
-export const HTML_LANG: Record<Language, string> = { en: 'en', fr: 'fr' };
+export const HTML_LANG: Record<Language, string> = { de: 'de', en: 'en', es: 'es', fr: 'fr', it: 'it', pt: 'pt' };
 
 function resolve(tree: TranslationTree, key: string): string | undefined {
   let current: TranslationTree | string = tree;
