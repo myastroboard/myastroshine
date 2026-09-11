@@ -16,7 +16,6 @@ class JobSummary(BaseModel):
     progress_percent: int
     current_step: str | None
     error: str | None
-    client_ip: str | None
     created_at: datetime
     updated_at: datetime
 
