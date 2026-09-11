@@ -55,3 +55,6 @@ filterwarnings = [
     # Emitted only when a newer starlette than we pin is installed locally.
     "ignore:Using `httpx` with `starlette.testclient` is deprecated",
 ]
+
+[tool.coverage.run]
+branch = true

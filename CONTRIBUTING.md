@@ -153,6 +153,19 @@ RUN_BENCHMARKS=1 pytest tests/benchmarks --no-cov -v
 Runs weekly in CI (`.github/workflows/benchmarks.yml`) as a signal to
 investigate, not a merge gate.
 
+`tests/regression/` is the opposite again: a handful of **golden-image**
+tests that run a small synthetic frame through the real enhancement/stacking
+pipeline and diff the output against a checked-in reference (`tests/regression/golden/`)
+- catches a change that runs cleanly, with no exception, but silently alters
+what the pipeline actually produces (numeric drift in a gain/clamp, say).
+Included in the default `pytest` run - fast and deterministic, no opt-in. A
+deliberate pipeline change updates the references instead of fighting the
+test:
+
+```bash
+UPDATE_GOLDEN=1 pytest tests/regression -v
+```
+
 - Tests mirror the source tree: `app/services/foo.py` -> `tests/services/test_foo.py`.
 - Validate all external input through `app/utils/validators.py`.
 
