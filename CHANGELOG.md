@@ -52,21 +52,27 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- **Auto Astro now also measures light pollution, colour cast, and noise.**
-  Previously scoped to tone (contrast/exposure/highlights/shadows) and star
-  density; it now additionally proposes `gradient_reduction` (a plane fitted
-  to a heavily blurred copy of the frame - deliberately the fitted *trend*,
-  not raw deviation from flat, so a centred DSO doesn't get mistaken for a
-  light-pollution gradient), `temperature` (from the background sky's own
+- **Auto Astro now also measures colour cast and noise.** Previously scoped
+  to tone (contrast/exposure/highlights/shadows) and star density; it now
+  additionally proposes `temperature` (from the background sky's own
   blue-vs-red balance, damped to half the measured cast so a genuinely
   coloured target isn't washed out - the same caveat as the Colour
-  calibration hint below), and `denoise` / `chroma_denoise` (from the sky
+  calibration hint below) and `denoise` / `chroma_denoise` (from the sky
   background's own luma and Cr/Cb noise level - colour speckle is usually
   more objectionable than luma noise in a stacked frame). Each stays at its
   default when the measurement is inconclusive or the frame is already close
-  to neutral/flat/clean; `tint`, saturation, sharpness, and colour grading
-  remain manual - confidence-limited choices a heuristic has no business
-  making. See `docs/ALGORITHMS.md` "Auto Astro".
+  to neutral/clean; `tint`, saturation, sharpness, and colour grading remain
+  manual - confidence-limited choices a heuristic has no business making.
+  A `gradient_reduction` heuristic (a fitted brightness trend) was also built
+  and checked against a real library of stacked composites and lunar
+  photos - and reverted, since it couldn't reliably tell a real
+  light-pollution gradient apart from an ordinary asymmetric bright subject
+  (an ordinary lunar photo measured in the same range as legitimate-looking
+  deep-sky corrections); `gradient_reduction` stays manual-only. The
+  denoise/chroma-denoise scale was also recalibrated against that same
+  library - the first cut, tuned only against synthetic noise, capped out
+  (over-smoothing real DSO detail along with the sky) on nearly every real
+  capture tested. See `docs/ALGORITHMS.md` "Auto Astro".
 - **The Colour calibration hint now says what it can get wrong.** It neutralises
   the sky and balances the channels toward a white star field - the right call
   for a sensor colour cast, but it can't tell that apart from a target's own

@@ -1,13 +1,23 @@
 """AutoAstroService - one-click adaptive enhancement.
 
-Analyses an image's tone distribution, star density, background gradient,
-colour cast, and noise level (luma and chroma), then proposes a
-``ProcessingParameters`` starting point - a computed alternative to the fixed
-built-in presets. Scope is deliberately limited to what a single frame's own
-statistics can drive with confidence (tone stretch, star reduction, gradient
-reduction, white balance, luma/chroma denoise); saturation, sharpness,
-colour grading, and geometry stay at their defaults - creative choices a
-heuristic has no business making. See docs/ALGORITHMS.md "Auto Astro".
+Analyses an image's tone distribution, star density, colour cast, and noise
+level (luma and chroma), then proposes a ``ProcessingParameters`` starting
+point - a computed alternative to the fixed built-in presets. Scope is
+deliberately limited to what a single frame's own statistics can drive with
+confidence (tone stretch, star reduction, white balance, luma/chroma
+denoise); saturation, sharpness, colour grading, and geometry stay at their
+defaults - creative choices a heuristic has no business making. See
+docs/ALGORITHMS.md "Auto Astro".
+
+``gradient_reduction`` was tried and removed (see git history /
+docs/ALGORITHMS.md) - fitting a linear trend to a blurred copy of the frame
+looked clean on synthetic, perfectly-symmetric test images, but real
+photos tested against real captures (a plain lunar shot, no light pollution
+to correct) landed in the *same* severity range as plausible-looking
+deep-sky corrections. A single frame's own brightness distribution can't
+reliably separate "real gradient" from "asymmetric bright object" - the same
+structural confound that already ruled out an auto vignette-correction
+heuristic. `vignette_correction` and `gradient_reduction` both stay manual.
 """
 
 from __future__ import annotations
@@ -53,20 +63,6 @@ _MIN_SKY_PIXELS = 400  # below this there isn't enough background to measure con
 
 _NEUTRAL_KELVIN = 6500
 
-#: matches the downscale `ImageProcessingService.apply_gradient_reduction`
-#: itself uses for the same large-blur background estimate - severity should
-#: be measured on the same smoothed quantity the real correction subtracts
-#: deviations from, not a sharper or blurrier stand-in.
-_GRADIENT_PROBE_MAX_SIZE = 256
-#: below this the fitted trend is indistinguishable from rasterization / float
-#: noise on an otherwise flat-with-a-symmetric-object frame - propose nothing
-#: rather than a meaningless gradient_reduction of 1 or 2.
-_MIN_GRADIENT_SEVERITY = 0.02
-_GRADIENT_SEVERITY_SCALE = 300.0
-_MAX_AUTO_GRADIENT_REDUCTION = (
-    60  # gentle - a strong gradient still gets a starting nudge, not the full fix
-)
-
 _MIN_COLOR_CAST_RATIO = 0.03  # ignore a cast this small - more likely noise than a real tint
 #: Nudge toward neutral, don't fully neutralise: the "Colour calibration"
 #: hint's own caveat applies here too - a full correction can't tell a sensor
@@ -81,8 +77,16 @@ _MAX_COOL_STEPS = 0.75  # (8000 - 6500) / 2000
 #: which a frame is treated as already clean (a stack, or a low-ISO frame) -
 #: propose nothing rather than softening real detail for a marginal reading.
 _MIN_NOISE_SIGMA = 1.5
-_NOISE_SCALE = 4.5
-_MAX_AUTO_DENOISE = 60  # gentle, matching the star-reduction/gradient caps above
+#: Calibrated against real stacked composites (not just synthetic noise): a
+#: typical noisy-but-real stack's sky background reads sigma ~15-22, which
+#: this maps to a gentle ~20-25 rather than slamming into the cap - an
+#: earlier `4.5` scale (tuned only against synthetic per-pixel noise) mapped
+#: that same real range to 70-100+, capping out on nearly every real capture
+#: tested and over-smoothing genuine DSO detail (dust lanes, star clusters)
+#: along with it, since `apply_denoise` runs on the whole frame, not just the
+#: sky. A single noisy raw sub-frame (sigma 50+) still reaches the cap.
+_NOISE_SCALE = 1.2
+_MAX_AUTO_DENOISE = 50  # gentle, matching the star-reduction cap above
 #: colour (chroma) noise has no separately-calibrated scale of its own here -
 #: it reuses luma's threshold/scale/cap verbatim, on the same reasoning
 #: `apply_chroma_denoise` itself is built on (Cr/Cb noise behaves like luma
@@ -109,9 +113,8 @@ class AutoAstroService:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if image.ndim == _COLOR_NDIM else image
         sky = _sky_mask(gray)
 
-        contrast, exposure, highlights, shadows, usable_range = self._suggest_tone(gray)
+        contrast, exposure, highlights, shadows = self._suggest_tone(gray)
         star_reduction = self._suggest_star_reduction(image, gray)
-        gradient_reduction = self._suggest_gradient_reduction(gray, usable_range)
         temperature = self._suggest_temperature(image, sky)
         denoise = self._suggest_denoise(gray, sky)
         chroma_denoise = self._suggest_chroma_denoise(image, sky)
@@ -130,27 +133,24 @@ class AutoAstroService:
             highlights=highlights,
             shadows=shadows,
             star_reduction=star_reduction,
-            gradient_reduction=gradient_reduction,
             temperature=temperature,
             denoise=denoise,
             chroma_denoise=chroma_denoise,
         )
 
-    def _suggest_tone(self, gray: np.ndarray) -> tuple[float, float, float, float, float]:
+    def _suggest_tone(self, gray: np.ndarray) -> tuple[float, float, float, float]:
         """Stretch the real signal range, then push the DSO and background apart.
 
         Contrast/exposure alone just fill the tonal range; the depth/pop a
         DSO shot wants comes from treating the background and the object
         differently, not from a single uniform curve - see ``shadows`` and
-        ``highlights`` below. Also returns the measured ``usable_range``
-        (black-to-white point spread), which the gradient-reduction estimate
-        below normalises against.
+        ``highlights`` below.
         """
         black_point = float(np.percentile(gray, 0.5))
         white_point = float(np.percentile(gray, 99.5))
         usable_range = white_point - black_point
         if usable_range < _MIN_USABLE_RANGE:
-            return 1.0, 0.0, 0.0, 0.0, usable_range
+            return 1.0, 0.0, 0.0, 0.0
 
         contrast = float(np.clip(_TARGET_RANGE / max(usable_range, 1.0), 0.5, 3.0))
 
@@ -175,7 +175,7 @@ class AutoAstroService:
         crushed_fraction = float((gray <= _SHADOW_CRUSH_THRESHOLD).mean())
         shadows = _DEPTH_SHADOWS if crushed_fraction < _SHADOW_CRUSH_BASELINE * 2 else 0.0
 
-        return contrast, exposure, highlights, shadows, usable_range
+        return contrast, exposure, highlights, shadows
 
     def _suggest_star_reduction(self, image: np.ndarray, gray: np.ndarray) -> int:
         stars = self.star_detector.detect(image, sensitivity=50, max_size=30)
@@ -183,50 +183,6 @@ class AutoAstroService:
         density = len(stars) / megapixels
         scaled = _STAR_DENSITY_LOG_SCALE * math.log1p(density)
         return int(np.clip(round(scaled), 0, _MAX_AUTO_STAR_REDUCTION))
-
-    def _suggest_gradient_reduction(self, gray: np.ndarray, usable_range: float) -> int:
-        """Light pollution / vignetting shows up as a broad, monotonic
-        brightness *trend* across the frame - a corner brighter (or dimmer)
-        than the opposite one. Measured by fitting a plane to a heavily
-        blurred copy of the frame (same large-blur estimate
-        `apply_gradient_reduction` itself uses) and taking the fitted plane's
-        own corner-to-corner amplitude.
-
-        Deliberately not "how far does the blurred frame stray from flat"
-        (its raw std): a centred, radially-symmetric DSO also survives the
-        blur and strays from flat just as much as a real gradient would, but
-        contributes almost nothing to a best-fit *linear* trend - a symmetric
-        bump's slope cancels out around the centre, where a genuine corner-to-
-        corner gradient does not.
-        """
-        if usable_range < _MIN_USABLE_RANGE:
-            return 0
-        height, width = gray.shape
-        scale = _GRADIENT_PROBE_MAX_SIZE / max(height, width)
-        small = (
-            cv2.resize(
-                gray, (round(width * scale), round(height * scale)), interpolation=cv2.INTER_AREA
-            )
-            if scale < 1.0
-            else gray
-        )
-        sigma = max(small.shape) * 0.1
-        background = cv2.GaussianBlur(small.astype(np.float32), (0, 0), sigmaX=sigma)
-
-        small_h, small_w = background.shape
-        yy, xx = np.mgrid[0:small_h, 0:small_w].astype(np.float32)
-        xx_norm = (xx - small_w / 2) / (small_w / 2)  # -1..1 corner to corner
-        yy_norm = (yy - small_h / 2) / (small_h / 2)
-        design = np.stack([np.ones(xx_norm.size), xx_norm.ravel(), yy_norm.ravel()], axis=1)
-        _intercept, slope_x, slope_y = np.linalg.lstsq(design, background.ravel(), rcond=None)[0]
-
-        trend_amplitude = abs(float(slope_x)) + abs(float(slope_y))
-        severity = trend_amplitude / usable_range
-        if severity < _MIN_GRADIENT_SEVERITY:
-            return 0
-        return int(
-            np.clip(round(severity * _GRADIENT_SEVERITY_SCALE), 0, _MAX_AUTO_GRADIENT_REDUCTION)
-        )
 
     def _suggest_temperature(self, image: np.ndarray, sky: np.ndarray) -> int:
         """Nudge the white balance toward neutral, from the sky background's
