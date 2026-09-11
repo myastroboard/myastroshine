@@ -1,0 +1,715 @@
+{
+  "common": {
+    "cancel": "Annulla",
+    "reset": "Ripristina",
+    "loading": "Caricamento...",
+    "saving": "Salvataggio...",
+    "name": "Nome",
+    "close": "Chiudi"
+  },
+  "errors": {
+    "busy": "Il server è occupato - attendi un momento e riprova.",
+    "unavailable": "Il server non è temporaneamente disponibile - riprova a breve.",
+    "server": "Si è verificato un errore sul server. Riprova tra un momento."
+  },
+  "presets": {
+    "builtin": {
+      "system_nebula": {
+        "name": "Nebulosa",
+        "description": "Contrasto e nitidezza marcati per le nebulose a emissione."
+      },
+      "system_galaxy": {
+        "name": "Galassia",
+        "description": "Recupero tonale bilanciato per galassie a spirale ed ellittiche."
+      },
+      "system_deep_field": {
+        "name": "Campo profondo",
+        "description": "Forte sollevamento delle ombre e riduzione del rumore per campi ampi e deboli."
+      },
+      "system_lunar": {
+        "name": "Lunare",
+        "description": "Alto microcontrasto e nitidezza, colore attenuato per la Luna."
+      },
+      "system_cluster": {
+        "name": "Ammasso",
+        "description": "Stelle nitide per ammassi aperti e globulari."
+      }
+    }
+  },
+  "language_switcher": {
+    "aria_label": "Lingua"
+  },
+  "theme_switcher": {
+    "aria_label": "Tema",
+    "system": "Sistema",
+    "light": "Chiaro",
+    "dark": "Scuro"
+  },
+  "update_banner": {
+    "available": "È disponibile una nuova versione: v{version}",
+    "view_on_github": "Vedi su GitHub",
+    "whats_new": "Novità"
+  },
+  "app": {
+    "nav_settings": "Impostazioni",
+    "opening_from_astrodex": "Apertura dell'immagine da AstroDex..."
+  },
+  "image_upload": {
+    "format_not_supported": "Formato {ext} non supportato",
+    "file_too_large": "Il file supera il limite di {mb} MB",
+    "drop_hint": "Trascina qui un'immagine astronomica",
+    "choose_file_hint": "oppure scegli un file per iniziare",
+    "choose_file_button": "Scegli un file",
+    "uploading_percent": "Caricamento… {percent}%",
+    "processing": "Preparazione dell'immagine…",
+    "accepted_formats": "JPEG, PNG, TIFF, FITS o RAW della fotocamera",
+    "max_size": "fino a {mb} MB"
+  },
+  "editor": {
+    "depth_shift_failed": "Spostamento di profondità non riuscito: {error}",
+    "generating_depth_map": "Generazione della mappa di profondità...",
+    "presets_heading": "Preset",
+    "auto_astro_button": "Auto Astro",
+    "auto_astro_analyzing": "Analisi in corso...",
+    "auto_astro_failed": "Auto Astro non riuscito: {error}",
+    "save_as_preset": "Salva come preset",
+    "reset_all": "Ripristina tutte le regolazioni",
+    "next_step": "Avanti: {step}",
+    "new_photo": "Nuova foto",
+    "discard_title": "Scartare le modifiche?",
+    "discard_body": "Caricando un'altra foto perderai le regolazioni fatte su questa.",
+    "discard_confirm": "Scarta e continua",
+    "rail": {
+      "aria_label": "Flusso di modifica",
+      "modified": "modificato rispetto al valore predefinito",
+      "start": "Inizio",
+      "stack": "Stack",
+      "frame": "Inquadratura",
+      "sky": "Sfondo",
+      "light": "Luce",
+      "curves": "Curve",
+      "colour": "Colore",
+      "detail": "Dettaglio",
+      "stars": "Stelle",
+      "depth": "Profondità",
+      "export": "Esporta"
+    },
+    "steps": {
+      "start": {
+        "help": "Inizia da qui: un punto di partenza con un clic tramite Auto Astro, oppure applica un preset salvato. Poi procedi lungo i passaggi."
+      },
+      "stack": {
+        "help": "Il composito stack lineare, prima di qualsiasi lavoro creativo: distendere il segnale debole, sottrarre il gradiente del cielo, neutralizzare il colore. Non distruttivo - tutto viene ricalcolato dai dati a 32 bit."
+      },
+      "frame": {
+        "help": "Imposta prima l'inquadratura - ritaglia, livella l'orizzonte, ruota o capovolgi. Tutto ciò che segue lavora sull'immagine inquadrata.",
+        "unavailable": "L'inquadratura richiede le dimensioni originali dell'immagine, non disponibili per un composito stack."
+      },
+      "sky": {
+        "help": "Ripulisci il segnale grezzo prima di qualsiasi ritocco creativo: bilanciamento del bianco, vignettatura dell'obiettivo, gradienti da inquinamento luminoso e foschia."
+      },
+      "light": {
+        "help": "Esposizione generale e bilanciamento tonale - quanto l'immagine appare luminosa, contrastata e ricca di dettaglio in ombre e alte luci."
+      },
+      "curves": {
+        "help": "Affina tono e colore con una curva principale, poi curve rosso/verde/blu per canale per la gradazione."
+      },
+      "colour": {
+        "help": "Quanto sono vivaci i colori. La vividezza protegge le aree già sature; la saturazione agisce su tutto in modo uniforme."
+      },
+      "detail": {
+        "help": "Texture locale: microcontrasto, riduzione del rumore e nitidezza. Da fare dopo aver definito tono e colore."
+      },
+      "stars": {
+        "help": "Due modi per gestire le stelle: rimpicciolirle dove sono, oppure rimuoverle del tutto in modo che il resto della modifica agisca solo sulla nebulosa."
+      },
+      "depth": {
+        "help": "Scegli il punto focale, poi apri il visualizzatore Depth Shift per un'anteprima interattiva di parallasse."
+      },
+      "export": {
+        "help": "Esporta il risultato: scaricalo, invialo ad AstroDex, oppure salva le regolazioni attuali come preset riutilizzabile."
+      }
+    },
+    "milestones": {
+      "title": "Traguardi",
+      "help": "Salva le regolazioni attuali per poter tornare a questo punto se spingi troppo oltre un cursore. Conservati solo per questa immagine.",
+      "add": "Salva traguardo",
+      "origin": "Originale",
+      "point": "Traguardo {n}",
+      "restore_aria": "Ripristina {label}"
+    },
+    "capture_info": {
+      "title": "Acquisizione",
+      "object": "Oggetto",
+      "telescope": "Telescopio",
+      "filter": "Filtro",
+      "frames": "Pose",
+      "total_exposure": "Esposizione totale",
+      "date": "Data",
+      "gain": "Gain",
+      "sensor_temp": "Temperatura sensore"
+    }
+  },
+  "export_panel": {
+    "filename_label": "Nome del file",
+    "download": "Scarica",
+    "return_to_astrodex": "Rinvia ad AstroDex",
+    "returning": "Invio in corso...",
+    "returned": "Aggiunta all'oggetto AstroDex come nuova immagine.",
+    "return_hint": "Aggiunge una copia all'oggetto AstroDex con l'immagine migliorata - l'originale viene conservato.",
+    "return_hint_named": "Aggiunge una copia a '{object}' nell'AstroDex con l'immagine migliorata - l'originale viene conservato.",
+    "return_failed": "Impossibile rinviare ad AstroDex: {error}"
+  },
+  "image_preview": {
+    "processed_alt": "Elaborata",
+    "original_alt": "Originale",
+    "click_to_set_focal_point": "Fai clic sull'immagine per impostare il punto focale",
+    "zoom_out": "Riduci zoom",
+    "reset_zoom": "Ripristina zoom",
+    "zoom_in": "Aumenta zoom",
+    "processing": "Elaborazione in corso",
+    "removing_stars_starnet2": "Rimozione delle stelle (StarNet2)",
+    "before_after": "Prima / Dopo",
+    "open_depth_shift": "Apri il visualizzatore Depth Shift",
+    "change_focal_point": "Cambia punto focale",
+    "set_focal_point": "Imposta punto focale",
+    "clear_focal_point": "Cancella punto focale"
+  },
+  "preset_buttons": {
+    "confirm_delete_aria": "Conferma eliminazione del preset {name}",
+    "delete_aria": "Elimina il preset {name}",
+    "click_again_to_delete": "Fai clic di nuovo per eliminare",
+    "delete_preset_title": "Elimina preset"
+  },
+  "save_preset_dialog": {
+    "title": "Salva come preset",
+    "name_placeholder": "Il mio look nebulosa",
+    "description_label": "Descrizione (facoltativa)",
+    "name_required_error": "È richiesto un nome",
+    "save": "Salva"
+  },
+  "token_manager": {
+    "heading": "Token webhook AstroDex",
+    "copy_now_warning": "Copiali ora, non verranno mostrati di nuovo.",
+    "done": "Fatto",
+    "name_placeholder": "AstroDex prod",
+    "expires_label": "Scadenza (giorni, facoltativo)",
+    "create_button": "Crea token",
+    "revoke_button": "Revoca",
+    "expires_on": "scade il {date}"
+  },
+  "depth_shift_viewer": {
+    "dialog_aria_label": "Visualizzatore Depth Shift",
+    "layer_alt": "Livello di profondità {index}",
+    "intensity_label": "Intensità",
+    "intensity_aria_label": "Intensità dello spostamento di profondità"
+  },
+  "tone_curve": {
+    "title": "Curva tonale",
+    "help": "Trascina un punto per modificare la curva, fai doppio clic su uno spazio vuoto per aggiungerne uno, fai doppio clic su un punto per rimuoverlo.",
+    "channel_tabs_aria_label": "Canale della curva",
+    "channels": {
+      "rgb": "RGB",
+      "red": "Rosso",
+      "green": "Verde",
+      "blue": "Blu"
+    }
+  },
+  "crop_tool": {
+    "free": "Libero",
+    "original": "Originale",
+    "apply": "Applica inquadratura",
+    "straighten_label": "Raddrizza",
+    "rotate_90": "Ruota di 90°",
+    "flip_h": "Capovolgi O",
+    "flip_v": "Capovolgi V",
+    "crop_source_alt": "Sorgente del ritaglio"
+  },
+  "slider_panel": {
+    "show_star_mask": "Mostra maschera delle stelle",
+    "sources_count": "{count} sorgenti",
+    "about_param_aria": "Informazioni su {label}",
+    "revert_aria": "Ripristina {label} al valore precedente",
+    "revert_title": "Torna a {value}",
+    "params": {
+      "contrast": {
+        "label": "Contrasto",
+        "hint": "Estende la gamma tonale attorno al punto medio dell'immagine, separando i dettagli deboli da quelli luminosi."
+      },
+      "exposure": {
+        "label": "Esposizione",
+        "hint": "Sposta la luminanza generale verso l'alto o verso il basso."
+      },
+      "highlights": {
+        "label": "Alte luci",
+        "hint": "Recupera o rafforza i dettagli luminosi - ponderato solo verso i pixel più luminosi."
+      },
+      "shadows": {
+        "label": "Ombre",
+        "hint": "Schiarisce o approfondisce i dettagli scuri - ponderato solo verso i pixel più scuri."
+      },
+      "whites": {
+        "label": "Bianchi",
+        "hint": "Sposta il punto di clipping dei bianchi - più stretto e più aggressivo di Alte luci, solo la fascia prossima al bianco."
+      },
+      "blacks": {
+        "label": "Neri",
+        "hint": "Sposta il punto di clipping dei neri - più stretto e più aggressivo di Ombre, solo la fascia prossima al nero."
+      },
+      "vignetteCorrection": {
+        "label": "Vignettatura",
+        "hint": "Positivo schiarisce gli angoli (contrasta la vignettatura dell'obiettivo); negativo li scurisce (accentua una vignettatura, o corregge uno stack sovracorretto)."
+      },
+      "gradientReduction": {
+        "label": "Riduzione del gradiente",
+        "hint": "Appiattisce dolci gradienti di sfondo - inquinamento luminoso, luminescenza del cielo."
+      },
+      "dehaze": {
+        "label": "Rimozione foschia",
+        "hint": "Ripristina il contrasto e il colore perduti a causa di foschia o luminescenza da inquinamento luminoso."
+      },
+      "clarity": {
+        "label": "Chiarezza",
+        "hint": "Contrasto locale tramite maschera di contrasto. I valori negativi ammorbidiscono l'immagine."
+      },
+      "denoise": {
+        "label": "Riduzione rumore",
+        "hint": "Levigatura che preserva i bordi. Valori più alti sacrificano il dettaglio fine per uno sfondo più pulito."
+      },
+      "chromaDenoise": {
+        "label": "Riduzione rumore colore",
+        "hint": "Leviga solo il rumore cromatico, senza toccare il dettaglio di luminosità."
+      },
+      "starReduction": {
+        "label": "Riduzione stelle",
+        "hint": "Rimpicciolisce e attenua i punti stella per far risaltare maggiormente la nebulosità debole."
+      },
+      "starSensitivity": {
+        "label": "Sensibilità stellare",
+        "hint": "Quanto può essere debole un punto e contare ancora come stella. Valori più alti trovano più stelle, anche più deboli."
+      },
+      "starMaxSize": {
+        "label": "Dimensione max stelle",
+        "hint": "Limita quanto grande può essere una macchia luminosa e contare ancora come stella, così i nuclei brillanti non vengono rimpiccioliti."
+      },
+      "starRemoval": {
+        "label": "Rimuovi stelle",
+        "hint": "Estrae le stelle in modo che tutte le altre regolazioni agiscano solo sulla nebulosa."
+      },
+      "starRecombine": {
+        "label": "Ripristina stelle",
+        "hint": "Reincorpora alla fine le stelle rimosse con una fusione a schiarire: 0 mantiene l'immagine senza stelle, 100 le ripristina al massimo."
+      },
+      "sharpness": {
+        "label": "Nitidezza",
+        "hint": "Sfoca sotto il 100%, aumenta la nitidezza sopra tramite rafforzamento dei bordi."
+      },
+      "vibrance": {
+        "label": "Vividezza",
+        "hint": "Aumenta la saturazione, ponderata verso i colori già spenti in modo che le aree vivaci restino naturali."
+      },
+      "saturation": {
+        "label": "Saturazione",
+        "hint": "Scala l'intensità del colore in modo uniforme su tutta l'immagine."
+      },
+      "temperature": {
+        "label": "Temperatura",
+        "hint": "Bilanciamento del bianco: un K più basso riscalda l'immagine (ambra), un K più alto la raffredda (blu). 6500 K è neutro. Si aggancia a valori standard.",
+        "tone": {
+          "warm": "Caldo",
+          "neutral": "Neutro",
+          "cool": "Freddo"
+        }
+      },
+      "tint": {
+        "label": "Tinta",
+        "hint": "Bilanciamento del bianco: sposta la dominante cromatica tra verde e magenta."
+      }
+    }
+  },
+  "stack_panel": {
+    "stretch": {
+      "label": "Distensione",
+      "hint": "Con quanta forza estrarre il segnale debole dallo sfondo. Basso mantiene il cielo scuro e discreto; alto fa emergere la nebulosità tenue a costo di uno sfondo più chiaro e rumoroso."
+    },
+    "background_extraction": {
+      "label": "Estrazione dello sfondo",
+      "hint": "Rimuove un gradiente dolce di inquinamento luminoso adattando una superficie di ordine basso al cielo tra gli oggetti. 0 lascia il gradiente; 100 lo sottrae completamente."
+    },
+    "color_calibration": {
+      "label": "Calibrazione del colore",
+      "hint": "Neutralizza lo sfondo del cielo verso il grigio ed equilibra i canali in modo che il campo stellare appaia pressoché bianco. Corregge una dominante cromatica del sensore (uno stack che risulta uniformemente giallo, ad esempio) - ma non può distinguerla dal vero colore del soggetto, quindi disattivala per un oggetto genuinamente molto colorato (una nebulosa a riflessione blu come le Pleiadi, una nebulosa a emissione rossa) se il risultato appare slavato."
+    }
+  },
+  "stars_panel": {
+    "reduce": {
+      "heading": "Riduci",
+      "help": "Rimpicciolisce ogni stella dove si trova. Veloce, tutte le stelle vengono conservate - usalo quando vuoi semplicemente un campo più compatto."
+    },
+    "remove": {
+      "heading": "Rimuovi (starless)",
+      "help": "Estrae le stelle in modo che gli altri passaggi agiscano solo sulla nebulosa, poi Ripristina stelle le riporta gradualmente alla fine (0 = immagine senza stelle). Più lento, ma consente di distendere e affinare la nebulosa senza gonfiare le stelle.",
+      "engine": {
+        "aria": "Motore di rimozione stelle",
+        "classic": "Classico",
+        "starnet2": "StarNet2",
+        "hint": "Usa il modello StarNet2 installato sul server. Il primo passaggio su una nuova immagine può richiedere tempo; i controlli di rilevamento sottostanti non si applicano."
+      }
+    },
+    "detection": {
+      "heading": "Rilevamento",
+      "help": "Cosa conta come stella. Sia Riduci che Rimuovi usano queste impostazioni. Attiva la maschera per verificare prima di confermare."
+    }
+  },
+  "detail_panel": {
+    "denoise": {
+      "heading": "Riduzione del rumore",
+      "engine": {
+        "aria": "Motore di riduzione rumore",
+        "classic": "Classico",
+        "deepsnr": "DeepSNR",
+        "hint": "Usa il modello DeepSNR installato sul server, applicato in una fase iniziale (prima della distensione tonale). Il primo passaggio su una nuova immagine può richiedere tempo."
+      }
+    }
+  },
+  "histogram": {
+    "aria_label": "Istogramma RGB"
+  },
+  "settings": {
+    "back_to_editor": "Torna all'editor",
+    "heading": "Impostazioni",
+    "subheading": "Configurazione a runtime. Salvata nel volume dati, applicata senza un nuovo deploy.",
+    "unsaved_changes": "Modifiche non salvate",
+    "save_changes": "Salva le modifiche",
+    "sections_aria_label": "Sezioni delle impostazioni",
+    "sections": {
+      "general": {
+        "label": "Generale",
+        "blurb": "Caricamenti e valori predefiniti dello stack."
+      },
+      "webhooks": {
+        "label": "Webhook",
+        "blurb": "Token AstroDex e consegna dei callback."
+      },
+      "advanced": {
+        "label": "Avanzate",
+        "blurb": "Rete e livelli di log."
+      },
+      "logs": {
+        "label": "Log",
+        "blurb": "Consulta, svuota ed esporta il log dell'applicazione."
+      },
+      "operations": {
+        "label": "Operazioni",
+        "blurb": "Elaborazioni recenti e utilizzo del disco."
+      }
+    },
+    "groups": {
+      "uploads_and_sessions": "Caricamenti e sessioni",
+      "stacking_defaults": "Valori predefiniti dello stack",
+      "callback_delivery": "Consegna dei callback",
+      "network": "Rete",
+      "rate_limiting": "Limitazione della velocità",
+      "logging": "Registrazione log",
+      "external_engines": "Motori ML esterni",
+      "job_history": "Cronologia lavori",
+      "backup_restore": "Backup e ripristino"
+    },
+    "general": {
+      "max_upload": {
+        "label": "Dimensione massima di caricamento",
+        "hint": "I caricamenti superiori a questo limite vengono rifiutati. Megabyte."
+      },
+      "session_ttl": {
+        "label": "Durata della sessione",
+        "hint": "Per quanto tempo vengono conservate una sessione e i suoi file di lavoro. Ore."
+      },
+      "preview_size": {
+        "label": "Dimensione dell'anteprima",
+        "hint": "Lato più lungo dell'immagine di anteprima veloce. Pixel."
+      },
+      "stacking_enabled": {
+        "label": "Stacking abilitato",
+        "hint": "Mostra la modalità di stacking multi-immagine."
+      },
+      "stacking_max": {
+        "label": "Numero massimo di pose",
+        "hint": "Limite superiore di pose accettate per uno stack."
+      },
+      "stacking_retention": {
+        "label": "Conservazione dello stack",
+        "hint": "Per quanto tempo vengono conservate le pose caricate di uno stack per un nuovo stacking. Il composito mantiene la durata della sessione. Ore."
+      },
+      "stacking_workers": {
+        "label": "Thread di stacking",
+        "hint": "Thread paralleli per le passate di allineamento/combinazione. 0 = automatico (numero di core, con limite a 4); 1 = sequenziale. Aumenta su una macchina con molti core."
+      },
+      "stacking_watch_dir": {
+        "label": "Cartella monitorata",
+        "hint": "Un percorso del server che il worker controlla per nuove pose (vuoto = disattivato). Le nuove immagini vengono acquisite in uno stack continuo apribile dalla schermata di stacking."
+      },
+      "stacking_watch_idle": {
+        "label": "Stack automatico dopo",
+        "hint": "Elabora lo stack monitorato quando non arriva una nuova posa da questo numero di minuti."
+      },
+      "stacking_watch_auto": {
+        "label": "Stack automatico della cartella monitorata",
+        "hint": "Se disattivato, le pose monitorate vengono solo acquisite - avvia tu stesso lo stack dalla schermata di stacking."
+      }
+    },
+    "webhooks": {
+      "allowlist": {
+        "label": "Lista consentita origini AstroDex",
+        "hint": "Un prefisso URL per riga - la o le origini MyAstroBoard da cui può provenire un handoff, es. https://astro.example.com. Vuoto significa che ogni handoff AstroDex viene rifiutato."
+      },
+      "max_retries": {
+        "label": "Numero massimo di tentativi",
+        "hint": "Tentativi di consegna prima che il rinvio ad AstroDex venga segnato come non riuscito."
+      },
+      "retry_delay": {
+        "label": "Ritardo tra i tentativi",
+        "hint": "Attesa di base tra i tentativi. Secondi."
+      }
+    },
+    "advanced": {
+      "cors_origins": {
+        "label": "Origini CORS",
+        "hint": "Un'origine per riga. Ha effetto dopo il riavvio del servizio api."
+      },
+      "rate_limit_enabled": {
+        "label": "Limitazione della velocità",
+        "hint": "Limita la frequenza con cui un IP può caricare, elaborare o impilare immagini."
+      },
+      "rate_limit_per_minute": {
+        "label": "Richieste al minuto",
+        "hint": "Per IP, condiviso tra gli endpoint di caricamento/elaborazione/stacking."
+      },
+      "max_concurrent_jobs": {
+        "label": "Lavori simultanei",
+        "hint": "Numero massimo di lavori di miglioramento/stacking in esecuzione contemporaneamente, per IP."
+      },
+      "log_file_level": {
+        "label": "Livello del log su file",
+        "hint": "Livello scritto nel file di log a rotazione."
+      },
+      "log_console_level": {
+        "label": "Livello del log su console",
+        "hint": "Livello riportato nei log del container."
+      },
+      "external_engines_blurb": "Rimozione delle stelle (StarNet2) e riduzione del rumore (DeepSNR) opzionali. Nulla è incluso: installa il binario da starnetastro.com, montalo nei container api e worker, e imposta qui il percorso. Sei responsabile dei termini di licenza propri dello strumento. Lascia vuoto per mantenere i motori classici.",
+      "starnet2_path": {
+        "label": "Percorso del binario StarNet2",
+        "hint": "Percorso assoluto all'interno del container, es. /opt/engines/starnet2/starnet2."
+      },
+      "starnet2_stride": {
+        "label": "Stride di StarNet2",
+        "hint": "Passo di tassellazione, pari, 2-512. 0 = usa il valore predefinito di StarNet2 (256). Più grande è più veloce e più grossolano; più piccolo è più lento con meno giunture."
+      },
+      "deepsnr_path": {
+        "label": "Percorso del binario DeepSNR",
+        "hint": "Percorso assoluto all'interno del container. Aggiunge un'opzione DeepSNR al controllo di riduzione rumore del passaggio Dettaglio, applicata all'inizio della pipeline."
+      },
+      "deepsnr_stride": {
+        "label": "Stride di DeepSNR",
+        "hint": "Passo di tassellazione, pari, 2-512. 0 = usa il valore predefinito di DeepSNR (480)."
+      },
+      "recheck_engines": "Ricontrolla i motori",
+      "backup": {
+        "blurb": "Scarica le tue impostazioni e i preset personalizzati in un unico file, oppure ripristinali da un'esportazione precedente - non le sessioni o le immagini, pensate per scadere.",
+        "export": "Esporta configurazione",
+        "import": "Importa configurazione",
+        "import_result": "{imported} preset importati, {skipped} saltati (nome già esistente)."
+      }
+    },
+    "logs": {
+      "level_label": "Livello",
+      "level_all_option": "tutti",
+      "refresh": "Aggiorna",
+      "export_zip": "Esporta ZIP",
+      "confirm_clear": "Conferma svuotamento",
+      "clear": "Svuota",
+      "levels_hint": "Livelli - file: {file}, console: {console}. Modificali nella scheda Avanzate.",
+      "no_lines": "Nessuna riga di log."
+    },
+    "operations": {
+      "retention": {
+        "label": "Conservazione della cronologia lavori",
+        "hint": "Per quanto tempo un lavoro completato viene conservato prima che la pulizia oraria lo rimuova. Ore."
+      },
+      "disk": {
+        "heading": "Utilizzo del disco",
+        "volume": "Volume dati",
+        "images": "Immagini",
+        "stacks": "Stack",
+        "database": "Database",
+        "logs": "Log"
+      },
+      "jobs": {
+        "heading": "Lavori recenti",
+        "status_label": "Stato",
+        "status_all_option": "tutti (esclusi i sostituiti)",
+        "refresh": "Aggiorna",
+        "no_jobs": "Nessun lavoro.",
+        "column_status": "Stato",
+        "column_session": "Sessione / stack",
+        "column_created": "Creato",
+        "column_error": "Errore",
+        "previous_page": "Precedente",
+        "next_page": "Successivo",
+        "page_info": "{from}-{to} di {total}"
+      }
+    }
+  },
+  "stacking": {
+    "combination_label": "Combinazione",
+    "mode": {
+      "single": "Immagine singola",
+      "stack": "Stack multi-immagine"
+    },
+    "progress": {
+      "heading": "Stacking"
+    },
+    "watch": {
+      "title": "Cartella monitorata",
+      "open": "Apri",
+      "status": {
+        "waiting_for_frames": "{count} pose acquisite, in attesa di altre",
+        "ready": "{count} pose acquisite, in attesa di altre",
+        "processing": "Stacking di {count} pose…",
+        "completed": "Completato - {count} pose impilate",
+        "failed": "Stacking non riuscito"
+      }
+    },
+    "steps": {
+      "registration": "Allineamento",
+      "normalization": "Normalizzazione",
+      "integration": "Integrazione",
+      "upload": "Caricamento pose",
+      "calibration": "Calibrazione"
+    },
+    "results": {
+      "failed": "Stacking non riuscito: {error}",
+      "status_ellipsis": "Stack {status}...",
+      "composite_alt": "Composito impilato",
+      "frames_stacked": "Pose impilate",
+      "frames_excluded": "Pose escluse",
+      "snr_improvement": "Miglioramento SNR",
+      "measured_noise_reduction": "Riduzione del rumore misurata",
+      "enhance_composite": "Migliora composito",
+      "download_composite": "Scarica composito",
+      "alignment_rms": "Residuo di allineamento",
+      "calibrated": "Calibrazione",
+      "calibrated_yes": "Applicata",
+      "frames_auto_rejected": "Rifiutate automaticamente",
+      "post_processed": "Ripulito",
+      "drizzle": "Drizzle"
+    },
+    "settings": {
+      "transform_label": "Allineamento",
+      "transform": {
+        "translation": "Solo traslazione",
+        "similarity": "Traslazione + rotazione + scala",
+        "affine": "Affine"
+      },
+      "combination": {
+        "average": "Media",
+        "median": "Mediana"
+      },
+      "rejection_label": "Rifiuto pixel",
+      "rejection": {
+        "none": "Nessuno",
+        "sigma": "Sigma clip",
+        "winsorized_sigma": "Sigma winsorizzato"
+      },
+      "weighting_label": "Ponderazione delle pose",
+      "weighting": {
+        "none": "Uguale",
+        "noise": "Per rumore",
+        "quality": "Per qualità"
+      },
+      "quality_label": "Rifiuta automaticamente le pose scadenti",
+      "quality_hint": "Valuta ogni posa (stelle, nitidezza, rotondità, cielo) e scarta automaticamente le peggiori. Puoi recuperare qualsiasi posa in seguito.",
+      "quality": {
+        "off": "Disattivato",
+        "lenient": "Permissivo",
+        "moderate": "Moderato",
+        "strict": "Rigoroso"
+      },
+      "post_process_label": "Ripulisci il composito",
+      "post_process_hint": "Ritaglia i bordi da rotazione di campo, appiattisce il gradiente del cielo e neutralizza il colore prima dell'editor.",
+      "drizzle_label": "Drizzle",
+      "drizzle_hint": "Ricostruisce su una griglia più fine per un reale guadagno di risoluzione da uno stack ben ditherato. Più lento, correla il rumore - lascialo disattivato a meno che tu non abbia centinaia di pose.",
+      "drizzle": {
+        "1": "Disattivato",
+        "2": "2x",
+        "3": "3x"
+      }
+    },
+    "upload_zone": {
+      "add_frames": "Aggiungi pose",
+      "select_multiple_hint": "Seleziona più file contemporaneamente",
+      "status": {
+        "queued": "in coda",
+        "uploading": "caricamento in corso",
+        "done": "completato",
+        "error": "errore"
+      },
+      "drop_hint": "Trascina qui i tuoi light frame",
+      "choose_files_button": "Scegli i file",
+      "accepted_formats": "JPEG, PNG, TIFF, FITS o RAW della fotocamera",
+      "max_size": "fino a {mb} MB ciascuno"
+    },
+    "view": {
+      "stacking_button": "Stacking in corso...",
+      "stack_n_frames": "Impila {count} pose",
+      "upload_n_frames": "Carica {count} pose",
+      "review_hint": "{total} pose caricate, {excluded} escluse. Fai clic su una miniatura per visualizzarla; usa la casella per scartare una posa mossa o nuvolosa.",
+      "new_stack": "Nuovo stack",
+      "back_to_composite": "Torna al composito",
+      "restack_n_frames": "Reimpila {count} pose",
+      "upload_more": "Carica altre {count}",
+      "frames_summary": "{total} pose · {excluded} escluse",
+      "result_pending": "Avvia lo stacking per vedere il risultato."
+    },
+    "errors": {
+      "too_few": "Aggiungi almeno {min} pose per impilare.",
+      "too_many": "{count} pose selezionate - questa istanza ne consente al massimo {max} per stack (aumentabile nelle Impostazioni).",
+      "failed": "Stacking non riuscito."
+    },
+    "grid": {
+      "frame_aria": "Posa {n}",
+      "exclude": "Escludi questa posa dallo stack",
+      "remove": "Rimuovi {name}",
+      "quality_title": "{stars} stelle · FWHM {fwhm}",
+      "reject": {
+        "clouds": "nuvole",
+        "soft": "sfocata",
+        "trailed": "mossa",
+        "bright_sky": "cielo chiaro",
+        "other": "rifiutata"
+      }
+    },
+    "calibration": {
+      "title": "Pose di calibrazione",
+      "hint": "Master dark, flat e bias opzionali. Vengono applicati a ogni light frame prima del debayering per rimuovere il segnale termico, la vignettatura e i difetti del sensore.",
+      "count": "{n} pose",
+      "add": "Aggiungi",
+      "clear": "Svuota",
+      "cosmetic_label": "Ripara pixel caldi e morti",
+      "masters_note": "I master vengono costruiti durante lo stacking.",
+      "kinds": {
+        "dark": "Dark",
+        "flat": "Flat",
+        "bias": "Bias / offset",
+        "dark_flat": "Dark-flat"
+      }
+    },
+    "rail": {
+      "aria_label": "Flusso di stacking",
+      "frames": "Pose",
+      "calibration": "Calibrazione",
+      "settings": "Impostazioni",
+      "result": "Risultato"
+    }
+  }
+}

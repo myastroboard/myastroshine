@@ -1,9 +1,16 @@
 import { SUPPORTED_LANGUAGES, isSupportedLanguage } from '@/i18n/config';
 import { useTranslation } from '@/hooks/useTranslation';
 
-const LANGUAGE_CODE_LABEL: Record<string, string> = { en: 'EN', fr: 'FR' };
+const LANGUAGE_CODE_LABEL: Record<string, string> = {
+  de: 'DE',
+  en: 'EN',
+  es: 'ES',
+  fr: 'FR',
+  it: 'IT',
+  pt: 'PT',
+};
 
-/** Compact EN/FR select, persisted client-side only - not part of `AppSettings`. */
+/** Compact language select, persisted client-side only - not part of `AppSettings`. */
 export function LanguageSwitcher() {
   const { language, setLanguage, t } = useTranslation();
 
