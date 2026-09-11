@@ -18,6 +18,27 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   exposure instead. Every field is best-effort and simply omitted if absent;
   the whole card stays hidden for an ordinary photo. New
   `GET /api/session/{id}/capture-info`.
+- **A golden-image regression test suite** (`backend/tests/regression/`) runs a
+  synthetic frame through the real enhancement and stacking pipelines on every
+  `pytest` run and diffs the result against a checked-in reference - catches a
+  silent numeric regression (a gain, a clamp) that runs cleanly with no
+  exception but changes what the pipeline actually produces, the shape of the
+  0.4.1 colour-calibration bug. Internal - no user-facing change; see
+  `CONTRIBUTING.md`.
+- **Settings gains an Operations tab.** Recent processing jobs (status,
+  session/stack, timestamp, error - filterable, paginated, `superseded` rows
+  hidden by default since every debounced slider edit creates one) and a
+  disk-usage breakdown of the data volume (images / stacks / database / logs)
+  - useful for the folder-watch stacking mode, meant to run unattended for
+  hours. A new `job_history_retention_hours` setting (default 7 days) bounds
+  how long a finished job is kept; the hourly cleanup now prunes old rows
+  instead of letting the `jobs` table grow forever. New
+  `GET /api/admin/jobs`, `GET /api/admin/disk-usage`.
+- **`GET /api/health` now actually checks something.** It used to always
+  report `"database": "connected"` regardless of whether the database was
+  reachable. It now runs a real query, pings Redis when
+  `PROCESSING_MODE=queue` (skipped entirely in `sync` mode, where nothing uses
+  Redis), and reports the data volume's disk usage.
 
 ### Changed
 

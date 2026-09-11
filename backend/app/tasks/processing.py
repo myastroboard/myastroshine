@@ -18,6 +18,7 @@ from app.services.stacking import StackingService
 from app.services.storage import StorageService
 from app.tasks.celery_app import celery_app
 from app.types import JsonDict
+from app.utils.app_settings import get_app_settings
 
 logger = get_logger(__name__)
 
@@ -52,13 +53,16 @@ def task_process_stack(stack_id: str, job_id: str) -> str:
 
 @celery_app.task(name="myastroshine.cleanup_sessions")
 def task_cleanup_sessions() -> int:
-    """Delete expired sessions and stacks (and their files), and fail stale jobs."""
+    """Delete expired sessions and stacks (and their files), fail stale jobs,
+    and prune old *terminal* job history past ``job_history_retention_hours``."""
     storage = StorageService()
     with database.SessionLocal() as db:
         sessions = SessionService(db, storage)
+        jobs = JobService(db)
         removed = sessions.cleanup_old_sessions()
         removed += StackingService(db, sessions, storage).cleanup_old_stacks()
-        removed += JobService(db).cleanup_stale_jobs()
+        removed += jobs.cleanup_stale_jobs()
+        removed += jobs.prune_old_jobs(get_app_settings().job_history_retention_hours)
         return removed
 
 

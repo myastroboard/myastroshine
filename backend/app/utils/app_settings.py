@@ -104,6 +104,14 @@ class AppSettings(BaseModel):
     log_level: str = "info"
     console_log_level: str = "warning"
 
+    #: How long a *terminal* job row (completed / failed / superseded) is kept
+    #: before the hourly cleanup prunes it. Every debounced slider edit creates
+    #: one row (the previous one is "superseded"), so this bounds the `jobs`
+    #: table's growth - a still-running job is never touched regardless of age
+    #: (see STALE_JOB_SECONDS in app.constants for a stuck job, a different,
+    #: much shorter window).
+    job_history_retention_hours: int = Field(default=168, ge=1, le=8760)
+
     @field_validator("starnet2_stride", "deepsnr_stride", mode="after")
     @classmethod
     def _stride_even(cls, value: int) -> int:

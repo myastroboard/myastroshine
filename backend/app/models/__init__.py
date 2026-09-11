@@ -17,6 +17,7 @@ from app.models.depth_shift import (
 )
 from app.models.engines import EngineStatus, EngineStatusResponse
 from app.models.image import Dimensions, HistogramData, UploadResponse
+from app.models.job import DiskUsageResponse, JobListResponse, JobSummary
 from app.models.logs import LogLevels, LogLevelUpdate, LogTailResponse
 from app.models.preset import (
     PresetListResponse,
@@ -72,6 +73,7 @@ __all__ = [
     "DepthShiftResponse",
     "DepthStatistics",
     "Dimensions",
+    "DiskUsageResponse",
     "EngineStatus",
     "EngineStatusResponse",
     "ExcludeFrameRequest",
@@ -84,6 +86,8 @@ __all__ = [
     "HandoffReturnResponse",
     "HistogramData",
     "InitiateStackRequest",
+    "JobListResponse",
+    "JobSummary",
     "LogLevelUpdate",
     "LogLevels",
     "LogTailResponse",

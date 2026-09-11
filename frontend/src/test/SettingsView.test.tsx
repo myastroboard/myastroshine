@@ -17,6 +17,8 @@ vi.mock('@/services/api', () => ({
     getLogLevels: vi.fn(),
     clearLogs: vi.fn(),
     exportLogs: vi.fn(),
+    getJobs: vi.fn(),
+    getDiskUsage: vi.fn(),
   },
 }));
 
@@ -46,6 +48,7 @@ const SETTINGS: AppSettings = {
   deepsnrStride: 0,
   logLevel: 'info',
   consoleLogLevel: 'warning',
+  jobHistoryRetentionHours: 168,
 };
 
 function renderView() {
@@ -68,6 +71,16 @@ describe('SettingsView', () => {
       filteredLevel: null,
     });
     mocked.getLogLevels.mockResolvedValue({ file: 'info', console: 'warning' });
+    mocked.getJobs.mockResolvedValue({ jobs: [], total: 0, limit: 25, offset: 0 });
+    mocked.getDiskUsage.mockResolvedValue({
+      totalBytes: 100_000_000_000,
+      usedBytes: 40_000_000_000,
+      freeBytes: 60_000_000_000,
+      imagesBytes: 1_000_000,
+      stacksBytes: 2_000_000,
+      dbBytes: 500_000,
+      logsBytes: 100_000,
+    });
   });
 
   it('loads current values and only shows Save once something changed', async () => {
@@ -139,6 +152,51 @@ describe('SettingsView', () => {
 
     await waitFor(() => expect(screen.getByText(/INFO \[x:1\] - started/)).toBeInTheDocument());
     expect(mocked.getLogs).toHaveBeenCalled();
+  });
+
+  it('shows disk usage and job history under the Operations section', async () => {
+    mocked.getJobs.mockResolvedValue({
+      jobs: [
+        {
+          jobId: 'job-1',
+          sessionId: 'sess-1',
+          status: 'failed',
+          progressPercent: 40,
+          currentStep: 'denoise',
+          error: 'boom',
+          clientIp: '1.2.3.4',
+          createdAt: '2026-09-11T10:00:00Z',
+          updatedAt: '2026-09-11T10:00:01Z',
+        },
+      ],
+      total: 1,
+      limit: 25,
+      offset: 0,
+    });
+    renderView();
+    await screen.findByLabelText('Maximum upload size');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Operations' }));
+
+    expect(await screen.findByText('boom')).toBeInTheDocument();
+    expect(screen.getByText(/37.3 GB \/ 93.1 GB/)).toBeInTheDocument();
+    expect(mocked.getJobs).toHaveBeenCalled();
+    expect(mocked.getDiskUsage).toHaveBeenCalled();
+  });
+
+  it('filters job history by status', async () => {
+    renderView();
+    await screen.findByLabelText('Maximum upload size');
+    fireEvent.click(screen.getByRole('button', { name: 'Operations' }));
+    await waitFor(() => expect(mocked.getJobs).toHaveBeenCalledTimes(1));
+
+    fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'failed' } });
+
+    await waitFor(() =>
+      expect(mocked.getJobs).toHaveBeenLastCalledWith(
+        expect.objectContaining({ status: 'failed' }),
+      ),
+    );
   });
 
   it('probes the external engine paths under the Advanced section', async () => {

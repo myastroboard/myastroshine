@@ -142,6 +142,7 @@ after changing it).
 | Advanced | `rate_limit_enabled` / `rate_limit_per_minute` / `max_concurrent_jobs_per_ip` | `true` / 600 / 5 |
 | Advanced | `log_level` / `console_log_level` | `info` / `warning` |
 | Advanced | `starnet2_path` / `deepsnr_path` / `starnet2_stride` / `deepsnr_stride` (external ML engines; empty = off) | "" / "" / 0 / 0 |
+| Operations | `job_history_retention_hours` (how long a finished job row is kept before the hourly cleanup prunes it) | 168 (7 days) |
 
 ## External ML engines (optional)
 

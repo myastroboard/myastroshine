@@ -110,6 +110,49 @@ class JobService:
             logger.info("stale jobs cleaned", count=len(stale))
         return len(stale)
 
+    def prune_old_jobs(self, retention_hours: int) -> int:
+        """Delete *terminal* job rows older than ``retention_hours``.
+
+        Nothing else ever removes a finished ``JobRecord`` - every debounced
+        slider edit creates one, so without this the table grows forever.
+        A still-running job is never touched here regardless of age (that is
+        ``cleanup_stale_jobs``'s job, on a much shorter window).
+        """
+        cutoff = datetime.now(UTC) - timedelta(hours=retention_hours)
+        old = self.db.scalars(
+            select(JobRecord).where(
+                JobRecord.status.in_(TERMINAL_STATUSES),
+                JobRecord.created_at <= cutoff,
+            )
+        ).all()
+        for record in old:
+            self.db.delete(record)
+        self.db.commit()
+        if old:
+            logger.info("old job history pruned", count=len(old))
+        return len(old)
+
+    def list_recent(
+        self, *, status: str | None = None, limit: int = 50, offset: int = 0
+    ) -> tuple[list[JobRecord], int]:
+        """The most recent jobs, newest first, and the total matching the filter.
+
+        With no explicit ``status``, ``superseded`` rows are hidden by default -
+        one is created for every debounced slider edit that got pre-empted by
+        the next, so an unfiltered view is mostly noise. Pass
+        ``status="superseded"`` explicitly to see them anyway.
+        """
+        conditions = [JobRecord.status == status] if status else [JobRecord.status != "superseded"]
+        total = self.db.scalar(select(func.count(JobRecord.job_id)).where(*conditions)) or 0
+        rows = self.db.scalars(
+            select(JobRecord)
+            .where(*conditions)
+            .order_by(JobRecord.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        ).all()
+        return list(rows), total
+
     def assert_under_concurrency_limit(self, client_ip: str | None) -> None:
         """Raise :class:`RateLimitedError` once ``client_ip`` has too many active jobs.
 

@@ -12,10 +12,12 @@ import type {
   CaptureInfo,
   CreatedToken,
   DepthShiftResult,
+  DiskUsage,
   EngineStatusResponse,
   FocusPoint,
   HandoffResumeResponse,
   HandoffReturnResponse,
+  JobListResult,
   LogLevel,
   LogLevels,
   LogTail,
@@ -259,6 +261,22 @@ export const apiClient = {
       throw await readError(response);
     }
     return response.blob();
+  },
+
+  // --- Job history / disk usage (Settings -> Operations) ---
+  getJobs(options: { status?: string; limit?: number; offset?: number } = {}): Promise<JobListResult> {
+    const params = new URLSearchParams({
+      limit: String(options.limit ?? 50),
+      offset: String(options.offset ?? 0),
+    });
+    if (options.status) {
+      params.set('status', options.status);
+    }
+    return request<JobListResult>(`/admin/jobs?${params.toString()}`);
+  },
+
+  getDiskUsage(): Promise<DiskUsage> {
+    return request<DiskUsage>('/admin/disk-usage');
   },
 
   // --- Webhook tokens (created from Settings) ---
