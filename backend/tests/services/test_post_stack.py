@@ -199,6 +199,37 @@ def test_background_is_neutralised_and_channels_balanced() -> None:
     assert all(np.isfinite(g) for g in gains)
 
 
+def test_colour_balance_survives_a_large_shared_pedestal() -> None:
+    """A single already-stacked upload (Seestar/ASIAIR) can carry a large flat
+    offset common to every channel - the multi-frame stacker's own composite
+    never has one (bias/dark already subtracted per sub-frame). The balance
+    gain must be measured on the signal above each channel's own sky level,
+    not on the raw pedestal-inclusive composite - otherwise the shared offset
+    swamps the per-channel mean and the "balance toward grey" gain silently
+    collapses to ~1 regardless of how skewed the real signal is."""
+    height, width = 120, 120
+    pedestal = 20_000.0  # dwarfs the signal below, like a real 16-bit stack
+    comp = np.full((height, width, 3), pedestal, dtype=np.float32)
+    comp += np.random.default_rng(2).normal(0, 3.0, comp.shape).astype(np.float32)
+
+    # An object patch with a strong colour skew above the (shared, neutral)
+    # pedestal - red and green much stronger than blue, like an uncalibrated
+    # OSC sensor's response to a broadband target.
+    patch = (slice(40, 80), slice(40, 80))
+    comp[patch] += np.array([400.0, 250.0, 40.0], dtype=np.float32)
+
+    out, gains = calibrate_colour(comp)
+
+    assert max(gains) - min(gains) > 0.5  # a real, non-trivial correction - not a ~1.0 no-op
+    assert gains[2] > gains[0]  # blue (the weak channel) is boosted more than red
+
+    before = comp[patch].reshape(-1, 3).mean(axis=0) - pedestal
+    after = out[patch].reshape(-1, 3).mean(axis=0) - float(out[:20, :20].mean())
+    before_spread = float(before.max() - before.min()) / float(before.mean())
+    after_spread = float(after.max() - after.min()) / float(after.mean())
+    assert after_spread < before_spread * 0.5  # the object's colour is now far more neutral
+
+
 # -- 4. the whole pre-stage (linear composite -> BGR ready for the editor) --
 
 

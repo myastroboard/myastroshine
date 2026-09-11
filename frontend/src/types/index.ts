@@ -355,8 +355,12 @@ export interface EditorStep {
 }
 
 export const EDITOR_STEPS: EditorStep[] = [
-  { id: 'start', number: null, params: [] },
+  // 'stack' before 'start': a composite session opens straight on 'stack' (see
+  // EditorView's initial activeStep), and Auto Astro (on 'start') analyses the
+  // rendered image - it belongs *after* the stack render is dialled in, not
+  // before. This order also drives the inspector's "next step" button.
   { id: 'stack', number: null, params: [], stackOnly: true },
+  { id: 'start', number: null, params: [] },
   { id: 'frame', number: 1, params: [] },
   {
     id: 'sky',

@@ -47,6 +47,21 @@ Nothing yet.
 
 ### Fixed
 
+- **Colour calibration silently no-op'd on a single already-stacked upload**
+  (a live stack, `is_stack: true`): its balance gain was
+  measured on the raw composite, and a large pedestal shared by every channel
+  (no bias/dark subtraction on device, unlike the multi-frame stacker's own
+  composite) swamped the per-channel mean, so the gains always landed within
+  ~0.3% of 1 regardless of the real colour skew - a broadband capture under
+  skyglow could come out visibly yellow with no way to neutralise it. The
+  gain is now measured on the signal above each channel's own sky level, and
+  the clamp is widened from 0.5-2x to 0.5-4x to actually reach a weak-blue
+  sensor's real imbalance.
+- **The editor's Empilement (Stack) step now precedes Départ (Start)** in the
+  rail and in the panel's "next step" button, not the other way round - a
+  composite session already opens on Stack, and Auto Astro (on Start)
+  analyses the rendered image, so it belongs after the stack render is
+  dialled in, not before.
 - A trailing slash on a **CORS origin** or **AstroDex callback allowlist** entry
   in Settings is now stripped on save (`https://host/` -> `https://host`). A
   pasted slash previously made the entry silently match nothing - the CORS

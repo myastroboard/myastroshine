@@ -675,7 +675,10 @@ the enhancement pipeline works on:
    re-run per slider move.
 2. **Colour calibration** (`color_calibration`, on/off) - the per-channel sky
    level is equalised (neutral grey background), then the channels are scaled so
-   their means match (gains clamped to 0.5-2x).
+   their means match, measured on the signal above each channel's own sky level
+   so a large shared pedestal (a Seestar/ASIAIR live stack, not bias-subtracted
+   like the multi-frame stacker's own composite) can't swamp it (gains clamped
+   to 0.5-4x).
 3. **Stretch** (`stretch`, 0-1) - the sky is neutralised (subtract each channel's
    low percentile) and **one** MTF stretch, derived from the luminance, is
    applied to all three channels. `stretch` sets the auto-stretch target

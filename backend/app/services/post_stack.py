@@ -82,7 +82,13 @@ _BG_FLOOR_PERCENTILE = 10.0  # flatten the sky toward this percentile of the fit
 _BG_ESTIMATE_MAX_SIZE = 640
 
 _NEUTRAL_PERCENTILE = 20.0  # per-channel sky level for background neutralisation
-_BALANCE_GAIN_CLIP = (0.5, 2.0)
+# A broadband OSC sensor with no light-pollution filter can have a genuinely
+# weak blue channel (e.g. a Seestar under skyglow: the real signal above sky
+# is red:green:blue ~11:7:1) - 2x can't reach that. 4x still holds the
+# background neutral (checked against a 1406-frame Seestar stack: background
+# mean/std stay balanced across channels up to ~4x; unclamped overshoots and
+# tints the background blue).
+_BALANCE_GAIN_CLIP = (0.5, 4.0)
 _COLOR_NDIM = 3
 _TINY = 1e-8
 
@@ -390,13 +396,29 @@ def _eval_poly2d(x: np.ndarray, y: np.ndarray, coeffs: np.ndarray, degree: int) 
 
 
 def calibrate_colour(composite: np.ndarray) -> tuple[np.ndarray, tuple[float, float, float]]:
-    """Neutralise the sky background, then balance the channels toward grey."""
+    """Neutralise the sky background, then balance the channels toward grey.
+
+    The balance gain is measured on the signal *above* each channel's own sky
+    level, not on the raw composite - a single already-stacked upload (a
+    Seestar / ASIAIR live stack) can still carry a large shared pedestal
+    (bias/offset baked in by the source device, tens of thousands of ADU on a
+    16-bit frame) that the multi-frame stacker's own composite never has
+    (its sub-frames are bias/dark-subtracted before combining). Computing the
+    per-channel mean on pedestal-inclusive data makes the ratio between means
+    ~1 regardless of how skewed the real signal is - the pedestal, identical
+    on every channel, swamps it - silently turning this into a no-op on
+    exactly the frames that need it most. Zeroing each channel's own sky
+    level first keeps the gain measurement sensitive to the actual colour of
+    the signal; the shared floor is added back afterwards, unscaled, so the
+    background stays exactly as neutral as before and is never pushed
+    negative.
+    """
     channels = [composite[..., c] for c in range(_COLOR_NDIM)]
     sky = np.array([np.percentile(ch, _NEUTRAL_PERCENTILE) for ch in channels])
-    neutral = composite - (sky - sky.min())
+    zeroed = composite - sky
 
-    positive = np.clip(neutral, 0.0, None)
+    positive = np.clip(zeroed, 0.0, None)
     means = np.array([positive[..., c].mean() for c in range(_COLOR_NDIM)]) + _TINY
     gains = np.clip(float(means.mean()) / means, *_BALANCE_GAIN_CLIP)
-    balanced = np.clip(neutral * gains, 0.0, None)
+    balanced = np.clip(zeroed * gains, 0.0, None) + sky.min()
     return balanced.astype(np.float32), (float(gains[0]), float(gains[1]), float(gains[2]))
