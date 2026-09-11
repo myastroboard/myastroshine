@@ -6,6 +6,10 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.4.2] - 2026-09-11
+
 ### Added
 
 - **A capture info panel for a stacked composite session.** Below the workflow
