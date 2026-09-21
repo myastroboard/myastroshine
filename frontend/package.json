@@ -14,7 +14,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "markdown-to-jsx": "^9.10.2",
+    "markdown-to-jsx": "^9.10.3",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },
