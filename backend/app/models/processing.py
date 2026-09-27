@@ -24,6 +24,12 @@ StarRemovalEngine = Literal["classic", "starnet2"]
 #: falls back to ``"classic"`` when one is not available.
 DenoiseEngine = Literal["classic", "deepsnr"]
 
+#: How the Stack step stretches the linear composite. ``"adaptive"`` is the
+#: colour-preserving luminance stretch fitted to the image's own sky and object
+#: levels (``app.services.stretch``); ``"classic"`` is the original per-channel
+#: screen-transfer-function auto-stretch, kept for comparison and old edits.
+StretchMode = Literal["adaptive", "classic"]
+
 
 class GeometryParameters(BaseModel):
     """Framing applied before enhancement: rotate, flip, straighten, crop.
@@ -66,15 +72,17 @@ class StackParameters(BaseModel):
     A stacked composite opens the editor on its 32-bit linear data; these run as
     a non-destructive pre-stage (``post_stack.render_stack_base``) ahead of the
     normal pipeline. ``stretch`` (0 = subtle .. 1 = aggressive) sets the
-    auto-stretch target background; ``background_extraction`` (0 = off .. 100)
-    is how much of the fitted low-order sky gradient to subtract;
-    ``color_calibration`` neutralises the sky and balances the channels. All at
-    their default on a fresh composite. Ignored for an ordinary single image.
+    auto-stretch target background; ``stretch_mode`` picks the stretch itself;
+    ``background_extraction`` (0 = off .. 100) is how much of the fitted
+    low-order sky gradient to subtract; ``color_calibration`` neutralises the sky
+    and white-balances on the star field. All at their default on a fresh
+    composite. Ignored for an ordinary single image.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     stretch: float = Field(default=0.5, ge=0.0, le=1.0)
+    stretch_mode: StretchMode = "adaptive"
     background_extraction: int = Field(default=100, ge=0, le=100)
     color_calibration: bool = True
 
@@ -140,6 +148,11 @@ class ProcessingParameters(BaseModel):
     sharpness: float = Field(default=1.0, ge=0.0, le=2.0)
     temperature: int = Field(default=6500, ge=2000, le=8000)
     tint: int = Field(default=0, ge=-50, le=50)
+    #: SCNR "average neutral" green removal (0 = off .. 100 = full). A one-shot-
+    #: colour sensor has twice as many green photosites, and almost nothing in the
+    #: deep sky is genuinely green, so a residual green cast is removed by capping
+    #: green at the mean of red and blue.
+    green_removal: int = Field(default=0, ge=0, le=100)
     curve_points: list[CurvePoint] = Field(default_factory=list)
     red_curve_points: list[CurvePoint] = Field(default_factory=list)
     green_curve_points: list[CurvePoint] = Field(default_factory=list)

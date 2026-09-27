@@ -274,11 +274,11 @@
       },
       "denoise": {
         "label": "Reducción de ruido",
-        "hint": "Suavizado que preserva los bordes. Un valor mayor sacrifica detalle fino por un fondo más limpio."
+        "hint": "Reducción de ruido multiescala (ondículas) sobre el brillo. Quita el grano conservando estrellas y filamentos finos; cuanto más alto, más suaviza."
       },
       "chromaDenoise": {
         "label": "Reducción de ruido de color",
-        "hint": "Suaviza solo el moteado de color, sin afectar el detalle de brillo."
+        "hint": "Suavizado multiescala solo del ruido de color, sin tocar el detalle de brillo."
       },
       "starReduction": {
         "label": "Reducción de estrellas",
@@ -302,7 +302,7 @@
       },
       "sharpness": {
         "label": "Nitidez",
-        "hint": "Difumina por debajo del 100%, agudiza por encima mediante realce de bordes."
+        "hint": "Por debajo de 1 suaviza. Por encima, enfoca estrellas y estructuras finas solo donde superan el ruido, sin enfocar el grano del fondo."
       },
       "vibrance": {
         "label": "Viveza",
@@ -324,6 +324,10 @@
       "tint": {
         "label": "Matiz",
         "hint": "Balance de blancos: desplaza la dominante de color entre verde y magenta."
+      },
+      "greenRemoval": {
+        "label": "Eliminar verde",
+        "hint": "Elimina una dominante verde residual (SCNR). Casi nada en el cielo profundo es verde; un filamento OIII turquesa conserva su color porque el azul lo respalda."
       }
     }
   },
@@ -332,13 +336,20 @@
       "label": "Estiramiento",
       "hint": "Con qué fuerza se extrae la señal débil del fondo. Bajo mantiene el cielo oscuro y discreto; alto realza la nebulosidad tenue a costa de un fondo más brillante y ruidoso."
     },
+    "stretch_mode": {
+      "aria": "Método de estiramiento",
+      "adaptive": "Adaptativo",
+      "classic": "Clásico",
+      "adaptive_hint": "Estiramiento que conserva el color, ajustado a esta imagen: los núcleos brillantes mantienen su estructura y las estrellas su color en vez de quemarse a blanco.",
+      "classic_hint": "El autoestiramiento original por canal, para comparar. Más brillante, pero quema los núcleos de galaxias y blanquea las estrellas."
+    },
     "background_extraction": {
       "label": "Extracción de fondo",
       "hint": "Elimina un degradado suave de contaminación lumínica ajustando una superficie de bajo orden al cielo entre los objetos. 0 deja el degradado; 100 lo resta por completo."
     },
     "color_calibration": {
       "label": "Calibración de color",
-      "hint": "Neutraliza el fondo del cielo a gris y equilibra los canales para que el campo de estrellas se vea aproximadamente blanco. Corrige una dominante de color del sensor (un stack que sale uniformemente amarillo, por ejemplo) - pero no puede distinguir eso del color real del objeto, así que desactívela para un objeto genuinamente muy coloreado (una nebulosa de reflexión azul como las Pléyades, una nebulosa de emisión roja) si el resultado se ve deslavado."
+      "hint": "Neutraliza el fondo de cielo a gris y equilibra el blanco con el campo estelar: la mediana de las estrellas no saturadas pasa a ser blanca. Como la referencia son las estrellas y no la imagen entera, una nebulosa roja o las Pléyades azules conservan su color real."
     }
   },
   "stars_panel": {

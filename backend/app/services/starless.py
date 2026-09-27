@@ -173,7 +173,11 @@ class StarlessService:
         """
         if recombine_amount <= 0:
             return starless
+        # uint8 (0-255) or float32 (0-1) - the pipeline recombines in float.
+        full = 255.0 if starless.dtype == np.uint8 else 1.0
         stars = stars_layer.astype(np.float32) * (recombine_amount / 100.0)
         base = starless.astype(np.float32)
-        blended = 255.0 - (255.0 - base) * (255.0 - stars) / 255.0
-        return to_uint8(blended)
+        blended = full - (full - base) * (full - stars) / full
+        if starless.dtype == np.uint8:
+            return to_uint8(blended)
+        return np.clip(blended, 0.0, 1.0).astype(np.float32)

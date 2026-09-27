@@ -274,11 +274,11 @@
       },
       "denoise": {
         "label": "Débruitage",
-        "hint": "Lissage préservant les contours. Plus la valeur est élevée, plus le fond est propre au détriment des détails fins."
+        "hint": "Réduction du bruit multi-échelle (ondelettes) sur la luminosité. Retire le grain en gardant les étoiles et les filaments fins ; plus la valeur est élevée, plus le lissage est profond."
       },
       "chromaDenoise": {
         "label": "Réduction du bruit couleur",
-        "hint": "Lisse uniquement le bruit de couleur, sans toucher aux détails de luminosité."
+        "hint": "Lissage multi-échelle du bruit de couleur uniquement, sans toucher aux détails de luminosité."
       },
       "starReduction": {
         "label": "Réduction des étoiles",
@@ -302,7 +302,7 @@
       },
       "sharpness": {
         "label": "Netteté",
-        "hint": "Floute en dessous de 100 %, accentue au-dessus via un renforcement des contours."
+        "hint": "En dessous de 1, adoucit. Au-dessus, accentue les étoiles et les structures fines seulement là où elles dépassent le bruit : le grain du fond n'est pas accentué."
       },
       "vibrance": {
         "label": "Vibrance",
@@ -324,6 +324,10 @@
       "tint": {
         "label": "Teinte",
         "hint": "Balance des blancs : décale la dominante colorée entre vert et magenta."
+      },
+      "greenRemoval": {
+        "label": "Suppression du vert",
+        "hint": "Retire une dominante verte résiduelle (SCNR). Presque rien n'est vert dans le ciel profond ; un filament OIII bleu-vert garde sa couleur car le bleu le soutient."
       }
     }
   },
@@ -332,13 +336,20 @@
       "label": "Étirement",
       "hint": "L'intensité avec laquelle sortir le signal faible du fond. Bas garde un ciel sombre et discret ; haut fait ressortir la nébulosité ténue au prix d'un fond plus clair et plus bruité."
     },
+    "stretch_mode": {
+      "aria": "Méthode d'étirement",
+      "adaptive": "Adaptatif",
+      "classic": "Classique",
+      "adaptive_hint": "Étirement qui préserve la couleur, ajusté à cette image : les noyaux brillants gardent leur structure et les étoiles leur couleur au lieu de brûler en blanc.",
+      "classic_hint": "L'étirement automatique d'origine, canal par canal, pour comparer. Plus lumineux, mais brûle les noyaux de galaxies et blanchit les étoiles."
+    },
     "background_extraction": {
       "label": "Extraction du fond",
       "hint": "Retire un dégradé lisse de pollution lumineuse en ajustant une surface d'ordre faible au ciel entre les objets. 0 laisse le dégradé ; 100 le soustrait entièrement."
     },
     "color_calibration": {
       "label": "Calibration des couleurs",
-      "hint": "Neutralise le fond de ciel vers le gris et équilibre les canaux pour que le champ d'étoiles paraisse à peu près blanc. Corrige une dominante due au capteur (une prise qui sort uniformément jaune, par exemple) - mais ne peut pas distinguer ça de la vraie couleur de l'objet, donc désactivez-la pour un objet réellement très coloré (une nébuleuse par réflexion bleue comme les Pléiades, une nébuleuse en émission rouge) si le résultat paraît délavé."
+      "hint": "Neutralise le fond de ciel en gris et équilibre les blancs sur le champ d'étoiles : la médiane des étoiles non saturées devient blanche. La référence étant les étoiles et non l'image entière, une nébuleuse rouge ou les Pléiades bleues gardent leur vraie couleur."
     }
   },
   "stars_panel": {

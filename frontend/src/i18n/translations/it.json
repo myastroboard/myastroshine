@@ -274,11 +274,11 @@
       },
       "denoise": {
         "label": "Riduzione rumore",
-        "hint": "Levigatura che preserva i bordi. Valori più alti sacrificano il dettaglio fine per uno sfondo più pulito."
+        "hint": "Riduzione del rumore multiscala (wavelet) sulla luminosità. Toglie la grana mantenendo stelle e filamenti sottili; più alto leviga di più."
       },
       "chromaDenoise": {
         "label": "Riduzione rumore colore",
-        "hint": "Leviga solo il rumore cromatico, senza toccare il dettaglio di luminosità."
+        "hint": "Levigatura multiscala solo del rumore di colore, senza toccare il dettaglio di luminosità."
       },
       "starReduction": {
         "label": "Riduzione stelle",
@@ -302,7 +302,7 @@
       },
       "sharpness": {
         "label": "Nitidezza",
-        "hint": "Sfoca sotto il 100%, aumenta la nitidezza sopra tramite rafforzamento dei bordi."
+        "hint": "Sotto 1 ammorbidisce. Sopra, rende nitide stelle e strutture fini solo dove superano il rumore, senza accentuare la grana del fondo."
       },
       "vibrance": {
         "label": "Vividezza",
@@ -324,6 +324,10 @@
       "tint": {
         "label": "Tinta",
         "hint": "Bilanciamento del bianco: sposta la dominante cromatica tra verde e magenta."
+      },
+      "greenRemoval": {
+        "label": "Rimozione del verde",
+        "hint": "Rimuove una dominante verde residua (SCNR). Quasi nulla nel cielo profondo è verde; un filamento OIII turchese mantiene il suo colore perché il blu lo sostiene."
       }
     }
   },
@@ -332,13 +336,20 @@
       "label": "Distensione",
       "hint": "Con quanta forza estrarre il segnale debole dallo sfondo. Basso mantiene il cielo scuro e discreto; alto fa emergere la nebulosità tenue a costo di uno sfondo più chiaro e rumoroso."
     },
+    "stretch_mode": {
+      "aria": "Metodo di stretching",
+      "adaptive": "Adattivo",
+      "classic": "Classico",
+      "adaptive_hint": "Stretching che preserva il colore, adattato a questa immagine: i nuclei luminosi mantengono la struttura e le stelle il colore invece di bruciarsi in bianco.",
+      "classic_hint": "L'auto-stretching originale per canale, per confronto. Più luminoso, ma brucia i nuclei delle galassie e sbianca le stelle."
+    },
     "background_extraction": {
       "label": "Estrazione dello sfondo",
       "hint": "Rimuove un gradiente dolce di inquinamento luminoso adattando una superficie di ordine basso al cielo tra gli oggetti. 0 lascia il gradiente; 100 lo sottrae completamente."
     },
     "color_calibration": {
       "label": "Calibrazione del colore",
-      "hint": "Neutralizza lo sfondo del cielo verso il grigio ed equilibra i canali in modo che il campo stellare appaia pressoché bianco. Corregge una dominante cromatica del sensore (uno stack che risulta uniformemente giallo, ad esempio) - ma non può distinguerla dal vero colore del soggetto, quindi disattivala per un oggetto genuinamente molto colorato (una nebulosa a riflessione blu come le Pleiadi, una nebulosa a emissione rossa) se il risultato appare slavato."
+      "hint": "Neutralizza il fondo cielo in grigio e bilancia il bianco sul campo stellare: la mediana delle stelle non sature diventa bianca. Poiché il riferimento sono le stelle e non l'intera immagine, una nebulosa rossa o le Pleiadi blu mantengono il loro colore reale."
     }
   },
   "stars_panel": {

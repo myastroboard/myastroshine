@@ -32,14 +32,24 @@ from app.utils.math_utils import (
     kelvin_to_rgb_gain,
     tint_to_rgb_gain,
 )
+from app.utils.starlet import denoise_plane, enhance_detail
 
 StepCallback = Callable[[str, int], None]
+#: ``(image, linear) -> denoised``, ``float32`` in and out. ``linear`` is true when
+#: the stage runs on a linear stacked composite (RGB planes, before the stretch).
+DenoiseStageFn = Callable[[np.ndarray, bool], np.ndarray]
 
 logger = get_logger(__name__)
 
 _EPS = 1e-3  # a parameter within this of its default is treated as "unchanged"
 _NEUTRAL_KELVIN = 6500
-_DENOISE_MORPH_THRESHOLD = 50
+_LUMA_BGR = np.array([0.0722, 0.7152, 0.2126], dtype=np.float32)
+_DENOISE_MAX_SIGMAS = 3.0  # luma denoise at 100: shrink coefficients up to 3 noise sigma
+_DENOISE_LAYERS = 4
+_CHROMA_DENOISE_MAX_SIGMAS = 4.0  # colour noise can take a harder cut than luma
+_CHROMA_DENOISE_LAYERS = 5
+_SHARPEN_GAIN = 1.5  # sharpness 2.0 -> fine-scale detail boosted by 1 + 1.5
+_SHARPEN_LAYERS = 2
 _STAR_FALLOFF_MARGIN = 1.6  # widen each star's blend footprint past its own radius
 _DEHAZE_PATCH_SIZE = 15
 _DEHAZE_ATMOSPHERE_FRACTION = 0.001  # brightest 0.1% of dark-channel pixels
@@ -366,24 +376,45 @@ class ImageProcessingService:
 
     @_dtype_flexible
     def apply_saturation(self, image: np.ndarray, saturation: float) -> np.ndarray:
-        """Scale the HSV saturation channel (0.0..2.0)."""
+        """Scale each pixel's colour away from its own luminance (0.0..2.0).
+
+        Luminance-preserving and in float: the brightness the tone stages chose is
+        kept, and a faint, low-chroma nebula is not posterised the way an 8-bit
+        HSV round-trip quantises it.
+        """
         if _unchanged(saturation, 1.0):
             return image
-        u8 = _to_u8(image)
-        hsv = cv2.cvtColor(u8, cv2.COLOR_BGR2HSV).astype(np.float32)
-        hsv[:, :, 1] = np.clip(hsv[:, :, 1] * saturation, 0, 255)
-        return _to_f32(cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR))
+        luma = (image @ _LUMA_BGR)[:, :, np.newaxis]
+        return np.clip(luma + (image - luma) * saturation, 0.0, 1.0)
 
     @_dtype_flexible
     def apply_vibrance(self, image: np.ndarray, vibrance: float) -> np.ndarray:
         """Boost saturation weighted towards less-saturated pixels (0.0..2.0)."""
         if _unchanged(vibrance, 1.0):
             return image
-        hsv = cv2.cvtColor(_to_u8(image), cv2.COLOR_BGR2HSV).astype(np.float32)
-        sat = hsv[:, :, 1] / 255.0
-        boost = (1.0 - sat) * (vibrance - 1.0)
-        hsv[:, :, 1] = np.clip(hsv[:, :, 1] * (1.0 + boost), 0, 255)
-        return _to_f32(cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR))
+        peak = image.max(axis=2)
+        sat = (peak - image.min(axis=2)) / np.maximum(peak, 1e-6)
+        factor = (1.0 + (1.0 - sat) * (vibrance - 1.0))[:, :, np.newaxis]
+        luma = (image @ _LUMA_BGR)[:, :, np.newaxis]
+        boosted: np.ndarray = np.clip(luma + (image - luma) * factor, 0.0, 1.0)
+        return boosted
+
+    @_dtype_flexible
+    def apply_green_removal(self, image: np.ndarray, amount: int) -> np.ndarray:
+        """SCNR "average neutral" green removal (0-100).
+
+        Green is capped at the mean of red and blue, blended in by ``amount``. A
+        one-shot-colour sensor's residual green cast goes; a genuinely teal OIII
+        filament (green *and* blue) keeps most of its colour, since blue lifts the
+        cap along with it.
+        """
+        if amount <= 0:
+            return image
+        neutral = 0.5 * (image[:, :, 0] + image[:, :, 2])
+        excess = np.clip(image[:, :, 1] - neutral, 0.0, None)
+        out = image.copy()
+        out[:, :, 1] -= (amount / 100.0) * excess
+        return out
 
     @_dtype_flexible
     def apply_clarity(self, image: np.ndarray, clarity: float) -> np.ndarray:
@@ -401,37 +432,72 @@ class ImageProcessingService:
 
     @_dtype_flexible
     def apply_denoise(self, image: np.ndarray, denoise: int) -> np.ndarray:
-        """Edge-preserving bilateral filter (0 = off .. 100 = aggressive)."""
+        """Multiscale (starlet) luminance denoise (0 = off .. 100 = aggressive).
+
+        The luma plane's four finest wavelet layers are shrunk at up to 3 noise
+        sigma, following a local noise map - grain goes, while stars and
+        filaments (coefficients far above the noise) keep their amplitude. A
+        bilateral filter, the previous implementation, flattened faint stars and
+        left a plastic texture. Colour is handled by `apply_chroma_denoise`.
+        """
         if denoise <= 0:
             return image
-        strength = denoise / 100.0
-        diameter = int(5 + strength * 15)
-        sigma = 75.0 + strength * 75.0
-        out = cv2.bilateralFilter(_to_u8(image), diameter, sigma, sigma)
-        if denoise > _DENOISE_MORPH_THRESHOLD:
-            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-            out = cv2.morphologyEx(out, cv2.MORPH_CLOSE, kernel)
-        return _to_f32(out)
+        y, cr, cb = cv2.split(cv2.cvtColor(image, cv2.COLOR_BGR2YCrCb))
+        y = denoise_plane(y, _DENOISE_MAX_SIGMAS * denoise / 100.0, _DENOISE_LAYERS)
+        out = cv2.cvtColor(cv2.merge([y, cr, cb]), cv2.COLOR_YCrCb2BGR)
+        return np.clip(out, 0.0, 1.0)
 
     @_dtype_flexible
     def apply_chroma_denoise(self, image: np.ndarray, amount: int) -> np.ndarray:
-        """Bilateral-filter just the colour (Cr/Cb) channels, leaving luma untouched (0-100).
+        """Multiscale (starlet) denoise of just the colour (Cr/Cb) planes (0-100).
 
         Colour speckle is usually more objectionable than luma noise in a
         stacked astro frame, and can be smoothed much harder than luma
         without an apparent loss of detail, since detail lives almost
-        entirely in luma. Same diameter/sigma mapping as `apply_denoise`,
-        applied per chroma channel.
+        entirely in luma - so it takes a harder cut, one layer deeper, than
+        `apply_denoise`, and luma is left untouched.
         """
         if amount <= 0:
             return image
-        strength = amount / 100.0
-        diameter = int(5 + strength * 15)
-        sigma = 75.0 + strength * 75.0
-        y, cr, cb = cv2.split(cv2.cvtColor(_to_u8(image), cv2.COLOR_BGR2YCrCb))
-        cr = cv2.bilateralFilter(cr, diameter, sigma, sigma)
-        cb = cv2.bilateralFilter(cb, diameter, sigma, sigma)
-        return _to_f32(cv2.cvtColor(cv2.merge([y, cr, cb]), cv2.COLOR_YCrCb2BGR))
+        y, cr, cb = cv2.split(cv2.cvtColor(image, cv2.COLOR_BGR2YCrCb))
+        cut = _CHROMA_DENOISE_MAX_SIGMAS * amount / 100.0
+        cr = denoise_plane(cr, cut, _CHROMA_DENOISE_LAYERS, local=False)
+        cb = denoise_plane(cb, cut, _CHROMA_DENOISE_LAYERS, local=False)
+        out = cv2.cvtColor(cv2.merge([y, cr, cb]), cv2.COLOR_YCrCb2BGR)
+        return np.clip(out, 0.0, 1.0)
+
+    def apply_linear_denoise(self, image: np.ndarray, denoise: int) -> np.ndarray:
+        """Starlet denoise of each plane of linear data (mono or RGB, ``float32``).
+
+        The fallback when the DeepSNR engine was asked to run on a linear
+        composite and failed: the same multiscale shrinkage as `apply_denoise`,
+        per plane (the linear data has no meaningful luma/chroma split yet).
+        """
+        if denoise <= 0:
+            return image
+        cut = _DENOISE_MAX_SIGMAS * denoise / 100.0
+        if image.ndim == 2:  # noqa: PLR2004
+            return denoise_plane(image.astype(np.float32), cut, _DENOISE_LAYERS)
+        planes = [
+            denoise_plane(
+                np.ascontiguousarray(image[..., c], dtype=np.float32), cut, _DENOISE_LAYERS
+            )
+            for c in range(image.shape[2])
+        ]
+        return np.stack(planes, axis=-1)
+
+    def classic_starless_split(
+        self, image: np.ndarray, sensitivity: int, max_size: int, removal_amount: int
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """:meth:`StarlessService.split` for a BGR ``float32`` image.
+
+        The classical split is uint8-native (mask units, the detector), so it
+        round-trips at this boundary; the StarNet2 engine does not.
+        """
+        starless, removed = self._starless.split(
+            _to_u8(image), sensitivity, max_size, removal_amount
+        )
+        return _to_f32(starless), _to_f32(removed)
 
     @_dtype_flexible
     def apply_star_reduction(
@@ -491,16 +557,22 @@ class ImageProcessingService:
 
     @_dtype_flexible
     def apply_sharpness(self, image: np.ndarray, sharpness: float) -> np.ndarray:
-        """Blur below 1.0, Laplacian-kernel sharpen above (0.0..2.0)."""
+        """Blur below 1.0, noise-aware multiscale sharpen above (0.0..2.0).
+
+        Above 1.0 the two finest starlet layers of the luma plane are boosted, but
+        only where they rise clearly above the noise (`enhance_detail`), so stars
+        and fine filaments sharpen while the background grain is not amplified,
+        and colour is left alone (no coloured fringes).
+        """
         if _unchanged(sharpness, 1.0):
             return image
         if sharpness < 1.0:
             radius = round((1.0 - sharpness) * 8) * 2 + 1
             return cast("np.ndarray", cv2.GaussianBlur(image, (radius, radius), 0))
-        kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]], dtype=np.float32)
-        sharp = cv2.filter2D(image, -1, kernel)
-        strength = (sharpness - 1.0) * 0.5
-        return np.clip(cv2.addWeighted(image, 1.0 - strength, sharp, strength, 0), 0.0, 1.0)
+        y, cr, cb = cv2.split(cv2.cvtColor(image, cv2.COLOR_BGR2YCrCb))
+        y = enhance_detail(y, (sharpness - 1.0) * _SHARPEN_GAIN, _SHARPEN_LAYERS)
+        out = cv2.cvtColor(cv2.merge([y, cr, cb]), cv2.COLOR_YCrCb2BGR)
+        return np.clip(out, 0.0, 1.0)
 
     def _background_stages(
         self, params: ProcessingParameters
@@ -513,6 +585,7 @@ class ImageProcessingService:
                 "color_correction",
                 lambda r: self.apply_white_balance(r, params.temperature, params.tint),
             ),
+            ("green_removal", lambda r: self.apply_green_removal(r, params.green_removal)),
             (
                 "vignette_correction",
                 lambda r: self.apply_vignette_correction(r, params.vignette_correction),
@@ -569,7 +642,7 @@ class ImageProcessingService:
         *,
         linear_composite: bool = False,
         starless_split: StarlessSplitFn | None = None,
-        denoise_stage: Callable[[np.ndarray], np.ndarray] | None = None,
+        denoise_stage: DenoiseStageFn | None = None,
     ) -> np.ndarray:
         """Run the full pipeline in the recommended order.
 
@@ -587,10 +660,13 @@ class ImageProcessingService:
         and wrapped with its own fallback.
 
         ``denoise_stage``: when given (the DeepSNR engine - see
-        ``app.services.external_denoise``), it runs as an extra stage right after
-        the background corrections, before any tone work, and the classical
-        ``denoise`` creative stage is dropped so denoise never runs twice. Like
-        ``starless_split``, the caller has vetted it and wrapped its fallback.
+        ``app.services.external_denoise``), the classical ``denoise`` creative
+        stage is dropped so denoise never runs twice, and the engine runs instead
+        - on a stacked composite, on the **linear** data ahead of ``stack_base``
+        (before any stretch amplifies and reshapes the noise, which is what the
+        model is trained on); on an ordinary image, right after the background
+        corrections. Like ``starless_split``, the caller has vetted it and wrapped
+        its fallback. Both engines exchange 16-bit or float data, never 8-bit.
 
         ``linear_composite``: ``image`` is a linear stacked composite (RGB
         planes, ``float32``), not a uint8 upload - prepend the ``stack_base``
@@ -606,33 +682,30 @@ class ImageProcessingService:
                 *background,
             ]
         if denoise_stage is not None:
-            # DeepSNR runs on linear-ish data (before the tone stretch) and takes
-            # over the classical `denoise` slot; drop it so denoise never runs
-            # twice. The stage is uint8-native (the TIFF it round-trips); convert
-            # at this boundary.
+            # DeepSNR takes over the classical `denoise` slot; drop it so denoise
+            # never runs twice.
             deepsnr = denoise_stage
-            background = [*background, ("denoise", lambda r: _to_f32(deepsnr(_to_u8(r))))]
+            if linear_composite:
+                background = [("denoise", lambda r: deepsnr(r, True)), *background]
+            else:
+                background = [*background, ("denoise", lambda r: deepsnr(r, False))]
             creative = [(name, stage) for name, stage in creative if name != "denoise"]
 
         if params.star_removal <= 0:
             stages = background + creative
         else:
-            # The split is uint8-native (mask units, the detector, the TIFF a
-            # StarNet2 pass round-trips); convert at this boundary either way.
-            split_impl = starless_split or self._starless.split
+            split_impl = starless_split or self.classic_starless_split
             stars_layer: list[np.ndarray] = []
 
             def split(r: np.ndarray) -> np.ndarray:
                 starless, removed = split_impl(
-                    _to_u8(r), params.star_sensitivity, params.star_max_size, params.star_removal
+                    r, params.star_sensitivity, params.star_max_size, params.star_removal
                 )
                 stars_layer.append(removed)
-                return _to_f32(starless)
+                return starless
 
             def recombine(r: np.ndarray) -> np.ndarray:
-                return _to_f32(
-                    self._starless.recombine(_to_u8(r), stars_layer[0], params.star_recombine)
-                )
+                return self._starless.recombine(r, stars_layer[0], params.star_recombine)
 
             stages = [
                 *background,

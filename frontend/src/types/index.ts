@@ -78,17 +78,26 @@ export const DEFAULT_CURVE_POINTS: CurvePoint[] = [
  * "Stack" step). They run as a non-destructive pre-stage on the 32-bit linear
  * composite, ahead of every other stage. Ignored for an ordinary image.
  */
+/** How the Stack step stretches the linear composite: `'adaptive'` is the
+ * colour-preserving stretch fitted to the image's sky and object levels,
+ * `'classic'` the original per-channel auto-stretch (kept for comparison). */
+export type StretchMode = 'adaptive' | 'classic';
+
+export const STRETCH_MODES: StretchMode[] = ['adaptive', 'classic'];
+
 export interface StackParameters {
   /** Auto-stretch intensity: 0 = subtle (dark sky), 1 = aggressive. */
   stretch: number;
+  stretchMode: StretchMode;
   /** How much of the fitted low-order sky gradient to remove (0 = off, 100 = full). */
   backgroundExtraction: number;
-  /** Neutralise the sky background and balance the channels toward grey. */
+  /** Neutralise the sky background and white-balance on the star field. */
   colorCalibration: boolean;
 }
 
 export const DEFAULT_STACK_PARAMETERS: StackParameters = {
   stretch: 0.5,
+  stretchMode: 'adaptive',
   backgroundExtraction: 100,
   colorCalibration: true,
 };
@@ -96,6 +105,7 @@ export const DEFAULT_STACK_PARAMETERS: StackParameters = {
 export function stackParametersEqual(a: StackParameters, b: StackParameters): boolean {
   return (
     a.stretch === b.stretch &&
+    a.stretchMode === b.stretchMode &&
     a.backgroundExtraction === b.backgroundExtraction &&
     a.colorCalibration === b.colorCalibration
   );
@@ -134,6 +144,8 @@ export interface ProcessingParameters {
   sharpness: number;
   temperature: number;
   tint: number;
+  /** SCNR green removal, 0 (off) - 100 (green capped at the red/blue mean). */
+  greenRemoval: number;
   curvePoints: CurvePoint[];
   redCurvePoints: CurvePoint[];
   greenCurvePoints: CurvePoint[];
@@ -167,6 +179,7 @@ export const DEFAULT_PARAMETERS: ProcessingParameters = {
   sharpness: 1.0,
   temperature: 6500,
   tint: 0,
+  greenRemoval: 0,
   curvePoints: [], // empty = no curve (identity); the editor shows DEFAULT_CURVE_POINTS instead
   redCurvePoints: [],
   greenCurvePoints: [],
@@ -291,6 +304,7 @@ const PARAMETER_BOUNDS: ParameterBound[] = [
   { key: 'saturation', min: 0.0, max: 2.0, step: 0.1 },
   { key: 'temperature', min: 2000, max: 8000, step: 50 },
   { key: 'tint', min: -50, max: 50, step: 1 },
+  { key: 'greenRemoval', min: 0, max: 100, step: 1 },
 ];
 
 export const PARAMETER_BOUND_BY_KEY: Partial<Record<SliderParameterKey, ParameterBound>> =
@@ -365,7 +379,14 @@ export const EDITOR_STEPS: EditorStep[] = [
   {
     id: 'sky',
     number: 2,
-    params: ['temperature', 'tint', 'vignetteCorrection', 'gradientReduction', 'dehaze'],
+    params: [
+      'temperature',
+      'tint',
+      'greenRemoval',
+      'vignetteCorrection',
+      'gradientReduction',
+      'dehaze',
+    ],
   },
   {
     id: 'light',

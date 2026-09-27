@@ -27,6 +27,7 @@ _WIRE = {
     },
     "stack": {
         "stretch": 0.35,
+        "stretch_mode": "classic",
         "background_extraction": 80,
         "color_calibration": False,
     },
@@ -54,6 +55,7 @@ _WIRE = {
     "sharpness": 1.2,
     "temperature": 5500,
     "tint": 5,
+    "green_removal": 40,
     "curve_points": [{"x": 0, "y": 0}, {"x": 128, "y": 160}, {"x": 255, "y": 255}],
     "red_curve_points": [{"x": 0, "y": 0}, {"x": 128, "y": 170}, {"x": 255, "y": 255}],
     "green_curve_points": [{"x": 0, "y": 0}, {"x": 128, "y": 150}, {"x": 255, "y": 255}],

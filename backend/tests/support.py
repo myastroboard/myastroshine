@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 
 import cv2
@@ -34,7 +35,7 @@ def fake_engine_run(*, returncode: int = 0, write_output: bool = True):
 
     def run(cmd: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
         if write_output and returncode == 0:
-            _copy_tiff(cmd)
+            _copy_output(cmd)
         return subprocess.CompletedProcess(
             cmd, returncode, stdout="", stderr="boom" if returncode else ""
         )
@@ -42,8 +43,12 @@ def fake_engine_run(*, returncode: int = 0, write_output: bool = True):
     return run
 
 
-def _copy_tiff(cmd: list[str]) -> None:
-    cv2.imwrite(cmd[cmd.index("-o") + 1], cv2.imread(cmd[cmd.index("-i") + 1], cv2.IMREAD_COLOR))
+def _copy_output(cmd: list[str]) -> None:
+    """An identity "model": the output file is the input file, byte for byte.
+
+    Works for every exchange format the runner uses (8/16-bit TIFF, float FITS).
+    """
+    shutil.copyfile(cmd[cmd.index("-i") + 1], cmd[cmd.index("-o") + 1])
 
 
 def fake_engine_popen(
@@ -62,7 +67,7 @@ def fake_engine_popen(
                 record.append(cmd)
             self.args = cmd
             if write_output and returncode == 0:
-                _copy_tiff(cmd)
+                _copy_output(cmd)
             self.stdout = iter(progress_lines)
             self.returncode = returncode
 

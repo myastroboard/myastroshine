@@ -9,6 +9,7 @@ import {
   DEFAULT_STACK_PARAMETERS,
   editorStepsFor,
   stackParametersEqual,
+  STRETCH_MODES,
   type CurveChannel,
   type CurvePoint,
   type Dimensions,
@@ -353,6 +354,28 @@ function StackPanel({
           onChange={(event) => onParameterChange('stretch', Number(event.target.value))}
         />
         <p className="text-xs text-faint">{t('stack_panel.stretch.hint')}</p>
+        <div
+          className="flex gap-1"
+          role="radiogroup"
+          aria-label={t('stack_panel.stretch_mode.aria')}
+        >
+          {STRETCH_MODES.map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              role="radio"
+              aria-checked={parameters.stretchMode === mode}
+              disabled={isProcessing}
+              className={`chip ${parameters.stretchMode === mode ? 'chip-active' : ''}`}
+              onClick={() => onParameterChange('stretchMode', mode)}
+            >
+              {t(`stack_panel.stretch_mode.${mode}`)}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-faint">
+          {t(`stack_panel.stretch_mode.${parameters.stretchMode}_hint`)}
+        </p>
       </div>
 
       <div className="flex flex-col gap-1.5 text-sm">

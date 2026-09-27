@@ -13,8 +13,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from app.services.external_engine import ProgressCallback, run_cli
-from app.utils.math_utils import to_uint8
+from app.services.external_engine import ProgressCallback, lerp_like, run_cli
 
 
 def blend_denoise(image: np.ndarray, denoised_estimate: np.ndarray, amount: int) -> np.ndarray:
@@ -24,10 +23,7 @@ def blend_denoise(image: np.ndarray, denoised_estimate: np.ndarray, amount: int)
     lower value is a lighter touch and changing only the strength never re-invokes
     the binary.
     """
-    weight = max(0, min(100, amount)) / 100.0
-    return to_uint8(
-        image.astype(np.float32) * (1.0 - weight) + denoised_estimate.astype(np.float32) * weight
-    )
+    return lerp_like(image, denoised_estimate, max(0, min(100, amount)) / 100.0)
 
 
 class ExternalDenoiseService:
@@ -41,10 +37,11 @@ class ExternalDenoiseService:
         self._progress_cb = progress_cb
 
     def run_model(self, image: np.ndarray) -> np.ndarray:
-        """Return DeepSNR's denoised estimate for a BGR ``uint8`` image.
+        """Return DeepSNR's denoised estimate, same shape and dtype as ``image``.
 
-        No ``--linear``: by this point the pipeline's sky corrections have already
-        run, so the data is display-referred, not raw linear.
+        A ``float32`` image is linear data (a stacked composite, before the
+        stretch - where DeepSNR is meant to run) and goes through ``--linear``;
+        an integer image is display-referred (see :func:`run_cli`).
         """
         return run_cli(
             self._path, image, name="DeepSNR", stride=self._stride, progress_cb=self._progress_cb

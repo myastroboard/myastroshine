@@ -180,11 +180,15 @@ A stacked composite opens in the editor with an extra **Stack** step at the top 
 a non-destructive pre-stage on the 32-bit linear data:
 
 - **Stretch** (0-1) - auto-stretch intensity; higher lifts fainter signal at the
-  cost of a brighter, noisier background.
+  cost of a brighter, noisier background. Two methods: **Adaptive** (default) -
+  a colour-preserving stretch fitted to the image's own sky and object levels, so
+  a galaxy core keeps its structure and stars keep their colour - and
+  **Classic**, the original per-channel auto-stretch, kept for comparison.
 - **Background extraction** (0-100) - fits and subtracts the sky gradient
   (degree-2 polynomial, so it can never be mistaken for a nebula).
-- **Colour calibration** (on/off) - neutralises the sky and balances the
-  channels.
+- **Colour calibration** (on/off) - neutralises the sky and white-balances on
+  the star field (the median unsaturated star is made white), so a red emission
+  nebula or the blue Pleiades keep their real colour.
 
 Nothing here touches `composite.npy`; every value recomputes the working image
 from the linear data, so these choices stay reversible.

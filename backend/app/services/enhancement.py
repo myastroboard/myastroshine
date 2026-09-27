@@ -7,8 +7,6 @@ and the Celery task call it.
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
 import numpy as np
 from sqlalchemy import select
 
@@ -26,15 +24,24 @@ from app.services.external_starless import (
     StarlessSplitFn,
     blend_starless,
 )
-from app.services.image_processing import ImageProcessingService, StepCallback
+from app.services.image_processing import DenoiseStageFn, ImageProcessingService, StepCallback
 from app.services.job import JobService
 from app.services.session import SessionService
-from app.services.star_detection import StarDetectionService
-from app.services.starless import StarlessService
 from app.services.storage import StorageService
 from app.utils.app_settings import get_app_settings
 
 logger = get_logger(__name__)
+
+_U16_FULL = 65535.0
+
+
+def _to_u16(image: np.ndarray) -> np.ndarray:
+    """BGR ``float32`` ``[0, 1]`` -> ``uint16`` - the engines' display-referred input."""
+    return np.clip(np.rint(image * _U16_FULL), 0, _U16_FULL).astype(np.uint16)
+
+
+def _from_u16(image: np.ndarray) -> np.ndarray:
+    return image.astype(np.float32) / _U16_FULL
 
 
 class _JobSuperseded(Exception):
@@ -117,7 +124,8 @@ class EnhancementService:
         ``"starnet2"``, and the operator has a working binary. The returned fn caches
         StarNet2's estimate per session and falls back to the classical split if a
         pass fails - so the pipeline can treat it as an ordinary split. ``on_step``
-        is fed the live per-pass progress a StarNet2 run reports.
+        is fed the live per-pass progress a StarNet2 run reports. The split takes
+        and returns BGR ``float32``; StarNet2 sees it as a 16-bit TIFF.
         """
         if params.star_removal <= 0 or params.star_removal_engine != "starnet2":
             return None
@@ -138,34 +146,38 @@ class EnhancementService:
             settings.starnet2_path, settings.starnet2_stride, progress_cb=report
         )
         cache = ModelEstimateCache(self.storage, session_id, "starnet2")
-        fallback = StarlessService(StarDetectionService())
         key = {"engine": "starnet2", "stride": settings.starnet2_stride}
 
         def split(
             image: np.ndarray, sensitivity: int, max_size: int, removal_amount: int
         ) -> tuple[np.ndarray, np.ndarray]:
+            source = _to_u16(image)
             try:
-                estimate = cache.get_or_compute(image, key, lambda: engine.run_model(image))
+                estimate = cache.get_or_compute(source, key, lambda: engine.run_model(source))
             except ExternalEngineError:
                 logger.warning(
                     "starnet2 split failed; falling back to classical split",
                     session_id=session_id,
                     exc_info=True,
                 )
-                return fallback.split(image, sensitivity, max_size, removal_amount)
-            return blend_starless(image, estimate, removal_amount)
+                return self.processing.classic_starless_split(
+                    image, sensitivity, max_size, removal_amount
+                )
+            return blend_starless(image, _from_u16(estimate), removal_amount)
 
         return split
 
     def _denoise_stage(
         self, session_id: str, params: ProcessingParameters, on_step: StepCallback
-    ) -> Callable[[np.ndarray], np.ndarray] | None:
+    ) -> DenoiseStageFn | None:
         """A DeepSNR denoise stage for the pipeline, or ``None`` for the classical filter.
 
         Same shape as :meth:`_starless_split`: returns ``None`` unless denoise is
         on, the edit asked for ``"deepsnr"``, and a working binary is configured.
-        The returned fn (BGR ``uint8`` in and out) caches DeepSNR's estimate per
-        session and falls back to the classical bilateral filter if a pass fails.
+        The returned fn (``float32`` in and out) caches DeepSNR's estimate per
+        session and falls back to the classical starlet denoise if a pass fails.
+        Linear composite data goes to DeepSNR as float FITS (``--linear``), an
+        ordinary image as a 16-bit TIFF.
         """
         if params.denoise <= 0 or params.denoise_engine != "deepsnr":
             return None
@@ -188,17 +200,22 @@ class EnhancementService:
         cache = ModelEstimateCache(self.storage, session_id, "deepsnr")
         key = {"engine": "deepsnr", "stride": settings.deepsnr_stride}
 
-        def denoise(image: np.ndarray) -> np.ndarray:
+        def denoise(image: np.ndarray, linear: bool) -> np.ndarray:
+            source = image.astype(np.float32) if linear else _to_u16(image)
             try:
-                estimate = cache.get_or_compute(image, key, lambda: engine.run_model(image))
+                estimate = cache.get_or_compute(source, key, lambda: engine.run_model(source))
             except ExternalEngineError:
                 logger.warning(
                     "deepsnr denoise failed; falling back to classical denoise",
                     session_id=session_id,
                     exc_info=True,
                 )
+                if linear:
+                    return self.processing.apply_linear_denoise(image, params.denoise)
                 return self.processing.apply_denoise(image, params.denoise)
-            return blend_denoise(image, estimate, params.denoise)
+            if linear:
+                return blend_denoise(image.astype(np.float32), estimate, params.denoise)
+            return blend_denoise(image, _from_u16(estimate), params.denoise)
 
         return denoise
 

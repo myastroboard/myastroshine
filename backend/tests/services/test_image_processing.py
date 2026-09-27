@@ -527,3 +527,89 @@ def test_full_pipeline_stays_in_range(
     assert out.dtype == np.uint8
     assert out.min() >= 0
     assert out.max() <= 255
+
+
+def test_green_removal_caps_green_at_the_red_blue_mean(service: ImageProcessingService) -> None:
+    """Full SCNR leaves no pixel greener than its red/blue average; 0 is identity."""
+    image = np.zeros((10, 10, 3), dtype=np.uint8)
+    image[:] = (60, 200, 100)  # BGR: a green cast
+    assert np.array_equal(service.apply_green_removal(image, 0), image)
+    out = service.apply_green_removal(image, 100)
+    assert int(out[0, 0, 1]) == 80
+    assert tuple(out[0, 0, [0, 2]]) == (60, 100)
+
+
+def test_green_removal_keeps_a_teal_filament_teal(service: ImageProcessingService) -> None:
+    """Green that blue backs up (OIII teal) survives far better than a lone green cast."""
+    teal = np.full((4, 4, 3), (200, 200, 20), dtype=np.uint8)
+    out = service.apply_green_removal(teal, 100)
+    assert int(out[0, 0, 1]) >= 110
+
+
+def test_saturation_keeps_luminance(service: ImageProcessingService) -> None:
+    """The saturation control moves colour, not brightness."""
+    image = np.full((8, 8, 3), (40, 90, 160), dtype=np.uint8)
+    weights = np.array([0.0722, 0.7152, 0.2126])
+    before = float((image.astype(np.float64) @ weights).mean())
+    after = float((service.apply_saturation(image, 1.5).astype(np.float64) @ weights).mean())
+    assert after == pytest.approx(before, abs=1.5)
+
+
+def test_vibrance_boosts_muted_colour_more_than_vivid_colour(
+    service: ImageProcessingService,
+) -> None:
+    image = np.zeros((2, 1, 3), dtype=np.float32)
+    image[0, 0] = (0.40, 0.45, 0.50)  # muted
+    image[1, 0] = (0.05, 0.20, 0.90)  # vivid
+    out = service.apply_vibrance(image, 2.0)
+
+    def spread(pixel: np.ndarray) -> float:
+        return float(pixel.max() - pixel.min())
+
+    muted_gain = spread(out[0, 0]) / spread(image[0, 0])
+    vivid_gain = spread(out[1, 0]) / spread(image[1, 0])
+    assert muted_gain > vivid_gain
+
+
+def test_sharpness_boosts_a_star_without_amplifying_flat_noise(
+    service: ImageProcessingService,
+) -> None:
+    rng = np.random.default_rng(4)
+    image = np.clip(rng.normal(0.3, 0.02, (128, 128, 3)), 0, 1).astype(np.float32)
+    cv2.circle(image, (64, 64), 2, (0.8, 0.8, 0.8), -1)
+    out = service.apply_sharpness(image, 2.0)
+    assert float(out[64, 64].mean()) > float(image[64, 64].mean())
+    corner = (slice(0, 40), slice(0, 40))
+    assert float(out[corner].std()) < float(image[corner].std()) * 1.1
+
+
+def test_linear_denoise_handles_mono_and_rgb(service: ImageProcessingService) -> None:
+    """The DeepSNR fallback on linear data denoises each plane, 2D or 3D."""
+    rng = np.random.default_rng(8)
+    rgb = (0.02 + rng.normal(0, 0.002, (96, 96, 3))).astype(np.float32)
+    mono = rgb[..., 0].copy()
+    assert service.apply_linear_denoise(rgb, 0) is rgb
+    assert float(service.apply_linear_denoise(rgb, 80).std()) < float(rgb.std())
+    out_mono = service.apply_linear_denoise(mono, 80)
+    assert out_mono.shape == mono.shape
+    assert float(out_mono.std()) < float(mono.std())
+
+
+def test_classic_starless_split_takes_and_returns_float(service: ImageProcessingService) -> None:
+    image = np.full((120, 120, 3), 0.1, dtype=np.float32)
+    cv2.circle(image, (60, 60), 2, (1.0, 1.0, 1.0), -1)
+    starless, stars = service.classic_starless_split(image, 50, 30, 100)
+    assert starless.dtype == np.float32 and stars.dtype == np.float32
+    assert float(starless[60, 60].mean()) < 0.5
+    assert float(stars[60, 60].mean()) > 0.3
+
+
+def test_star_removal_pipeline_recombines_in_float(service: ImageProcessingService) -> None:
+    """The split/recombine path runs in float: a full recombine brings the star back."""
+    image = np.full((120, 120, 3), 25, dtype=np.uint8)
+    cv2.circle(image, (60, 60), 2, (250, 250, 250), -1)
+    params = ProcessingParameters(star_removal=100, star_recombine=100)
+    out = service.apply_parameters(image, params)
+    assert int(out[60, 60].mean()) > 200
+    starless = service.apply_parameters(image, params.model_copy(update={"star_recombine": 0}))
+    assert int(starless[60, 60].mean()) < 120

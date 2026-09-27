@@ -177,6 +177,7 @@ the upload opened as a composite session (linear stack data, above).
 | sharpness | 0.0 | 2.0 | 1.0 | float |
 | temperature | 2000 | 8000 | 6500 | int (Kelvin) |
 | tint | -50 | 50 | 0 | int |
+| green_removal | 0 | 100 | 0 | int (SCNR: green capped at the red/blue mean) |
 | curve_points | - | - | `[]` | array of `{x, y}` |
 | red_curve_points | - | - | `[]` | array of `{x, y}` |
 | green_curve_points | - | - | `[]` | array of `{x, y}` |
@@ -205,8 +206,9 @@ stage; it is ignored for an ordinary 8-bit image upload.
 | Field | Min | Max | Default | Type |
 |-------|-----|-----|---------|------|
 | stretch | 0.0 | 1.0 | 0.5 | float (auto-stretch intensity: 0 subtle, 1 aggressive) |
+| stretch_mode | - | - | `"adaptive"` | `"adaptive"` (colour-preserving, fitted to the image) \| `"classic"` (the original per-channel auto-stretch) |
 | background_extraction | 0 | 100 | 100 | int (how much of the fitted sky gradient to remove) |
-| color_calibration | - | - | true | bool (neutralise the sky, balance the channels) |
+| color_calibration | - | - | true | bool (neutralise the sky, white-balance on the star field) |
 
 `curve_points` is a tone curve: a list of `{x, y}` 8-bit input/output level
 pairs (both 0-255). `[]` (the default) means no curve. Otherwise: at least 2
@@ -233,7 +235,8 @@ default) is byte-identical to the flat pipeline. See `docs/ALGORITHMS.md`
 working (see "External ML engines"), and silently fall back to `"classic"`
 otherwise - so a client may always request them. With `"starnet2"`,
 `star_sensitivity` / `star_max_size` have no effect; with `"deepsnr"`, denoise
-runs early (before the tone stretch) and `chroma_denoise` still runs classically.
+runs early - on a composite session, on the linear data before the stretch - and
+`chroma_denoise` still runs classically.
 
 The canonical model is `app/models/processing.py`; keep this table in sync with it.
 
