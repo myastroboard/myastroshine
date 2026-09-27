@@ -274,11 +274,11 @@
       },
       "denoise": {
         "label": "Entrauschen",
-        "hint": "Kantenschonende Glättung. Höhere Werte tauschen feine Details gegen einen saubereren Hintergrund."
+        "hint": "Mehrskalige (Wavelet-) Rauschminderung der Helligkeit. Entfernt Körnung und erhält Sterne und feine Filamente; höhere Werte glätten stärker."
       },
       "chromaDenoise": {
         "label": "Farbrauschreduzierung",
-        "hint": "Glättet nur Farbrauschen, lässt die Helligkeitsdetails unberührt."
+        "hint": "Mehrskalige Glättung nur des Farbrauschens; Helligkeitsdetails bleiben unberührt."
       },
       "starReduction": {
         "label": "Sternreduzierung",
@@ -302,7 +302,7 @@
       },
       "sharpness": {
         "label": "Schärfe",
-        "hint": "Weichzeichnung unter 100%, Schärfung darüber durch Kantenverstärkung."
+        "hint": "Unter 1 wird weichgezeichnet. Darüber werden Sterne und feine Strukturen nur dort geschärft, wo sie über dem Rauschen liegen - die Hintergrundkörnung wird nicht geschärft."
       },
       "vibrance": {
         "label": "Dynamik",
@@ -324,6 +324,10 @@
       "tint": {
         "label": "Farbstich",
         "hint": "Weißabgleich: verschiebt den Farbstich zwischen Grün und Magenta."
+      },
+      "greenRemoval": {
+        "label": "Grünentfernung",
+        "hint": "Entfernt einen verbleibenden Grünstich (SCNR). Am Deep-Sky-Himmel ist fast nichts grün; ein türkises OIII-Filament behält seine Farbe, weil Blau es stützt."
       }
     }
   },
@@ -332,13 +336,20 @@
       "label": "Streckung",
       "hint": "Wie stark das schwache Signal aus dem Hintergrund herausgehoben wird. Niedrig hält den Himmel dunkel und dezent; hoch hebt schwache Nebelstrukturen hervor, auf Kosten eines helleren, rauscheren Hintergrunds."
     },
+    "stretch_mode": {
+      "aria": "Streckmethode",
+      "adaptive": "Adaptiv",
+      "classic": "Klassisch",
+      "adaptive_hint": "Farberhaltende, an dieses Bild angepasste Streckung: helle Kerne behalten ihre Struktur und Sterne ihre Farbe, statt weiß auszubrennen.",
+      "classic_hint": "Die ursprüngliche kanalweise Auto-Streckung zum Vergleich. Heller, beschneidet aber Galaxienkerne und macht Sterne weiß."
+    },
     "background_extraction": {
       "label": "Hintergrundextraktion",
       "hint": "Entfernt einen sanften Lichtverschmutzungs-/Himmelsaufhellungsgradienten, indem eine Fläche niedriger Ordnung an den Himmel zwischen den Objekten angepasst wird. 0 lässt den Gradienten bestehen; 100 zieht ihn vollständig ab."
     },
     "color_calibration": {
       "label": "Farbkalibrierung",
-      "hint": "Neutralisiert den Himmelshintergrund zu Grau und gleicht die Kanäle so ab, dass das Sternfeld annähernd weiß erscheint. Behebt einen Farbstich des Sensors (z. B. ein Stapel, der einheitlich gelb ausfällt) - kann das aber nicht von der tatsächlichen Farbe des Objekts unterscheiden. Schalten Sie sie daher bei einem wirklich stark farbigen Objekt (ein blauer Reflexionsnebel wie die Plejaden, ein roter Emissionsnebel) aus, falls es ausgewaschen wirkt."
+      "hint": "Neutralisiert den Himmelshintergrund zu Grau und richtet den Weißabgleich am Sternfeld aus: der Median der ungesättigten Sterne wird weiß. Da die Sterne die Referenz sind, nicht das ganze Bild, behalten ein roter Emissionsnebel oder die blauen Plejaden ihre echte Farbe."
     }
   },
   "stars_panel": {

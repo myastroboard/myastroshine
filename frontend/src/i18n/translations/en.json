@@ -274,11 +274,11 @@
       },
       "denoise": {
         "label": "Denoise",
-        "hint": "Edge-preserving smoothing. Higher trades fine detail for a cleaner background."
+        "hint": "Multiscale (wavelet) noise reduction on brightness. Removes grain while keeping stars and fine filaments; higher smooths deeper."
       },
       "chromaDenoise": {
         "label": "Colour noise reduction",
-        "hint": "Smooths colour speckle only, leaving brightness detail untouched."
+        "hint": "Multiscale smoothing of colour speckle only, leaving brightness detail untouched."
       },
       "starReduction": {
         "label": "Star reduction",
@@ -302,7 +302,7 @@
       },
       "sharpness": {
         "label": "Sharpness",
-        "hint": "Blurs below 100%, sharpens above via edge enhancement."
+        "hint": "Below 1 softens. Above 1 sharpens stars and fine structure only where they rise above the noise, so the background grain is not sharpened."
       },
       "vibrance": {
         "label": "Vibrance",
@@ -324,6 +324,10 @@
       "tint": {
         "label": "Tint",
         "hint": "White balance: shifts the colour cast between green and magenta."
+      },
+      "greenRemoval": {
+        "label": "Green removal",
+        "hint": "Removes a residual green cast (SCNR). Almost nothing in the deep sky is green; a teal OIII filament keeps its colour because blue backs it up."
       }
     }
   },
@@ -332,13 +336,20 @@
       "label": "Stretch",
       "hint": "How hard to lift the faint signal out of the background. Low keeps the sky dark and subtle; high pulls up dim nebulosity at the cost of a brighter, noisier background."
     },
+    "stretch_mode": {
+      "aria": "Stretch method",
+      "adaptive": "Adaptive",
+      "classic": "Classic",
+      "adaptive_hint": "Colour-preserving stretch fitted to this image: bright cores keep their structure and stars keep their colour instead of burning to white.",
+      "classic_hint": "The original per-channel auto-stretch, for comparison. Brighter, but clips galaxy cores and whitens stars."
+    },
     "background_extraction": {
       "label": "Background extraction",
       "hint": "Removes a smooth light-pollution / sky-glow gradient by fitting a low-order surface to the sky between the objects. 0 leaves the gradient in; 100 subtracts all of it."
     },
     "color_calibration": {
       "label": "Colour calibration",
-      "hint": "Neutralises the sky background to grey and balances the channels so the star field reads roughly white. Fixes a sensor colour cast (a stack coming out uniformly yellow, say) - but it cannot tell that apart from a target's own real colour, so turn it off for a genuinely strongly-coloured object (a blue reflection nebula like the Pleiades, a red emission nebula) if it looks washed out."
+      "hint": "Neutralises the sky background to grey and white-balances on the star field: the median of the unsaturated stars is made white. Because the reference is the stars, not the whole frame, a red emission nebula or the blue Pleiades keep their real colour."
     }
   },
   "stars_panel": {

@@ -8,6 +8,13 @@ engines", THIRD_PARTY.md), both take ``-i -o -q [-s stride] --machine-progress
 
 This module is the arm's-length subprocess runner (:func:`run_cli`) and the
 per-session estimate cache (:class:`ModelEstimateCache`) they share.
+
+Precision matters here: an 8-bit round trip posterises exactly the faint signal
+these models exist to recover, and a later stretch or curve makes the banding
+visible. ``run_cli`` therefore keeps the caller's depth - ``uint8`` / ``uint16``
+go through a TIFF of the same depth, and ``float32`` (linear data, nominal
+``[0, 1]``) goes through a 32-bit FITS with ``--linear``, which both tools
+support: they apply their own reversible stretch around inference.
 :mod:`app.services.external_starless` / :mod:`app.services.external_denoise` are
 thin wrappers that add the model-specific blend.
 """
@@ -26,6 +33,7 @@ from typing import Any
 
 import cv2
 import numpy as np
+from astropy.io import fits
 
 from app.constants import EXTERNAL_ENGINE_MIN_DIMENSION, EXTERNAL_ENGINE_TIMEOUT_SECONDS
 from app.logging_config import get_logger
@@ -80,10 +88,14 @@ def run_cli(
     extra_args: list[str] | None = None,
     progress_cb: ProgressCallback | None = None,
 ) -> np.ndarray:
-    """Run one starnetastro CLI tool on a BGR ``uint8`` image; return its output.
+    """Run one starnetastro CLI tool on an image; return its output.
 
-    Same shape as the input - a side below the 512 px floor is upscaled to meet it
-    and the result scaled back. Raises :class:`ExternalEngineError` on any failure
+    ``uint8`` / ``uint16`` input is display-referred BGR, exchanged as a TIFF of
+    the same depth. ``float32`` input is **linear** data in nominal ``[0, 1]`` (a
+    stacked composite, channel order preserved as given - RGB planes for the
+    composite), exchanged as a FITS cube and run with ``--linear``. Same shape and
+    dtype as the input - a side below the 512 px floor is upscaled to meet it and
+    the result scaled back. Raises :class:`ExternalEngineError` on any failure
     (missing binary, non-zero exit, timeout, unreadable output).
     """
     height, width = image.shape[:2]
@@ -105,15 +117,16 @@ def _invoke(
     extra_args: list[str],
     progress_cb: ProgressCallback | None,
 ) -> np.ndarray:
+    linear = image.dtype == np.float32
+    suffix = ".fits" if linear else ".tif"
     with tempfile.TemporaryDirectory(prefix="onnx-engine-") as tmp:
-        in_path = Path(tmp) / "in.tif"
-        out_path = Path(tmp) / "out.tif"
-        # cv2 encodes BGR -> RGB for TIFF, so the tool sees correct colour and
-        # cv2.imread gives BGR back: the round trip is identity.
-        if not cv2.imwrite(str(in_path), image):
-            raise ExternalEngineError(f"could not write the {name} input TIFF")
+        in_path = Path(tmp) / f"in{suffix}"
+        out_path = Path(tmp) / f"out{suffix}"
+        _write_input(in_path, image, name)
 
         cmd = [binary_path, "-i", str(in_path), "-o", str(out_path), "-q", *extra_args]
+        if linear:
+            cmd.append("--linear")
         if stride:
             cmd += ["-s", str(stride)]
 
@@ -124,13 +137,79 @@ def _invoke(
 
         if not out_path.exists():
             raise ExternalEngineError(f"{name} exited cleanly but wrote no output")
-        result = cv2.imread(str(out_path), cv2.IMREAD_COLOR)
+        result = _read_output(out_path, image.dtype)
 
     if result is None:
-        raise ExternalEngineError(f"{name} output TIFF was unreadable")
+        raise ExternalEngineError(f"{name} output was unreadable")
     if result.shape != image.shape:
         result = cv2.resize(result, (image.shape[1], image.shape[0]), interpolation=cv2.INTER_AREA)
     return result
+
+
+def cast_like(reference: np.ndarray, values: np.ndarray) -> np.ndarray:
+    """``values`` clipped and cast to ``reference``'s dtype and full-scale range.
+
+    Integer dtypes clip to ``[0, max]`` and round; ``float32`` clips at 0 only
+    (linear data may legitimately exceed 1).
+    """
+    cast: np.ndarray
+    if reference.dtype.kind == "u":
+        top = _int_max(reference.dtype)
+        cast = np.clip(np.rint(values), 0, top).astype(reference.dtype)
+    else:
+        cast = np.clip(values, 0.0, None).astype(reference.dtype)
+    return cast
+
+
+def _int_max(dtype: np.dtype) -> int:
+    """Full-scale value of an unsigned integer dtype."""
+    return int(np.iinfo(dtype.type).max)
+
+
+def lerp_like(image: np.ndarray, estimate: np.ndarray, weight: float) -> np.ndarray:
+    """``image * (1 - weight) + estimate * weight``, in ``image``'s dtype."""
+    blended = image.astype(np.float32) * (1.0 - weight) + estimate.astype(np.float32) * weight
+    return cast_like(image, blended)
+
+
+def _write_input(path: Path, image: np.ndarray, name: str) -> None:
+    if image.dtype == np.float32:
+        # Both tools reject float FITS outside [0, 1]; a stacked composite's
+        # brightest star cores can sit a hair above it.
+        cube = np.clip(np.moveaxis(image, -1, 0) if image.ndim == 3 else image, 0.0, 1.0)  # noqa: PLR2004
+        try:
+            fits.PrimaryHDU(np.ascontiguousarray(cube, dtype=np.float32)).writeto(path)
+        except OSError as exc:
+            raise ExternalEngineError(f"could not write the {name} input FITS") from exc
+        return
+    # cv2 encodes BGR -> RGB for TIFF, so the tool sees correct colour and
+    # cv2.imread gives BGR back: the round trip is identity, at the input's depth.
+    if not cv2.imwrite(str(path), image):
+        raise ExternalEngineError(f"could not write the {name} input TIFF")
+
+
+def _read_output(path: Path, dtype: np.dtype) -> np.ndarray | None:
+    if dtype == np.float32:
+        try:
+            with fits.open(path, memmap=False) as hdul:
+                data = next((h.data for h in hdul if h.data is not None), None)
+        except OSError:
+            return None
+        if data is None:
+            return None
+        array = np.asarray(data, dtype=np.float32)
+        return np.ascontiguousarray(np.moveaxis(array, 0, -1)) if array.ndim == 3 else array  # noqa: PLR2004
+    result = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
+    if result is None:
+        return None
+    if result.ndim == 2:  # noqa: PLR2004 - a mono output for a colour input
+        result = cv2.cvtColor(result, cv2.COLOR_GRAY2BGR)
+    if result.dtype != dtype:  # the tool promoted/demoted depth - bring it back
+        top = _int_max(dtype)
+        scale = top / _int_max(result.dtype) if result.dtype.kind == "u" else 1.0
+        result = np.clip(np.rint(result.astype(np.float64) * scale), 0, top).astype(dtype)
+    typed: np.ndarray = result
+    return typed
 
 
 def _run_blocking(cmd: list[str], name: str) -> None:
@@ -214,18 +293,25 @@ class ModelEstimateCache:
         self, image: np.ndarray, key_parts: dict[str, Any], compute: Callable[[], np.ndarray]
     ) -> np.ndarray:
         digest = hashlib.sha1(  # a cache key, not a security primitive
-            image.tobytes() + repr(sorted(key_parts.items())).encode(), usedforsecurity=False
+            image.tobytes() + str(image.dtype).encode() + repr(sorted(key_parts.items())).encode(),
+            usedforsecurity=False,
         ).hexdigest()[:16]
-        path = self._dir / f"{digest}.png"
+        # .npy, not an image format: lossless at any depth (a 16-bit or float
+        # estimate must come back bit-identical, not re-quantised).
+        path = self._dir / f"{digest}.npy"
 
         if path.exists():
-            cached = cv2.imread(str(path), cv2.IMREAD_COLOR)
-            if cached is not None and cached.shape == image.shape:
+            cached: np.ndarray | None
+            try:
+                cached = np.load(path, allow_pickle=False)
+            except OSError, ValueError:
+                cached = None
+            if cached is not None and cached.shape == image.shape and cached.dtype == image.dtype:
                 logger.info("engine cache hit", engine=self._name, key=digest)
                 return cached
 
         result = compute()
         self._dir.mkdir(parents=True, exist_ok=True)
-        cv2.imwrite(str(path), result)
+        np.save(path, result, allow_pickle=False)
         logger.info("engine cache store", engine=self._name, key=digest)
         return result

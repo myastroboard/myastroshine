@@ -193,6 +193,28 @@ describe('EditorInspector', () => {
     expect(onParameterChange).toHaveBeenCalledWith('colorCalibration', false);
   });
 
+  it('switches the stretch method on the stack step, adaptive by default', () => {
+    const onParameterChange = vi.fn();
+    render(
+      <EditorInspector
+        {...makeProps({
+          activeStep: 'stack',
+          stack: { available: true, onParameterChange, onReset: vi.fn() },
+        })}
+      />,
+    );
+
+    const group = screen.getByRole('radiogroup', { name: 'Stretch method' });
+    expect(group).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Adaptive' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Classic' }));
+    expect(onParameterChange).toHaveBeenCalledWith('stretchMode', 'classic');
+  });
+
   it('routes the header Reset on the stack step to its own reset', () => {
     const onReset = vi.fn();
     render(

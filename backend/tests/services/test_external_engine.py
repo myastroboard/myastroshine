@@ -247,8 +247,8 @@ def test_cache_key_separates_images_and_settings() -> None:
 def test_cache_recomputes_when_the_cached_file_has_the_wrong_shape(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A cache hit is only trusted if the decoded image matches the requested
-    shape - a stale or corrupt cache file falls through to recompute."""
+    """A cache hit is only trusted if the stored array matches the requested
+    shape and dtype - a stale or corrupt cache file falls through to recompute."""
     from app.services.storage import StorageService
 
     cache = ModelEstimateCache(StorageService(), "sess-cache-3", "tool")
@@ -263,8 +263,135 @@ def test_cache_recomputes_when_the_cached_file_has_the_wrong_shape(
     assert len(calls) == 1
 
     monkeypatch.setattr(
-        external_engine.cv2, "imread", lambda *_a, **_k: np.zeros((8, 8, 3), dtype=np.uint8)
+        external_engine.np, "load", lambda *_a, **_k: np.zeros((8, 8, 3), dtype=np.uint8)
     )
 
     cache.get_or_compute(image, {"stride": 0}, compute)
     assert len(calls) == 2  # shape mismatch on the cached file -> recomputed
+
+
+def test_cache_recomputes_when_the_cached_file_is_unreadable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A truncated or corrupt ``.npy`` is treated as a miss, not an error."""
+    from app.services.storage import StorageService
+
+    cache = ModelEstimateCache(StorageService(), "sess-cache-4", "tool")
+    image = engine_image(64, 64)
+    calls: list[int] = []
+
+    def compute() -> np.ndarray:
+        calls.append(1)
+        return image
+
+    cache.get_or_compute(image, {"stride": 0}, compute)
+
+    def broken(*_a: object, **_k: object) -> np.ndarray:
+        raise ValueError("truncated")
+
+    monkeypatch.setattr(external_engine.np, "load", broken)
+    cache.get_or_compute(image, {"stride": 0}, compute)
+    assert len(calls) == 2
+
+
+def test_cache_is_lossless_for_16_bit_and_float_estimates() -> None:
+    """A 16-bit or float estimate comes back bit-identical - never re-quantised
+    to 8 bits the way an image-format cache would."""
+    from app.services.storage import StorageService
+
+    cache = ModelEstimateCache(StorageService(), "sess-cache-5", "tool")
+    for image in (
+        np.random.default_rng(1).integers(0, 65536, (32, 32, 3), dtype=np.uint16),
+        np.random.default_rng(2).random((32, 32, 3), dtype=np.float32) * 1e-3,
+    ):
+        stored = cache.get_or_compute(image, {"stride": 0}, lambda img=image: img)
+        served = cache.get_or_compute(image, {"stride": 0}, lambda: pytest.fail("recomputed"))
+        assert served.dtype == image.dtype
+        assert np.array_equal(served, stored)
+
+
+def test_16_bit_input_round_trips_at_16_bit(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A uint16 image is exchanged as a 16-bit TIFF and comes back uint16, unchanged."""
+    monkeypatch.setattr(external_engine.subprocess, "run", fake_engine_run())
+    image = np.random.default_rng(3).integers(0, 65536, (600, 800, 3), dtype=np.uint16)
+
+    out = _run(image)
+
+    assert out.dtype == np.uint16
+    assert np.array_equal(out, image)
+
+
+def test_float_input_is_sent_as_linear_fits(monkeypatch: pytest.MonkeyPatch) -> None:
+    """float32 input is linear data: it goes through a FITS file with ``--linear``
+    and comes back float32, in the same channel order."""
+    seen: list[list[str]] = []
+    runner = fake_engine_run()
+
+    def run(cmd: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        seen.append(cmd)
+        return runner(cmd, **kwargs)
+
+    monkeypatch.setattr(external_engine.subprocess, "run", run)
+    image = np.random.default_rng(4).random((600, 800, 3), dtype=np.float32) * 0.1
+    image[0, 0] = (0.1, 0.2, 0.3)
+
+    out = _run(image)
+
+    assert "--linear" in seen[0]
+    assert seen[0][seen[0].index("-i") + 1].endswith(".fits")
+    assert out.dtype == np.float32
+    assert np.allclose(out, image)
+    assert tuple(out[0, 0]) == pytest.approx((0.1, 0.2, 0.3))
+
+
+def test_float_input_is_clipped_to_the_unit_range_for_the_tool(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The tools reject float FITS outside [0, 1]; a star core a hair above 1 is
+    clipped on the way in rather than failing the whole pass."""
+    monkeypatch.setattr(external_engine.subprocess, "run", fake_engine_run())
+    image = np.full((600, 800), 0.5, dtype=np.float32)
+    image[10, 10] = 1.3
+
+    out = _run(image)
+
+    assert out.shape == image.shape
+    assert float(out.max()) == pytest.approx(1.0)
+
+
+def test_unreadable_fits_output_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    def run(cmd: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        with open(cmd[cmd.index("-o") + 1], "wb") as handle:
+            handle.write(b"not a fits file")
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(external_engine.subprocess, "run", run)
+    with pytest.raises(ExternalEngineError):
+        _run(np.zeros((600, 800, 3), dtype=np.float32))
+
+
+def test_a_depth_change_by_the_tool_is_undone(monkeypatch: pytest.MonkeyPatch) -> None:
+    """If the tool answers a 16-bit request with an 8-bit file, the result is
+    rescaled back to the input's depth rather than handed on at the wrong scale."""
+
+    def run(cmd: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        cv2.imwrite(cmd[cmd.index("-o") + 1], np.full((600, 800, 3), 255, dtype=np.uint8))
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(external_engine.subprocess, "run", run)
+    out = _run(np.zeros((600, 800, 3), dtype=np.uint16))
+    assert out.dtype == np.uint16
+    assert int(out.max()) == 65535
+
+
+def test_lerp_like_and_cast_like_keep_the_reference_dtype() -> None:
+    """The blend helpers work at the caller's depth: integers clip and round,
+    float only clips below zero."""
+    a8 = np.array([[[0, 100, 255]]], dtype=np.uint8)
+    b8 = np.array([[[255, 100, 0]]], dtype=np.uint8)
+    assert external_engine.lerp_like(a8, b8, 0.5).tolist() == [[[128, 100, 128]]]
+    assert external_engine.cast_like(a8, np.array([-5.0, 300.0])).tolist() == [0, 255]
+
+    af = np.array([0.2, 1.5], dtype=np.float32)
+    assert external_engine.cast_like(af, np.array([-0.1, 1.5])).tolist() == [0.0, 1.5]
+    assert external_engine.lerp_like(af, af * 0, 1.0).dtype == np.float32

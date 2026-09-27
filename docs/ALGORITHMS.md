@@ -2,8 +2,10 @@
 
 Reference for the image processing pipeline. Implementations live in
 `app/services/image_processing.py`, `app/services/star_detection.py`,
-`app/services/depth_map.py`, and the stacking services. All functions operate on
-BGR `uint8` numpy arrays unless noted.
+`app/services/depth_map.py`, `app/services/stretch.py`,
+`app/services/color_calibration.py`, `app/utils/starlet.py`, and the stacking
+services. The enhancement stages work on BGR `float32` in `[0, 1]` (each also
+accepts `uint8`); the Stack step works on the linear composite.
 
 ## Contents
 
@@ -102,6 +104,11 @@ Applied in this order to minimize artifacts (`apply_parameters`):
    crop rectangle. Runs first; it changes the working dimensions.
 1. **White balance** (`temperature`, `tint`) - per-channel gain in linear RGB;
    6500K is neutral. Warm shifts reduce blue, cool shifts boost blue.
+   **Green removal** (`green_removal`, 0-100) follows it: SCNR "average
+   neutral", `G' = G - amount * max(0, G - (R + B) / 2)`. A one-shot-colour
+   sensor's residual green cast goes (almost nothing in the deep sky is green),
+   while a teal OIII filament keeps most of its colour because its blue lifts the
+   cap.
 2. **Vignette** (`vignette_correction`, -100..100) - a generic radial gain
    model (not a per-lens calibrated profile), `gain = 1 + (amount/100) *
    dist^2 * 0.8` where `dist` is the normalized distance from centre (0 at
@@ -178,24 +185,39 @@ Applied in this order to minimize artifacts (`apply_parameters`):
    a further fine-tuning layer on top of it, same relationship the master
    curve has with the basic tone sliders. Any of the three left empty is
    skipped independently - a red-only edit never touches green/blue.
-11. **Saturation** (0-2) - scale the HSV S channel.
-12. **Vibrance** (0-2) - saturation boost weighted by `(1 - current_saturation)`
-   so already-saturated pixels move less.
+11. **Saturation** (0-2) - each pixel's colour is scaled away from its own
+   luminance, `L + (rgb - L) * s` (Rec. 709 weights), in float - brightness is
+   kept, and a faint low-chroma nebula is not posterised the way the former
+   8-bit HSV round trip quantised it.
+12. **Vibrance** (0-2) - the same luminance-anchored boost, weighted by
+   `(1 - current_saturation)` (saturation = `(max - min) / max`) so
+   already-saturated pixels move less.
 13. **Clarity** (-1..1) - unsharp mask against a Gaussian blur with
    `sigmaX=9` (`cv2.GaussianBlur` auto-selects an odd kernel from sigma,
    around the high-20px range here); positive sharpens, negative softens.
-14. **Denoise** (0-100) - bilateral filter; map to diameter 5-20 and
-   sigma_color / sigma_space 75-150. Above 50, add a 3x3 morphological close.
+14. **Denoise** (0-100) - multiscale wavelet shrinkage of the luma plane
+   (`app/utils/starlet.py`). The **starlet** transform (isotropic undecimated
+   "a trous" B3-spline - the transform PixInsight's MultiscaleLinearTransform and
+   Siril's wavelets use) splits the plane into detail layers of doubling scale
+   plus a smooth residual, reconstructing exactly. The noise sigma is read off
+   the finest layer (MAD), each layer's threshold is `k * sigma * n_j` (`n_j` the
+   known per-layer response to unit white noise, `k = 3 * denoise/100`), and the
+   coefficients are shrunk with a **non-negative garrote**
+   (`w * max(0, 1 - t^2/w^2)`): noise-level coefficients go to zero while strong
+   ones - stars, filament edges - keep almost all their amplitude (a soft
+   threshold would dim every star by `t`). The threshold also follows a local
+   noise map (the finest layer's smoothed energy), so a stretched frame's noisier
+   background is cleaned harder than its brighter object. Four layers. The former
+   bilateral filter flattened faint stars and left a plastic texture.
    With `denoise_engine = "deepsnr"` this stage instead runs the DeepSNR model
-   **early**, right after the sky/optics corrections (see "Quality path" below);
-   the classical filter here becomes a no-op and the 0-100 value blends DeepSNR's
-   output back.
-15. **Chroma denoise** (`chroma_denoise`, 0-100) - the same bilateral filter as
-   Denoise, applied only to the Cr/Cb channels (`COLOR_BGR2YCrCb`), leaving
-   luma untouched. Colour speckle is usually more objectionable than luma
-   noise in a stacked astro frame, and can be smoothed much harder than luma
-   without an apparent loss of detail, since detail lives almost entirely in
-   luma.
+   **early** (see "Quality path" below); the classical stage here becomes a no-op
+   and the 0-100 value blends DeepSNR's output back.
+15. **Chroma denoise** (`chroma_denoise`, 0-100) - the same starlet shrinkage on
+   the Cr/Cb planes only (`COLOR_BGR2YCrCb`), one layer deeper (five) and harder
+   (`k = 4 * amount/100`, one global threshold), luma untouched. Colour speckle
+   is usually more objectionable than luma noise in a stacked astro frame, and
+   can be smoothed much harder than luma without an apparent loss of detail,
+   since detail lives almost entirely in luma.
 16. **Star reduction** (`star_reduction` 0-100, `star_sensitivity` /
    `star_max_size` 0-100) - shrink *individually detected* stars, leaving
    everything else untouched. Detection (`StarDetectionService.detect`, shared
@@ -240,8 +262,12 @@ Applied in this order to minimize artifacts (`apply_parameters`):
    photo - worse than the black-dot bug it was meant to fix - because
    inpainting fills from the mask boundary rather than shrinking the star's
    own disc in place.
-17. **Sharpness** (0-2) - below 1.0 Gaussian blur, above 1.0 Laplacian-kernel
-    sharpen blended by `(sharpness - 1) * 0.5`.
+17. **Sharpness** (0-2) - below 1.0 Gaussian blur. Above 1.0 the two finest
+    starlet layers of the luma plane are boosted by `1 + 1.5 * (sharpness - 1)`,
+    but only where a coefficient clears 3 noise sigma (the same garrote weight as
+    denoise) - stars and fine filaments sharpen, the background grain is not
+    amplified, and colour is untouched (no coloured fringes). The former 3x3
+    Laplacian kernel sharpened the grain as much as the signal.
 
 Preview path downscales to 512 px (`preview_max_size`) for instant feedback; the
 full-resolution result is computed on demand or via the job queue.
@@ -250,7 +276,9 @@ full-resolution result is computed on demand or via the job queue.
 (starless)" below), stages 0-4 (geometry + the sky/optics corrections) run on
 the whole frame, then the stars are pulled out, stages 5-17 run on the
 *starless* image, and a final `star_recombine` step screen-blends the stars
-back. `star_removal = 0` (the default) runs the flat list above unchanged.
+back. `star_removal = 0` (the default) runs the flat list above unchanged. The
+split and the recombine exchange `float32` with the pipeline (the classical
+split round-trips to uint8 internally; StarNet2 does not).
 
 ## Star removal (starless)
 
@@ -333,21 +361,32 @@ only when the matching `AppSettings` path points at a working binary (probed by
 `app.services.engine_probe`), and any failure - missing binary, non-zero exit,
 timeout, bad output - logs and falls back to the classical code.
 
-- The shared machinery is `app.services.external_engine`: `run_cli` writes a
-  TIFF, runs `<tool> -i … -o … -q [-s stride] --machine-progress`, reads the
-  result back (BGR round-trips through `cv2` unchanged); `ModelEstimateCache`
-  stores the output per session, keyed on the pixels fed to the stage plus the
-  engine settings (the editor re-runs the pipeline on every slider move, so an
-  edit that doesn't touch those must reuse the estimate).
+- The shared machinery is `app.services.external_engine`: `run_cli` writes the
+  input, runs `<tool> -i … -o … -q [-s stride] --machine-progress`, and reads the
+  result back **at the input's depth** - an 8-bit round trip posterises exactly
+  the faint signal these models exist to recover. `uint8` / `uint16` BGR goes
+  through a TIFF of the same depth (`cv2` swaps BGR/RGB both ways, so the round
+  trip is identity); `float32` is linear data and goes through a 32-bit FITS cube
+  (clipped to `[0, 1]`, which both tools require) with `--linear`, under which
+  each tool applies its own reversible MTF around inference. `ModelEstimateCache`
+  stores the output per session as a lossless `.npy`, keyed on the pixels fed to
+  the stage, their dtype and the engine settings (the editor re-runs the pipeline
+  on every slider move, so an edit that doesn't touch those must reuse the
+  estimate).
 - **StarNet2** (`external_starless`): `apply_parameters` takes a `starless_split`
-  override at the existing split point; `blend_starless` applies `star_removal`
-  exactly as the classical split, and the recombine step is unchanged.
+  override at the existing split point; the stretched frame is sent as a 16-bit
+  TIFF, `blend_starless` applies `star_removal` exactly as the classical split,
+  and the recombine step is unchanged.
 - **DeepSNR** (`external_denoise`): `apply_parameters` takes a `denoise_stage`
-  override that runs **right after the background corrections**, before any tone
-  work - a NAFNet restoration model wants linear-ish data, and keying the cache
-  on the pre-stretch image means creative edits don't re-invoke it. The classical
-  `denoise` creative stage is dropped when this is active; `blend_denoise`
-  applies the 0-100 strength.
+  override. On a **stacked composite** it runs on the **linear** data, ahead of
+  the `stack_base` pre-stage - before any stretch amplifies and reshapes the
+  noise; a NAFNet restoration model trained on stacked astro data wants exactly
+  that, and keying the cache on the linear composite means no Stack-step or
+  creative edit re-invokes it. On an ordinary image it runs right after the
+  background corrections, as a 16-bit TIFF. The classical `denoise` creative
+  stage is dropped when this is active; `blend_denoise` applies the 0-100
+  strength. If a pass fails on linear data, the fallback is a per-plane starlet
+  denoise of the linear planes (`apply_linear_denoise`).
 - A pass is seconds to minutes, so it streams. Both tools emit `--machine-progress`
   JSON Lines on **stderr**
   (`{"schema":"starnetastro.cli.progress.v1","event":"progress",…,"percent":P}`,
@@ -764,22 +803,67 @@ the enhancement pipeline works on:
    partly took), while a galaxy halo or a frame-filling nebula in the interior
    stays untouched. Estimating on the downscale keeps this ~100 ms so it can
    re-run per slider move.
-2. **Colour calibration** (`color_calibration`, on/off) - the per-channel sky
-   level is equalised (neutral grey background), then the channels are scaled so
-   their means match, measured on the signal above each channel's own sky level
-   so a large shared pedestal (a Seestar/ASIAIR live stack, not bias-subtracted
-   like the multi-frame stacker's own composite) can't swamp it (gains clamped
-   to 0.5-4x).
-3. **Stretch** (`stretch`, 0-1) - the sky is neutralised (subtract each channel's
-   low percentile) and **one** MTF stretch, derived from the luminance, is
-   applied to all three channels. `stretch` sets the auto-stretch target
-   background by log interpolation (0 -> 0.05, 0.5 -> 0.10, 1 -> 0.20), so higher
+2. **Sky neutralisation** (always, `app/services/color_calibration.py`
+   `neutralise_sky`) - each channel's sky level (its median over the darker half
+   of the frame by luminance) is subtracted **without clipping**: the noise keeps
+   its negative half. Clipping it at zero, as the former stretch did, leaves a
+   positive bias proportional to each channel's noise, which a later channel gain
+   (a Seestar's weak blue is boosted ~4x) turned into a purple, mottled sky.
+3. **Colour calibration** (`color_calibration`, on/off, `star_white_balance`) -
+   **the star field is the white reference.** Stars are detected on a band-passed
+   luminance (Gaussian 1 px minus 6 px, 8 sigma, 4-400 px components) of a copy
+   downscaled to <=2048 px (INTER_AREA keeps flux ratios); each unsaturated star
+   (no channel above 0.9) is measured by aperture photometry against the median
+   of a surrounding annulus (the local sky, so a star on a nebula is not tinted
+   by it); the median `R/G` and `B/G` of the 400 brightest set the gains, which
+   are normalised to keep luminance. A field's star population averages out close
+   to neutral, so - unlike the former "balance the channel means", which a red
+   emission nebula or the blue Pleiades pulled toward grey - the target keeps its
+   real colour. Verified on four real Seestar stacks: M31's weak blue got a 4.6x
+   gain (the old method clamped at 4x), NGC 7000's frame-filling H-alpha stays
+   red instead of being neutralised to grey-pink, and the Pleiades reflection
+   nebula comes out blue. With fewer than 20 clean stars the former
+   means-balance runs as a fallback.
+4. **Stretch** (`stretch`, 0-1; `stretch_mode`) - `stretch` sets the target sky
+   level by log interpolation (0 -> 0.05, 0.5 -> 0.10, 1 -> 0.20), so higher
    pulls up fainter signal at the cost of a brighter, noisier background.
+
+   `stretch_mode = "adaptive"` (default, `app/services/stretch.py`) stretches
+   **luminance** and carries colour as a ratio, `rgb * L'/L` (Lupton et al.
+   2004; Siril's colour-preserving asinh), so hue and saturation survive. The
+   curve is chosen per image from a one-parameter family by bisection so that two
+   measured levels land where they should: the **sky** (10th percentile of a
+   star-suppressed copy - a 5x5 median on a <=800 px downscale - not the frame
+   median, which on a frame-filling nebula *is* the nebula) maps to the target,
+   and the **object** (99th percentile of the same copy - the nebula / galaxy
+   body, not the star cores) maps to 0.72. Negative family values lower the white
+   point (a pure midtone transfer - lifts a faint object); positive values keep
+   the white point and put an arcsinh stage under the midtone transfer
+   (compresses highlights - a bright core keeps its structure). The black point
+   is the sky minus 2.8 noise sigma, the noise read as the MAD of a 3x3-median
+   residual on the darkest 30% of the sky. A pixel whose brightest channel would
+   exceed 1 is **desaturated toward its own stretched luminance** just enough to
+   fit - scaling it down instead darkens it (a dark ring round every bright blue
+   Pleiades star). Where the *source* composite was near saturation (> 0.9) the
+   colour is an artefact of one channel clipping first, so the pixel is faded to
+   neutral. On the reference Seestar stacks: M31's core, which the classic
+   stretch clipped to a flat white disc although it sits at ~0.64 in the linear
+   data (sky 0.426), keeps its gradient; star cores keep their colour. About
+   0.7 s for the stretch at 8 MP; the whole pre-stage costs about what the
+   classic one did.
+
+   `stretch_mode = "classic"` is the former stretch, kept for comparison and for
+   older edits: sky neutralised by subtracting each channel's low percentile
+   (clipped), then **one** MTF stretch, derived from the luminance after a
+   99.9th-percentile clip, applied to all three channels - brighter, but it clips
+   galaxy cores and pushes stars to white. It also keeps the former means-based
+   colour calibration.
 
 Nothing here touches `composite.npy`; every value recomputes the working image
 from the linear data, so the stretch/background/colour choices stay reversible
-and never lose highlight or shadow detail to an early 8-bit quantisation. Denoise
-and photometric calibration are still the rest of the editor's job.
+and never lose highlight or shadow detail to an early 8-bit quantisation.
+Photometric (catalogue-based) calibration would need plate solving and is not
+done; the star-referenced white balance above is the catalogue-free equivalent.
 
 The composite is saved as 32-bit `composite.npy`; the editor session is seeded
 with `render_stack_base` at the `StackParameters()` defaults (so the first
@@ -809,8 +893,9 @@ tests.
 | Gradient reduction | ~90 ms (downscaled background estimate) |
 | Dehaze | ~200-250 ms (downscaled dark-channel/transmission) |
 | Clarity (unsharp) | 30-50 ms |
-| Denoise (bilateral) | 100-300 ms |
-| Chroma denoise (bilateral, Cr/Cb only) | ~100 ms |
+| Denoise (starlet, 4 layers, luma) | ~300 ms (measured at 8 MP) |
+| Chroma denoise (starlet, 5 layers, Cr/Cb) | ~400 ms (measured at 8 MP) |
+| Stack pre-stage, adaptive (background + calibration + stretch) | ~1.1 s (measured at 8 MP) |
 | Depth map (Sobel) | 50-100 ms |
 | Stacking, per frame (calibrate + register at half-res + align at full-res debayer + combine) | ~0.4-1 s (three IO passes, run across `stacking_workers` threads) |
 

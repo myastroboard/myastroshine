@@ -3,7 +3,7 @@
 
 # Web framework
 fastapi==0.141.1
-uvicorn[standard]==0.53.0
+uvicorn[standard]==0.54.0
 python-multipart==0.0.32
 websockets==17.1
 
@@ -21,7 +21,7 @@ astropy==8.0.1
 rawpy==0.27.1
 
 # Database
-SQLAlchemy==2.0.54
+SQLAlchemy==2.1.1
 alembic==1.20.0
 
 # HTTP client (AstroDex webhooks, GitHub release checks)

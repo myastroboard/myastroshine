@@ -18,11 +18,11 @@ from collections.abc import Callable
 
 import numpy as np
 
-from app.services.external_engine import ProgressCallback, run_cli
-from app.utils.math_utils import to_uint8
+from app.services.external_engine import ProgressCallback, cast_like, lerp_like, run_cli
 
 #: ``(image, sensitivity, max_size, removal_amount) -> (starless, stars_layer)`` -
 #: the shape the pipeline's split step calls, shared with ``StarlessService.split``.
+#: The pipeline calls it with BGR ``float32`` ``[0, 1]`` and expects the same back.
 StarlessSplitFn = Callable[[np.ndarray, int, int, int], tuple[np.ndarray, np.ndarray]]
 
 
@@ -35,11 +35,9 @@ def blend_starless(
     star field rather than clearing it, and ``stars_layer`` is the removed flux on
     black, ready for :meth:`StarlessService.recombine`.
     """
-    weight = max(0, min(100, removal_amount)) / 100.0
-    starless = to_uint8(
-        image.astype(np.float32) * (1.0 - weight) + starless_estimate.astype(np.float32) * weight
-    )
-    stars_layer = to_uint8(image.astype(np.int16) - starless.astype(np.int16))
+    starless = lerp_like(image, starless_estimate, max(0, min(100, removal_amount)) / 100.0)
+    difference = image.astype(np.float32) - starless.astype(np.float32)
+    stars_layer = cast_like(image, difference)
     return starless, stars_layer
 
 
@@ -64,7 +62,7 @@ class ExternalStarlessService:
         return blend_starless(image, self.run_model(image), removal_amount)
 
     def run_model(self, image: np.ndarray) -> np.ndarray:
-        """Return StarNet2's star-free estimate for a BGR ``uint8`` image."""
+        """Return StarNet2's star-free estimate, same shape and dtype as ``image``."""
         return run_cli(
             self._path, image, name="StarNet2", stride=self._stride, progress_cb=self._progress_cb
         )

@@ -4,6 +4,7 @@ background / colour / stretch pre-stage the editor drives."""
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from app.models import StackParameters
 from app.services.post_stack import (
@@ -340,3 +341,58 @@ def test_render_stack_base_handles_a_mono_composite() -> None:
     out = render_stack_base(mono, StackParameters())
     assert out.shape == (120, 160, 3)
     assert np.isfinite(out).all()
+
+
+def test_render_stack_base_classic_mode_keeps_the_original_stretch() -> None:
+    """``stretch_mode="classic"`` is the previous per-channel auto-stretch, byte for byte."""
+    from app.utils.image_utils import stretch_composite_linear
+
+    comp = _linear_sky(120, 160)
+    params = StackParameters(
+        stretch_mode="classic", background_extraction=0, color_calibration=False
+    )
+    target = 0.05 * (0.20 / 0.05) ** params.stretch
+    expected = stretch_composite_linear(comp, target_background=target)
+    assert np.array_equal(render_stack_base(comp, params), expected)
+
+
+def test_render_stack_base_adaptive_neutralises_the_sky() -> None:
+    """The default (adaptive) mode removes the red sky cast: the flattened sky
+    comes out grey."""
+    out = render_stack_base(_linear_sky(200, 260), StackParameters())
+    sky = out[50:150, 60:200].reshape(-1, 3).mean(axis=0)
+    assert float(sky.max() - sky.min()) < 0.02
+
+
+def test_render_stack_base_falls_back_to_mean_balance_without_stars(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With too few stars for the star reference, colour calibration falls back
+    to balancing the signal means rather than doing nothing."""
+    from app.services import post_stack
+
+    calls: list[int] = []
+    original = post_stack.calibrate_colour
+
+    def spy(composite: np.ndarray) -> tuple[np.ndarray, tuple[float, float, float]]:
+        calls.append(1)
+        return original(composite)
+
+    monkeypatch.setattr(post_stack, "calibrate_colour", spy)
+    render_stack_base(_linear_sky(120, 160), StackParameters())
+    assert calls == [1]
+
+
+def test_render_stack_base_uses_star_gains_when_the_field_has_stars(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.services import post_stack
+
+    monkeypatch.setattr(
+        post_stack, "star_white_balance", lambda _l: np.array([0.5, 1.0, 2.0], dtype=np.float32)
+    )
+    monkeypatch.setattr(
+        post_stack, "calibrate_colour", lambda _c: pytest.fail("fallback must not run")
+    )
+    out = render_stack_base(_linear_sky(120, 160), StackParameters())
+    assert out.shape == (120, 160, 3)

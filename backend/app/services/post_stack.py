@@ -30,6 +30,8 @@ import cv2
 import numpy as np
 
 from app.logging_config import get_logger
+from app.services.color_calibration import neutralise_sky, star_white_balance
+from app.services.stretch import adaptive_stretch
 from app.utils.image_utils import stretch_composite_linear
 
 if TYPE_CHECKING:
@@ -125,14 +127,26 @@ def render_stack_base(composite: np.ndarray, params: StackParameters) -> np.ndar
     linear = np.nan_to_num(composite.astype(np.float32, copy=False))
     if linear.ndim == 2:  # noqa: PLR2004 - a mono stack: give the shared code 3 planes
         linear = np.repeat(linear[:, :, np.newaxis], _COLOR_NDIM, axis=2)
+    target = _STRETCH_TARGET_LOW * (_STRETCH_TARGET_HIGH / _STRETCH_TARGET_LOW) ** params.stretch
 
+    if params.stretch_mode == "classic":
+        if params.background_extraction > 0:
+            linear, _ = extract_background(linear, params.background_extraction / 100.0)
+        if params.color_calibration:
+            linear, _ = calibrate_colour(linear)
+        return stretch_composite_linear(linear, target_background=target)
+
+    source_peak = linear.max(axis=2)
     if params.background_extraction > 0:
         linear, _ = extract_background(linear, params.background_extraction / 100.0)
+    linear, _ = neutralise_sky(linear)
     if params.color_calibration:
-        linear, _ = calibrate_colour(linear)
-
-    target = _STRETCH_TARGET_LOW * (_STRETCH_TARGET_HIGH / _STRETCH_TARGET_LOW) ** params.stretch
-    return stretch_composite_linear(linear, target_background=target)
+        gains = star_white_balance(linear)
+        if gains is not None:
+            linear = linear * gains
+        else:  # too few clean stars: fall back to balancing the signal means
+            linear, _ = neutralise_sky(calibrate_colour(np.clip(linear, 0.0, None))[0])
+    return adaptive_stretch(linear, target, source_peak=source_peak)
 
 
 # -- 1. crop the rotation wedge ---------------------------------------------

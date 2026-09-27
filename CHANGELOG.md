@@ -6,7 +6,43 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- **Stack step: adaptive, colour-preserving stretch** (`stack.stretch_mode`,
+  default `"adaptive"`). The stretch now works on luminance and carries colour
+  as a ratio, and its curve is solved per image from the sky level and the
+  object level (both read on a star-suppressed copy). Galaxy cores are no longer
+  clipped flat (M31's core was never saturated in the linear data - the old
+  stretch clipped it), stars keep their colour, and a frame-filling nebula is no
+  longer mistaken for the sky. `"classic"` keeps the previous stretch.
+- **Colour calibration uses the star field as the white reference.** Aperture
+  photometry on the unsaturated stars sets the channel gains, replacing the
+  balance of channel means, which a strongly coloured target (a red emission
+  nebula, the Pleiades) pulled toward grey. Falls back to the previous method
+  when fewer than 20 clean stars are measured. The sky is neutralised without
+  clipping its noise, which removes the purple, mottled background a weak-blue
+  sensor gave after calibration.
+- **Denoise, colour noise reduction and sharpness are multiscale (starlet
+  wavelet) operations** instead of a bilateral filter and a 3x3 Laplacian kernel:
+  grain is removed while stars and filaments keep their amplitude, and
+  sharpening only boosts structure that rises above the noise.
+- **Saturation and vibrance run in float and preserve luminance** (no 8-bit HSV
+  round trip).
+- **StarNet2 and DeepSNR exchange 16-bit or float data, never 8-bit.** On a
+  stacked composite, DeepSNR now runs on the linear data before the stretch (a
+  float FITS with `--linear`), which is what the model is trained on. The
+  engine estimate cache stores lossless `.npy` files.
+
+### Added
+
+- `green_removal` (0-100): SCNR average-neutral green removal, in the Sky step.
+
+### Dependencies
+
+- Backend: SQLAlchemy 2.0.54 -> 2.1.1, uvicorn 0.53.0 -> 0.54.0, ruff 0.16.8 ->
+  0.16.9 (dev).
+- Frontend (dev): vite 8.3.0 -> 8.3.1, vitest / @vitest/coverage-v8 5.0.1 ->
+  5.0.2, @types/node 26.6.2 -> 26.6.3.
 
 ## [0.4.2] - 2026-09-11
 

@@ -389,3 +389,138 @@ def test_deepsnr_engine_falls_back_to_classical_when_unavailable(
     )
 
     assert enhancement.jobs.get(job.job_id).status == "completed"
+
+
+def _recording_popen(record: list[tuple[list[str], np.ndarray]]):
+    """A ``fake_engine_popen`` that also keeps the pixels the tool was handed."""
+    from astropy.io import fits
+
+    from tests.support import fake_engine_popen
+
+    inner = fake_engine_popen(lines=['{"percent": 100}\n'])
+
+    def popen(cmd: list[str], **kwargs: object) -> object:
+        path = cmd[cmd.index("-i") + 1]
+        if path.endswith(".fits"):
+            with fits.open(path, memmap=False) as hdul:
+                pixels = np.asarray(hdul[0].data)
+        else:
+            import cv2
+
+            pixels = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+        record.append((cmd, pixels))
+        return inner(cmd, **kwargs)
+
+    return popen
+
+
+def test_deepsnr_runs_on_the_linear_composite_before_the_stretch(
+    enhancement: EnhancementService, sample_image: np.ndarray, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """On a stack-backed session DeepSNR gets the *linear* composite as a float
+    FITS with ``--linear`` - the data it is trained on - not the stretched 8-bit
+    render, and the classical denoise does not also run."""
+    from app.services import enhancement as enh_module
+    from app.services import external_engine, image_processing
+    from app.utils.app_settings import save_app_settings
+
+    save_app_settings({"deepsnr_path": "/opt/deepsnr"})
+    monkeypatch.setattr(enh_module, "get_engine_statuses", _all_engines_found)
+    seen: list[tuple[list[str], np.ndarray]] = []
+    monkeypatch.setattr(external_engine.subprocess, "Popen", _recording_popen(seen))
+
+    def _boom(*_a: object, **_k: object) -> object:
+        raise AssertionError("classical denoise must not run when DeepSNR is active")
+
+    monkeypatch.setattr(image_processing.ImageProcessingService, "apply_denoise", _boom)
+
+    record = enhancement.sessions.create_session(image_path="")
+    enhancement.storage.save_original(record.session_id, sample_image)
+    rng = np.random.default_rng(5)
+    composite = (rng.random((520, 540, 3)) * 0.01 + 0.02).astype(np.float32)
+    _link_stack(enhancement, record.session_id, composite)
+    job = enhancement.jobs.create(record.session_id)
+
+    enhancement.run(
+        record.session_id, ProcessingParameters(denoise=70, denoise_engine="deepsnr"), job.job_id
+    )
+
+    assert enhancement.jobs.get(job.job_id).status == "completed"
+    assert len(seen) == 1
+    cmd, pixels = seen[0]
+    assert "--linear" in cmd
+    assert pixels.dtype.kind == "f"
+    # (3, H, W) RGB cube of the untouched linear data - not a stretched render.
+    assert pixels.shape == (3, 520, 540)
+    assert np.allclose(np.moveaxis(pixels, 0, -1), composite)
+
+
+def test_deepsnr_failure_on_a_linear_composite_falls_back_to_linear_starlet_denoise(
+    enhancement: EnhancementService, sample_image: np.ndarray, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failed pass on linear data falls back to the per-plane starlet denoise
+    (the linear composite has no luma/chroma split yet) and the job completes."""
+    from app.services import enhancement as enh_module
+    from app.services import image_processing
+    from app.services.external_denoise import ExternalDenoiseService
+    from app.services.external_engine import ExternalEngineError
+    from app.utils.app_settings import save_app_settings
+
+    save_app_settings({"deepsnr_path": "/opt/deepsnr"})
+    monkeypatch.setattr(enh_module, "get_engine_statuses", _all_engines_found)
+
+    def boom(self, image: np.ndarray) -> np.ndarray:
+        raise ExternalEngineError("deepsnr crashed")
+
+    monkeypatch.setattr(ExternalDenoiseService, "run_model", boom)
+    calls: list[tuple[int, ...]] = []
+    original = image_processing.ImageProcessingService.apply_linear_denoise
+
+    def spy(self, image: np.ndarray, denoise: int) -> np.ndarray:
+        calls.append(image.shape)
+        return original(self, image, denoise)
+
+    monkeypatch.setattr(image_processing.ImageProcessingService, "apply_linear_denoise", spy)
+
+    record = enhancement.sessions.create_session(image_path="")
+    enhancement.storage.save_original(record.session_id, sample_image)
+    composite = (np.random.default_rng(6).random((64, 80, 3)) * 0.01 + 0.02).astype(np.float32)
+    _link_stack(enhancement, record.session_id, composite)
+    job = enhancement.jobs.create(record.session_id)
+
+    enhancement.run(
+        record.session_id, ProcessingParameters(denoise=50, denoise_engine="deepsnr"), job.job_id
+    )
+
+    assert enhancement.jobs.get(job.job_id).status == "completed"
+    assert calls == [(64, 80, 3)]
+
+
+def test_starnet2_is_fed_a_16_bit_image(
+    enhancement: EnhancementService, sample_image: np.ndarray, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """StarNet2 receives a 16-bit TIFF - an 8-bit round trip posterises the faint
+    nebulosity the starless image exists to push."""
+    from app.services import enhancement as enh_module
+    from app.services import external_engine
+    from app.utils.app_settings import save_app_settings
+
+    save_app_settings({"starnet2_path": "/opt/starnet2"})
+    monkeypatch.setattr(enh_module, "get_engine_statuses", _all_engines_found)
+    seen: list[tuple[list[str], np.ndarray]] = []
+    monkeypatch.setattr(external_engine.subprocess, "Popen", _recording_popen(seen))
+
+    record = enhancement.sessions.create_session(image_path="")
+    enhancement.storage.save_original(record.session_id, sample_image)
+    job = enhancement.jobs.create(record.session_id)
+
+    enhancement.run(
+        record.session_id,
+        ProcessingParameters(star_removal=100, star_recombine=50, star_removal_engine="starnet2"),
+        job.job_id,
+    )
+
+    assert enhancement.jobs.get(job.job_id).status == "completed"
+    cmd, pixels = seen[0]
+    assert cmd[cmd.index("-i") + 1].endswith(".tif")
+    assert pixels.dtype == np.uint16
