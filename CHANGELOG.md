@@ -6,6 +6,10 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.5.1] - 2026-10-01
+
 ### Fixed
 
 - **Clean stop exit code.** Stopping the container now exits with code 0
