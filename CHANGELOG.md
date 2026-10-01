@@ -6,7 +6,12 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **Clean stop exit code.** Stopping the container now exits with code 0
+  instead of 143. uvicorn re-raised the SIGTERM after its graceful shutdown, so
+  Home Assistant reported the app as "did not handle SIGTERM" and showed an
+  error on the app card.
 
 ## [0.5.0] - 2026-10-01
 
