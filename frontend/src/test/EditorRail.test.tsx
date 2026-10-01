@@ -87,7 +87,52 @@ describe('EditorRail', () => {
   it('flags the Depth step once a focal point is set', () => {
     renderRail({ focalPoint: { x: 0.5, y: 0.5 } });
 
-    const depthButton = screen.getByRole('button', { name: /Depth/ });
+    const depthButton = screen.getByRole('button', { name: /3D effect/ });
     expect(depthButton.querySelector('[aria-label="changed from default"]')).toBeInTheDocument();
+  });
+
+  it('groups the steps under phase headings with a plain-language subtitle each', () => {
+    renderRail();
+
+    expect(screen.getByText('Prepare')).toBeInTheDocument();
+    expect(screen.getByText('Enhance')).toBeInTheDocument();
+    expect(screen.getByText('Finish')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Light/ })).toHaveAccessibleDescription(
+      'Brightness and contrast',
+    );
+  });
+
+  it('draws an icon, not a number, for every step', () => {
+    renderRail();
+
+    for (const button of screen.getAllByRole('button')) {
+      expect(button.querySelector('svg')).toBeInTheDocument();
+      // The old rail numbered the steps 1-8; no badge carries a bare number now.
+      const badges = Array.from(button.querySelectorAll('span')).map((span) => span.textContent);
+      expect(badges).not.toContainEqual(expect.stringMatching(/^\d+$/));
+    }
+  });
+
+  it('scrolls the active step into view in the phone tab bar, not on desktop', () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    const matchMedia = vi.fn().mockReturnValue({ matches: true });
+    vi.stubGlobal('matchMedia', matchMedia);
+
+    const { rerender } = renderRail({ activeStep: 'light' });
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+
+    matchMedia.mockReturnValue({ matches: false });
+    rerender(
+      <EditorRail
+        activeStep="stars"
+        onStepChange={vi.fn()}
+        parameters={DEFAULT_PARAMETERS}
+        focalPoint={null}
+        isStack={false}
+      />,
+    );
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
   });
 });

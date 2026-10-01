@@ -8,9 +8,8 @@ test('collect, upload, review and stack three frames, then enhance the composite
   test.slow(); // registration + integration on real frames
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Multi-Image Stack' }).click();
-
-  await page.locator('input[type=file]').first().setInputFiles(FRAMES);
+  // The landing screen's stacking zone takes the frames straight away.
+  await page.locator('input[type=file][multiple]').setInputFiles(FRAMES);
 
   await Promise.all([
     page.waitForResponse(

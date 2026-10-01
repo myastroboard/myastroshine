@@ -11,7 +11,7 @@ describe('ImageUpload', () => {
   it('renders the file picker and the configured size limit', () => {
     render(<ImageUpload onUpload={vi.fn()} maxSizeMb={250} />);
 
-    expect(screen.getByRole('button', { name: /choose a file/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /choose a photo/i })).toBeInTheDocument();
     expect(screen.getByText(/up to 250 MB/i)).toBeInTheDocument();
   });
 
@@ -30,7 +30,7 @@ describe('ImageUpload', () => {
     render(<ImageUpload onUpload={vi.fn()} isLoading progress={null} />);
 
     expect(screen.getByRole('status')).toHaveTextContent(/preparing/i);
-    expect(screen.queryByRole('button', { name: /choose a file/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /choose a photo/i })).not.toBeInTheDocument();
   });
 
   it('shows a percentage while the file transfers', () => {
@@ -105,7 +105,7 @@ describe('ImageUpload', () => {
     render(<ImageUpload onUpload={vi.fn()} />);
     const click = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => undefined);
 
-    fireEvent.click(screen.getByRole('button', { name: /choose a file/i }));
+    fireEvent.click(screen.getByRole('button', { name: /choose a photo/i }));
 
     expect(click).toHaveBeenCalled();
     click.mockRestore();

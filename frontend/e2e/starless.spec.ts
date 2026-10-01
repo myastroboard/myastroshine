@@ -5,7 +5,7 @@ const SAMPLE = 'e2e/fixtures/sample.png';
 /** Upload the sample and wait for the editor (its workflow rail) to mount. */
 async function openEditor(page: Page): Promise<void> {
   await page.goto('/');
-  await page.locator('input[type=file]').setInputFiles(SAMPLE);
+  await page.locator('input[type=file]:not([multiple])').setInputFiles(SAMPLE);
   await expect(page.locator('nav[aria-label="Editing workflow"]')).toBeVisible();
 }
 

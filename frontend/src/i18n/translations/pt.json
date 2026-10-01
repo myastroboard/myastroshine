@@ -31,7 +31,7 @@
         "description": "Alto microcontraste e nitidez, cor atenuada para a Lua."
       },
       "system_cluster": {
-        "name": "Enxame",
+        "name": "Enxame estelar",
         "description": "Estrelas nítidas para enxames abertos e globulares."
       }
     }
@@ -52,18 +52,20 @@
   },
   "app": {
     "nav_settings": "Definições",
-    "opening_from_astrodex": "A abrir a sua imagem a partir do Astrodex..."
+    "opening_from_astrodex": "A abrir a sua imagem a partir do Astrodex...",
+    "back_to_single": "Prefiro uma só foto"
   },
   "image_upload": {
     "format_not_supported": "O formato {ext} não é suportado",
     "file_too_large": "O ficheiro excede o limite de {mb} MB",
-    "drop_hint": "Largue aqui uma imagem astronómica",
-    "choose_file_hint": "ou escolha um ficheiro para começar",
-    "choose_file_button": "Escolher um ficheiro",
-    "uploading_percent": "A enviar… {percent}%",
-    "processing": "A preparar a sua imagem…",
+    "drop_hint": "ou solte-a aqui",
+    "choose_file_button": "Escolher uma foto",
+    "uploading_percent": "A enviar... {percent}%",
+    "processing": "A preparar a sua imagem...",
     "accepted_formats": "JPEG, PNG, TIFF, FITS ou RAW da câmara",
-    "max_size": "até {mb} MB"
+    "max_size": "até {mb} MB",
+    "title": "Uma foto",
+    "subtitle": "Uma única exposição ou uma imagem já empilhada."
   },
   "editor": {
     "depth_shift_failed": "Falha no deslocamento de profundidade: {error}",
@@ -72,9 +74,10 @@
     "auto_astro_button": "Auto Astro",
     "auto_astro_analyzing": "A analisar...",
     "auto_astro_failed": "Falha no Auto Astro: {error}",
-    "save_as_preset": "Guardar como predefinição",
+    "save_as_preset": "Guardar estas definições para outras fotos",
     "reset_all": "Repor todos os ajustes",
     "next_step": "Seguinte: {step}",
+    "next_step_eyebrow": "Próximo passo",
     "new_photo": "Nova foto",
     "discard_title": "Descartar as suas edições?",
     "discard_body": "Carregar outra foto irá descartar os ajustes feitos nesta.",
@@ -85,58 +88,86 @@
       "start": "Início",
       "stack": "Empilhamento",
       "frame": "Enquadramento",
-      "sky": "Fundo",
+      "sky": "Limpar o céu",
       "light": "Luz",
       "curves": "Curvas",
       "colour": "Cor",
       "detail": "Detalhe",
       "stars": "Estrelas",
-      "depth": "Profundidade",
-      "export": "Exportar"
+      "depth": "Efeito 3D",
+      "export": "Exportar",
+      "phase": {
+        "prepare": "Preparar",
+        "enhance": "Realçar",
+        "finish": "Acabamento"
+      },
+      "hint": {
+        "start": "Um clique ou uma predefinição",
+        "stack": "Revelar o sinal",
+        "frame": "Recortar, endireitar, rodar",
+        "sky": "Poluição luminosa, dominante",
+        "light": "Brilho e contraste",
+        "curves": "Afinar os tons",
+        "colour": "Intensidade das cores",
+        "detail": "Nitidez, grão",
+        "stars": "Reduzi-las ou removê-las",
+        "depth": "Paralaxe animada",
+        "export": "Descarregar ou partilhar"
+      }
     },
     "steps": {
       "start": {
-        "help": "Comece aqui: um ponto de partida com um clique através do Auto Astro, ou aplique uma predefinição guardada. Depois avance pelos passos."
+        "help": "Deixe o Auto Astro ajustar tudo num clique, ou parta de uma predefinição. Depois pode afinar cada passo."
       },
       "stack": {
-        "help": "O composto de empilhamento linear, antes de qualquer trabalho criativo: esticar o sinal fraco, subtrair o gradiente do céu, neutralizar a cor. Não destrutivo - tudo é recalculado a partir dos dados de 32 bits."
+        "help": "Revele os detalhes ténues da sua imagem empilhada.",
+        "more": "O composto de empilhamento linear, antes de qualquer trabalho criativo: esticar o sinal fraco, subtrair o gradiente do céu, neutralizar a cor. Não destrutivo - tudo é recalculado a partir dos dados de 32 bits."
       },
       "frame": {
         "help": "Defina primeiro o enquadramento - recorte, nivele o horizonte, rode ou inverta. Tudo o que se segue trabalha sobre a imagem enquadrada.",
         "unavailable": "O enquadramento precisa das dimensões originais da imagem, indisponíveis para um composto de empilhamento."
       },
       "sky": {
-        "help": "Limpe o sinal em bruto antes de qualquer ajuste criativo: balanço de brancos, vinhetagem da objetiva, gradientes de poluição luminosa e neblina."
+        "help": "Remova a poluição luminosa e as dominantes para um céu natural.",
+        "more": "Limpe o sinal em bruto antes de qualquer ajuste criativo: balanço de brancos, vinhetagem da objetiva, gradientes de poluição luminosa e neblina."
       },
       "light": {
-        "help": "Exposição geral e equilíbrio tonal - quão brilhante, contrastada e rica em detalhe de sombras e luzes a imagem parece."
+        "help": "Quão luminosa e viva é a imagem.",
+        "more": "Exposição geral e equilíbrio tonal - quão brilhante, contrastada e rica em detalhe de sombras e luzes a imagem parece."
       },
       "curves": {
-        "help": "Ajuste fino de tom e cor com uma curva mestra, depois curvas de vermelho/verde/azul por canal para a gradação."
+        "help": "Controlo fino dos tons claros e escuros - opcional.",
+        "more": "Ajuste fino de tom e cor com uma curva mestra, depois curvas de vermelho/verde/azul por canal para a gradação."
       },
       "colour": {
-        "help": "Quão vivas são as cores. A vivacidade protege as áreas já saturadas; a saturação escala tudo por igual."
+        "help": "Torne as cores mais ou menos vivas.",
+        "more": "Quão vivas são as cores. A vivacidade protege as áreas já saturadas; a saturação escala tudo por igual."
       },
       "detail": {
-        "help": "Textura local: microcontraste, redução de ruído e nitidez. Faça isto depois de definidos o tom e a cor."
+        "help": "Suavize o grão e realce as estruturas finas.",
+        "more": "Textura local: microcontraste, redução de ruído e nitidez. Faça isto depois de definidos o tom e a cor."
       },
       "stars": {
-        "help": "Duas formas de tratar as estrelas: reduzi-las onde estão, ou removê-las por completo para que o resto da edição afete apenas a nebulosa."
+        "help": "Torne as estrelas menores ou remova-as para trabalhar só a nebulosa.",
+        "more": "Duas formas de tratar as estrelas: reduzi-las onde estão, ou removê-las por completo para que o resto da edição afete apenas a nebulosa."
       },
       "depth": {
-        "help": "Escolha o ponto focal e depois abra o visualizador Depth Shift para uma pré-visualização interativa de paralaxe."
+        "help": "Transforme a sua imagem num suave efeito 3D animado.",
+        "more": "Escolha o ponto focal e depois abra o visualizador Depth Shift para uma pré-visualização interativa de paralaxe."
       },
       "export": {
-        "help": "Obtenha o resultado: descarregue-o, envie-o para o Astrodex, ou guarde os ajustes atuais como uma predefinição reutilizável."
+        "help": "Guarde a sua imagem ou mantenha estas definições para as próximas fotos."
       }
     },
     "milestones": {
-      "title": "Marcos",
-      "help": "Guarde os ajustes atuais para poder voltar a este ponto se levar um controlo longe demais. Mantidos apenas para esta imagem.",
-      "add": "Guardar marco",
-      "origin": "Original",
-      "point": "Marco {n}",
-      "restore_aria": "Restaurar {label}"
+      "title": "Pontos de retorno",
+      "help": "Crie um ponto antes de experimentar algo - se correr mal, um clique leva-o de volta. Nada se perde.",
+      "saved": "Ponto {n} criado - clique nele a qualquer momento para voltar aqui.",
+      "add": "Criar um ponto de retorno",
+      "origin": "Foto original",
+      "point": "Ponto {n}",
+      "point_named": "{n} - {steps}",
+      "restore_aria": "Voltar a {label}"
     },
     "capture_info": {
       "title": "Captura",
@@ -148,7 +179,12 @@
       "date": "Data",
       "gain": "Ganho",
       "sensor_temp": "Temperatura do sensor"
-    }
+    },
+    "learn_more": "Saber mais",
+    "slider_tip": "Dica: faça duplo clique num cursor para o repor no neutro.",
+    "auto_astro_hint": "Analisa a sua foto e ajusta cada passo por si.",
+    "auto_astro_done": "Feito - cada passo está ajustado. Retoque o que quiser ou vá direto para Exportar.",
+    "presets_hint": "Ou parta de um estilo pensado para o seu objeto."
   },
   "export_panel": {
     "filename_label": "Nome do ficheiro",
@@ -158,7 +194,11 @@
     "returned": "Adicionada ao objeto Astrodex como nova imagem.",
     "return_hint": "Adiciona uma cópia ao objeto Astrodex com a sua imagem melhorada - o original é mantido.",
     "return_hint_named": "Adiciona uma cópia a '{object}' no Astrodex com a sua imagem melhorada - o original é mantido.",
-    "return_failed": "Não foi possível reenviar para o Astrodex: {error}"
+    "return_failed": "Não foi possível reenviar para o Astrodex: {error}",
+    "ready_title": "A sua imagem está pronta",
+    "recap": "Retocado: {steps}",
+    "recap_none": "Ainda sem ajustes - é a original.",
+    "result_alt": "A sua imagem retocada"
   },
   "image_preview": {
     "processed_alt": "Processada",
@@ -169,11 +209,12 @@
     "zoom_in": "Aumentar zoom",
     "processing": "A processar",
     "removing_stars_starnet2": "A remover estrelas (StarNet2)",
-    "before_after": "Antes / Depois",
     "open_depth_shift": "Abrir o visualizador Depth Shift",
     "change_focal_point": "Alterar o ponto focal",
     "set_focal_point": "Definir o ponto focal",
-    "clear_focal_point": "Limpar o ponto focal"
+    "clear_focal_point": "Limpar o ponto focal",
+    "before": "Antes",
+    "after": "Depois"
   },
   "preset_buttons": {
     "confirm_delete_aria": "Confirmar eliminação da predefinição {name}",
@@ -261,7 +302,7 @@
         "hint": "Positivo clareia os cantos (contraria a vinhetagem da objetiva); negativo escurece-os (acentua uma vinhetagem, ou corrige um stack sobrecorrigido)."
       },
       "gradientReduction": {
-        "label": "Redução de gradiente",
+        "label": "Gradiente de poluição",
         "hint": "Achata gradientes suaves de fundo - poluição luminosa, resplendor do céu."
       },
       "dehaze": {
@@ -285,11 +326,11 @@
         "hint": "Reduz e atenua os pontos das estrelas para que a nebulosidade fraca se destaque mais."
       },
       "starSensitivity": {
-        "label": "Sensibilidade às estrelas",
+        "label": "Detetar estrelas ténues",
         "hint": "Quão fraco um ponto pode ser e ainda contar como estrela. Valores mais altos encontram mais estrelas, mais fracas."
       },
       "starMaxSize": {
-        "label": "Tamanho máx. das estrelas",
+        "label": "Tamanho máximo de estrela",
         "hint": "Limita quão grande uma mancha brilhante pode ser e ainda contar como estrela, para que os núcleos brilhantes não sejam reduzidos."
       },
       "starRemoval": {
@@ -326,7 +367,7 @@
         "hint": "Balanço de brancos: desloca a dominante de cor entre verde e magenta."
       },
       "greenRemoval": {
-        "label": "Remover verde",
+        "label": "Remover dominante verde",
         "hint": "Remove um tom verde residual (SCNR). Quase nada no céu profundo é verde; um filamento OIII turquesa mantém a cor porque o azul o sustenta."
       }
     }
@@ -354,12 +395,12 @@
   },
   "stars_panel": {
     "reduce": {
-      "heading": "Reduzir",
-      "help": "Reduz cada estrela onde se encontra. Rápido, todas as estrelas são mantidas - use quando quiser apenas um campo mais compacto."
+      "heading": "Reduzir estrelas",
+      "help": "Reduz cada estrela no lugar - rápido, e todas as estrelas ficam."
     },
     "remove": {
-      "heading": "Remover (sem estrelas)",
-      "help": "Extrai as estrelas para que os outros passos afetem apenas a nebulosa, depois Repor estrelas reincorpora-as gradualmente no final (0 = manter a imagem sem estrelas). Mais lento, mas permite esticar e realçar a nebulosa sem inchar as estrelas.",
+      "heading": "Remover estrelas",
+      "help": "Retira as estrelas para que os outros passos só toquem a nebulosa; o segundo cursor devolve-as no fim.",
       "engine": {
         "aria": "Motor de remoção de estrelas",
         "classic": "Clássico",
@@ -368,8 +409,8 @@
       }
     },
     "detection": {
-      "heading": "Deteção",
-      "help": "O que conta como uma estrela. Tanto Reduzir como Remover usam estas definições. Ative a máscara para verificar antes de confirmar."
+      "heading": "Que pontos são estrelas",
+      "help": "As duas ferramentas acima usam isto. Ative a máscara de estrelas para verificar o que é detetado."
     }
   },
   "detail_panel": {
@@ -384,7 +425,8 @@
     }
   },
   "histogram": {
-    "aria_label": "Histograma RGB"
+    "aria_label": "Histograma RGB",
+    "toggle": "Histograma"
   },
   "settings": {
     "back_to_editor": "Voltar ao editor",
@@ -645,10 +687,6 @@
   },
   "stacking": {
     "combination_label": "Combinação",
-    "mode": {
-      "single": "Imagem única",
-      "stack": "Empilhamento multi-imagem"
-    },
     "progress": {
       "heading": "Empilhamento"
     },
@@ -658,7 +696,7 @@
       "status": {
         "waiting_for_frames": "{count} fotogramas incorporados, a aguardar mais",
         "ready": "{count} fotogramas incorporados, a aguardar mais",
-        "processing": "A empilhar {count} fotogramas…",
+        "processing": "A empilhar {count} fotogramas...",
         "completed": "Concluído - {count} fotogramas empilhados",
         "failed": "Falha no empilhamento"
       }
@@ -730,17 +768,18 @@
     },
     "upload_zone": {
       "add_frames": "Adicionar fotogramas",
-      "select_multiple_hint": "Selecione vários ficheiros de uma vez",
       "status": {
         "queued": "em fila",
         "uploading": "a carregar",
         "done": "concluído",
         "error": "erro"
       },
-      "drop_hint": "Largue aqui os seus light frames",
+      "drop_hint": "ou solte-as todas aqui de uma vez",
       "choose_files_button": "Escolher ficheiros",
       "accepted_formats": "JPEG, PNG, TIFF, FITS ou RAW da câmara",
-      "max_size": "até {mb} MB cada"
+      "max_size": "até {mb} MB cada",
+      "title": "Várias exposições do mesmo alvo",
+      "subtitle": "São alinhadas e combinadas numa imagem mais limpa e profunda."
     },
     "view": {
       "stacking_button": "A empilhar...",
@@ -751,7 +790,7 @@
       "back_to_composite": "Voltar ao composto",
       "restack_n_frames": "Reempilhar {count} fotogramas",
       "upload_more": "Carregar mais {count}",
-      "frames_summary": "{total} fotogramas · {excluded} excluídos",
+      "frames_summary": "{total} fotogramas - {excluded} excluídos",
       "result_pending": "Execute o empilhamento para ver o resultado."
     },
     "errors": {
@@ -763,7 +802,7 @@
       "frame_aria": "Fotograma {n}",
       "exclude": "Excluir este fotograma do empilhamento",
       "remove": "Remover {name}",
-      "quality_title": "{stars} estrelas · FWHM {fwhm}",
+      "quality_title": "{stars} estrelas - FWHM {fwhm}",
       "reject": {
         "clouds": "nuvens",
         "soft": "desfocado",

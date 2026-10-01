@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useServerConfig } from '@/hooks/useServerConfig';
 import { useStackProcessing } from '@/hooks/useStackProcessing';
@@ -15,6 +15,8 @@ import { StackSettings } from './StackSettings';
 import { StackUploadZone } from './StackUploadZone';
 
 export interface StackViewProps {
+  /** Frames already picked on the landing screen - queued once on mount. */
+  initialFiles?: File[];
   /** Hand the stacked composite session to the single-image editor. */
   onEnhanceComposite: (sessionId: string) => void;
   /** Report whether a stack is in progress, so the shell can hide the mode toggle. */
@@ -31,7 +33,7 @@ const STEPS: StackStep[] = ['frames', 'calibration', 'settings', 'result'];
  * block first, then - once frames are in - a left workflow rail, a step
  * inspector, and a persistent preview with the frame grid.
  */
-export function StackView({ onEnhanceComposite, onWorkingChange }: StackViewProps) {
+export function StackView({ initialFiles, onEnhanceComposite, onWorkingChange }: StackViewProps) {
   const { t } = useTranslation();
   const { stackingMaxFrames, maxImageSizeMb } = useServerConfig();
   const { settings, setSettings } = useStackSettings();
@@ -58,6 +60,15 @@ export function StackView({ onEnhanceComposite, onWorkingChange }: StackViewProp
   } = useStackProcessing(settings, stackingMaxFrames);
 
   const [step, setStep] = useState<StackStep>('frames');
+
+  // Queue the landing screen's frames exactly once (StrictMode re-runs effects).
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (!seeded.current && initialFiles && initialFiles.length > 0) {
+      seeded.current = true;
+      addFiles(initialFiles);
+    }
+  }, [initialFiles, addFiles]);
 
   const inEditor = phase === 'reviewing' || phase === 'processing' || phase === 'done';
   const busy = phase === 'processing';

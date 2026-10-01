@@ -258,4 +258,16 @@ describe('StackView', () => {
 
     expect(screen.getByRole('button', { name: /upload 1 frames/i })).toBeDisabled();
   });
+
+  it('queues the frames picked on the landing screen, once, ready to upload', async () => {
+    const files = [frameFile('a.png'), frameFile('b.png')];
+    const { rerender } = render(<StackView initialFiles={files} onEnhanceComposite={vi.fn()} />);
+
+    expect(await screen.findByRole('button', { name: /upload 2 frames/i })).toBeInTheDocument();
+
+    // A re-render with the same seed must not queue the frames a second time.
+    rerender(<StackView initialFiles={files} onEnhanceComposite={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /upload 2 frames/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /upload 4 frames/i })).not.toBeInTheDocument();
+  });
 });

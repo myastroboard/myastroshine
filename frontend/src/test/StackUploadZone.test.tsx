@@ -33,7 +33,7 @@ describe('StackUploadZone', () => {
       <StackUploadZone compact={false} maxSizeMb={50} onAddFiles={onAddFiles} />,
     );
 
-    expect(screen.getByText('Drop your light frames here')).toBeInTheDocument();
+    expect(screen.getByText('Several shots of the same target')).toBeInTheDocument();
     expect(screen.getByText(/up to 50 MB each/i)).toBeInTheDocument();
 
     const clickSpy = vi.spyOn(HTMLInputElement.prototype, 'click');

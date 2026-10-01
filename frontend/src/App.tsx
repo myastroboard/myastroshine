@@ -4,7 +4,8 @@ import { EditorView } from '@/components/EditorView';
 import { Footer } from '@/components/Footer';
 import { ImageUpload } from '@/components/ImageUpload';
 import { SettingsView } from '@/components/SettingsView';
-import { StackMode, type EditorMode } from '@/components/stacking/StackMode';
+import { ChevronIcon, GearIcon } from '@/components/icons';
+import { StackUploadZone } from '@/components/stacking/StackUploadZone';
 import { StackView } from '@/components/stacking/StackView';
 import { useServerConfig } from '@/hooks/useServerConfig';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -12,6 +13,9 @@ import { apiClient } from '@/services/api';
 import type { EditorSession } from '@/types';
 
 type Route = 'editor' | 'settings';
+
+/** Single-image enhancement vs multi-frame stacking. */
+type EditorMode = 'single' | 'stack';
 
 function readRoute(): Route {
   return window.location.hash.replace(/^#\/?/, '') === 'settings' ? 'settings' : 'editor';
@@ -60,6 +64,8 @@ export default function App() {
   const serverConfig = useServerConfig();
   const [mode, setMode] = useState<EditorMode>('single');
   const [stackWorking, setStackWorking] = useState(false);
+  // Frames dropped on the landing screen's stacking zone, handed to StackView.
+  const [stackSeed, setStackSeed] = useState<File[]>([]);
   const [session, setSession] = useState<EditorSession | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   // 0-1 while the file bytes transfer; null once they're sent and the server is
@@ -115,8 +121,23 @@ export default function App() {
     }
   }
 
+  function handleStackFiles(files: File[]): void {
+    if (files.length === 0) {
+      return;
+    }
+    setError(null);
+    setStackSeed(files);
+    setMode('stack');
+  }
+
+  function handleLeaveStack(): void {
+    setStackSeed([]);
+    setMode('single');
+  }
+
   function handleEnhanceComposite(sessionId: string): void {
     setSession({ sessionId, isStack: true });
+    setStackSeed([]);
     setMode('single');
     setStackWorking(false);
   }
@@ -126,8 +147,14 @@ export default function App() {
     setError(null);
   }
 
+  // The landing screen: nothing loaded yet, nothing in flight.
+  const landing =
+    route === 'editor' && mode === 'single' && !session && !resumingHandoff && !isUploading;
+
   return (
-    <div className="flex min-h-screen flex-col">
+    // Below lg the editor's workflow rail is a fixed bottom tab bar - pad the
+    // page so the footer isn't trapped behind it.
+    <div className={`flex min-h-screen flex-col ${session && route === 'editor' ? 'max-lg:pb-16' : ''}`}>
       <header className="sticky top-0 z-40 border-b border-hairline bg-canvas/80 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-[1360px] items-center justify-between px-4 sm:px-6">
           <button
@@ -153,28 +180,38 @@ export default function App() {
             aria-current={route === 'settings' ? 'page' : undefined}
             onClick={() => navigate(route === 'settings' ? 'editor' : 'settings')}
           >
+            <GearIcon className="h-4 w-4" />
             {t('app.nav_settings')}
           </button>
         </div>
       </header>
 
-      <div className="flex-1">
+      <div className="relative flex-1">
+        {landing && <div className="starfield pointer-events-none absolute inset-0" aria-hidden />}
         {route === 'settings' ? (
           <SettingsView onClose={() => navigate('editor')} />
         ) : (
-          <main className="mx-auto flex max-w-[1360px] flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
+          <main className="relative mx-auto flex max-w-[1360px] flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
             {error && (
               <p className="rounded-md border border-danger/30 bg-danger-wash px-4 py-2.5 text-sm text-danger">
                 {error}
               </p>
             )}
 
-            {(mode === 'stack' ? !stackWorking : !session) && !resumingHandoff && (
-              <StackMode mode={mode} onModeChange={setMode} />
+            {mode === 'stack' && !stackWorking && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm self-start"
+                onClick={handleLeaveStack}
+              >
+                <ChevronIcon className="h-3.5 w-3.5 rotate-180" />
+                {t('app.back_to_single')}
+              </button>
             )}
 
             {mode === 'stack' ? (
               <StackView
+                initialFiles={stackSeed}
                 onEnhanceComposite={handleEnhanceComposite}
                 onWorkingChange={setStackWorking}
               />
@@ -182,13 +219,30 @@ export default function App() {
               <EditorView session={session} onExit={handleExitEditor} />
             ) : resumingHandoff ? (
               <p className="panel text-sm text-muted">{t('app.opening_from_astrodex')}</p>
+            ) : isUploading ? (
+              <div className="mx-auto w-full max-w-xl">
+                <ImageUpload
+                  onUpload={handleUpload}
+                  isLoading
+                  progress={uploadProgress}
+                  maxSizeMb={serverConfig.maxImageSizeMb}
+                />
+              </div>
             ) : (
-              <ImageUpload
-                onUpload={handleUpload}
-                isLoading={isUploading}
-                progress={uploadProgress}
-                maxSizeMb={serverConfig.maxImageSizeMb}
-              />
+              // Two ways in, side by side: what you have decides where you drop it.
+              <div className="mx-auto grid w-full max-w-4xl gap-5 pt-2 md:grid-cols-2 md:pt-8">
+                <ImageUpload
+                  onUpload={handleUpload}
+                  isLoading={false}
+                  progress={uploadProgress}
+                  maxSizeMb={serverConfig.maxImageSizeMb}
+                />
+                <StackUploadZone
+                  compact={false}
+                  maxSizeMb={serverConfig.maxImageSizeMb}
+                  onAddFiles={handleStackFiles}
+                />
+              </div>
             )}
           </main>
         )}

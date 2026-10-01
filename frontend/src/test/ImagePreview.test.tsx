@@ -59,7 +59,7 @@ describe('ImagePreview', () => {
 
     // The images are scaled about the centre, so the divider element sits back
     // at the container fraction the pointer was actually over (75%).
-    const divider = container.querySelector('.bg-white\\/70') as HTMLElement;
+    const divider = container.querySelector('.bg-white\\/80') as HTMLElement;
     expect(divider.style.left).toBe('75%');
   });
 
@@ -160,7 +160,7 @@ describe('ImagePreview', () => {
     const stage = container.querySelector('.cursor-ew-resize')!;
     fireEvent.pointerDown(stage, { clientX: 50, clientY: 50, pointerId: 1 });
 
-    const divider = container.querySelector('.bg-white\\/70') as HTMLElement;
+    const divider = container.querySelector('.bg-white\\/80') as HTMLElement;
     expect(divider.style.left).toBe('25%');
     // While dragging, the handle grows (scale-110).
     expect(divider.querySelector('span')).toHaveClass('scale-110');
@@ -182,7 +182,7 @@ describe('ImagePreview', () => {
 
     const stage = container.querySelector('.cursor-ew-resize')!;
     fireEvent.pointerDown(stage, { clientX: 50, clientY: 50, pointerId: 1 });
-    const divider = container.querySelector('.bg-white\\/70') as HTMLElement;
+    const divider = container.querySelector('.bg-white\\/80') as HTMLElement;
     expect(divider.querySelector('span')).toHaveClass('scale-110');
 
     fireEvent.pointerCancel(stage, { pointerId: 1 });
@@ -228,7 +228,8 @@ describe('ImagePreview', () => {
     );
     const stage = container.querySelector('.cursor-ew-resize') as HTMLElement;
     expect(stage.style.aspectRatio).toBe('1.5 / 1');
-    expect(stage.style.maxWidth).toBe('100%');
+    // A landscape frame fills the column - no portrait width cap.
+    expect(stage.className).not.toMatch(/max-w-\[calc/);
   });
 
   it('caps the width of a portrait frame instead of letterboxing', () => {
@@ -237,8 +238,11 @@ describe('ImagePreview', () => {
     );
     const stage = container.querySelector('.cursor-ew-resize') as HTMLElement;
     expect(stage.style.aspectRatio).toBe('0.5 / 1');
-    // jsdom's CSS parser folds the constant multiplication.
-    expect(stage.style.maxWidth).toBe('calc(35vh)');
+    // The width cap scales the max height by the frame ratio (42vh pinned on a
+    // phone, 70vh on desktop), so the portrait frame centres instead of letterboxing.
+    expect(stage.style.getPropertyValue('--frame-ratio')).toBe('0.5');
+    expect(stage).toHaveClass('max-w-[calc(42vh*var(--frame-ratio))]');
+    expect(stage).toHaveClass('lg:max-w-[calc(70vh*var(--frame-ratio))]');
   });
 
   it('falls back to the processed image natural ratio once it loads', () => {
@@ -270,7 +274,7 @@ describe('ImagePreview', () => {
     const controls = screen.getByRole('button', { name: 'Zoom out' }).parentElement as HTMLElement;
     fireEvent.pointerDown(controls, { clientX: 100, clientY: 50, pointerId: 1, bubbles: true });
 
-    const divider = container.querySelector('.bg-white\\/70') as HTMLElement;
+    const divider = container.querySelector('.bg-white\\/80') as HTMLElement;
     expect(divider.querySelector('span')).not.toHaveClass('scale-110');
   });
 
@@ -309,5 +313,47 @@ describe('ImagePreview', () => {
     hasCapture.mockRestore();
     release.mockRestore();
   });
-});
 
+  it('labels the before and after sides, hiding a label the divider sweeps off', () => {
+    mockContainerRect();
+    const { container } = render(<ImagePreview originalUrl="/a" processedUrl="/b" />);
+    expect(screen.getByText('Before')).toBeInTheDocument();
+    expect(screen.getByText('After')).toBeInTheDocument();
+
+    const stage = container.querySelector('.cursor-ew-resize')!;
+    // Drag the split almost fully left: the "Before" side is nearly gone.
+    fireEvent.pointerDown(stage, { clientX: 5, clientY: 50, pointerId: 1 });
+    expect(screen.queryByText('Before')).not.toBeInTheDocument();
+    expect(screen.getByText('After')).toBeInTheDocument();
+
+    // ...and almost fully right: now the "After" side is.
+    fireEvent.pointerMove(stage, { clientX: 195, clientY: 50, pointerId: 1 });
+    expect(screen.getByText('Before')).toBeInTheDocument();
+    expect(screen.queryByText('After')).not.toBeInTheDocument();
+  });
+
+  it('folds the histogram away behind a disclosure, closed by default', () => {
+    const { container } = render(
+      <ImagePreview
+        originalUrl="/a"
+        processedUrl="/b"
+        histogram={{ r: [1, 2], g: [1, 2], b: [1, 2] }}
+      />,
+    );
+
+    const details = container.querySelector('details')!;
+    expect(details).not.toHaveAttribute('open');
+    expect(details).toHaveTextContent('Histogram');
+    expect(details.querySelector('svg[role="img"]')).toBeInTheDocument();
+  });
+
+  it('renders its children (the versions strip) inside the preview card', () => {
+    render(
+      <ImagePreview originalUrl="/a" processedUrl="/b">
+        <p>versions-strip</p>
+      </ImagePreview>,
+    );
+
+    expect(screen.getByText('versions-strip').closest('.panel')).not.toBeNull();
+  });
+});

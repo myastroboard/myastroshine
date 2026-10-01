@@ -31,7 +31,7 @@
         "description": "High micro-contrast and sharpness, muted colour for the Moon."
       },
       "system_cluster": {
-        "name": "Cluster",
+        "name": "Star cluster",
         "description": "Crisp stars for open and globular clusters."
       }
     }
@@ -52,18 +52,20 @@
   },
   "app": {
     "nav_settings": "Settings",
-    "opening_from_astrodex": "Opening your image from Astrodex..."
+    "opening_from_astrodex": "Opening your image from Astrodex...",
+    "back_to_single": "One photo instead"
   },
   "image_upload": {
     "format_not_supported": "Format {ext} not supported",
     "file_too_large": "File is larger than the {mb} MB limit",
-    "drop_hint": "Drop an astronomical image here",
-    "choose_file_hint": "or choose a file to begin",
-    "choose_file_button": "Choose a file",
-    "uploading_percent": "Uploading… {percent}%",
-    "processing": "Preparing your image…",
+    "drop_hint": "or drop it here",
+    "choose_file_button": "Choose a photo",
+    "uploading_percent": "Uploading... {percent}%",
+    "processing": "Preparing your image...",
     "accepted_formats": "JPEG, PNG, TIFF, FITS or camera RAW",
-    "max_size": "up to {mb} MB"
+    "max_size": "up to {mb} MB",
+    "title": "One photo",
+    "subtitle": "A single shot, or an image you have already stacked."
   },
   "editor": {
     "depth_shift_failed": "Depth shift failed: {error}",
@@ -72,9 +74,10 @@
     "auto_astro_button": "Auto Astro",
     "auto_astro_analyzing": "Analyzing...",
     "auto_astro_failed": "Auto Astro failed: {error}",
-    "save_as_preset": "Save as preset",
+    "save_as_preset": "Keep these settings for other photos",
     "reset_all": "Reset all adjustments",
     "next_step": "Next: {step}",
+    "next_step_eyebrow": "Next step",
     "new_photo": "New photo",
     "discard_title": "Discard your edits?",
     "discard_body": "Loading another photo will discard the adjustments you've made to this one.",
@@ -85,58 +88,86 @@
       "start": "Start",
       "stack": "Stack",
       "frame": "Framing",
-      "sky": "Background",
+      "sky": "Clean the sky",
       "light": "Light",
       "curves": "Curves",
       "colour": "Colour",
       "detail": "Detail",
       "stars": "Stars",
-      "depth": "Depth",
-      "export": "Export"
+      "depth": "3D effect",
+      "export": "Export",
+      "phase": {
+        "prepare": "Prepare",
+        "enhance": "Enhance",
+        "finish": "Finish"
+      },
+      "hint": {
+        "start": "One click, or a preset",
+        "stack": "Bring out the signal",
+        "frame": "Crop, straighten, rotate",
+        "sky": "Light pollution, colour cast",
+        "light": "Brightness and contrast",
+        "curves": "Fine-tune the tones",
+        "colour": "How vivid it looks",
+        "detail": "Sharpen, remove grain",
+        "stars": "Shrink or remove them",
+        "depth": "Animated parallax",
+        "export": "Download or share"
+      }
     },
     "steps": {
       "start": {
-        "help": "Begin here: a one-click starting point with Auto Astro, or apply a saved preset. Then work down the steps."
+        "help": "Let Auto Astro set everything in one click, or start from a preset. You can fine-tune each step afterwards."
       },
       "stack": {
-        "help": "The linear stacked composite, before any creative work: stretch the faint signal, subtract the sky gradient, neutralise the colour. Non-destructive - it all recomputes from the 32-bit data."
+        "help": "Bring the faint detail out of your stacked image.",
+        "more": "The linear stacked composite, before any creative work: stretch the faint signal, subtract the sky gradient, neutralise the colour. Non-destructive - it all recomputes from the 32-bit data."
       },
       "frame": {
         "help": "Set the frame first - crop, level the horizon, rotate or flip. Everything after this works on the framed image.",
         "unavailable": "Framing needs the original image dimensions, which aren't available for a stacked composite."
       },
       "sky": {
-        "help": "Clean up the raw signal before any creative grading: white balance, lens vignetting, light-pollution gradients, and haze."
+        "help": "Remove light pollution and colour casts so the sky looks natural.",
+        "more": "Clean up the raw signal before any creative grading: white balance, lens vignetting, light-pollution gradients, and haze."
       },
       "light": {
-        "help": "Overall exposure and tonal balance - how bright, contrasty, and full of shadow and highlight detail the image reads."
+        "help": "How bright and punchy the image is.",
+        "more": "Overall exposure and tonal balance - how bright, contrasty, and full of shadow and highlight detail the image reads."
       },
       "curves": {
-        "help": "Fine-tune tone and colour with a master curve, then per-channel red/green/blue curves for grading."
+        "help": "Fine control over light and dark tones - optional.",
+        "more": "Fine-tune tone and colour with a master curve, then per-channel red/green/blue curves for grading."
       },
       "colour": {
-        "help": "How vivid the colours are. Vibrance protects already-saturated areas; saturation scales everything."
+        "help": "Make the colours more or less vivid.",
+        "more": "How vivid the colours are. Vibrance protects already-saturated areas; saturation scales everything."
       },
       "detail": {
-        "help": "Local texture: micro-contrast, noise reduction, and sharpening. Do this after tone and colour are settled."
+        "help": "Smooth away grain and bring out fine structure.",
+        "more": "Local texture: micro-contrast, noise reduction, and sharpening. Do this after tone and colour are settled."
       },
       "stars": {
-        "help": "Two ways to handle stars: shrink them where they are, or lift them out entirely so the rest of your edit only touches the nebula."
+        "help": "Make stars smaller, or remove them to work on the nebula alone.",
+        "more": "Two ways to handle stars: shrink them where they are, or lift them out entirely so the rest of your edit only touches the nebula."
       },
       "depth": {
-        "help": "Pick the focal point, then open the Depth Shift viewer for an interactive parallax preview."
+        "help": "Turn your image into a gentle animated 3D effect.",
+        "more": "Pick the focal point, then open the Depth Shift viewer for an interactive parallax preview."
       },
       "export": {
-        "help": "Get the result out: download it, hand it to Astrodex, or save the current settings as a reusable preset."
+        "help": "Save your image, or keep these settings for your next photos."
       }
     },
     "milestones": {
-      "title": "Milestones",
-      "help": "Save the current adjustments so you can jump back to this point if you push a slider too far. Kept only for this image.",
-      "add": "Save milestone",
-      "origin": "Original",
-      "point": "Milestone {n}",
-      "restore_aria": "Restore {label}"
+      "title": "Go-back points",
+      "help": "Mark a point before trying something - if it goes wrong, one click brings you back. Nothing is lost.",
+      "saved": "Point {n} created - click it any time to come back here.",
+      "add": "Mark this point",
+      "origin": "Original photo",
+      "point": "Point {n}",
+      "point_named": "{n} - {steps}",
+      "restore_aria": "Go back to {label}"
     },
     "capture_info": {
       "title": "Capture",
@@ -148,7 +179,12 @@
       "date": "Date",
       "gain": "Gain",
       "sensor_temp": "Sensor temp"
-    }
+    },
+    "learn_more": "Learn more",
+    "slider_tip": "Tip: double-click a slider to put it back to neutral.",
+    "auto_astro_hint": "Analyses your photo and sets every step for you.",
+    "auto_astro_done": "Done - every step is set. Tweak any of them, or go straight to Export.",
+    "presets_hint": "Or start from a look tuned for your subject."
   },
   "export_panel": {
     "filename_label": "File name",
@@ -158,7 +194,11 @@
     "returned": "Added to the Astrodex object as a new picture.",
     "return_hint": "Adds a copy to the Astrodex object with your enhanced image - the original is kept.",
     "return_hint_named": "Adds a copy to '{object}' in the Astrodex with your enhanced image - the original is kept.",
-    "return_failed": "Could not send back to Astrodex: {error}"
+    "return_failed": "Could not send back to Astrodex: {error}",
+    "ready_title": "Your image is ready",
+    "recap": "Touched up: {steps}",
+    "recap_none": "No adjustments yet - it is the original.",
+    "result_alt": "Your edited image"
   },
   "image_preview": {
     "processed_alt": "Processed",
@@ -169,11 +209,12 @@
     "zoom_in": "Zoom in",
     "processing": "Processing",
     "removing_stars_starnet2": "Removing stars (StarNet2)",
-    "before_after": "Before / After",
     "open_depth_shift": "Open Depth Shift viewer",
     "change_focal_point": "Change focal point",
     "set_focal_point": "Set focal point",
-    "clear_focal_point": "Clear focal point"
+    "clear_focal_point": "Clear focal point",
+    "before": "Before",
+    "after": "After"
   },
   "preset_buttons": {
     "confirm_delete_aria": "Confirm delete preset {name}",
@@ -261,11 +302,11 @@
         "hint": "Positive brightens the corners (counteracts lens vignetting); negative darkens them (deepen a vignette, or tame an over-corrected stack)."
       },
       "gradientReduction": {
-        "label": "Gradient reduction",
+        "label": "Light-pollution gradient",
         "hint": "Flattens smooth background gradients - light pollution, sky glow."
       },
       "dehaze": {
-        "label": "Dehaze",
+        "label": "Remove haze",
         "hint": "Restores contrast and colour lost to a veiling haze or light-pollution glow."
       },
       "clarity": {
@@ -285,11 +326,11 @@
         "hint": "Shrinks and dims star points so faint nebulosity stands out more."
       },
       "starSensitivity": {
-        "label": "Star sensitivity",
+        "label": "Catch fainter stars",
         "hint": "How faint a point can be and still count as a star. Higher finds more, fainter stars."
       },
       "starMaxSize": {
-        "label": "Star max size",
+        "label": "Largest star size",
         "hint": "Caps how large a bright spot can be and still count as a star, so bright cores aren't shrunk."
       },
       "starRemoval": {
@@ -326,7 +367,7 @@
         "hint": "White balance: shifts the colour cast between green and magenta."
       },
       "greenRemoval": {
-        "label": "Green removal",
+        "label": "Remove green cast",
         "hint": "Removes a residual green cast (SCNR). Almost nothing in the deep sky is green; a teal OIII filament keeps its colour because blue backs it up."
       }
     }
@@ -354,12 +395,12 @@
   },
   "stars_panel": {
     "reduce": {
-      "heading": "Reduce",
-      "help": "Shrinks each star where it is. Fast, every star kept - reach for this when you just want a tighter field."
+      "heading": "Reduce stars",
+      "help": "Shrinks every star where it is - quick, and every star is kept."
     },
     "remove": {
-      "heading": "Remove (starless)",
-      "help": "Lifts the stars out so every other step only touches the nebula, then Bring stars back fades them in at the end (0 = keep the image starless). Slower, but lets you stretch and sharpen the nebula without bloating stars.",
+      "heading": "Remove stars",
+      "help": "Lifts the stars out so the other steps only touch the nebula; the second slider fades them back in at the end.",
       "engine": {
         "aria": "Star removal engine",
         "classic": "Classic",
@@ -368,8 +409,8 @@
       }
     },
     "detection": {
-      "heading": "Detection",
-      "help": "What counts as a star. Both Reduce and Remove use these. Turn on the mask to check before committing."
+      "heading": "Which points are stars",
+      "help": "Both tools above use this. Turn on the star mask to check what is picked up."
     }
   },
   "detail_panel": {
@@ -384,7 +425,8 @@
     }
   },
   "histogram": {
-    "aria_label": "RGB histogram"
+    "aria_label": "RGB histogram",
+    "toggle": "Histogram"
   },
   "settings": {
     "back_to_editor": "Back to editor",
@@ -645,10 +687,6 @@
   },
   "stacking": {
     "combination_label": "Combination",
-    "mode": {
-      "single": "Single Image",
-      "stack": "Multi-Image Stack"
-    },
     "progress": {
       "heading": "Stacking"
     },
@@ -658,7 +696,7 @@
       "status": {
         "waiting_for_frames": "{count} frames ingested, waiting for more",
         "ready": "{count} frames ingested, waiting for more",
-        "processing": "Stacking {count} frames…",
+        "processing": "Stacking {count} frames...",
         "completed": "Done - {count} frames stacked",
         "failed": "Stacking failed"
       }
@@ -730,17 +768,18 @@
     },
     "upload_zone": {
       "add_frames": "Add frames",
-      "select_multiple_hint": "Select multiple files at once",
       "status": {
         "queued": "queued",
         "uploading": "uploading",
         "done": "done",
         "error": "error"
       },
-      "drop_hint": "Drop your light frames here",
+      "drop_hint": "or drop them all here at once",
       "choose_files_button": "Choose files",
       "accepted_formats": "JPEG, PNG, TIFF, FITS or camera RAW",
-      "max_size": "up to {mb} MB each"
+      "max_size": "up to {mb} MB each",
+      "title": "Several shots of the same target",
+      "subtitle": "They are aligned and combined into one cleaner, deeper image."
     },
     "view": {
       "stacking_button": "Stacking...",
@@ -751,7 +790,7 @@
       "back_to_composite": "Back to composite",
       "restack_n_frames": "Re-stack {count} frames",
       "upload_more": "Upload {count} more",
-      "frames_summary": "{total} frames · {excluded} excluded",
+      "frames_summary": "{total} frames - {excluded} excluded",
       "result_pending": "Run the stack to see the result."
     },
     "errors": {
@@ -763,7 +802,7 @@
       "frame_aria": "Frame {n}",
       "exclude": "Exclude this frame from the stack",
       "remove": "Remove {name}",
-      "quality_title": "{stars} stars · FWHM {fwhm}",
+      "quality_title": "{stars} stars - FWHM {fwhm}",
       "reject": {
         "clouds": "clouds",
         "soft": "soft",

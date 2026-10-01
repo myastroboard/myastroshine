@@ -134,4 +134,103 @@ describe('SliderGroup', () => {
     );
     expect(screen.queryByRole('button', { name: /revert contrast/i })).not.toBeInTheDocument();
   });
+
+  it('fills the track from the neutral value to the thumb', () => {
+    render(
+      <SliderGroup
+        keys={['contrast', 'denoise']}
+        parameters={{ ...DEFAULT_PARAMETERS, contrast: 2, denoise: 25 }}
+        onParameterChange={vi.fn()}
+      />,
+    );
+
+    // contrast: neutral 1.0 in 0.5-3.0 -> 0.2; value 2.0 -> 0.6
+    const contrast = screen.getByLabelText('Contrast');
+    expect(contrast.style.getPropertyValue('--fill-from')).toBe('0.2');
+    expect(contrast.style.getPropertyValue('--fill-to')).toBe('0.6');
+    // denoise: neutral 0 is the low end of 0-100
+    const denoise = screen.getByLabelText('Denoise');
+    expect(denoise.style.getPropertyValue('--fill-from')).toBe('0');
+    expect(denoise.style.getPropertyValue('--fill-to')).toBe('0.25');
+  });
+
+  it('marks the neutral point only when it sits inside the range', () => {
+    const { container } = render(
+      <SliderGroup keys={['exposure']} parameters={DEFAULT_PARAMETERS} onParameterChange={vi.fn()} />,
+    );
+    expect(container.querySelectorAll('span.bg-line-strong')).toHaveLength(1);
+
+    const { container: low } = render(
+      <SliderGroup keys={['denoise']} parameters={DEFAULT_PARAMETERS} onParameterChange={vi.fn()} />,
+    );
+    expect(low.querySelectorAll('span.bg-line-strong')).toHaveLength(0);
+  });
+
+  it('draws an explanatory gradient track instead of the fill for white balance and colour', () => {
+    render(
+      <SliderGroup
+        keys={['temperature', 'tint', 'exposure', 'saturation']}
+        parameters={DEFAULT_PARAMETERS}
+        onParameterChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText('Temperature')).toHaveClass('slider-track-temperature');
+    expect(screen.getByLabelText('Tint')).toHaveClass('slider-track-tint');
+    expect(screen.getByLabelText('Exposure')).toHaveClass('slider-track-exposure');
+    const saturation = screen.getByLabelText('Saturation');
+    expect(saturation).toHaveClass('slider-track-colour');
+    expect(saturation.style.getPropertyValue('--fill-to')).toBe('');
+  });
+
+  it('puts a slider back to neutral on double-click', () => {
+    const onParameterChange = vi.fn();
+    render(
+      <SliderGroup
+        keys={['exposure', 'temperature']}
+        parameters={{ ...DEFAULT_PARAMETERS, exposure: 0.5, temperature: 4000 }}
+        onParameterChange={onParameterChange}
+      />,
+    );
+
+    fireEvent.doubleClick(screen.getByLabelText('Exposure'));
+    expect(onParameterChange).toHaveBeenCalledWith('exposure', 0);
+    fireEvent.doubleClick(screen.getByLabelText('Temperature'));
+    expect(onParameterChange).toHaveBeenCalledWith('temperature', 6500);
+  });
+
+  it('ignores a double-click when already neutral or while processing', () => {
+    const onParameterChange = vi.fn();
+    const { rerender } = render(
+      <SliderGroup keys={['exposure']} parameters={DEFAULT_PARAMETERS} onParameterChange={onParameterChange} />,
+    );
+    fireEvent.doubleClick(screen.getByLabelText('Exposure'));
+
+    rerender(
+      <SliderGroup
+        keys={['exposure']}
+        parameters={{ ...DEFAULT_PARAMETERS, exposure: 0.5 }}
+        onParameterChange={onParameterChange}
+        isProcessing
+      />,
+    );
+    fireEvent.doubleClick(screen.getByLabelText('Exposure'));
+    expect(onParameterChange).not.toHaveBeenCalled();
+  });
+
+  it('opens a parameter hint on tap and closes it on blur', () => {
+    render(<SliderGroup keys={['contrast']} parameters={DEFAULT_PARAMETERS} onParameterChange={vi.fn()} />);
+
+    const info = screen.getByRole('button', { name: 'About Contrast' });
+    const tooltip = screen.getByRole('tooltip');
+    expect(info).toHaveAttribute('aria-expanded', 'false');
+    expect(tooltip).toHaveClass('opacity-0');
+
+    fireEvent.click(info);
+    expect(info).toHaveAttribute('aria-expanded', 'true');
+    expect(tooltip).toHaveClass('opacity-100');
+
+    fireEvent.blur(info);
+    expect(tooltip).toHaveClass('opacity-0');
+  });
 });

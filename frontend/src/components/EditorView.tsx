@@ -123,6 +123,10 @@ export function EditorView({ session, onExit }: EditorViewProps) {
   const [framingGeom, setFramingGeom] = useState<GeometryParameters>(parameters.geometry);
   const [framingRatioFrac, setFramingRatioFrac] = useState<number | null>(null);
   const [confirmExit, setConfirmExit] = useState(false);
+  // The parameter set Auto Astro last produced: while the edit still matches it
+  // the Start step says "done - fine-tune or export". Derived, so any change
+  // (a slider, a preset, a reset) retires the note on its own.
+  const [autoAstroParams, setAutoAstroParams] = useState<ProcessingParameters | null>(null);
   // The edit state that was last sent back to Astrodex - once it matches the
   // current state the work is delivered, so the unsaved-changes guard stands down.
   const [delivered, setDelivered] = useState<{
@@ -261,11 +265,13 @@ export function EditorView({ session, onExit }: EditorViewProps) {
     if (result) {
       // Auto Astro proposes tone/star/gradient/white-balance/denoise settings
       // only - carry the framing over.
-      syncParameters({
+      const next = {
         ...DEFAULT_PARAMETERS,
         ...result.parameters,
         geometry: parameters.geometry,
-      });
+      };
+      syncParameters(next);
+      setAutoAstroParams(next);
       trackJob(result);
     }
   }
@@ -301,6 +307,11 @@ export function EditorView({ session, onExit }: EditorViewProps) {
   }
 
   function handleMilestoneRestore(milestone: Milestone): void {
+    // Nothing is ever lost: work that matches no point yet is kept as a new
+    // point first, so going back is itself undoable.
+    if (activeMilestoneId === null) {
+      captureMilestone();
+    }
     clearActivePreset();
     setFocalPoint(milestone.focalPoint);
     restoreParameters(milestone.parameters); // sets state + reprocesses
@@ -355,11 +366,14 @@ export function EditorView({ session, onExit }: EditorViewProps) {
   const isProcessing = status === 'processing';
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[12.5rem_19rem_minmax(0,1fr)] lg:items-start">
-      <div className="panel flex flex-col gap-3">
+    // Below lg: the rail panel dissolves (`contents`) - its nav becomes the
+    // fixed bottom tab bar - and the preview is pinned on top, above the
+    // controls, so a slider's effect stays in view while you drag it.
+    <div className="grid gap-5 lg:grid-cols-[14rem_19rem_minmax(0,1fr)] lg:items-start [&>*]:min-w-0">
+      <div className="panel flex flex-col gap-3 max-lg:contents">
         <button
           type="button"
-          className="btn btn-ghost btn-sm self-start"
+          className="btn btn-ghost btn-sm self-start justify-self-start"
           onClick={handleExitRequest}
         >
           <svg viewBox="0 0 12 12" className="h-3 w-3 stroke-current" fill="none" aria-hidden>
@@ -379,8 +393,14 @@ export function EditorView({ session, onExit }: EditorViewProps) {
           focalPoint={focalPoint}
           isStack={Boolean(session.isStack)}
         />
-        {captureInfo && <CaptureInfoPanel info={captureInfo} />}
+        {captureInfo && (
+          <div className="min-w-0 max-lg:order-3">
+            <CaptureInfoPanel info={captureInfo} />
+          </div>
+        )}
       </div>
+
+      <div className="min-w-0 max-lg:order-2">
 
       <EditorInspector
         activeStep={activeStep}
@@ -397,6 +417,8 @@ export function EditorView({ session, onExit }: EditorViewProps) {
           onAutoAstro: () => void handleAutoAstro(),
           autoAstroLoading: autoAstro.isLoading,
           autoAstroError: autoAstro.error,
+          autoAstroApplied:
+            autoAstroParams !== null && parametersEqual(parameters, autoAstroParams),
           presets,
           activePreset,
           onPresetApply: (id) => void handlePresetApply(id),
@@ -454,13 +476,15 @@ export function EditorView({ session, onExit }: EditorViewProps) {
           astrodexReturned: astrodex.success,
           astrodexError: astrodex.error,
           defaultFilename: defaultExportName(session),
+          resultUrl: processedUrl,
           onDownload: (filename) => void handleDownload(filename),
           onReturnToAstroDex: () => void handleReturnToAstrodex(),
           onSaveAsPreset: () => setShowSavePreset(true),
         }}
       />
+      </div>
 
-      <div className="flex flex-col gap-4 lg:sticky lg:top-20 lg:self-start">
+      <div className="flex flex-col gap-4 self-start max-lg:sticky max-lg:top-14 max-lg:z-20 max-lg:order-1 lg:sticky lg:top-20">
         <ImagePreview
           originalUrl={originalUrl}
           processedUrl={processedUrl}
@@ -488,38 +512,40 @@ export function EditorView({ session, onExit }: EditorViewProps) {
           focalPoint={framingActive ? null : focalPoint}
           pickingFocalPoint={activeStep === 'depth' && pickingFocalPoint}
           onFocalPointPick={handleFocalPointPick}
-        />
+        >
+          <MilestoneTimeline
+            milestones={milestones}
+            activeId={activeMilestoneId}
+            onCapture={captureMilestone}
+            onRestore={handleMilestoneRestore}
+            disabled={isProcessing}
+          />
+        </ImagePreview>
 
-        <MilestoneTimeline
-          milestones={milestones}
-          activeId={activeMilestoneId}
-          onCapture={captureMilestone}
-          onRestore={handleMilestoneRestore}
-          disabled={isProcessing}
-        />
-
-        {showDepthViewer && (
-          <div className="flex flex-col gap-2">
-            {depthShift.error ? (
-              <p className="rounded-md border border-danger/30 bg-danger-wash px-3 py-2 text-xs text-danger">
-                {t('editor.depth_shift_failed', { error: depthShift.error })}
-              </p>
-            ) : depthShift.layerUrls.length === 0 ? (
-              <div className="panel grid h-40 place-items-center text-xs text-faint">
-                {t('editor.generating_depth_map')}
-              </div>
-            ) : (
-              <DepthShiftViewer
-                depthLayerUrls={depthShift.layerUrls}
-                intensity={depthShift.intensity}
-                aspectRatio={aspectRatio}
-                onIntensityChange={depthShift.setIntensity}
-                onClose={() => setShowDepthViewer(false)}
-              />
-            )}
+        {showDepthViewer && depthShift.error && (
+          <p className="rounded-md border border-danger/30 bg-danger-wash px-3 py-2 text-xs text-danger">
+            {t('editor.depth_shift_failed', { error: depthShift.error })}
+          </p>
+        )}
+        {showDepthViewer && !depthShift.error && depthShift.layerUrls.length === 0 && (
+          <div className="panel grid h-40 place-items-center text-xs text-faint">
+            {t('editor.generating_depth_map')}
           </div>
         )}
       </div>
+
+      {/* The viewer is a full-screen modal: rendered here at the editor root,
+          not inside the sticky preview column - a sticky box is its own
+          stacking context, which let the inspector (z-10) paint over it. */}
+      {showDepthViewer && !depthShift.error && depthShift.layerUrls.length > 0 && (
+        <DepthShiftViewer
+          depthLayerUrls={depthShift.layerUrls}
+          intensity={depthShift.intensity}
+          aspectRatio={aspectRatio}
+          onIntensityChange={depthShift.setIntensity}
+          onClose={() => setShowDepthViewer(false)}
+        />
+      )}
 
       {showSavePreset && (
         <SavePresetDialog

@@ -76,6 +76,8 @@ redeclares them. Radius, motion, and type never change with theme.
 | Status | `danger` `danger-wash` `success` `warning` |
 | Chrome hover | `hover` (theme-flipped wash for `hover:bg-hover` on rails, tabs, ghost buttons) |
 | Channels | `channel-red` `channel-green` `channel-blue` (tone curve + histogram) |
+| Slider tracks | `track-warm` `track-neutral` `track-cool` `track-green` `track-magenta` `track-dark` `track-bright` `track-muted` (the `.slider-track-*` gradients - illustrative hues, not status) |
+| Starfield | `star` (the landing screen's `.starfield` pin-points) |
 | Radius | `--radius-sm|md|lg|xl` (6 / 8 / 12 / 16 px) |
 | Elevation | `--shadow-panel` `--shadow-pop` `--shadow-glass` `--shadow-premium` |
 | Gradients / halos | `--bg-gradient` `--gradient-accent` `--halo-accent` `--halo-amber` (raw CSS, not utilities) |
@@ -94,10 +96,21 @@ Compose these; do not re-implement them per component.
 | `.btn` + `.btn-primary\|-amber\|-outline\|-ghost\|-danger` | Buttons (`.btn-sm` for compact). `-primary` is the teal gradient, `-amber` is the Astrodex gradient |
 | `.field` | Text input / select / textarea |
 | `.label` | Form field label |
-| `.slider` | Range input (custom track + thumb) |
+| `.slider` | Range input. The track fills in the accent from the neutral value to the thumb (`--fill-from` / `--fill-to`, 0-1, set per instance by `SliderGroup`); the thumb is an accent ring |
+| `.slider-track-temperature\|-tint\|-exposure\|-colour` | A gradient track that shows what the slider does (warm -> cool, green -> magenta, dark -> bright, muted -> vivid), in place of the fill |
 | `.segmented` + `.segmented-item` / `.segmented-item-active` | Tab-style switch |
-| `.chip` / `.chip-active` | Toggle pill (presets, filters) |
+| `.chip` / `.chip-active` | Toggle pill (engines, stretch mode, go-back points) |
+| `.option-card` / `.option-card-active` | Selectable card: icon + name + one-line description (presets). Chip states, block-shaped |
 | `.dropzone` / `.dropzone-active` | Drag-and-drop target |
+| `.starfield` | Decorative pin-point starfield behind the landing screen only |
+
+## Icons
+
+One family, in `components/icons.tsx`: 24px grid, 1.6 round stroke,
+`currentColor`, sized and coloured by the caller's classes - the same drawing
+rules as MyAstroBoard's own icons (`static/img/icons`; `GalaxyIcon` is a port of
+its `galaxy.svg`). **Never emoji** in the UI: every platform draws them
+differently. A missing icon gets drawn in this family and added there.
 
 ## Rules of thumb
 
@@ -108,25 +121,41 @@ Compose these; do not re-implement them per component.
 - Panel padding: `p-4 sm:p-5` (that is what `.panel` does).
 - Numbers (percentages, counts, versions): add `tabular-nums`.
 - Editor layout: three `.panel` columns,
-  `lg:grid-cols-[12.5rem_19rem_minmax(0,1fr)]` - a numbered **workflow rail**
-  (`EditorRail`), the active step's **inspector** (`EditorInspector`), then the
-  **preview** (the image matted in a `bg-black` inset with the histogram in a
-  `.panel-inset` below, one card). The preview column is `lg:sticky lg:top-20`
-  so it stays visible while the inspector scrolls. Below `lg` the rail is a
-  horizontal scroll strip and the three panes stack. The workflow order lives in
-  one place - `EDITOR_STEPS` in `types/index.ts` - and mirrors the backend
-  pipeline order.
+  `lg:grid-cols-[14rem_19rem_minmax(0,1fr)]` - the **workflow rail**
+  (`EditorRail`: steps grouped by `phase` under Prepare / Enhance / Finish
+  headings, an icon and a plain-language subtitle each), the active step's
+  **inspector** (`EditorInspector`), then the **preview** (the image matted in a
+  `bg-black` inset, the go-back points and the folded histogram below it, one
+  card). The preview column is sticky so it stays visible while the inspector
+  scrolls. The workflow order lives in one place - `EDITOR_STEPS` in
+  `types/index.ts` - and mirrors the backend pipeline order.
+- Below `lg` the editor reflows for a phone: the rail panel dissolves
+  (`contents`) and its nav becomes a **fixed bottom tab bar** (icon over label),
+  and the preview is **pinned on top** (`sticky top-14`, image capped at 42vh) so
+  a slider's effect stays in view. Keep anything `fixed` out of a `.panel` - its
+  `backdrop-filter` would become the containing block.
+- Full-screen modals (the Depth Shift viewer, confirm dialogs) render at the
+  editor root, never inside the sticky preview column: a sticky box is its own
+  stacking context, and the inspector (`z-10`) would paint over the modal.
+- Inspector: the step title with its icon, **one** short help sentence, the
+  longer explanation behind a native `<details>` "Learn more". It ends on the
+  **Next step** footer - below a hairline, on the accent wash, with the next
+  step's icon - so workflow navigation never reads as one more setting.
+- Plain language first: labels say what a control does for the picture
+  ("Remove haze", "Catch fainter stars"), not the algorithm; the jargon stays in
+  the hint and "Learn more".
 - Settings: the section nav and the section content are each a `.panel`
   (`lg:grid-cols-[210px_minmax(0,1fr)]`). Rows inside: label + one-line
   description on the left, control on the right, hairline divider between rows.
-- Footer: app name + version on the left; the **Theme** and **Language**
-  controls (`ThemeSwitcher`, `LanguageSwitcher` - compact `.field` selects) plus
-  the GitHub link on the right. The update notice folds in as a second line.
+- Footer: app name + version on the left; the **Theme** icon toggle
+  (`ThemeSwitcher`, a compact `.segmented` radio group: system / light / dark)
+  and the **Language** select (`LanguageSwitcher`) plus the GitHub link on the
+  right. The update notice folds in as a second line.
 - Overlays on top of an image: `bg-black/55` + `backdrop-blur-sm` + `border-white/10` -
   this is the one place a fixed dark treatment is correct in both themes.
 - Never introduce a raw hex colour, a theme-specific colour (`bg-white/10`,
   `text-white`), or a new font in a component - add / reuse a token, and give a
   new token a `.dark` override.
 - No static inline styles (`AGENTS.md` section 5); dynamic values only
-  (`transform: scale(zoom)`, progress-bar `width`).
+  (`transform: scale(zoom)`, progress-bar `width`, a slider's `--fill-*`).
 - Verify every new surface in **both** themes (footer Theme -> Light / Dark).

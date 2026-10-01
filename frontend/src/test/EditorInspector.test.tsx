@@ -25,6 +25,7 @@ function makeProps(overrides: Partial<EditorInspectorProps> = {}): EditorInspect
       onAutoAstro: vi.fn(),
       autoAstroLoading: false,
       autoAstroError: null,
+      autoAstroApplied: false,
       presets: [],
       activePreset: undefined,
       onPresetApply: vi.fn(),
@@ -72,6 +73,7 @@ function makeProps(overrides: Partial<EditorInspectorProps> = {}): EditorInspect
       astrodexReturned: false,
       astrodexError: null,
       defaultFilename: 'photo_myastroshine',
+      resultUrl: '/api/preview/s1?full=true',
       onDownload: vi.fn(),
       onReturnToAstroDex: vi.fn(),
       onSaveAsPreset: vi.fn(),
@@ -155,7 +157,7 @@ describe('EditorInspector', () => {
     expect(screen.getByLabelText('Star reduction')).toBeInTheDocument();
     expect(screen.getByLabelText('Remove stars')).toBeInTheDocument();
     expect(screen.getByLabelText('Bring stars back')).toBeInTheDocument();
-    expect(screen.getByLabelText('Star sensitivity')).toBeInTheDocument();
+    expect(screen.getByLabelText('Catch fainter stars')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('checkbox', { name: /show star mask/i }));
     expect(onToggle).toHaveBeenCalledWith(true);
@@ -383,5 +385,84 @@ describe('EditorInspector', () => {
     expect(onClear).toHaveBeenCalled();
     expect(screen.getByText('Depth shift failed: out of memory')).toBeInTheDocument();
   });
-});
 
+  it('sets the Next button apart as workflow navigation naming the next step', () => {
+    render(<EditorInspector {...makeProps({ activeStep: 'light' })} />);
+
+    const next = screen.getByRole('button', { name: 'Next: Curves' });
+    expect(next).toHaveTextContent('Next step');
+    expect(next).toHaveTextContent('Curves');
+    expect(next).toHaveClass('bg-accent-wash');
+  });
+
+  it('shows no Next button on the last step', () => {
+    render(<EditorInspector {...makeProps({ activeStep: 'export' })} />);
+
+    expect(screen.queryByRole('button', { name: /^Next:/ })).not.toBeInTheDocument();
+  });
+
+  it('keeps the long step explanation behind a Learn more disclosure', () => {
+    const { container } = render(<EditorInspector {...makeProps({ activeStep: 'sky' })} />);
+
+    expect(screen.getByText(/Remove light pollution and colour casts/)).toBeInTheDocument();
+    const details = container.querySelector('details');
+    expect(details).not.toBeNull();
+    expect(details).not.toHaveAttribute('open');
+    expect(details).toHaveTextContent('Learn more');
+    expect(details).toHaveTextContent(/white balance, lens vignetting/);
+  });
+
+  it('offers no Learn more on a step with only a short help line', () => {
+    const { container } = render(<EditorInspector {...makeProps({ activeStep: 'frame' })} />);
+
+    expect(container.querySelector('details')).toBeNull();
+  });
+
+  it('tells the user Auto Astro is done while its settings are untouched', () => {
+    const props = makeProps({ activeStep: 'start' });
+    const { rerender } = render(<EditorInspector {...props} />);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+
+    rerender(<EditorInspector {...props} start={{ ...props.start, autoAstroApplied: true }} />);
+    expect(screen.getByRole('status')).toHaveTextContent(/every step is set/);
+  });
+
+  it('hides the Auto Astro done note when the run failed', () => {
+    const props = makeProps({ activeStep: 'start' });
+    render(
+      <EditorInspector
+        {...props}
+        start={{ ...props.start, autoAstroApplied: true, autoAstroError: 'boom' }}
+      />,
+    );
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByText('Auto Astro failed: boom')).toBeInTheDocument();
+  });
+
+  it('recaps on the export step which steps changed the image', () => {
+    render(
+      <EditorInspector
+        {...makeProps({
+          activeStep: 'export',
+          parameters: { ...DEFAULT_PARAMETERS, exposure: 0.4, saturation: 1.3 },
+        })}
+      />,
+    );
+
+    expect(screen.getByText('Your image is ready')).toBeInTheDocument();
+    expect(screen.getByText('Touched up: Light, Colour')).toBeInTheDocument();
+    expect(screen.getByAltText('Your edited image')).toHaveAttribute(
+      'src',
+      '/api/preview/s1?full=true',
+    );
+  });
+
+  it('shows a slider tip only on steps that have sliders', () => {
+    const { rerender } = render(<EditorInspector {...makeProps({ activeStep: 'light' })} />);
+    expect(screen.getByText(/double-click a slider/)).toBeInTheDocument();
+
+    rerender(<EditorInspector {...makeProps({ activeStep: 'depth' })} />);
+    expect(screen.queryByText(/double-click a slider/)).not.toBeInTheDocument();
+  });
+});

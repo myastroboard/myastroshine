@@ -55,14 +55,14 @@ describe('ExportPanel', () => {
 
     expect(screen.getByRole('button', { name: 'Download' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Send back to Astrodex' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Save as preset' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Keep these settings for other photos' })).toBeDisabled();
   });
 
   it('calls onSaveAsPreset when the save-as-preset button is clicked', () => {
     const onSaveAsPreset = vi.fn();
     render(<ExportPanel {...base} onSaveAsPreset={onSaveAsPreset} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save as preset' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Keep these settings for other photos' }));
     expect(onSaveAsPreset).toHaveBeenCalledTimes(1);
   });
 
@@ -85,5 +85,20 @@ describe('ExportPanel', () => {
     expect(
       screen.queryByText('Added to the Astrodex object as a new picture.'),
     ).not.toBeInTheDocument();
+  });
+
+  it('opens on a ready state that says nothing was changed yet', () => {
+    render(<ExportPanel {...base} />);
+
+    expect(screen.getByText('Your image is ready')).toBeInTheDocument();
+    expect(screen.getByText(/No adjustments yet/)).toBeInTheDocument();
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  });
+
+  it('shows the result thumbnail and the touched steps when given', () => {
+    render(<ExportPanel {...base} resultUrl="/result.jpg" touchedSteps={['Light', 'Stars']} />);
+
+    expect(screen.getByAltText('Your edited image')).toHaveAttribute('src', '/result.jpg');
+    expect(screen.getByText('Touched up: Light, Stars')).toBeInTheDocument();
   });
 });

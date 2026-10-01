@@ -1,29 +1,41 @@
+import type { ComponentType } from 'react';
+
+import { MonitorIcon, MoonIcon, SunIcon, type IconProps } from '@/components/icons';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useTheme } from '@/hooks/useTheme';
-import { THEME_PREFERENCES, isThemePreference } from '@/theme/config';
+import { THEME_PREFERENCES, type ThemePreference } from '@/theme/config';
 
-/** Compact System/Light/Dark select, persisted client-side only. */
+const THEME_ICONS: Record<ThemePreference, ComponentType<IconProps>> = {
+  system: MonitorIcon,
+  light: SunIcon,
+  dark: MoonIcon,
+};
+
+/** Compact System/Light/Dark icon toggle, persisted client-side only. */
 export function ThemeSwitcher() {
   const { t } = useTranslation();
   const { preference, setPreference } = useTheme();
 
   return (
-    <select
-      className="field w-auto py-1.5 text-xs"
-      aria-label={t('theme_switcher.aria_label')}
-      value={preference}
-      onChange={(event) => {
-        const next = event.target.value;
-        if (isThemePreference(next)) {
-          setPreference(next);
-        }
-      }}
-    >
-      {THEME_PREFERENCES.map((value) => (
-        <option key={value} value={value}>
-          {t(`theme_switcher.${value}`)}
-        </option>
-      ))}
-    </select>
+    <div className="segmented p-0.5" role="radiogroup" aria-label={t('theme_switcher.aria_label')}>
+      {THEME_PREFERENCES.map((value) => {
+        const Icon = THEME_ICONS[value];
+        const active = preference === value;
+        return (
+          <button
+            key={value}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            aria-label={t(`theme_switcher.${value}`)}
+            title={t(`theme_switcher.${value}`)}
+            className={`segmented-item grid place-items-center px-2 py-1 ${active ? 'segmented-item-active' : ''}`}
+            onClick={() => setPreference(value)}
+          >
+            <Icon className="h-3.5 w-3.5" />
+          </button>
+        );
+      })}
+    </div>
   );
 }
