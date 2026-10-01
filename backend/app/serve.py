@@ -13,12 +13,16 @@ the kernel has no IPv6.
 Shutdown is bounded so a container stop ends well inside Docker's 10 s (and the
 Home Assistant app's ``timeout``): ``SERVER_SHUTDOWN_GRACE_SECONDS`` for open
 connections, then the lifespan stops the background jobs
-(``JOB_SHUTDOWN_GRACE_SECONDS``).
+(``JOB_SHUTDOWN_GRACE_SECONDS``). After that graceful stop the process exits
+with code 0: uvicorn would re-raise the SIGTERM it caught, and Python's default
+handler would then end the process with 143, which Home Assistant reports as an
+app that "did not handle SIGTERM".
 """
 
 from __future__ import annotations
 
 import socket
+from types import FrameType
 
 import uvicorn
 
@@ -48,6 +52,16 @@ def listening_socket(port: int = SERVER_PORT) -> socket.socket:
     return sock
 
 
+class Server(uvicorn.Server):
+    """A uvicorn server whose graceful stop on a signal ends the process with code 0."""
+
+    def handle_exit(self, sig: int, frame: FrameType | None) -> None:
+        super().handle_exit(sig, frame)
+        # uvicorn re-raises every captured signal once shutdown is done (see
+        # uvicorn.Server.capture_signals): forget it, the stop already happened.
+        self._captured_signals.clear()
+
+
 def main() -> None:
     sock = listening_socket()
     config = uvicorn.Config(
@@ -55,7 +69,7 @@ def main() -> None:
         proxy_headers=False,
         timeout_graceful_shutdown=SERVER_SHUTDOWN_GRACE_SECONDS,
     )
-    uvicorn.Server(config).run(sockets=[sock])
+    Server(config).run(sockets=[sock])
 
 
 if __name__ == "__main__":  # pragma: no cover - exercised through main()

@@ -583,6 +583,10 @@ Checklist used for the board, adapted:
   `/api/...` without the ingress prefix.
 - **Large uploads and long sync requests through ingress** (stack archives, many frames):
   body size and proxy timeouts of the Supervisor are unknown for our sizes - measure.
+  Measured on MyAstroShine: without `ingress_stream: true` the Supervisor reads the
+  body whole (`await request.read()`) and refuses anything over 16 MiB ("Maximum
+  request body size 16777216 exceeded"). With it, POST bodies are streamed (other
+  methods are still read whole). Its proxy timeout is `total=None`.
 - WebSocket progress through ingress.
 - Two HA users (or two browsers) at once: rate limit / concurrent-job limit is per user.
 - HA companion app on mobile, and remote access (Nabu Casa / remote URL) if available.
@@ -628,6 +632,10 @@ grep/regex scans of JS and templates missed a CSS `url(/static/...)` and an inli
 - HA linter (`frenck/action-addon-linter`) runs in CI per app folder; keep config.yaml
   minimal (we removed `startup`/`watchdog` it complained about or that were redundant).
 - `timeout:` in config.yaml defaults to 10 s - too short for apps with background work.
+- Exit code 143 on stop shows as an error on the app card ("did not handle SIGTERM").
+  uvicorn >= 0.29 re-raises the caught SIGTERM after its graceful shutdown; MyAstroShine
+  drops it (`app.serve.Server`). Check with `docker run --init` + `docker stop` + the
+  `ExitCode` from `docker inspect`, not with the logs (they look clean either way).
 - `stage: experimental` while the app is young.
 - Docs for end users go in the app's `DOCS.md` (HA "Documentation" tab); link to the
   upstream docs for the rest. Keep the upstream README's "Home Assistant app" install

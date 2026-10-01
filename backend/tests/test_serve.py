@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import signal
 import socket
 from typing import Any
 
@@ -68,7 +69,7 @@ def test_main_hands_the_socket_to_uvicorn_with_a_bounded_shutdown(
         seen["sockets"] = sockets
         seen["config"] = self.config
 
-    monkeypatch.setattr(serve.uvicorn.Server, "run", run)
+    monkeypatch.setattr(serve.Server, "run", run)
 
     serve.main()
 
@@ -76,3 +77,33 @@ def test_main_hands_the_socket_to_uvicorn_with_a_bounded_shutdown(
     assert seen["config"].app == "app.main:app"
     assert seen["config"].timeout_graceful_shutdown == serve.SERVER_SHUTDOWN_GRACE_SECONDS
     assert seen["config"].proxy_headers is False
+
+
+def _stop_by_signal(server: Any, monkeypatch: pytest.MonkeyPatch) -> list[int]:
+    """Deliver SIGTERM through the server's own signal capture; return what it re-raises."""
+    raised: list[int] = []
+    monkeypatch.setattr(signal, "raise_signal", raised.append)
+    with server.capture_signals():
+        server.handle_exit(signal.SIGTERM, None)
+    return raised
+
+
+def test_graceful_stop_on_sigterm_does_not_re_raise_the_signal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A SIGTERM stops the server without being raised again afterwards, so the
+    process exits with code 0 instead of 143 (Home Assistant flags 143 as an error)."""
+    server = serve.Server(serve.uvicorn.Config("app.main:app"))
+
+    raised = _stop_by_signal(server, monkeypatch)
+
+    assert server.should_exit is True
+    assert raised == []
+
+
+def test_plain_uvicorn_re_raises_the_signal(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pins the upstream behaviour the Server subclass works around: once uvicorn
+    stops re-raising the captured signal, the subclass can go."""
+    server = serve.uvicorn.Server(serve.uvicorn.Config("app.main:app"))
+
+    assert _stop_by_signal(server, monkeypatch) == [signal.SIGTERM]
