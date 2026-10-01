@@ -132,7 +132,7 @@ docker compose up -d
   (`scripts/check_deps_fresh.py`, `.github/workflows/deps-fresh.yml`) and known
   CVEs (`pip-audit` / `npm audit` in CI, plus a Trivy scan on every published
   image).
-- Review `docker-compose.yml`'s CORS/AstroDex settings in Settings -> Advanced
+- Review `docker-compose.yml`'s CORS/AstroDex settings in Settings -> Security and Settings -> AstroDex
   if this deployment is reachable from more than your own machine.
 
 ## References

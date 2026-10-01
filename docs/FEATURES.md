@@ -248,9 +248,12 @@ a few backend detail strings stay English.)
 ## Settings
 
 Everything tunable lives in **Settings** in the UI and persists under the data
-volume - no `.env` editing, no restart (except `cors_origins`). The tabs:
-**General** (upload cap, session lifetime, preview size, stacking limits and
-workers, folder-watch), **Webhooks** (AstroDex tokens and allowlist),
-**Advanced** (CORS, rate limits, log levels, external ML engine paths), and
-**Logs** (tail, filter, clear, export a ZIP for a bug report). Full table:
+volume - no `.env` editing, no restart (except `cors_origins`). It is the
+admin's area (password set on first visit). One subject per tab: **General**
+(upload cap, session lifetime, preview size), **Stacking** (limits, workers,
+folder-watch), **ML engines** (install StarNet2 / DeepSNR from their archive,
+or set their paths), **AstroDex** (tokens, callback allowlist and delivery),
+**Security** (admin password and sessions, CORS, rate limits), **Logs** (levels,
+then tail, filter, clear, export a ZIP for a bug report) and **Maintenance**
+(disk usage, job history, configuration backup and restore). Full table:
 [DEPLOYMENT.md](DEPLOYMENT.md#runtime-settings-edited-in-the-ui).

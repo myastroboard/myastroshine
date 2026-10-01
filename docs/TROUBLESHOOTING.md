@@ -36,14 +36,14 @@ restarting `api` clears the stuck connections; upgrade to stop it recurring.
 **"Too many concurrent processing jobs" (429).**
 The per-IP concurrent-job cap (`max_concurrent_jobs_per_ip`, default 5) was hit -
 usually several stacks or re-stacks in flight at once, or a shared household IP.
-Raise it in **Settings -> Advanced**, no restart needed. A burst of slider moves
+Raise it in **Settings -> Security**, no restart needed. A burst of slider moves
 can't cause this (a new edit retires the previous pending job for that session).
 
 **"Rate limit exceeded" (429) during normal editing.**
 `rate_limit_per_minute` (default 600) is a shared 60-second window across
 `/upload`, `/process`, preset apply, `/star-mask`, `/auto-astro`, and `/stack/*`.
 One person doing real work should never reach it; raise it in
-**Settings -> Advanced** for a shared IP, or turn the limiter off there.
+**Settings -> Security** for a shared IP, or turn the limiter off there.
 
 **The depth map looks like a flat gradient with no stars.**
 The depth estimate is gradient-based (detail = near, smooth sky = far). On a
@@ -115,7 +115,7 @@ session's temporal middle to keep the common footprint centred.
 
 **The StarNet2 / DeepSNR toggle doesn't appear in the editor.**
 The engine only shows when its path points at a working binary. In
-**Settings -> Advanced -> External ML engines**, check the status line, then
+**Settings -> ML engines**, check the status line, then
 **Re-check engines**:
 
 | Status line | Meaning | Fix |
@@ -139,7 +139,7 @@ CLI from `starnetastro.com` yourself and accept its licence -
 
 **A stack waits a long time before it starts.**
 One stack runs at a time; the next waits for it (edits have their own threads
-and are never blocked by a stack). Settings -> Operations lists the jobs.
+and are never blocked by a stack). Settings -> Maintenance lists the jobs.
 
 **A job ended "interrupted by a server shutdown" or "by a restart".**
 The container stopped while the job ran. Run it again - a re-stack that only
@@ -167,7 +167,7 @@ container after changing it. Every other setting applies immediately.
 `astrodex_callback_urls` is an allowlist that fails closed - an empty allowlist
 rejects every board origin. Add the MyAstroBoard origin the handoff was minted
 with (the public URL and, if the container reaches the board another way, that
-address too) in **Settings -> Webhooks**.
+address too) in **Settings -> AstroDex**.
 
 **"Send back to AstroDex" fails with a 502.**
 The container could not reach `callback_base`. If MyAstroBoard is behind a
@@ -213,5 +213,5 @@ explicitly, `SKIP_DEPS_FRESH=1 pytest`.
 - **Settings -> Logs** tails the file, changes the filter level (no restart),
   clears it, and **exports a ZIP** of the log plus its rotations - attach that
   ZIP to a bug report.
-- Levels: `log_level` (file) and `console_log_level` (console) on the
-  **Advanced** tab.
+- Levels: `log_level` (file) and `console_log_level` (console) at the top of
+  the same **Logs** tab.

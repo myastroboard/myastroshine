@@ -141,17 +141,19 @@ after changing it).
 | General | `max_image_size_mb` | 100 |
 | General | `session_expiry_hours` | 24 |
 | General | `preview_max_size` | 512 |
-| General | `stacking_enabled` / `stacking_max_frames` / `stacking_retention_hours` | true / 2000 / 12 |
-| General | `stacking_workers` (register/align/combine threads; 0 = auto, cap 4) | 0 |
-| General | `stacking_watch_dir` / `stacking_watch_idle_minutes` / `stacking_watch_auto_process` (folder-watch ingest; empty dir = off) | "" / 10 / true |
+| Stacking | `stacking_enabled` / `stacking_max_frames` / `stacking_retention_hours` | true / 2000 / 12 |
+| Stacking | `stacking_workers` (register/align/combine threads; 0 = auto, cap 4) | 0 |
+| Stacking | `stacking_watch_dir` / `stacking_watch_idle_minutes` / `stacking_watch_auto_process` (folder-watch ingest; empty dir = off) | "" / 10 / true |
 | AstroDex | webhook token (create / revoke; paste token + signing secret into MyAstroBoard) | - |
 | AstroDex | `astrodex_callback_urls` (board-origin allowlist, fails closed) | empty |
 | AstroDex | `astrodex_max_retries` / `astrodex_retry_delay_seconds` (return delivery) | 3 / 5s |
-| Advanced | `cors_origins` | `http://localhost:3000` |
-| Advanced | `rate_limit_enabled` / `rate_limit_per_minute` / `max_concurrent_jobs_per_ip` | `true` / 600 / 5 |
-| Advanced | `log_level` / `console_log_level` | `info` / `warning` |
-| Advanced | `starnet2_path` / `deepsnr_path` / `starnet2_stride` / `deepsnr_stride` (external ML engines; empty = off) | "" / "" / 0 / 0 |
-| Operations | `job_history_retention_hours` (how long a finished job row is kept before the hourly cleanup prunes it) | 168 (7 days) |
+| ML engines | StarNet2 / DeepSNR package (install from its archive, or remove) | - |
+| ML engines | `starnet2_path` / `deepsnr_path` / `starnet2_stride` / `deepsnr_stride` (empty = off) | "" / "" / 0 / 0 |
+| Security | admin password, logged-in browsers, `admin_session_idle_days` | - / - / 7 |
+| Security | `cors_origins` | `http://localhost:3000` |
+| Security | `rate_limit_enabled` / `rate_limit_per_minute` / `max_concurrent_jobs_per_ip` | `true` / 600 / 5 |
+| Logs | `log_level` / `console_log_level` | `info` / `warning` |
+| Maintenance | `job_history_retention_hours` (how long a finished job row is kept before the hourly cleanup prunes it) | 168 (7 days) |
 
 ## External ML engines (optional)
 
@@ -163,8 +165,7 @@ nothing changes.
 
 **Install from Settings (simplest).** Download the CLI package for
 **linux-x64** from `starnetastro.com` (there is no linux-arm64 build - an ARM
-host cannot use it, and the upload says so), then in **Settings -> Advanced ->
-External ML engines** click **Install StarNet2 from its archive** (or DeepSNR)
+host cannot use it, and the upload says so), then in **Settings -> ML engines** click **Install StarNet2 from its archive** (or DeepSNR)
 and pick the `.zip` / `.tar.gz` as downloaded. The server unpacks and checks it
 (the binary for this machine's architecture, its weights, its licence) and runs
 `--version`; Settings then shows the package's own `LICENSE.txt`. Tick that you
@@ -186,7 +187,7 @@ until you set a path). Its contents are git-ignored.
    published image without the repo? Create an `engines/` dir next to your
    `docker-compose.yml` first.) The image runs on Debian 13 / glibc 2.41, which
    meets the tools' runtime baseline.
-3. In **Settings -> Advanced -> External ML engines**, set `starnet2_path` /
+3. In **Settings -> ML engines**, set `starnet2_path` /
    `deepsnr_path` to the path inside the container (e.g.
    `/opt/engines/starnet2/starnet2`), Save, then **Re-check engines**. A green
    "detected" line means the editor now offers that engine: a "StarNet2" toggle
@@ -284,8 +285,8 @@ alembic upgrade head   # apply it locally and eyeball the generated SQL
 - Timestamps are in the `TZ` zone with the UTC offset always shown.
 - **Settings -> Logs** tails the file, changes filter level, clears it, and
   exports a ZIP of the log plus its rotations - attach that
-  ZIP to bug reports. `log_level` / `console_log_level` are on the Advanced tab
-  and apply without a restart.
+  ZIP to bug reports. `log_level` / `console_log_level` are at the top of the
+  same Logs screen and apply without a restart.
 - CLI equivalents: `GET/POST /api/admin/logs*` (see `docs/API.md`).
 
 ## Backup

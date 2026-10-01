@@ -71,7 +71,7 @@ Per IP, on `/upload`, `/process/{id}`, `/presets/{id}/apply/{session_id}`,
   of slider edits can't exhaust this budget against itself.
 
 Both settings, plus a `rate_limit_enabled` switch, are editable from
-**Settings -> Advanced** (`app_settings.json`, see docs/DEPLOYMENT.md) - no
+**Settings -> Security** (`app_settings.json`, see docs/DEPLOYMENT.md) - no
 restart needed. Over either limit returns `429` with `error_code:
 "RATE_LIMITED"`.
 
