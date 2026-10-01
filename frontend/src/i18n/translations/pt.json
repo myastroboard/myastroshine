@@ -396,39 +396,45 @@
     "sections": {
       "general": {
         "label": "Geral",
-        "blurb": "Carregamentos e valores predefinidos de empilhamento."
+        "blurb": "Envios e sessões de edição."
       },
-      "webhooks": {
-        "label": "Webhooks",
-        "blurb": "Tokens do AstroDex e entrega de callbacks."
+      "stacking": {
+        "label": "Empilhamento",
+        "blurb": "Valores predefinidos do empilhamento e pasta vigiada."
       },
-      "advanced": {
-        "label": "Avançado",
-        "blurb": "Rede e níveis de registo."
+      "engines": {
+        "label": "Motores ML",
+        "blurb": "Remoção de estrelas com StarNet2 e redução de ruído com DeepSNR opcionais."
       },
-      "logs": {
-        "label": "Registos",
-        "blurb": "Consultar, limpar e exportar o registo da aplicação."
-      },
-      "operations": {
-        "label": "Operações",
-        "blurb": "Trabalhos de processamento recentes e utilização de disco."
+      "astrodex": {
+        "label": "AstroDex",
+        "blurb": "Ligação ao AstroDex do MyAstroBoard: tokens e entrega de callbacks."
       },
       "security": {
         "label": "Segurança",
-        "blurb": "Senha de administrador e navegadores conectados."
+        "blurb": "Conta de administrador, acesso de rede e limites de frequência."
+      },
+      "logs": {
+        "label": "Registos",
+        "blurb": "Níveis de registo, e o próprio registo: consultar, limpar, exportar."
+      },
+      "maintenance": {
+        "label": "Manutenção",
+        "blurb": "Espaço em disco, histórico de tarefas e cópia da configuração."
       }
     },
     "groups": {
       "uploads_and_sessions": "Carregamentos e sessões",
-      "stacking_defaults": "Valores predefinidos de empilhamento",
+      "stacking_defaults": "Valores predefinidos",
       "callback_delivery": "Entrega de callbacks",
       "network": "Rede",
       "rate_limiting": "Limitação de taxa",
-      "logging": "Registo",
-      "external_engines": "Motores de ML externos",
       "job_history": "Histórico de trabalhos",
-      "backup_restore": "Cópia de segurança e restauro"
+      "backup_restore": "Cópia de segurança e restauro",
+      "watch_folder": "Pasta vigiada",
+      "admin_account": "Conta de administrador",
+      "log_levels": "Níveis",
+      "log_file": "Ficheiro de registo"
     },
     "general": {
       "max_upload": {
@@ -511,7 +517,7 @@
         "label": "Nível do registo na consola",
         "hint": "Nível refletido nos registos do contentor."
       },
-      "external_engines_blurb": "Remoção de estrelas (StarNet2) e redução de ruído (DeepSNR) opcionais. Nada vem incluído: instale o binário a partir de starnetastro.com, monte-o nos contentores api e worker, e aponte estes campos para ele. É responsável pelos próprios termos de licença da ferramenta. Deixe em branco para manter os motores clássicos.",
+      "external_engines_blurb": "Remoção de estrelas (StarNet2) e redução de ruído (DeepSNR) opcionais. Nada vem incluído: descarregue o pacote CLI Linux x64 de starnetastro.com e instale-o abaixo, ou indique o caminho de um binário que montou por si. É responsável pelos termos de licença da ferramenta. Deixe vazio para manter os motores clássicos.",
       "starnet2_path": {
         "label": "Caminho do binário StarNet2",
         "hint": "Caminho absoluto dentro do contentor, por ex. /opt/engines/starnet2/starnet2."
@@ -543,7 +549,6 @@
       "export_zip": "Exportar ZIP",
       "confirm_clear": "Confirmar limpeza",
       "clear": "Limpar",
-      "levels_hint": "Níveis - ficheiro: {file}, consola: {console}. Altere-os no separador Avançado.",
       "no_lines": "Sem linhas de registo."
     },
     "operations": {
@@ -618,6 +623,23 @@
         "unknown_browser": "Navegador desconhecido",
         "details": "{ip} - última atividade {last_seen}",
         "revoke": "Desconectar"
+      }
+    },
+    "engines": {
+      "install_from_archive": "Instalar {name} a partir do seu arquivo",
+      "replace": "Substituir por outro arquivo de {name}",
+      "archive_input": "Arquivo de {name}",
+      "uploading": "A enviar... {percent}%",
+      "checking": "A verificar o pacote...",
+      "license_heading": "Licença de {name}",
+      "license_intro": "{archive}: {detail}. Leia a licença fornecida com o pacote antes de o instalar.",
+      "accept": "Descarreguei eu próprio este pacote de {name} de starnetastro.com e aceito a sua licença.",
+      "install": "Instalar",
+      "installed": "Instalado a partir de {archive} - versão {version}, licença aceite em {date}.",
+      "remove": "Remover",
+      "confirm_remove": "Confirmar remoção",
+      "errors": {
+        "generic": "A operação falhou. Tente novamente."
       }
     }
   },

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ReactN
 
 import { AdminLoginForm, AdminSetupForm, FormError } from '@/components/AdminAuthForms';
 import { AdminSecurityPanel } from '@/components/AdminSecurityPanel';
+import { EngineInstaller } from '@/components/EngineInstaller';
 import { TokenManager } from '@/components/TokenManager';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { useAppSettings } from '@/hooks/useAppSettings';
@@ -19,9 +20,25 @@ import type {
   LogLevel,
 } from '@/types';
 
-type Section = 'general' | 'webhooks' | 'advanced' | 'logs' | 'operations' | 'security';
+type Section =
+  | 'general'
+  | 'stacking'
+  | 'engines'
+  | 'astrodex'
+  | 'security'
+  | 'logs'
+  | 'maintenance';
 
-const SECTIONS: Section[] = ['general', 'webhooks', 'advanced', 'logs', 'operations', 'security'];
+/** One subject per section, in the order an admin usually needs them. */
+const SECTIONS: Section[] = [
+  'general',
+  'stacking',
+  'engines',
+  'astrodex',
+  'security',
+  'logs',
+  'maintenance',
+];
 
 const LOG_LEVELS: LogLevel[] = ['debug', 'info', 'warning', 'error', 'critical'];
 
@@ -94,7 +111,7 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
 /** The settings themselves - only mounted for a logged-in admin. */
 function SettingsPanels({ onSignedOut }: { onSignedOut: () => void }) {
   const { t } = useTranslation();
-  const { draft, patch, reset, save, refresh, dirty, isLoading, isSaving, error } =
+  const { draft, patch, reset, save, refresh, applyServerChange, dirty, isLoading, isSaving, error } =
     useAppSettings();
   const [section, setSection] = useState<Section>('general');
 
@@ -137,18 +154,18 @@ function SettingsPanels({ onSignedOut }: { onSignedOut: () => void }) {
 
           {isLoading && !draft && <p className="text-xs text-faint">{t('common.loading')}</p>}
 
-          {section === 'logs' && <LogsSection />}
-
           {draft && section === 'general' && <GeneralSection draft={draft} patch={patch} />}
-          {draft && section === 'webhooks' && <WebhooksSection draft={draft} patch={patch} />}
-          {draft && section === 'advanced' && (
-            <AdvancedSection draft={draft} patch={patch} onConfigImported={refresh} />
+          {draft && section === 'stacking' && <StackingSection draft={draft} patch={patch} />}
+          {draft && section === 'engines' && (
+            <EnginesSection draft={draft} patch={patch} onServerChange={applyServerChange} />
           )}
-          {draft && section === 'operations' && (
-            <OperationsSection draft={draft} patch={patch} />
-          )}
+          {draft && section === 'astrodex' && <AstroDexSection draft={draft} patch={patch} />}
           {draft && section === 'security' && (
             <SecuritySection draft={draft} patch={patch} onSignedOut={onSignedOut} />
+          )}
+          {draft && section === 'logs' && <LogsSection draft={draft} patch={patch} />}
+          {draft && section === 'maintenance' && (
+            <MaintenanceSection draft={draft} patch={patch} onConfigImported={refresh} />
           )}
         </div>
       </div>
@@ -215,7 +232,14 @@ function GeneralSection({ draft, patch }: SectionProps) {
         step={64}
         onChange={(previewMaxSize) => patch({ previewMaxSize })}
       />
+    </div>
+  );
+}
 
+function StackingSection({ draft, patch }: SectionProps) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex flex-col">
       <GroupLabel>{t('settings.groups.stacking_defaults')}</GroupLabel>
       <ToggleRow
         id="stacking-enabled"
@@ -251,6 +275,8 @@ function GeneralSection({ draft, patch }: SectionProps) {
         max={16}
         onChange={(stackingWorkers) => patch({ stackingWorkers })}
       />
+
+      <GroupLabel>{t('settings.groups.watch_folder')}</GroupLabel>
       <TextRow
         id="stacking-watch-dir"
         label={t('settings.general.stacking_watch_dir.label')}
@@ -279,7 +305,7 @@ function GeneralSection({ draft, patch }: SectionProps) {
   );
 }
 
-function WebhooksSection({ draft, patch }: SectionProps) {
+function AstroDexSection({ draft, patch }: SectionProps) {
   const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-8">
@@ -315,75 +341,6 @@ function WebhooksSection({ draft, patch }: SectionProps) {
           onChange={(astrodexRetryDelaySeconds) => patch({ astrodexRetryDelaySeconds })}
         />
       </div>
-    </div>
-  );
-}
-
-function AdvancedSection({
-  draft,
-  patch,
-  onConfigImported,
-}: SectionProps & { onConfigImported: () => void }) {
-  const { t } = useTranslation();
-  return (
-    <div className="flex flex-col">
-      <GroupLabel>{t('settings.groups.network')}</GroupLabel>
-      <ListRow
-        id="cors-origins"
-        label={t('settings.advanced.cors_origins.label')}
-        hint={t('settings.advanced.cors_origins.hint')}
-        value={draft.corsOrigins}
-        placeholder="http://localhost:3000"
-        onChange={(corsOrigins) => patch({ corsOrigins })}
-      />
-
-      <GroupLabel>{t('settings.groups.rate_limiting')}</GroupLabel>
-      <ToggleRow
-        id="rate-limit-enabled"
-        label={t('settings.advanced.rate_limit_enabled.label')}
-        hint={t('settings.advanced.rate_limit_enabled.hint')}
-        checked={draft.rateLimitEnabled}
-        onChange={(rateLimitEnabled) => patch({ rateLimitEnabled })}
-      />
-      <NumberRow
-        id="rate-limit-per-minute"
-        label={t('settings.advanced.rate_limit_per_minute.label')}
-        hint={t('settings.advanced.rate_limit_per_minute.hint')}
-        value={draft.rateLimitPerMinute}
-        min={1}
-        max={6000}
-        onChange={(rateLimitPerMinute) => patch({ rateLimitPerMinute })}
-      />
-      <NumberRow
-        id="max-concurrent-jobs"
-        label={t('settings.advanced.max_concurrent_jobs.label')}
-        hint={t('settings.advanced.max_concurrent_jobs.hint')}
-        value={draft.maxConcurrentJobsPerIp}
-        min={1}
-        max={100}
-        onChange={(maxConcurrentJobsPerIp) => patch({ maxConcurrentJobsPerIp })}
-      />
-
-      <GroupLabel>{t('settings.groups.logging')}</GroupLabel>
-      <SelectRow
-        id="log-file-level"
-        label={t('settings.advanced.log_file_level.label')}
-        hint={t('settings.advanced.log_file_level.hint')}
-        value={draft.logLevel}
-        options={LOG_LEVELS}
-        onChange={(logLevel) => patch({ logLevel })}
-      />
-      <SelectRow
-        id="log-console-level"
-        label={t('settings.advanced.log_console_level.label')}
-        hint={t('settings.advanced.log_console_level.hint')}
-        value={draft.consoleLogLevel}
-        options={LOG_LEVELS}
-        onChange={(consoleLogLevel) => patch({ consoleLogLevel })}
-      />
-
-      <ExternalEnginesGroup draft={draft} patch={patch} />
-      <BackupRestoreGroup onImported={onConfigImported} />
     </div>
   );
 }
@@ -485,7 +442,11 @@ function BackupRestoreGroup({ onImported }: { onImported: () => void }) {
 /** Operator-installed StarNet2 / DeepSNR paths, with a live `--version` probe.
  * See docs/DEPLOYMENT.md "External ML engines". The probe result is cached on the
  * server until settings change, so "Re-check" is the way to confirm a save. */
-function ExternalEnginesGroup({ draft, patch }: SectionProps) {
+function EnginesSection({
+  draft,
+  patch,
+  onServerChange,
+}: SectionProps & { onServerChange: (changes: Partial<AppSettings>) => void }) {
   const { t } = useTranslation();
   const [status, setStatus] = useState<EngineStatusResponse | null>(null);
   const [checking, setChecking] = useState(false);
@@ -507,8 +468,7 @@ function ExternalEnginesGroup({ draft, patch }: SectionProps) {
 
   return (
     <>
-      <GroupLabel>{t('settings.groups.external_engines')}</GroupLabel>
-      <p className="-mt-0.5 mb-2 text-xs text-muted">
+      <p className="mb-2 text-xs text-muted">
         {t('settings.advanced.external_engines_blurb')}
       </p>
       <TextRow
@@ -518,7 +478,20 @@ function ExternalEnginesGroup({ draft, patch }: SectionProps) {
         value={draft.starnet2Path}
         placeholder="/opt/engines/starnet2/starnet2"
         onChange={(starnet2Path) => patch({ starnet2Path })}
-        below={<EngineStatusLine status={status?.starnet2} />}
+        below={
+          <>
+            <EngineStatusLine status={status?.starnet2} />
+            <EngineInstaller
+              engine="starnet2"
+              name="StarNet2"
+              status={status?.starnet2}
+              onChanged={(starnet2Path) => {
+                onServerChange({ starnet2Path });
+                void check();
+              }}
+            />
+          </>
+        }
       />
       <NumberRow
         id="starnet2-stride"
@@ -537,7 +510,20 @@ function ExternalEnginesGroup({ draft, patch }: SectionProps) {
         value={draft.deepsnrPath}
         placeholder="/opt/engines/deepsnr/deepsnr"
         onChange={(deepsnrPath) => patch({ deepsnrPath })}
-        below={<EngineStatusLine status={status?.deepsnr} />}
+        below={
+          <>
+            <EngineStatusLine status={status?.deepsnr} />
+            <EngineInstaller
+              engine="deepsnr"
+              name="DeepSNR"
+              status={status?.deepsnr}
+              onChanged={(deepsnrPath) => {
+                onServerChange({ deepsnrPath });
+                void check();
+              }}
+            />
+          </>
+        }
       />
       <NumberRow
         id="deepsnr-stride"
@@ -574,10 +560,9 @@ function EngineStatusLine({ status }: { status?: EngineStatus }) {
   return <p className={`mt-1.5 text-xs ${tone}`}>{status.detail}</p>;
 }
 
-function LogsSection() {
+function LogsSection({ draft, patch }: SectionProps) {
   const { t } = useTranslation();
-  const { lines, level, setLevel, levels, refresh, clear, exportZip, isLoading, busy, error } =
-    useLogs();
+  const { lines, level, setLevel, refresh, clear, exportZip, isLoading, busy, error } = useLogs();
   const [confirmClear, setConfirmClear] = useState(false);
 
   async function handleClear() {
@@ -591,6 +576,27 @@ function LogsSection() {
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="flex flex-col">
+        <GroupLabel>{t('settings.groups.log_levels')}</GroupLabel>
+        <SelectRow
+          id="log-file-level"
+          label={t('settings.advanced.log_file_level.label')}
+          hint={t('settings.advanced.log_file_level.hint')}
+          value={draft.logLevel}
+          options={LOG_LEVELS}
+          onChange={(logLevel) => patch({ logLevel })}
+        />
+        <SelectRow
+          id="log-console-level"
+          label={t('settings.advanced.log_console_level.label')}
+          hint={t('settings.advanced.log_console_level.hint')}
+          value={draft.consoleLogLevel}
+          options={LOG_LEVELS}
+          onChange={(consoleLogLevel) => patch({ consoleLogLevel })}
+        />
+      </div>
+
+      <GroupLabel>{t('settings.groups.log_file')}</GroupLabel>
       {error && <p className="text-xs text-danger">{error}</p>}
 
       <div className="flex flex-wrap items-center gap-3">
@@ -625,12 +631,6 @@ function LogsSection() {
           {confirmClear ? t('settings.logs.confirm_clear') : t('settings.logs.clear')}
         </button>
       </div>
-
-      {levels && (
-        <p className="text-xs text-faint">
-          {t('settings.logs.levels_hint', { file: levels.file, console: levels.console })}
-        </p>
-      )}
 
       <pre className="max-h-[440px] overflow-auto rounded-md border border-line bg-canvas p-3 font-mono text-[11px] leading-relaxed whitespace-pre text-muted">
         {isLoading && lines.length === 0
@@ -686,7 +686,11 @@ function DiskUsagePanel({ usage }: { usage: DiskUsage }) {
 
 const JOB_STATUSES = ['queued', 'processing', 'completed', 'failed', 'superseded'] as const;
 
-function OperationsSection({ draft, patch }: SectionProps) {
+function MaintenanceSection({
+  draft,
+  patch,
+  onConfigImported,
+}: SectionProps & { onConfigImported: () => void }) {
   const { t } = useTranslation();
   const { jobs, total, offset, setOffset, status, setStatus, pageSize, diskUsage, isLoading, error } =
     useJobs();
@@ -789,6 +793,8 @@ function OperationsSection({ draft, patch }: SectionProps) {
           </span>
         </div>
       )}
+
+      <BackupRestoreGroup onImported={onConfigImported} />
     </div>
   );
 }
@@ -803,6 +809,7 @@ function SecuritySection({
   const { t } = useTranslation();
   return (
     <div className="flex flex-col">
+      <GroupLabel>{t('settings.groups.admin_account')}</GroupLabel>
       <NumberRow
         id="admin-session-idle"
         label={t('settings.security.session_idle.label')}
@@ -815,6 +822,43 @@ function SecuritySection({
       <div className="mt-4">
         <AdminSecurityPanel onSignedOut={onSignedOut} />
       </div>
+
+      <GroupLabel>{t('settings.groups.network')}</GroupLabel>
+      <ListRow
+        id="cors-origins"
+        label={t('settings.advanced.cors_origins.label')}
+        hint={t('settings.advanced.cors_origins.hint')}
+        value={draft.corsOrigins}
+        placeholder="http://localhost:3000"
+        onChange={(corsOrigins) => patch({ corsOrigins })}
+      />
+
+      <GroupLabel>{t('settings.groups.rate_limiting')}</GroupLabel>
+      <ToggleRow
+        id="rate-limit-enabled"
+        label={t('settings.advanced.rate_limit_enabled.label')}
+        hint={t('settings.advanced.rate_limit_enabled.hint')}
+        checked={draft.rateLimitEnabled}
+        onChange={(rateLimitEnabled) => patch({ rateLimitEnabled })}
+      />
+      <NumberRow
+        id="rate-limit-per-minute"
+        label={t('settings.advanced.rate_limit_per_minute.label')}
+        hint={t('settings.advanced.rate_limit_per_minute.hint')}
+        value={draft.rateLimitPerMinute}
+        min={1}
+        max={6000}
+        onChange={(rateLimitPerMinute) => patch({ rateLimitPerMinute })}
+      />
+      <NumberRow
+        id="max-concurrent-jobs"
+        label={t('settings.advanced.max_concurrent_jobs.label')}
+        hint={t('settings.advanced.max_concurrent_jobs.hint')}
+        value={draft.maxConcurrentJobsPerIp}
+        min={1}
+        max={100}
+        onChange={(maxConcurrentJobsPerIp) => patch({ maxConcurrentJobsPerIp })}
+      />
     </div>
   );
 }

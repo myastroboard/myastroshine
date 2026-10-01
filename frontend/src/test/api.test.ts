@@ -996,3 +996,53 @@ describe('server URLs in responses', () => {
   });
 });
 
+describe('engine packages', () => {
+  it('stageEngine uploads the archive with progress to the stage route', async () => {
+    class FakeXhr {
+      static last: FakeXhr;
+      status = 201;
+      responseText = JSON.stringify({ staging_id: 'abc', license_text: 'L' });
+      upload = { addEventListener: vi.fn() };
+      private handlers: Record<string, () => void> = {};
+      url = '';
+      constructor() {
+        FakeXhr.last = this;
+      }
+      open(_method: string, url: string) {
+        this.url = url;
+      }
+      addEventListener(name: string, handler: () => void) {
+        this.handlers[name] = handler;
+      }
+      send() {
+        this.handlers.load();
+      }
+    }
+    vi.stubGlobal('XMLHttpRequest', FakeXhr);
+
+    const staged = await apiClient.stageEngine('starnet2', new File(['z'], 'a.zip'), vi.fn());
+
+    expect(FakeXhr.last.url).toBe('/api/admin/engines/starnet2/stage');
+    expect(staged).toMatchObject({ stagingId: 'abc', licenseText: 'L' });
+  });
+
+  it('installEngine posts the staging id with the licence accepted', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { configured: true, found: true }));
+    await apiClient.installEngine('deepsnr', 'abc');
+    expect(lastCall()[0]).toBe('/api/admin/engines/deepsnr/install');
+    expect(JSON.parse(lastCall()[1]?.body as string)).toEqual({
+      staging_id: 'abc',
+      accept_license: true,
+    });
+  });
+
+  it('discardStagedEngine and removeEngine DELETE their routes', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(204, null));
+    await apiClient.discardStagedEngine('starnet2', 'a/b');
+    expect(lastCall()[0]).toBe('/api/admin/engines/starnet2/stage/a%2Fb');
+    await apiClient.removeEngine('starnet2');
+    expect(lastCall()[0]).toBe('/api/admin/engines/starnet2');
+    expect(lastCall()[1]?.method).toBe('DELETE');
+  });
+});
+

@@ -396,39 +396,45 @@
     "sections": {
       "general": {
         "label": "General",
-        "blurb": "Uploads and stacking defaults."
+        "blurb": "Uploads and editing sessions."
       },
-      "webhooks": {
-        "label": "Webhooks",
-        "blurb": "AstroDex tokens and callback delivery."
+      "stacking": {
+        "label": "Stacking",
+        "blurb": "Stacking defaults and the watch folder."
       },
-      "advanced": {
-        "label": "Advanced",
-        "blurb": "Networking and log levels."
+      "engines": {
+        "label": "ML engines",
+        "blurb": "Optional StarNet2 star removal and DeepSNR denoise."
       },
-      "logs": {
-        "label": "Logs",
-        "blurb": "Tail, clear, and export the application log."
-      },
-      "operations": {
-        "label": "Operations",
-        "blurb": "Recent processing jobs and disk usage."
+      "astrodex": {
+        "label": "AstroDex",
+        "blurb": "Pairing with MyAstroBoard's AstroDex: tokens and callback delivery."
       },
       "security": {
         "label": "Security",
-        "blurb": "Admin password and logged-in browsers."
+        "blurb": "Admin account, network access and rate limits."
+      },
+      "logs": {
+        "label": "Logs",
+        "blurb": "Log levels, and the log itself: tail, clear, export."
+      },
+      "maintenance": {
+        "label": "Maintenance",
+        "blurb": "Disk usage, job history and configuration backup."
       }
     },
     "groups": {
       "uploads_and_sessions": "Uploads and sessions",
-      "stacking_defaults": "Stacking defaults",
+      "stacking_defaults": "Defaults",
       "callback_delivery": "Callback delivery",
       "network": "Network",
       "rate_limiting": "Rate limiting",
-      "logging": "Logging",
-      "external_engines": "External ML engines",
       "job_history": "Job history",
-      "backup_restore": "Backup & restore"
+      "backup_restore": "Backup & restore",
+      "watch_folder": "Watch folder",
+      "admin_account": "Admin account",
+      "log_levels": "Levels",
+      "log_file": "Log file"
     },
     "general": {
       "max_upload": {
@@ -511,7 +517,7 @@
         "label": "Console log level",
         "hint": "Level echoed to the container logs."
       },
-      "external_engines_blurb": "Optional star removal (StarNet2) and denoise (DeepSNR). Nothing is bundled: install the binary from starnetastro.com, mount it into the api and worker containers, and point these at it. You are responsible for the tool's own licence terms. Leave blank to keep the classical engines.",
+      "external_engines_blurb": "Optional star removal (StarNet2) and denoise (DeepSNR). Nothing is bundled: download the Linux x64 CLI package from starnetastro.com and install it below, or point a path at a binary you mounted yourself. You are responsible for the tool's own licence terms. Leave empty to keep the classical engines.",
       "starnet2_path": {
         "label": "StarNet2 binary path",
         "hint": "Absolute path inside the container, e.g. /opt/engines/starnet2/starnet2."
@@ -543,7 +549,6 @@
       "export_zip": "Export ZIP",
       "confirm_clear": "Confirm clear",
       "clear": "Clear",
-      "levels_hint": "Levels - file: {file}, console: {console}. Change them on the Advanced tab.",
       "no_lines": "No log lines."
     },
     "operations": {
@@ -618,6 +623,23 @@
         "unknown_browser": "Unknown browser",
         "details": "{ip} - last active {last_seen}",
         "revoke": "Log out"
+      }
+    },
+    "engines": {
+      "install_from_archive": "Install {name} from its archive",
+      "replace": "Replace with another {name} archive",
+      "archive_input": "{name} archive",
+      "uploading": "Uploading... {percent}%",
+      "checking": "Checking the package...",
+      "license_heading": "{name} licence",
+      "license_intro": "{archive}: {detail}. Read the licence shipped with the package before installing it.",
+      "accept": "I downloaded this {name} package myself from starnetastro.com and I accept its licence.",
+      "install": "Install",
+      "installed": "Installed from {archive} - version {version}, licence accepted on {date}.",
+      "remove": "Remove",
+      "confirm_remove": "Confirm removal",
+      "errors": {
+        "generic": "The engine operation failed. Try again."
       }
     }
   },

@@ -18,6 +18,10 @@ vi.mock('@/services/api', async (importOriginal) => ({
     getAppSettings: vi.fn(),
     saveAppSettings: vi.fn(),
     getEngineStatus: vi.fn(),
+    stageEngine: vi.fn(),
+    installEngine: vi.fn(),
+    discardStagedEngine: vi.fn(),
+    removeEngine: vi.fn(),
     listTokens: vi.fn(),
     createToken: vi.fn(),
     revokeToken: vi.fn(),
@@ -121,11 +125,11 @@ describe('SettingsView', () => {
     );
   });
 
-  it('shows the token manager under the Webhooks section', async () => {
+  it('shows the token manager under the AstroDex section', async () => {
     renderView();
     await screen.findByLabelText('Maximum upload size');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Webhooks' }));
+    fireEvent.click(screen.getByRole('button', { name: 'AstroDex' }));
 
     expect(screen.getByText(/webhook tokens/i)).toBeInTheDocument();
   });
@@ -133,6 +137,7 @@ describe('SettingsView', () => {
   it('toggles a boolean setting via the switch', async () => {
     renderView();
     await screen.findByLabelText('Maximum upload size');
+    fireEvent.click(screen.getByRole('button', { name: 'Stacking' }));
 
     const toggle = screen.getByRole('switch', { name: 'Stacking enabled' });
     expect(toggle).toHaveAttribute('aria-checked', 'true');
@@ -140,11 +145,11 @@ describe('SettingsView', () => {
     expect(toggle).toHaveAttribute('aria-checked', 'false');
   });
 
-  it('edits rate limiting settings under the Advanced section', async () => {
+  it('edits rate limiting settings under the Security section', async () => {
     renderView();
     await screen.findByLabelText('Maximum upload size');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Advanced' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Security' }));
 
     const perMinute = await screen.findByLabelText('Requests per minute');
     expect(perMinute).toHaveValue(10);
@@ -167,7 +172,7 @@ describe('SettingsView', () => {
     expect(mocked.getLogs).toHaveBeenCalled();
   });
 
-  it('shows disk usage and job history under the Operations section', async () => {
+  it('shows disk usage and job history under the Maintenance section', async () => {
     mocked.getJobs.mockResolvedValue({
       jobs: [
         {
@@ -188,7 +193,7 @@ describe('SettingsView', () => {
     renderView();
     await screen.findByLabelText('Maximum upload size');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Operations' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Maintenance' }));
 
     expect(await screen.findByText('boom')).toBeInTheDocument();
     expect(screen.getByText(/37.3 GB \/ 93.1 GB/)).toBeInTheDocument();
@@ -199,7 +204,7 @@ describe('SettingsView', () => {
   it('filters job history by status', async () => {
     renderView();
     await screen.findByLabelText('Maximum upload size');
-    fireEvent.click(screen.getByRole('button', { name: 'Operations' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Maintenance' }));
     await waitFor(() => expect(mocked.getJobs).toHaveBeenCalledTimes(1));
 
     fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'failed' } });
@@ -211,11 +216,11 @@ describe('SettingsView', () => {
     );
   });
 
-  it('imports a config file under the Advanced section and reports the result', async () => {
+  it('imports a config file under the Maintenance section and reports the result', async () => {
     mocked.importConfig.mockResolvedValue({ presetsImported: 2, presetsSkipped: ['Mine'] });
     renderView();
     await screen.findByLabelText('Maximum upload size');
-    fireEvent.click(screen.getByRole('button', { name: 'Advanced' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Maintenance' }));
     await screen.findByRole('button', { name: 'Import configuration' });
 
     const file = new File(
@@ -223,7 +228,7 @@ describe('SettingsView', () => {
       'config.json',
       { type: 'application/json' },
     );
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const input = document.querySelector('input[type="file"][accept="application/json"]') as HTMLInputElement;
     fireEvent.change(input, { target: { files: [file] } });
 
     expect(await screen.findByText(/2 preset\(s\) imported, 1 skipped/)).toBeInTheDocument();
@@ -231,7 +236,7 @@ describe('SettingsView', () => {
     await waitFor(() => expect(mocked.getAppSettings).toHaveBeenCalledTimes(2)); // initial load + refresh
   });
 
-  it('exports the config as a downloadable file under the Advanced section', async () => {
+  it('exports the config as a downloadable file under the Maintenance section', async () => {
     mocked.exportConfig.mockResolvedValue({
       formatVersion: 1,
       appVersion: '0.4.1',
@@ -241,14 +246,14 @@ describe('SettingsView', () => {
     });
     renderView();
     await screen.findByLabelText('Maximum upload size');
-    fireEvent.click(screen.getByRole('button', { name: 'Advanced' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Maintenance' }));
 
     fireEvent.click(screen.getByRole('button', { name: 'Export configuration' }));
 
     await waitFor(() => expect(mocked.exportConfig).toHaveBeenCalledTimes(1));
   });
 
-  it('probes the external engine paths under the Advanced section', async () => {
+  it('probes the external engine paths under the ML engines section', async () => {
     mocked.getEngineStatus.mockResolvedValue({
       starnet2: {
         configured: true,
@@ -262,7 +267,7 @@ describe('SettingsView', () => {
     renderView();
     await screen.findByLabelText('Maximum upload size');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Advanced' }));
+    fireEvent.click(screen.getByRole('button', { name: 'ML engines' }));
 
     const path = await screen.findByLabelText('StarNet2 binary path');
     fireEvent.change(path, { target: { value: '/opt/engines/starnet2/starnet2' } });
@@ -403,10 +408,18 @@ describe('SettingsView', () => {
       editEverything('General');
       const saved = await saveAndRead();
 
+      expect(saved).toMatchObject({ maxImageSizeMb: 42, sessionExpiryHours: 42, previewMaxSize: 42 });
+    });
+
+    it('Stacking', async () => {
+      renderView();
+      await screen.findByLabelText('Maximum upload size');
+      fireEvent.click(screen.getByRole('button', { name: 'Stacking' }));
+
+      editEverything('Stacking');
+      const saved = await saveAndRead();
+
       expect(saved).toMatchObject({
-        maxImageSizeMb: 42,
-        sessionExpiryHours: 42,
-        previewMaxSize: 42,
         stackingEnabled: false,
         stackingMaxFrames: 42,
         stackingRetentionHours: 42,
@@ -417,13 +430,30 @@ describe('SettingsView', () => {
       });
     });
 
-    it('Webhooks', async () => {
+    it('ML engines', async () => {
       renderView();
       await screen.findByLabelText('Maximum upload size');
-      fireEvent.click(screen.getByRole('button', { name: 'Webhooks' }));
+      fireEvent.click(screen.getByRole('button', { name: 'ML engines' }));
+      await screen.findByLabelText('StarNet2 binary path');
+
+      editEverything('ML engines');
+      const saved = await saveAndRead();
+
+      expect(saved).toMatchObject({
+        starnet2Path: '/edited',
+        deepsnrPath: '/edited',
+        starnet2Stride: 42,
+        deepsnrStride: 42,
+      });
+    });
+
+    it('AstroDex', async () => {
+      renderView();
+      await screen.findByLabelText('Maximum upload size');
+      fireEvent.click(screen.getByRole('button', { name: 'AstroDex' }));
       await waitFor(() => expect(document.querySelector('textarea')).not.toBeNull());
 
-      editEverything('Webhooks');
+      editEverything('AstroDex');
       const saved = await saveAndRead();
 
       expect(saved).toMatchObject({
@@ -433,41 +463,45 @@ describe('SettingsView', () => {
       });
     });
 
-    it('Advanced', async () => {
+    it('Security', async () => {
       renderView();
       await screen.findByLabelText('Maximum upload size');
-      fireEvent.click(screen.getByRole('button', { name: 'Advanced' }));
-      await screen.findByLabelText('StarNet2 binary path');
+      fireEvent.click(screen.getByRole('button', { name: 'Security' }));
+      await screen.findByLabelText(/stay logged in/i);
 
-      editEverything('Advanced');
+      editEverything('Security');
       const saved = await saveAndRead();
 
       expect(saved).toMatchObject({
+        adminSessionIdleDays: 42,
         corsOrigins: ['http://a.example', 'http://b.example'],
         rateLimitEnabled: false,
         rateLimitPerMinute: 42,
         maxConcurrentJobsPerIp: 42,
-        logLevel: 'critical',
-        consoleLogLevel: 'critical',
-        starnet2Path: '/edited',
-        deepsnrPath: '/edited',
-        starnet2Stride: 42,
-        deepsnrStride: 42,
       });
     });
 
-    it('Operations and Security', async () => {
+    it('Logs and Maintenance', async () => {
       renderView();
       await screen.findByLabelText('Maximum upload size');
-      fireEvent.click(screen.getByRole('button', { name: 'Operations' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Logs' }));
+      fireEvent.change(await screen.findByLabelText('File log level'), {
+        target: { value: 'critical' },
+      });
+      fireEvent.change(screen.getByLabelText('Console log level'), {
+        target: { value: 'error' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Maintenance' }));
       await waitFor(() => expect(mocked.getJobs).toHaveBeenCalled());
-      editEverything('Operations');
-      fireEvent.click(screen.getByRole('button', { name: 'Security' }));
-      fireEvent.change(await screen.findByLabelText(/stay logged in/i), { target: { value: '3' } });
+      fireEvent.change(screen.getByLabelText('Job history retention'), { target: { value: '42' } });
 
       const saved = await saveAndRead();
 
-      expect(saved).toMatchObject({ jobHistoryRetentionHours: 42, adminSessionIdleDays: 3 });
+      expect(saved).toMatchObject({
+        logLevel: 'critical',
+        consoleLogLevel: 'error',
+        jobHistoryRetentionHours: 42,
+      });
     });
   });
 
@@ -485,7 +519,7 @@ describe('SettingsView', () => {
 
       // The panels mount once the admin gate opens; until the settings land
       // they show a loading line.
-      await screen.findByRole('button', { name: 'Webhooks' });
+      await screen.findByRole('button', { name: 'AstroDex' });
       expect(await screen.findByText('Loading...')).toBeInTheDocument();
     });
 
@@ -494,12 +528,12 @@ describe('SettingsView', () => {
       mocked.importConfig.mockRejectedValue('not an Error');
       renderView();
       await screen.findByLabelText('Maximum upload size');
-      fireEvent.click(screen.getByRole('button', { name: 'Advanced' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Maintenance' }));
 
       fireEvent.click(await screen.findByRole('button', { name: 'Export configuration' }));
       expect(await screen.findByText('Export blew up')).toBeInTheDocument();
 
-      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+      const input = document.querySelector('input[type="file"][accept="application/json"]') as HTMLInputElement;
       fireEvent.change(input, { target: { files: [] } });
       expect(mocked.importConfig).not.toHaveBeenCalled();
 
@@ -527,7 +561,7 @@ describe('SettingsView', () => {
       });
       renderView();
       await screen.findByLabelText('Maximum upload size');
-      fireEvent.click(screen.getByRole('button', { name: 'Advanced' }));
+      fireEvent.click(screen.getByRole('button', { name: 'ML engines' }));
 
       expect(await screen.findByText('untested 3.0.0')).toHaveClass('text-warning');
       expect(screen.getByText('Not found at /x')).toHaveClass('text-danger');
@@ -584,7 +618,7 @@ describe('SettingsView', () => {
       });
       renderView();
       await screen.findByLabelText('Maximum upload size');
-      fireEvent.click(screen.getByRole('button', { name: 'Operations' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Maintenance' }));
 
       expect(await screen.findByText('1-25 of 60')).toBeInTheDocument();
       expect(screen.getByText('-')).toBeInTheDocument();
@@ -602,7 +636,7 @@ describe('SettingsView', () => {
       mocked.getJobs.mockRejectedValue(new Error('Jobs unavailable'));
       renderView();
       await screen.findByLabelText('Maximum upload size');
-      fireEvent.click(screen.getByRole('button', { name: 'Operations' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Maintenance' }));
 
       expect(await screen.findByText('Jobs unavailable')).toBeInTheDocument();
     });
@@ -610,13 +644,15 @@ describe('SettingsView', () => {
     it('opens the import picker and re-checks the engines, tolerating a probe failure', async () => {
       renderView();
       await screen.findByLabelText('Maximum upload size');
-      fireEvent.click(screen.getByRole('button', { name: 'Advanced' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Maintenance' }));
       const click = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => undefined);
 
       fireEvent.click(await screen.findByRole('button', { name: 'Import configuration' }));
       expect(click).toHaveBeenCalled();
       click.mockRestore();
 
+      fireEvent.click(screen.getByRole('button', { name: 'ML engines' }));
+      await waitFor(() => expect(mocked.getEngineStatus).toHaveBeenCalledTimes(1));
       mocked.getEngineStatus.mockRejectedValueOnce(new Error('probe failed'));
       fireEvent.click(screen.getByRole('button', { name: /re-check engines/i }));
       await waitFor(() => expect(mocked.getEngineStatus).toHaveBeenCalledTimes(2));
@@ -627,7 +663,7 @@ describe('SettingsView', () => {
       mocked.exportConfig.mockRejectedValue('offline');
       renderView();
       await screen.findByLabelText('Maximum upload size');
-      fireEvent.click(screen.getByRole('button', { name: 'Advanced' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Maintenance' }));
 
       fireEvent.click(await screen.findByRole('button', { name: 'Export configuration' }));
 
@@ -638,13 +674,83 @@ describe('SettingsView', () => {
       mocked.importConfig.mockRejectedValue(new Error('Unsupported format version'));
       renderView();
       await screen.findByLabelText('Maximum upload size');
-      fireEvent.click(screen.getByRole('button', { name: 'Advanced' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Maintenance' }));
       await screen.findByRole('button', { name: 'Import configuration' });
 
-      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+      const input = document.querySelector('input[type="file"][accept="application/json"]') as HTMLInputElement;
       fireEvent.change(input, { target: { files: [new File(['{}'], 'config.json')] } });
 
       expect(await screen.findByText('Unsupported format version')).toBeInTheDocument();
+    });
+
+    it('installs an engine from its archive and shows its new path', async () => {
+      mocked.stageEngine.mockResolvedValue({
+        stagingId: 'abc',
+        engine: 'starnet2',
+        archiveName: 'starnet2.zip',
+        status: { configured: true, found: true, version: '2.6.1', knownGood: true, detail: 'ok' },
+        licenseText: 'LICENSE',
+      });
+      mocked.installEngine.mockResolvedValue({
+        configured: true,
+        found: true,
+        version: '2.6.1',
+        knownGood: true,
+        detail: 'ok',
+        installed: {
+          version: '2.6.1',
+          archiveName: 'starnet2.zip',
+          licenseAcceptedAt: '2026-10-01T07:00:00Z',
+          path: '/data/engines/starnet2/starnet2',
+        },
+      });
+      renderView();
+      await screen.findByLabelText('Maximum upload size');
+      fireEvent.click(screen.getByRole('button', { name: 'ML engines' }));
+      await screen.findByLabelText('StarNet2 binary path');
+
+      fireEvent.change(screen.getByLabelText('StarNet2 archive'), {
+        target: { files: [new File(['z'], 'starnet2.zip')] },
+      });
+      fireEvent.click(await screen.findByRole('checkbox', { name: /accept its licence/i }));
+      fireEvent.click(screen.getByRole('button', { name: 'Install' }));
+
+      await waitFor(() =>
+        expect(screen.getByLabelText('StarNet2 binary path')).toHaveValue(
+          '/data/engines/starnet2/starnet2',
+        ),
+      );
+      expect(screen.queryByText(/unsaved changes/i)).not.toBeInTheDocument();
+      expect(mocked.getEngineStatus).toHaveBeenCalledTimes(2); // re-checked after the install
+    });
+
+    it('clears the DeepSNR path once its uploaded package is removed', async () => {
+      mocked.getAppSettings.mockResolvedValue({ ...SETTINGS, deepsnrPath: '/data/engines/deepsnr/deepsnr' });
+      mocked.getEngineStatus.mockResolvedValue({
+        starnet2: { configured: false, found: false, version: null, knownGood: false, detail: 'x' },
+        deepsnr: {
+          configured: true,
+          found: true,
+          version: '1.3.1',
+          knownGood: true,
+          detail: 'DeepSNR 1.3.1 detected',
+          installed: {
+            version: '1.3.1',
+            archiveName: 'deepsnr.zip',
+            licenseAcceptedAt: '2026-10-01T07:00:00Z',
+            path: '/data/engines/deepsnr/deepsnr',
+          },
+        },
+      });
+      mocked.removeEngine.mockResolvedValue(undefined);
+      renderView();
+      await screen.findByLabelText('Maximum upload size');
+      fireEvent.click(screen.getByRole('button', { name: 'ML engines' }));
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Remove' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Confirm removal' }));
+
+      await waitFor(() => expect(screen.getByLabelText('DeepSNR binary path')).toHaveValue(''));
     });
   });
 });

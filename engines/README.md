@@ -1,6 +1,10 @@
 # External ML engines
 
-This directory is **bind-mounted read-only into the `api` container at
+**Simplest: you don't need this directory.** Upload the package from
+**Settings -> Advanced -> External ML engines** instead (see
+`docs/DEPLOYMENT.md`). This directory is for mounting a binary yourself.
+
+It is **bind-mounted read-only into the `api` container at
 `/opt/engines`** (see `docker-compose.yml` / `docker-compose.dev.yml`). It is
 empty by default and has no effect until you point a setting at a binary in it.
 

@@ -396,39 +396,45 @@
     "sections": {
       "general": {
         "label": "Allgemein",
-        "blurb": "Uploads und Stapel-Standardwerte."
+        "blurb": "Uploads und Bearbeitungssitzungen."
       },
-      "webhooks": {
-        "label": "Webhooks",
-        "blurb": "AstroDex-Tokens und Callback-Zustellung."
+      "stacking": {
+        "label": "Stapeln",
+        "blurb": "Stapel-Standardwerte und der überwachte Ordner."
       },
-      "advanced": {
-        "label": "Erweitert",
-        "blurb": "Netzwerk und Protokollierungsstufen."
+      "engines": {
+        "label": "ML-Engines",
+        "blurb": "Optionale Sternentfernung mit StarNet2 und Entrauschung mit DeepSNR."
       },
-      "logs": {
-        "label": "Protokolle",
-        "blurb": "Anwendungsprotokoll ansehen, leeren und exportieren."
-      },
-      "operations": {
-        "label": "Betrieb",
-        "blurb": "Aktuelle Verarbeitungsaufgaben und Speicherplatznutzung."
+      "astrodex": {
+        "label": "AstroDex",
+        "blurb": "Kopplung mit dem AstroDex von MyAstroBoard: Tokens und Callback-Zustellung."
       },
       "security": {
         "label": "Sicherheit",
-        "blurb": "Admin-Passwort und angemeldete Browser."
+        "blurb": "Admin-Konto, Netzwerkzugriff und Ratenbegrenzung."
+      },
+      "logs": {
+        "label": "Protokolle",
+        "blurb": "Protokollierungsstufen und das Protokoll selbst: ansehen, leeren, exportieren."
+      },
+      "maintenance": {
+        "label": "Wartung",
+        "blurb": "Speicherplatz, Aufgabenverlauf und Sicherung der Konfiguration."
       }
     },
     "groups": {
       "uploads_and_sessions": "Uploads und Sitzungen",
-      "stacking_defaults": "Stapel-Standardwerte",
+      "stacking_defaults": "Standardwerte",
       "callback_delivery": "Callback-Zustellung",
       "network": "Netzwerk",
       "rate_limiting": "Ratenbegrenzung",
-      "logging": "Protokollierung",
-      "external_engines": "Externe ML-Engines",
       "job_history": "Aufgabenverlauf",
-      "backup_restore": "Sicherung & Wiederherstellung"
+      "backup_restore": "Sicherung & Wiederherstellung",
+      "watch_folder": "Überwachter Ordner",
+      "admin_account": "Admin-Konto",
+      "log_levels": "Stufen",
+      "log_file": "Protokolldatei"
     },
     "general": {
       "max_upload": {
@@ -511,7 +517,7 @@
         "label": "Konsolenprotokoll-Stufe",
         "hint": "Stufe, die in den Container-Protokollen ausgegeben wird."
       },
-      "external_engines_blurb": "Optionale Sternentfernung (StarNet2) und Entrauschung (DeepSNR). Nichts davon ist mitgeliefert: Installieren Sie die Binärdatei von starnetastro.com, binden Sie sie in die API- und Worker-Container ein und tragen Sie hier den Pfad ein. Sie sind selbst für die Lizenzbedingungen des Tools verantwortlich. Leer lassen, um die klassischen Engines beizubehalten.",
+      "external_engines_blurb": "Optionale Sternentfernung (StarNet2) und Entrauschung (DeepSNR). Nichts ist enthalten: Laden Sie das Linux-x64-CLI-Paket von starnetastro.com herunter und installieren Sie es unten, oder geben Sie den Pfad zu einer selbst eingebundenen Binärdatei an. Sie sind für die Lizenzbedingungen des Werkzeugs verantwortlich. Leer lassen, um die klassischen Verfahren zu behalten.",
       "starnet2_path": {
         "label": "Pfad zur StarNet2-Binärdatei",
         "hint": "Absoluter Pfad im Container, z. B. /opt/engines/starnet2/starnet2."
@@ -543,7 +549,6 @@
       "export_zip": "Als ZIP exportieren",
       "confirm_clear": "Leeren bestätigen",
       "clear": "Leeren",
-      "levels_hint": "Stufen - Datei: {file}, Konsole: {console}. Ändern Sie diese im Tab Erweitert.",
       "no_lines": "Keine Protokollzeilen."
     },
     "operations": {
@@ -618,6 +623,23 @@
         "unknown_browser": "Unbekannter Browser",
         "details": "{ip} - zuletzt aktiv {last_seen}",
         "revoke": "Abmelden"
+      }
+    },
+    "engines": {
+      "install_from_archive": "{name} aus seinem Archiv installieren",
+      "replace": "Durch ein anderes {name}-Archiv ersetzen",
+      "archive_input": "{name}-Archiv",
+      "uploading": "Wird hochgeladen... {percent}%",
+      "checking": "Paket wird geprüft...",
+      "license_heading": "{name}-Lizenz",
+      "license_intro": "{archive}: {detail}. Lesen Sie die mitgelieferte Lizenz, bevor Sie das Paket installieren.",
+      "accept": "Ich habe dieses {name}-Paket selbst von starnetastro.com heruntergeladen und akzeptiere seine Lizenz.",
+      "install": "Installieren",
+      "installed": "Installiert aus {archive} - Version {version}, Lizenz akzeptiert am {date}.",
+      "remove": "Entfernen",
+      "confirm_remove": "Entfernen bestätigen",
+      "errors": {
+        "generic": "Der Vorgang ist fehlgeschlagen. Versuchen Sie es erneut."
       }
     }
   },

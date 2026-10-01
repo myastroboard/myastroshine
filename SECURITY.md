@@ -88,6 +88,12 @@ others. A lost password is reset from the host with
 - **Error handling**: the shared error envelope never includes a stack trace,
   file path, or other internal detail in a response body.
 
+- **Engine uploads**: installing a StarNet2 / DeepSNR package runs a binary on
+  the server, so it is admin-only. The archive is unpacked defensively (no path
+  or link leaving it, no special files, size and entry caps), must contain a
+  Linux binary for the server's architecture, and is only installed after the
+  admin accepted its licence. Installed engine files are never served back.
+
 ### Intentional scope boundaries
 
 - **No multi-user auth.** One admin password, no accounts or roles - a

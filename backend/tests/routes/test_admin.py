@@ -83,6 +83,7 @@ def test_engine_status_reports_nothing_configured_by_default(admin_client) -> No
         "version": None,
         "known_good": False,
         "detail": "No path configured",
+        "installed": None,
     }
     assert body["deepsnr"]["configured"] is False
 
