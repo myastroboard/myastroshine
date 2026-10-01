@@ -234,7 +234,7 @@ carries on:
 
 - **cleanup**, hourly (`cleanup_expired`) - deletes expired sessions and stacks
   (and their files), fails jobs left stuck, prunes finished job rows past
-  `job_history_retention_hours` (the Settings -> Operations job-history view,
+  `job_history_retention_hours` (the Settings -> Maintenance job-history view,
   otherwise unbounded - every debounced slider edit inserts a row), and drops
   expired admin logins.
 - **watch folder**, every minute (`watch_stacking_folder`) - a no-op unless

@@ -70,8 +70,12 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the host with `python -m app.cli reset-admin`. New routes under `/api/auth`
   (docs/API.md "Admin authentication"); migration `0a1b2c3d4e5f` adds the
   `admin_credentials` and `admin_sessions` tables.
+- **Settings reorganised by subject**: General, Stacking, ML engines, AstroDex
+  (was Webhooks), Security, Logs, Maintenance (was Operations). The catch-all
+  Advanced tab is gone: CORS and rate limiting moved to Security, log levels to
+  Logs, the ML engines to their own tab, configuration backup to Maintenance.
 - **Install StarNet2 / DeepSNR from Settings.** Upload the CLI package downloaded
-  from starnetastro.com (Settings -> Advanced -> External ML engines): the server
+  from starnetastro.com (Settings -> ML engines): the server
   unpacks and checks it, shows its licence, and installs it once the admin
   accepts - no bind mount or path to type. Remove deletes it. A package built for
   another architecture (the x86-64 build on a Raspberry Pi) is refused with a

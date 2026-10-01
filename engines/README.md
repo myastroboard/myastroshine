@@ -1,7 +1,7 @@
 # External ML engines
 
 **Simplest: you don't need this directory.** Upload the package from
-**Settings -> Advanced -> External ML engines** instead (see
+**Settings -> ML engines** instead (see
 `docs/DEPLOYMENT.md`). This directory is for mounting a binary yourself.
 
 It is **bind-mounted read-only into the `api` container at
@@ -19,7 +19,7 @@ you put here you install yourself and use under its own licence terms.
 2. Unpack it here, keeping the package layout, e.g. `engines/starnet2/starnet2`
    next to `StarNet2_weights.onnx` and `lib/`.
 3. `docker compose up -d` (the mount is already active).
-4. In **Settings -> Advanced -> External ML engines**, set
+4. In **Settings -> ML engines**, set
    `starnet2_path` to `/opt/engines/starnet2/starnet2`, save, and click
    **Re-check engines**.
 
