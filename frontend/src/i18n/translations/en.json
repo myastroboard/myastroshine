@@ -10,7 +10,8 @@
   "errors": {
     "busy": "The server is busy - wait a moment and try again.",
     "unavailable": "The server is temporarily unavailable - try again shortly.",
-    "server": "Something went wrong on the server. Try again in a moment."
+    "server": "Something went wrong on the server. Try again in a moment.",
+    "too_large_proxy": "This file is too large for the connection you are using - a proxy between you and MyAstroShine (Cloudflare, for example) limits uploads. Open MyAstroShine from your local network address to send it."
   },
   "presets": {
     "builtin": {

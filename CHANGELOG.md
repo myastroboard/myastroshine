@@ -6,7 +6,12 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **Uploads refused by a proxy explain themselves.** An upload that a proxy in
+  front of the app refuses as too large (Cloudflare caps a request at 100 MB)
+  now says so and suggests the local address, instead of showing the proxy's
+  raw HTML error page. Any other HTML error page is no longer shown as is.
 
 ## [0.5.1] - 2026-10-01
 

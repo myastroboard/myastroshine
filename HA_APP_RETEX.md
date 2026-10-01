@@ -587,6 +587,9 @@ Checklist used for the board, adapted:
   body whole (`await request.read()`) and refuses anything over 16 MiB ("Maximum
   request body size 16777216 exceeded"). With it, POST bodies are streamed (other
   methods are still read whole). Its proxy timeout is `total=None`.
+  A Cloudflare tunnel / proxied domain in front of HA caps a body at 100 MB (Free/Pro):
+  the upload hangs "pending" for a while, then Cloudflare answers an HTML 413. Engine
+  packages (200-300 MB) only install from the local address; documented in DOCS.md.
 - WebSocket progress through ingress.
 - Two HA users (or two browsers) at once: rate limit / concurrent-job limit is per user.
 - HA companion app on mobile, and remote access (Nabu Casa / remote URL) if available.

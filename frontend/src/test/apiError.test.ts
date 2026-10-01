@@ -15,6 +15,16 @@ describe('friendlyErrorKey', () => {
     expect(friendlyErrorKey(new ApiError(500, 'x'))).toBe('errors.server');
   });
 
+  it('maps a 413 from a proxy (no error code) to the "too large for the connection" key', () => {
+    expect(friendlyErrorKey(new ApiError(413, 'Status 413'))).toBe('errors.too_large_proxy');
+  });
+
+  it("keeps the backend's own 413 message, which names the upload limit", () => {
+    expect(
+      friendlyErrorKey(new ApiError(413, 'Upload exceeds the 500MB limit', 'PAYLOAD_TOO_LARGE')),
+    ).toBeNull();
+  });
+
   it('returns null for a 4xx that is not rate limiting, and for a plain Error', () => {
     expect(friendlyErrorKey(new ApiError(404, 'not found'))).toBeNull();
     expect(friendlyErrorKey(new Error('boom'))).toBeNull();

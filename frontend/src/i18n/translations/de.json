@@ -10,7 +10,8 @@
   "errors": {
     "busy": "Der Server ist ausgelastet - warten Sie einen Moment und versuchen Sie es erneut.",
     "unavailable": "Der Server ist vorübergehend nicht verfügbar - versuchen Sie es in Kürze erneut.",
-    "server": "Auf dem Server ist ein Fehler aufgetreten. Versuchen Sie es in einem Moment erneut."
+    "server": "Auf dem Server ist ein Fehler aufgetreten. Versuchen Sie es in einem Moment erneut.",
+    "too_large_proxy": "Diese Datei ist für die verwendete Verbindung zu groß - ein Proxy zwischen Ihnen und MyAstroShine (zum Beispiel Cloudflare) begrenzt Uploads. Öffnen Sie MyAstroShine über die Adresse in Ihrem lokalen Netzwerk, um sie zu senden."
   },
   "presets": {
     "builtin": {

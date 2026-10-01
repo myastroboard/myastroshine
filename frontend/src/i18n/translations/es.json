@@ -10,7 +10,8 @@
   "errors": {
     "busy": "El servidor está ocupado - espere un momento y vuelva a intentarlo.",
     "unavailable": "El servidor no está disponible temporalmente - vuelva a intentarlo en breve.",
-    "server": "Algo salió mal en el servidor. Vuelva a intentarlo en un momento."
+    "server": "Algo salió mal en el servidor. Vuelva a intentarlo en un momento.",
+    "too_large_proxy": "Este archivo es demasiado grande para la conexión que usa - un proxy entre usted y MyAstroShine (Cloudflare, por ejemplo) limita las subidas. Abra MyAstroShine desde la dirección de su red local para enviarlo."
   },
   "presets": {
     "builtin": {

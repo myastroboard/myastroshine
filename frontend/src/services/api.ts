@@ -121,7 +121,9 @@ function parseError(status: number, text: string, fallback: string): ApiError {
     const body = JSON.parse(text) as { error?: string; error_code?: string };
     return new ApiError(status, body.error ?? text, body.error_code);
   } catch {
-    return new ApiError(status, text || fallback);
+    // An HTML error page (a proxy's, not ours) is no message to show.
+    const html = text.trimStart().startsWith('<');
+    return new ApiError(status, html || !text ? fallback : text);
   }
 }
 

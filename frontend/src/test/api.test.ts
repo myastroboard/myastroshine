@@ -114,6 +114,16 @@ describe('request() error path (readError branches)', () => {
     });
   });
 
+  it("falls back to statusText instead of showing a proxy's HTML error page", async () => {
+    const page = '<html> <head><title>413 Payload Too Large</title></head></html>';
+    fetchMock.mockResolvedValueOnce(textErrorResponse(413, page));
+    await expect(apiClient.getAppSettings()).rejects.toMatchObject({
+      status: 413,
+      message: 'Status 413',
+      code: undefined,
+    });
+  });
+
   it('falls back to statusText when the body is empty and not JSON', async () => {
     fetchMock.mockResolvedValueOnce(textErrorResponse(503, ''));
     await expect(apiClient.getAppSettings()).rejects.toMatchObject({

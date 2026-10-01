@@ -13,6 +13,11 @@ export function friendlyErrorKey(err: unknown): string | null {
     if (err.status === 429) {
       return 'errors.busy';
     }
+    // A 413 without our envelope's code comes from a proxy in front of the app
+    // (Cloudflare caps a request body at 100 MB), not from the upload limit.
+    if (err.status === 413 && err.code === undefined) {
+      return 'errors.too_large_proxy';
+    }
     if (err.status === 503) {
       return 'errors.unavailable';
     }
