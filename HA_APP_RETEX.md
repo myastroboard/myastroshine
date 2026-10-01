@@ -596,6 +596,9 @@ Checklist used for the board, adapted:
 - Stop: ~seconds, exit code 0, no "Error" state. Restart. Update (bump) keeps `/data`.
 - Backup + restore of the app.
 - AppArmor enforce: no DENIED in the audit log after all of the above.
+  MyAstroShine 0.5.1 (2026-10-01): uploads, editing, StarNet2 + DeepSNR runs,
+  stop/restart - only `STATUS` lines (`profile_load`, `profile_replace`), no DENIED.
+  The profile without chown/fowner/dac/setuid/setgid holds in enforce.
 - Log the real ingress headers once at DEBUG (never log the token-bearing prefix at INFO).
 
 ---
