@@ -24,6 +24,29 @@ COPY frontend/ .
 RUN npm run build
 
 # ---------------------------------------------------------------------------
+# Stage: python-wheels - every runtime dependency as a wheel, with the ones that
+# need it rebuilt for older x86-64 CPUs. Only the wheels reach the image: the
+# compiler stays here.
+# ---------------------------------------------------------------------------
+FROM python:3.14-slim AS python-wheels
+
+ARG TARGETARCH
+# PyPI's NumPy wheels need x86-64-v2 (SSE4.2/POPCNT) and die with SIGILL on an
+# older CPU model such as Proxmox "kvm64", the default of the Home Assistant OS VM
+# scripts. On amd64, rebuild them with no CPU baseline: NumPy still picks its
+# SSE4 / AVX2 / AVX-512 kernels at run time on CPUs that have them.
+# scripts/check_cpu_compat.sh proves the result; CONTRIBUTING.md "CPU compatibility".
+ARG REBUILD_FOR_OLD_CPUS="numpy"
+
+RUN apt-get update && apt-get install -y --no-install-recommends gcc g++     && rm -rf /var/lib/apt/lists/*
+
+COPY backend/requirements.txt .
+RUN pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt
+# --no-cache-dir matters: pip's wheel cache ignores the -C build settings and
+# would silently hand back a wheel built with the default baseline.
+RUN if [ "$TARGETARCH" = "amd64" ]; then       set -e;       for pkg in $REBUILD_FOR_OLD_CPUS; do         version=$(sed -n "s/^${pkg}==//Ip" requirements.txt);         [ -n "$version" ] || { echo "$pkg: no '${pkg}==' pin in requirements.txt"; exit 1; };         wheel_name=$(echo "$pkg" | tr 'A-Z.-' 'a-z__');         find /wheels -iname "${wheel_name}-*.whl" -delete;         extra="";         if [ "$pkg" = "numpy" ]; then           extra="-Csetup-args=-Dcpu-baseline=none -Csetup-args=-Dallow-noblas=true";         fi;         pip wheel --no-cache-dir --no-binary "$pkg" --no-deps --wheel-dir /wheels           "${pkg}==${version}" $extra;       done;     fi
+
+# ---------------------------------------------------------------------------
 # Stage: backend - the API runtime, no static assets. This is the target
 # docker-compose.dev.yml builds (Vite's dev server serves the frontend live in
 # dev, so it does not need the frontend-builder stage above).
@@ -43,7 +66,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN --mount=type=bind,from=python-wheels,source=/wheels,target=/wheels     pip install --no-cache-dir --no-index --find-links /wheels -r requirements.txt
 
 COPY backend/app/ app/
 COPY backend/alembic.ini .
@@ -65,7 +88,8 @@ EXPOSE 8002
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8002/api/health || exit 1
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8002"]
+# Dual-stack (IPv4 + IPv6) listener with a bounded graceful shutdown - see app/serve.py.
+CMD ["python", "-m", "app.serve"]
 
 # ---------------------------------------------------------------------------
 # Stage: backend-with-frontend - the published image. Adds the built SPA;

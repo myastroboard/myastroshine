@@ -90,9 +90,38 @@ jobs:
           cache-from: type=gha,scope=${{ steps.platform.outputs.slug }}
           cache-to: type=gha,scope=${{ steps.platform.outputs.slug }},mode=max
 
-  merge-and-release:
+  # Gate: the amd64 image just built must still run on an x86-64 CPU without
+  # x86-64-v2 (Proxmox "kvm64", the Home Assistant OS VM default) before any
+  # manifest is published. See CONTRIBUTING.md "CPU compatibility".
+  cpu-compat:
     runs-on: ubuntu-latest
     needs: build-and-push
+    permissions:
+      packages: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Normalize image name (lowercase)
+        id: repo
+        run: echo "name=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check the amd64 image on an emulated kvm64 CPU
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:linux-amd64-build"
+          docker pull "$IMAGE"
+          sh scripts/check_cpu_compat.sh "$IMAGE"
+
+  merge-and-release:
+    runs-on: ubuntu-latest
+    needs: [build-and-push, cpu-compat]
     permissions:
       contents: write
       packages: write

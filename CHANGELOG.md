@@ -19,6 +19,16 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   star-mask, Auto Astro, depth-shift and upload-decoding routes no longer run on
   the event loop. **Upgrading from compose**: take the new `docker-compose.yml`
   (or drop the `worker` and `redis` services) - see docs/DEPLOYMENT.md.
+- **Runs on older x86-64 CPUs.** The amd64 image now starts on CPUs without
+  x86-64-v2 (Proxmox's default `kvm64` CPU model, used by the Home Assistant OS VM
+  scripts), where NumPy's PyPI wheels crashed with "Illegal instruction": NumPy
+  is rebuilt without a CPU baseline. A `CPU compatibility` CI check (also a gate
+  of the release) runs the image under an emulated `kvm64` CPU.
+- **Listens on IPv4 and IPv6.** One dual-stack socket instead of IPv4 only, so a
+  host name resolving to IPv6 (often `homeassistant.local`) reaches the app.
+- **Clean, bounded stop.** A container stop ends in a few seconds with exit code
+  0, even with a job running (it ends `failed`, "interrupted by a server
+  shutdown").
 - **Uploads never sit in memory whole.** Files stay in their spooled temp files
   and are read one at a time: a 20-frame batch, a calibration set or a `.zip`
   archive no longer loads entirely into RAM (an archive was read whole before),
