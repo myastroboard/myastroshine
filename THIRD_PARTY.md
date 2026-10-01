@@ -40,6 +40,14 @@ bear on this integration:
   within it. MyAstroShine's AGPL grant does not extend to these tools, and
   calling them does not make them part of MyAstroShine.
 
+**Installing from Settings.** An admin can upload the package as downloaded
+from `starnetastro.com` instead of mounting it. That is the operator's own copy
+placed on the operator's own server, as with a mount: MyAstroShine still ships
+nothing, never downloads the tool on anyone's behalf, and never serves the
+installed files back. Before installing, Settings shows the package's own
+`LICENSE.txt` and the admin must confirm they downloaded it themselves and accept
+it; the acceptance time is recorded with the install.
+
 If no path is configured (the default), these tools play no part and the
 classical, fully-AGPL code path is the only one that runs.
 

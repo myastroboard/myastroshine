@@ -179,4 +179,29 @@ describe('useAppSettings', () => {
     expect(result.current.draft).toEqual(updated);
     expect(result.current.error).toBeNull();
   });
+
+  it('takes in a server-side change without dropping unsaved edits', async () => {
+    mocked.getAppSettings.mockResolvedValue({ ...SETTINGS });
+    const { result } = renderHook(() => useAppSettings());
+    await waitFor(() => expect(result.current.draft).not.toBeNull());
+    act(() => result.current.patch({ maxImageSizeMb: 300 }));
+
+    act(() => result.current.applyServerChange({ starnet2Path: '/data/engines/starnet2/starnet2' }));
+
+    expect(result.current.draft?.starnet2Path).toBe('/data/engines/starnet2/starnet2');
+    expect(result.current.draft?.maxImageSizeMb).toBe(300);
+    expect(result.current.dirty).toBe(true); // only the user's edit is unsaved
+    act(() => result.current.patch({ maxImageSizeMb: SETTINGS.maxImageSizeMb }));
+    expect(result.current.dirty).toBe(false);
+  });
+
+  it('ignores a server-side change before the settings loaded', () => {
+    mocked.getAppSettings.mockReturnValue(new Promise(() => undefined));
+    const { result } = renderHook(() => useAppSettings());
+
+    act(() => result.current.applyServerChange({ deepsnrPath: '/x' }));
+
+    expect(result.current.draft).toBeNull();
+  });
 });
+

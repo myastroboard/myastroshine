@@ -49,7 +49,8 @@ Common codes: `INVALID_PARAMETER` (400), `UNAUTHORIZED` (401), `FORBIDDEN` (403)
 `NOT_FOUND` / `SESSION_NOT_FOUND` (404), `UNSUPPORTED_FORMAT` (415),
 `DUPLICATE_RESOURCE` (400), `PAYLOAD_TOO_LARGE` (413), `SESSION_EXPIRED` (410),
 `PROCESSING_FAILED` (500), `ASTRODEX_UNREACHABLE` (503), `RATE_LIMITED` (429).
-Admin authentication adds `ADMIN_LOGIN_REQUIRED` (401), `INVALID_CREDENTIALS`
+Engine uploads add `INVALID_ENGINE_ARCHIVE` (400). Admin authentication adds
+`ADMIN_LOGIN_REQUIRED` (401), `INVALID_CREDENTIALS`
 (401), `ADMIN_SETUP_REQUIRED` (403) and `ADMIN_ALREADY_CONFIGURED` (409).
 
 ## Rate Limiting
@@ -92,6 +93,10 @@ Every route is implemented and tested end to end.
 | GET | `/admin/app-settings` | Current runtime settings (`app_settings.json`) - every `/admin/*` route needs an admin login |
 | POST | `/admin/app-settings` | Replace runtime settings |
 | GET | `/admin/engine-status` | Probe the configured StarNet2 / DeepSNR paths |
+| POST | `/admin/engines/{engine}/stage` | Upload + check an engine package; returns its licence |
+| POST | `/admin/engines/{engine}/install` | Install a staged package once its licence is accepted |
+| DELETE | `/admin/engines/{engine}/stage/{staging_id}` | Drop a staged package |
+| DELETE | `/admin/engines/{engine}` | Remove the uploaded package |
 | GET | `/admin/logs` | Tail the log file, newest first (`limit`, `offset`, `level`) |
 | GET / POST | `/admin/logs/level` | Read / change the file and console log levels |
 | POST | `/admin/logs/clear` | Empty `myastroshine.log` |
@@ -473,7 +478,31 @@ with `<binary> --version` and drives the status line in Settings:
 
 `known_good` is false when the binary's version falls outside the range this
 release was tested against - the engine still runs, with a warning in Settings.
-The probe result is memoised until the next settings change.
+The probe result is memoised until the next settings change. An engine installed
+by upload (below) also carries `installed: { version, archive_name,
+license_accepted_at, path }`; `installed` is `null` otherwise.
+
+**Installing an engine package (admin).** Two steps, so the licence is read
+before anything is installed:
+
+1. `POST /admin/engines/{engine}/stage` (multipart `file` = the CLI archive as
+   downloaded, `.zip` / `.tar.gz` / `.tar.xz`, up to 1 GiB; `engine` =
+   `starnet2` / `deepsnr`) -> `201 { staging_id, engine, archive_name, status,
+   license_text }`. The archive is unpacked into a staging directory and checked:
+   no path or link leaving the package, no special files, at most 5000 entries
+   and 2 GiB unpacked, exactly one `starnet2` / `deepsnr` executable with
+   `*weights*.onnx` and `LICENSE.txt` next to it, an ELF binary for this server's
+   architecture, and a `--version` that runs. Any failure is `400
+   INVALID_ENGINE_ARCHIVE` with the reason.
+2. `POST /admin/engines/{engine}/install { staging_id, accept_license: true }`
+   -> `200` the engine's fresh status. Without `accept_license` it is a `400`.
+   The package replaces any previous one atomically in `DATA_DIR/engines/<engine>/`
+   and `<engine>_path` is set to it.
+
+`DELETE /admin/engines/{engine}/stage/{staging_id}` drops a staged package
+(staged packages are also pruned after an hour). `DELETE /admin/engines/{engine}`
+removes the installed package and clears the path setting if it pointed into it
+(`404` when nothing was uploaded). The engine files are never served back.
 
 ## Update check
 

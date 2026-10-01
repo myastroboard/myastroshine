@@ -13,6 +13,9 @@ def test_openapi_schema_is_served(client) -> None:
 
     for expected in (
         "/api/admin/app-settings",
+        "/api/admin/engines/{engine}/stage",
+        "/api/admin/engines/{engine}/install",
+        "/api/auth/status",
         "/api/config",
         "/api/upload",
         "/api/process/{session_id}",

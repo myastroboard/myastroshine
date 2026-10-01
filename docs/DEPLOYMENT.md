@@ -161,14 +161,26 @@ neither** - see `THIRD_PARTY.md`. The operator installs the binary and MyAstroSh
 shells out to it; with no path set, the classical engines are the only option and
 nothing changes.
 
-The `./engines` directory next to the compose file is **already bind-mounted
-read-only into `api`** at `/opt/engines` (empty and inert until you
-set a path). Its contents are git-ignored.
+**Install from Settings (simplest).** Download the CLI package for
+**linux-x64** from `starnetastro.com` (there is no linux-arm64 build - an ARM
+host cannot use it, and the upload says so), then in **Settings -> Advanced ->
+External ML engines** click **Install StarNet2 from its archive** (or DeepSNR)
+and pick the `.zip` / `.tar.gz` as downloaded. The server unpacks and checks it
+(the binary for this machine's architecture, its weights, its licence) and runs
+`--version`; Settings then shows the package's own `LICENSE.txt`. Tick that you
+downloaded it yourself and accept it, click **Install**: the package lands in
+`DATA_DIR/engines/<engine>/` and its path is set for you. **Remove** deletes it.
+Up to 1 GiB per archive. Admin only - installing an engine runs a binary on the
+server.
 
-1. Download the CLI build for **linux-x64** from `starnetastro.com` (there is no
-   linux-arm64 build - an ARM host cannot use this). Read its bundled
-   `LICENSE.txt` - it grants use "solely for astrophotography image processing";
-   the model is non-commercial, so a monetised instance takes that clause on.
+**Or mount it yourself.** The `./engines` directory next to the compose file is
+**already bind-mounted read-only into `api`** at `/opt/engines` (empty and inert
+until you set a path). Its contents are git-ignored.
+
+1. Download the CLI build for **linux-x64** from `starnetastro.com`. Read its
+   bundled `LICENSE.txt` - it grants use "solely for astrophotography image
+   processing"; the model is non-commercial, so a monetised instance takes that
+   clause on.
 2. Unpack it into `./engines/`, e.g. `./engines/starnet2/starnet2` and/or
    `./engines/deepsnr/deepsnr`, then `docker compose up -d`. (Running the
    published image without the repo? Create an `engines/` dir next to your

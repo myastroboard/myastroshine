@@ -396,39 +396,45 @@
     "sections": {
       "general": {
         "label": "Général",
-        "blurb": "Téléversements et valeurs par défaut de l'empilement."
+        "blurb": "Téléversements et sessions d'édition."
       },
-      "webhooks": {
-        "label": "Webhooks",
-        "blurb": "Jetons AstroDex et livraison des rappels."
+      "stacking": {
+        "label": "Empilement",
+        "blurb": "Valeurs par défaut de l'empilement et dossier surveillé."
       },
-      "advanced": {
-        "label": "Avancé",
-        "blurb": "Réseau et niveaux de journalisation."
+      "engines": {
+        "label": "Moteurs ML",
+        "blurb": "Suppression d'étoiles StarNet2 et débruitage DeepSNR optionnels."
       },
-      "logs": {
-        "label": "Journaux",
-        "blurb": "Consulter, vider et exporter le journal de l'application."
-      },
-      "operations": {
-        "label": "Opérations",
-        "blurb": "Tâches de traitement récentes et espace disque."
+      "astrodex": {
+        "label": "AstroDex",
+        "blurb": "Liaison avec l'AstroDex de MyAstroBoard : jetons et livraison des rappels."
       },
       "security": {
         "label": "Sécurité",
-        "blurb": "Mot de passe admin et navigateurs connectés."
+        "blurb": "Compte admin, accès réseau et limitation de débit."
+      },
+      "logs": {
+        "label": "Journaux",
+        "blurb": "Niveaux de journalisation, et le journal lui-même : consulter, vider, exporter."
+      },
+      "maintenance": {
+        "label": "Maintenance",
+        "blurb": "Espace disque, historique des tâches et sauvegarde de la configuration."
       }
     },
     "groups": {
       "uploads_and_sessions": "Téléversements et sessions",
-      "stacking_defaults": "Valeurs par défaut de l'empilement",
+      "stacking_defaults": "Valeurs par défaut",
       "callback_delivery": "Livraison des rappels",
       "network": "Réseau",
       "rate_limiting": "Limitation de débit",
-      "logging": "Journalisation",
-      "external_engines": "Moteurs ML externes",
       "job_history": "Historique des tâches",
-      "backup_restore": "Sauvegarde et restauration"
+      "backup_restore": "Sauvegarde et restauration",
+      "watch_folder": "Dossier surveillé",
+      "admin_account": "Compte admin",
+      "log_levels": "Niveaux",
+      "log_file": "Fichier journal"
     },
     "general": {
       "max_upload": {
@@ -511,7 +517,7 @@
         "label": "Niveau du journal console",
         "hint": "Niveau affiché dans les journaux du conteneur."
       },
-      "external_engines_blurb": "Suppression d'étoiles (StarNet2) et débruitage (DeepSNR) optionnels. Rien n'est embarqué : installez le binaire depuis starnetastro.com, montez-le dans les conteneurs api et worker, puis indiquez son chemin ici. Les conditions de licence de l'outil sont de votre responsabilité. Laissez vide pour conserver les moteurs classiques.",
+      "external_engines_blurb": "Suppression d'étoiles (StarNet2) et débruitage (DeepSNR) optionnels. Rien n'est embarqué : téléchargez le paquet CLI Linux x64 sur starnetastro.com et installez-le ci-dessous, ou indiquez le chemin d'un binaire que vous avez monté vous-même. Les conditions de licence de l'outil sont de votre responsabilité. Laissez vide pour conserver les moteurs classiques.",
       "starnet2_path": {
         "label": "Chemin du binaire StarNet2",
         "hint": "Chemin absolu dans le conteneur, ex. /opt/engines/starnet2/starnet2."
@@ -543,7 +549,6 @@
       "export_zip": "Exporter en ZIP",
       "confirm_clear": "Confirmer la suppression",
       "clear": "Vider",
-      "levels_hint": "Niveaux - fichier : {file}, console : {console}. Modifiez-les dans l'onglet Avancé.",
       "no_lines": "Aucune ligne de journal."
     },
     "operations": {
@@ -618,6 +623,23 @@
         "unknown_browser": "Navigateur inconnu",
         "details": "{ip} - dernière activité {last_seen}",
         "revoke": "Déconnecter"
+      }
+    },
+    "engines": {
+      "install_from_archive": "Installer {name} depuis son archive",
+      "replace": "Remplacer par une autre archive {name}",
+      "archive_input": "Archive {name}",
+      "uploading": "Envoi... {percent}%",
+      "checking": "Vérification du paquet...",
+      "license_heading": "Licence de {name}",
+      "license_intro": "{archive} : {detail}. Lisez la licence fournie avec le paquet avant de l'installer.",
+      "accept": "J'ai téléchargé moi-même ce paquet {name} sur starnetastro.com et j'accepte sa licence.",
+      "install": "Installer",
+      "installed": "Installé depuis {archive} - version {version}, licence acceptée le {date}.",
+      "remove": "Supprimer",
+      "confirm_remove": "Confirmer la suppression",
+      "errors": {
+        "generic": "L'opération sur le moteur a échoué. Réessayez."
       }
     }
   },
