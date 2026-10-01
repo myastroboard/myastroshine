@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 
 import { apiClient } from '@/services/api';
 
-/** Sends the enhanced image back to AstroDex via the backend handoff route. */
+/** Sends the enhanced image back to Astrodex via the backend handoff route. */
 export function useAstroDexIntegration() {
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -17,7 +17,7 @@ export function useAstroDexIntegration() {
       setSuccess(true);
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send back to AstroDex');
+      setError(err instanceof Error ? err.message : 'Failed to send back to Astrodex');
       return false;
     } finally {
       setIsLoading(false);

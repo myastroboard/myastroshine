@@ -10,7 +10,7 @@
 **A self-hosted astronomical image processing tool: automatic enhancement,
 multi-image stacking, and a parallax depth effect - from one Docker image, with
 no account and no cloud upload.** It integrates optionally with
-[MyAstroBoard](https://github.com/myastroboard/myastroboard)'s AstroDex - send a
+[MyAstroBoard](https://github.com/myastroboard/myastroboard)'s Astrodex - send a
 photo over for enhancement, get it back as a new picture on the same object - and
 runs just as well standalone, in a web browser.
 
@@ -60,7 +60,7 @@ runs just as well standalone, in a web browser.
   denoise (**nothing is bundled** - see [THIRD_PARTY.md](THIRD_PARTY.md)).
 - **Wide input support** - 8/16-bit JPEG/PNG/TIFF, FITS, and camera RAW.
 - **Edit milestones**, **English + French** UI, light / dark themes.
-- **AstroDex integration** - open a photo straight from MyAstroBoard's AstroDex
+- **Astrodex integration** - open a photo straight from MyAstroBoard's Astrodex
   with a signed handoff, enhance it here, then send it back as a new picture on
   the same object (the original is never touched). Or work fully standalone:
   upload, edit, download.

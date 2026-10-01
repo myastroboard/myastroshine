@@ -64,7 +64,7 @@ class AppSettings(BaseModel):
     session_expiry_hours: int = Field(default=24, ge=1, le=8760)
     preview_max_size: int = Field(default=512, ge=64, le=4096)
 
-    # AstroDex integration
+    # Astrodex integration
     astrodex_callback_urls: list[str] = Field(default_factory=list)
     astrodex_max_retries: int = Field(default=3, ge=1, le=10)
     astrodex_retry_delay_seconds: float = Field(default=5.0, ge=0, le=60)
@@ -129,7 +129,7 @@ class AppSettings(BaseModel):
         """Trim whitespace and any trailing slash, and drop blank entries.
 
         A trailing slash is the usual copy-paste artefact and never what is meant
-        here: a CORS ``Origin`` header carries none, and the AstroDex allowlist is
+        here: a CORS ``Origin`` header carries none, and the Astrodex allowlist is
         matched against a slash-stripped ``callback_base`` (see
         ``is_allowed_callback_url``), so ``https://host/`` would silently match
         nothing. An empty entry is dropped - an empty prefix would match every URL.

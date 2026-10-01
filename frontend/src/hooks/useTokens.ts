@@ -4,7 +4,7 @@ import { apiClient } from '@/services/api';
 import type { CreatedToken, WebhookToken } from '@/types';
 
 /**
- * Manages the AstroDex webhook tokens. `justCreated` holds the last created
+ * Manages the Astrodex webhook tokens. `justCreated` holds the last created
  * token's secret material - shown once, then cleared by `dismissCreated`.
  */
 export function useTokens() {

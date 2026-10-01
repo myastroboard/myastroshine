@@ -1,4 +1,4 @@
-"""TokenService - long-lived bearer tokens for the AstroDex integration.
+"""TokenService - long-lived bearer tokens for the Astrodex integration.
 
 Tokens are created and revoked from the UI. The raw value is returned once and
 never stored; only its SHA-256 hash is kept for constant-time lookup.

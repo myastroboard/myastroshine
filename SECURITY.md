@@ -60,7 +60,7 @@ others. A lost password is reset from the host with
   The decoded pixel count is capped too (`app/utils/image_utils.py:decode_image`)
   - a small file that would decompress into a huge array is rejected rather
   than trusted.
-- **AstroDex callback URLs fail closed**: an empty `astrodex_callback_urls`
+- **Astrodex callback URLs fail closed**: an empty `astrodex_callback_urls`
   allowlist rejects every callback. A handoff token carries the board origin it
   was minted with (`callback_base`); `/api/astrodex/handoff/resume` refuses it
   unless that origin is on the allowlist, before making any outbound request.
@@ -82,7 +82,7 @@ others. A lost password is reset from the host with
 - **XSS**: the frontend never uses `dangerouslySetInnerHTML` or `innerHTML`;
   React's default JSX escaping is the only rendering path.
 - **Rate limiting**: per-IP request limits cover the full API surface,
-  including `/api/tokens`, `/api/admin/*`, `/api/download/*`, and the AstroDex
+  including `/api/tokens`, `/api/admin/*`, `/api/download/*`, and the Astrodex
   handoff routes, plus a separate per-IP concurrent-job cap (`docs/API.md`
   "Rate Limiting").
 - **Error handling**: the shared error envelope never includes a stack trace,
@@ -106,7 +106,7 @@ others. A lost password is reset from the host with
   normal editing session (and accidental client bugs) from overwhelming the
   server, not to withstand a deliberate flood. Put this behind a reverse proxy
   or firewall if you're exposed to untrusted networks.
-- **Vulnerabilities in third-party services** MyAstroShine talks to (AstroDex,
+- **Vulnerabilities in third-party services** MyAstroShine talks to (Astrodex,
   the container registry) are out of scope for this policy.
 
 ## Reporting a Vulnerability
@@ -132,7 +132,7 @@ docker compose up -d
   (`scripts/check_deps_fresh.py`, `.github/workflows/deps-fresh.yml`) and known
   CVEs (`pip-audit` / `npm audit` in CI, plus a Trivy scan on every published
   image).
-- Review `docker-compose.yml`'s CORS/AstroDex settings in Settings -> Security and Settings -> AstroDex
+- Review `docker-compose.yml`'s CORS/Astrodex settings in Settings -> Security and Settings -> Astrodex
   if this deployment is reachable from more than your own machine.
 
 ## References

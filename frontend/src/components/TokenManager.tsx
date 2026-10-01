@@ -3,7 +3,7 @@ import { useState, type FormEvent } from 'react';
 import { useTokens } from '@/hooks/useTokens';
 import { useTranslation } from '@/hooks/useTranslation';
 
-/** Create, view, and revoke long-lived AstroDex webhook tokens. */
+/** Create, view, and revoke long-lived Astrodex webhook tokens. */
 export function TokenManager() {
   const { t } = useTranslation();
   const { tokens, justCreated, dismissCreated, createToken, revokeToken, isLoading, error } =

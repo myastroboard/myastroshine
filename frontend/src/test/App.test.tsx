@@ -319,7 +319,7 @@ describe('App', () => {
     expect(screen.getByTestId('image-upload')).toBeInTheDocument();
   });
 
-  it('resumes an AstroDex handoff carried in the hash fragment and opens the editor', async () => {
+  it('resumes an Astrodex handoff carried in the hash fragment and opens the editor', async () => {
     window.history.pushState({}, '', '#/?handoff=tok-123');
     let resolveHandoff!: (value: {
       sessionId: string;
@@ -340,7 +340,7 @@ describe('App', () => {
 
     // The token is single-use: stripped from the URL right away.
     expect(window.location.hash).toBe('#/');
-    expect(await screen.findByText('Opening your image from AstroDex...')).toBeInTheDocument();
+    expect(await screen.findByText('Opening your image from Astrodex...')).toBeInTheDocument();
     expect(mocked.resumeAstrodexHandoff).toHaveBeenCalledWith('tok-123');
     expect(screen.queryByTestId('stack-mode')).not.toBeInTheDocument();
 
@@ -404,6 +404,6 @@ describe('App', () => {
 
     render(<App />);
 
-    expect(await screen.findByText('Could not open the AstroDex image')).toBeInTheDocument();
+    expect(await screen.findByText('Could not open the Astrodex image')).toBeInTheDocument();
   });
 });

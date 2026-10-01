@@ -1,6 +1,6 @@
-"""AstroDex handoff crypto - the shared HMAC contract with MyAstroBoard.
+"""Astrodex handoff crypto - the shared HMAC contract with MyAstroBoard.
 
-MyAstroBoard mints a signed *handoff token* when a user sends an AstroDex
+MyAstroBoard mints a signed *handoff token* when a user sends an Astrodex
 picture here for enhancement; this instance verifies it, pulls the source image,
 and later POSTs the enhanced result back with its own signature. Both sides
 implement the primitives below identically (see ``docs/API.md`` and
@@ -91,7 +91,7 @@ def verify_handoff(token: str, secret: str) -> JsonDict:
 
 
 def enhanced_signing_input(payload: JsonDict, image_bytes: bytes) -> str:
-    """The exact string HMAC'd for the enhanced-image upload back to AstroDex."""
+    """The exact string HMAC'd for the enhanced-image upload back to Astrodex."""
     return canonical_json(payload) + "\n" + hashlib.sha256(image_bytes).hexdigest()
 
 

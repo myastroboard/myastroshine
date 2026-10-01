@@ -22,7 +22,7 @@ function navigate(route: Route): void {
 }
 
 /**
- * The AstroDex handoff token, from either the query string (`?handoff=`) or the
+ * The Astrodex handoff token, from either the query string (`?handoff=`) or the
  * hash (`#/?handoff=`) - the board builds the URL with hash routing, so the
  * token usually rides in the fragment where `location.search` never sees it.
  */
@@ -51,7 +51,7 @@ function useRoute(): Route {
 /**
  * Root orchestrator.
  *
- * When opened from AstroDex the URL carries a single signed `handoff` token;
+ * When opened from Astrodex the URL carries a single signed `handoff` token;
  * otherwise the app runs in standalone mode.
  */
 export default function App() {
@@ -93,7 +93,7 @@ export default function App() {
         });
       })
       .catch((err: unknown) => {
-        setError(err instanceof Error ? err.message : 'Could not open the AstroDex image');
+        setError(err instanceof Error ? err.message : 'Could not open the Astrodex image');
       })
       .finally(() => setResumingHandoff(false));
   }, []);

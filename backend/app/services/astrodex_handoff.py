@@ -54,7 +54,7 @@ def _dig(data: object, *keys: str) -> str | None:
 
 
 class AstroDexHandoffService:
-    """Request-scoped orchestration for the AstroDex <-> editor handoff."""
+    """Request-scoped orchestration for the Astrodex <-> editor handoff."""
 
     def __init__(
         self,
@@ -141,25 +141,25 @@ class AstroDexHandoffService:
         except httpx.HTTPStatusError as exc:
             logger.warning("astrodex source rejected", status=exc.response.status_code)
             raise UpstreamError(
-                f"AstroDex rejected the handoff ({exc.response.status_code})"
+                f"Astrodex rejected the handoff ({exc.response.status_code})"
             ) from exc
         except (httpx.RequestError, ValueError) as exc:
             logger.warning("astrodex source unreachable", error=str(exc))
-            raise UpstreamError("Could not reach AstroDex to fetch the source image") from exc
+            raise UpstreamError("Could not reach Astrodex to fetch the source image") from exc
 
         if not isinstance(meta, dict) or not image_bytes:
-            raise UpstreamError("AstroDex returned an unusable source response")
+            raise UpstreamError("Astrodex returned an unusable source response")
         return meta, image_bytes
 
     # -- outbound: editor -> board --------------------------------------
 
     async def return_enhanced(self, session_id: str) -> AstroDexLink:
-        """Sign and POST the enhanced result back to AstroDex."""
+        """Sign and POST the enhanced result back to Astrodex."""
         self.sessions.get_session(session_id)  # 404 / 410 if the session is gone
 
         link = self.db.scalar(select(AstroDexLink).where(AstroDexLink.session_id == session_id))
         if link is None:
-            raise ResourceNotFoundError("This session was not opened from AstroDex")
+            raise ResourceNotFoundError("This session was not opened from Astrodex")
 
         session = self.db.get(SessionRecord, session_id)
         payload: JsonDict = {
@@ -213,7 +213,7 @@ class AstroDexHandoffService:
                 ) as client:
                     response = await client.post(url, data=form, files=files, headers=headers)
             except httpx.RequestError as exc:
-                last_error = f"could not reach AstroDex ({exc.__class__.__name__})"
+                last_error = f"could not reach Astrodex ({exc.__class__.__name__})"
                 logger.warning("enhanced return request error", attempt=attempt, error=str(exc))
             else:
                 if response.is_success:
@@ -225,9 +225,9 @@ class AstroDexHandoffService:
                     return
                 if response.status_code not in _RETRYABLE_STATUS:
                     raise UpstreamError(
-                        f"AstroDex rejected the enhanced image ({response.status_code})"
+                        f"Astrodex rejected the enhanced image ({response.status_code})"
                     )
-                last_error = f"AstroDex returned {response.status_code}"
+                last_error = f"Astrodex returned {response.status_code}"
                 logger.warning(
                     "enhanced return transient failure", attempt=attempt, error=last_error
                 )

@@ -195,7 +195,7 @@ describe('EditorView', () => {
       expect(screen.getByTestId('capture')).toBeInTheDocument();
     });
 
-    it('names the export after the AstroDex object for a handoff session', () => {
+    it('names the export after the Astrodex object for a handoff session', () => {
       renderEditor({ sessionId: 's1', astrodex: { itemId: 'i1', objectName: 'M31' } });
 
       expect(inspector().exportActions.defaultFilename).toBe('M31_myastroshine');
@@ -254,7 +254,7 @@ describe('EditorView', () => {
       expect(onExit).toHaveBeenCalled();
     });
 
-    it('stands down once the current edit was sent back to AstroDex', async () => {
+    it('stands down once the current edit was sent back to Astrodex', async () => {
       resetState(EDITED);
       const { onExit } = renderEditor({ sessionId: 's1', astrodex: { itemId: 'i', objectName: null } });
 
@@ -265,7 +265,7 @@ describe('EditorView', () => {
       expect(onExit).toHaveBeenCalled();
     });
 
-    it('still asks when the AstroDex delivery failed or the edit moved on since', async () => {
+    it('still asks when the Astrodex delivery failed or the edit moved on since', async () => {
       resetState(EDITED);
       h.state.astrodex.returnImage = vi.fn().mockResolvedValue(false);
       const session = { sessionId: 's1', astrodex: { itemId: 'i', objectName: null } };
@@ -284,7 +284,7 @@ describe('EditorView', () => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();
     });
 
-    it('compares the focal point delivered to AstroDex with the current one', async () => {
+    it('compares the focal point delivered to Astrodex with the current one', async () => {
       const session = { sessionId: 's1', astrodex: { itemId: 'i', objectName: null } };
       const { onExit } = renderEditor(session);
       act(() => preview().onFocalPointPick!({ x: 0.2, y: 0.3 }));
@@ -304,7 +304,7 @@ describe('EditorView', () => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();
     });
 
-    it('does nothing when asked to return without an AstroDex session', async () => {
+    it('does nothing when asked to return without an Astrodex session', async () => {
       renderEditor();
 
       await act(async () => inspector().exportActions.onReturnToAstroDex());

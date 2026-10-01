@@ -192,7 +192,7 @@ def _decode_fits(data: bytes) -> np.ndarray:
 
     (A direct upload no longer reaches this: ``POST /api/upload`` opens a FITS as
     a linear composite session - see :mod:`app.services.linear_upload`. This
-    stays the path for an AstroDex handoff and any other ``decode_image`` caller
+    stays the path for an Astrodex handoff and any other ``decode_image`` caller
     that hands in a FITS.)
     """
     from astropy.io import fits  # noqa: PLC0415 - heavy, only imported for an actual FITS upload

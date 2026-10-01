@@ -17,7 +17,7 @@ const mocked = vi.mocked(apiClient);
 
 const TOKEN: WebhookToken = {
   id: 't1',
-  name: 'AstroDex prod',
+  name: 'Astrodex prod',
   tokenPrefix: 'mas_abcd',
   createdAt: '2026-09-03T00:00:00Z',
   lastUsedAt: null,
@@ -71,11 +71,11 @@ describe('useTokens', () => {
     mocked.listTokens.mockClear();
     let created: CreatedToken | undefined;
     await act(async () => {
-      created = await result.current.createToken('AstroDex prod', 30);
+      created = await result.current.createToken('Astrodex prod', 30);
     });
 
     expect(created).toEqual(CREATED);
-    expect(mocked.createToken).toHaveBeenCalledWith('AstroDex prod', 30);
+    expect(mocked.createToken).toHaveBeenCalledWith('Astrodex prod', 30);
     expect(result.current.justCreated).toEqual(CREATED);
     expect(mocked.listTokens).toHaveBeenCalledTimes(1); // refreshed after creating
   });
@@ -98,7 +98,7 @@ describe('useTokens', () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     await act(async () => {
-      await result.current.createToken('AstroDex prod');
+      await result.current.createToken('Astrodex prod');
     });
     expect(result.current.justCreated).not.toBeNull();
 

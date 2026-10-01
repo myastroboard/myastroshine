@@ -23,7 +23,7 @@ The runtime topology is in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 `docker compose up` works with **no `.env` editing**. The compose file carries
 only *structural* variables - the run mode, the persistence root, the container
-topology. Everything a user might tune (CORS origins, the AstroDex callback
+topology. Everything a user might tune (CORS origins, the Astrodex callback
 allowlist, upload limits, session lifetime, stacking defaults, log levels) is
 edited from **Settings** in the UI and persisted under the data volume. The
 session secret is generated on first start.
@@ -144,9 +144,9 @@ after changing it).
 | Stacking | `stacking_enabled` / `stacking_max_frames` / `stacking_retention_hours` | true / 2000 / 12 |
 | Stacking | `stacking_workers` (register/align/combine threads; 0 = auto, cap 4) | 0 |
 | Stacking | `stacking_watch_dir` / `stacking_watch_idle_minutes` / `stacking_watch_auto_process` (folder-watch ingest; empty dir = off) | "" / 10 / true |
-| AstroDex | webhook token (create / revoke; paste token + signing secret into MyAstroBoard) | - |
-| AstroDex | `astrodex_callback_urls` (board-origin allowlist, fails closed) | empty |
-| AstroDex | `astrodex_max_retries` / `astrodex_retry_delay_seconds` (return delivery) | 3 / 5s |
+| Astrodex | webhook token (create / revoke; paste token + signing secret into MyAstroBoard) | - |
+| Astrodex | `astrodex_callback_urls` (board-origin allowlist, fails closed) | empty |
+| Astrodex | `astrodex_max_retries` / `astrodex_retry_delay_seconds` (return delivery) | 3 / 5s |
 | ML engines | StarNet2 / DeepSNR package (install from its archive, or remove) | - |
 | ML engines | `starnet2_path` / `deepsnr_path` / `starnet2_stride` / `deepsnr_stride` (empty = off) | "" / "" / 0 / 0 |
 | Security | admin password, logged-in browsers, `admin_session_idle_days` | - / - / 7 |

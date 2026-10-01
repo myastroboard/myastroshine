@@ -464,16 +464,16 @@ export interface EditorSession {
   histogram?: HistogramData;
   dimensions?: Dimensions;
   /** Name of the uploaded file, when the session started from an upload - seeds
-   * the Export step's filename field. Absent for stacks and AstroDex handoffs. */
+   * the Export step's filename field. Absent for stacks and Astrodex handoffs. */
   originalFilename?: string;
   /** True when the session is a stacked composite - unlocks the "Stack" step. */
   isStack?: boolean;
-  /** Set when the session was opened from an AstroDex handoff - unlocks the
-   * "Send back to AstroDex" action in the Export step. */
+  /** Set when the session was opened from an Astrodex handoff - unlocks the
+   * "Send back to Astrodex" action in the Export step. */
   astrodex?: AstroDexReturn;
 }
 
-/** What the editor needs to send the enhanced result back to AstroDex. */
+/** What the editor needs to send the enhanced result back to Astrodex. */
 export interface AstroDexReturn {
   itemId: string;
   objectName: string | null;

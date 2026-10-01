@@ -162,14 +162,14 @@ container restarted more often than hourly never reaches it; check
 The CORS middleware reads `cors_origins` once at startup - restart the `api`
 container after changing it. Every other setting applies immediately.
 
-**"Send back to AstroDex" fails, or opening an image from AstroDex is refused
+**"Send back to Astrodex" fails, or opening an image from Astrodex is refused
 (403).**
 `astrodex_callback_urls` is an allowlist that fails closed - an empty allowlist
 rejects every board origin. Add the MyAstroBoard origin the handoff was minted
 with (the public URL and, if the container reaches the board another way, that
-address too) in **Settings -> AstroDex**.
+address too) in **Settings -> Astrodex**.
 
-**"Send back to AstroDex" fails with a 502.**
+**"Send back to Astrodex" fails with a 502.**
 The container could not reach `callback_base`. If MyAstroBoard is behind a
 reverse proxy the LAN cannot hairpin, set the connector's callback-URL override
 on the board to an address this container can reach directly.

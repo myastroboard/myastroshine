@@ -1,4 +1,4 @@
-"""Request/response models for the MyAstroBoard AstroDex handoff."""
+"""Request/response models for the MyAstroBoard Astrodex handoff."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ class HandoffReturnRequest(BaseModel):
 
 
 class HandoffReturnResponse(BaseModel):
-    """Delivery outcome of the enhanced image going back to AstroDex."""
+    """Delivery outcome of the enhanced image going back to Astrodex."""
 
     session_id: str
     status: str

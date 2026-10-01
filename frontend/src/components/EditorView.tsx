@@ -66,7 +66,7 @@ function stripImageExtension(name: string): string {
 }
 
 /** Default name (no extension) for the exported result: the uploaded file's base
- * name, or the AstroDex object, with a `_myastroshine` suffix - falling back to a
+ * name, or the Astrodex object, with a `_myastroshine` suffix - falling back to a
  * short session tag when there is no source name (a stacked composite). */
 function defaultExportName(session: EditorSession): string {
   if (session.originalFilename) {
@@ -123,7 +123,7 @@ export function EditorView({ session, onExit }: EditorViewProps) {
   const [framingGeom, setFramingGeom] = useState<GeometryParameters>(parameters.geometry);
   const [framingRatioFrac, setFramingRatioFrac] = useState<number | null>(null);
   const [confirmExit, setConfirmExit] = useState(false);
-  // The edit state that was last sent back to AstroDex - once it matches the
+  // The edit state that was last sent back to Astrodex - once it matches the
   // current state the work is delivered, so the unsaved-changes guard stands down.
   const [delivered, setDelivered] = useState<{
     parameters: ProcessingParameters;

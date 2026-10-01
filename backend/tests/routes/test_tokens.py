@@ -9,7 +9,7 @@ from app.config import get_settings
 
 def test_create_lists_and_revoke(admin_client) -> None:
     """A created token appears in the listing and can be revoked."""
-    created = admin_client.post("/api/tokens", json={"name": "AstroDex prod"})
+    created = admin_client.post("/api/tokens", json={"name": "Astrodex prod"})
     assert created.status_code == 201
     body = created.json()
     assert body["token"].startswith("mas_")
@@ -19,7 +19,7 @@ def test_create_lists_and_revoke(admin_client) -> None:
     listing = admin_client.get("/api/tokens").json()
     assert listing["total"] == 1
     entry = listing["tokens"][0]
-    assert entry["name"] == "AstroDex prod"
+    assert entry["name"] == "Astrodex prod"
     assert "token" not in entry  # secret material is never listed
     assert "signing_secret" not in entry
 

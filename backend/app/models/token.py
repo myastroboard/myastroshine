@@ -37,7 +37,7 @@ class CreatedTokenResponse(TokenOut):
     """Returned once by ``POST /api/tokens`` - carries the raw token.
 
     ``token`` is the bearer credential; ``signing_secret`` is the HMAC secret to
-    configure in AstroDex. Both are shown only here.
+    configure in Astrodex. Both are shown only here.
     """
 
     token: str

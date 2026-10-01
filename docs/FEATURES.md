@@ -26,7 +26,7 @@ the tour.
   - [Folder-watch ingest](#folder-watch-ingest)
 - [External ML engines](#external-ml-engines)
 - [Presets](#presets)
-- [AstroDex integration](#astrodex-integration)
+- [Astrodex integration](#astrodex-integration)
 - [Themes and language](#themes-and-language)
 - [Settings](#settings)
 
@@ -35,7 +35,7 @@ the tour.
 A toggle at the top of the app switches between:
 
 - **Single image** - upload one frame (or a stacked composite from elsewhere),
-  edit it with the workflow below, download or hand it back to AstroDex.
+  edit it with the workflow below, download or hand it back to Astrodex.
 - **Stacking** - upload many sub-exposures, review and calibrate them, combine
   them into one high-SNR composite, then edit that composite in the single-image
   editor.
@@ -137,8 +137,8 @@ sky as far); the focal point pulls the chosen spot forward too.
 
 ### Export
 
-Download the result (JPEG), **Send back to AstroDex** (when the session was
-opened from AstroDex), or **Save as preset** to reuse the current settings later.
+Download the result (JPEG), **Send back to Astrodex** (when the session was
+opened from Astrodex), or **Save as preset** to reuse the current settings later.
 
 ## Edit milestones
 
@@ -227,11 +227,11 @@ Five built-ins are always present: **Nebula**, **Galaxy**, **Deep Field**,
 **Export** step (up to 50); a user preset carries a delete affordance in the
 chip list.
 
-## AstroDex integration
+## Astrodex integration
 
-From a photo in MyAstroBoard's AstroDex, **Send to MyAstroShine** opens the
+From a photo in MyAstroBoard's Astrodex, **Send to MyAstroShine** opens the
 editor here with a signed one-time handoff; the backend verifies it and pulls the
-image itself. Edit as normal, then **Send back to AstroDex** posts the result
+image itself. Edit as normal, then **Send back to Astrodex** posts the result
 back, where it is filed as a **new** picture on the same object - the original is
 never replaced. MyAstroShine only ever calls out to the board, so it works even
 when the board is behind a reverse proxy. Standalone use needs none of this - the
@@ -252,7 +252,7 @@ volume - no `.env` editing, no restart (except `cors_origins`). It is the
 admin's area (password set on first visit). One subject per tab: **General**
 (upload cap, session lifetime, preview size), **Stacking** (limits, workers,
 folder-watch), **ML engines** (install StarNet2 / DeepSNR from their archive,
-or set their paths), **AstroDex** (tokens, callback allowlist and delivery),
+or set their paths), **Astrodex** (tokens, callback allowlist and delivery),
 **Security** (admin password and sessions, CORS, rate limits), **Logs** (levels,
 then tail, filter, clear, export a ZIP for a bug report) and **Maintenance**
 (disk usage, job history, configuration backup and restore). Full table:

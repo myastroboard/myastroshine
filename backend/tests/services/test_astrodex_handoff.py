@@ -180,7 +180,7 @@ async def test_return_enhanced_treats_conflict_as_already_delivered(
 async def test_return_enhanced_without_a_link_is_not_found(
     db_session, webhook_token, sample_image
 ) -> None:
-    """A session with no AstroDexLink cannot be returned to AstroDex."""
+    """A session with no AstroDexLink cannot be returned to Astrodex."""
     storage = StorageService()
     sessions = SessionService(db_session, storage)
     record = sessions.create_session(image_path="")
@@ -221,7 +221,7 @@ async def test_resume_surfaces_a_network_error_reaching_astrodex(db_session, web
         raise httpx.ConnectError("connection refused")
 
     service = _service(db_session, httpx.MockTransport(handler))
-    with pytest.raises(UpstreamError, match="Could not reach AstroDex"):
+    with pytest.raises(UpstreamError, match="Could not reach Astrodex"):
         await service.resume(_handoff(raw[:12], record.signing_secret))
 
 
