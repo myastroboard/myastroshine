@@ -6,6 +6,10 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.5.0] - 2026-10-01
+
 ### Changed
 
 - **A friendlier editor for people who are not photographers.** The start
