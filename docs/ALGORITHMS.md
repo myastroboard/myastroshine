@@ -837,7 +837,13 @@ the enhancement pipeline works on:
    median, which on a frame-filling nebula *is* the nebula) maps to the target,
    and the **object** (99th percentile of the same copy - the nebula / galaxy
    body, not the star cores) maps to 0.72. Negative family values lower the white
-   point (a pure midtone transfer - lifts a faint object); positive values keep
+   point (a midtone transfer - lifts a faint object); everything above 0.6 of
+   that lowered white rolls off through a log **highlight shoulder** (unit slope
+   at the knee, the true white landing exactly on 1, the role of GHS's highlight
+   protection) instead of clipping, so nebula filaments and stars brighter than
+   the object keep their gradation and colour. A low-contrast object (only a few
+   times the sky) may then stop short of 0.72 at the lowest family value - the
+   price of not burning everything brighter than it. Positive values keep
    the white point and put an arcsinh stage under the midtone transfer
    (compresses highlights - a bright core keeps its structure). The black point
    is the sky minus 2.8 noise sigma, the noise read as the MAD of a 3x3-median
