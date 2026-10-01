@@ -1,7 +1,8 @@
-import { useCallback, useState, type PointerEvent } from 'react';
+import { useCallback, useState, type CSSProperties, type PointerEvent, type ReactNode } from 'react';
 
 import { FramingLayer } from '@/components/FramingLayer';
 import { HistogramDisplay } from '@/components/HistogramDisplay';
+import { ChevronIcon } from '@/components/icons';
 import { useTranslation } from '@/hooks/useTranslation';
 import { baseAspectRatio } from '@/services/framingGeometry';
 import type {
@@ -41,6 +42,8 @@ export interface ImagePreviewProps {
   /** While true, a click on the image sets the focal point instead of dragging the divider. */
   pickingFocalPoint?: boolean;
   onFocalPointPick?: (point: FocusPoint) => void;
+  /** Rendered under the image, inside the same card (the saved-versions strip). */
+  children?: ReactNode;
 }
 
 const MIN_ZOOM = 1;
@@ -61,6 +64,7 @@ export function ImagePreview({
   focalPoint,
   pickingFocalPoint = false,
   onFocalPointPick,
+  children,
 }: ImagePreviewProps) {
   const { t } = useTranslation();
   const [splitPercent, setSplitPercent] = useState(50);
@@ -131,16 +135,21 @@ export function ImagePreview({
         ? naturalRatio
         : 16 / 9;
   // Portrait frames would blow past the viewport at full column width; cap their
-  // width so the frame stays inside 70vh and centres instead of letterboxing.
-  const maxWidth = ratio < 1 ? `calc(70vh * ${ratio})` : '100%';
+  // width so the frame stays inside its max height (70vh, 42vh on a phone where
+  // the preview is pinned above the controls) and centres instead of letterboxing.
+  const frameStyle = { aspectRatio: ratio, '--frame-ratio': ratio } as CSSProperties;
+  const portrait = ratio < 1;
+  // Hide a side's label once the divider has nearly swept it off-screen.
+  const showBefore = splitPercent > 12;
+  const showAfter = splitPercent < 88;
 
   return (
     <div className="panel flex flex-col gap-3">
       <div
-        className={`relative mx-auto max-h-[70vh] w-full touch-pan-y select-none overflow-hidden rounded-lg border border-hairline bg-black ${
-          framingActive ? '' : pickingFocalPoint ? 'cursor-crosshair' : 'cursor-ew-resize'
-        }`}
-        style={{ aspectRatio: ratio, maxWidth }}
+        className={`relative mx-auto max-h-[42vh] w-full touch-pan-y select-none overflow-hidden rounded-lg border border-hairline bg-black lg:max-h-[70vh] ${
+          portrait ? 'max-w-[calc(42vh*var(--frame-ratio))] lg:max-w-[calc(70vh*var(--frame-ratio))]' : ''
+        } ${framingActive ? '' : pickingFocalPoint ? 'cursor-crosshair' : 'cursor-ew-resize'}`}
+        style={frameStyle}
         onPointerDown={framingActive ? undefined : handlePointerDown}
         onPointerMove={framingActive ? undefined : handlePointerMove}
         onPointerUp={framingActive ? undefined : endDrag}
@@ -232,17 +241,17 @@ export function ImagePreview({
                 the clip edge (splitPercent of the image) lands at this fraction
                 of the unscaled container. */}
             <div
-              className="pointer-events-none absolute inset-y-0 z-10 w-px -translate-x-1/2 bg-white/70 shadow-[0_0_0_1px_rgb(0_0_0/0.35)]"
+              className="pointer-events-none absolute inset-y-0 z-10 w-0.5 -translate-x-1/2 bg-white/80 shadow-[0_0_0_1px_rgb(0_0_0/0.35)]"
               style={{ left: `${50 + (splitPercent - 50) * zoom}%` }}
             >
               <span
-                className={`absolute left-1/2 top-1/2 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/25 bg-black/60 backdrop-blur-sm transition-transform ${
+                className={`absolute left-1/2 top-1/2 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-black/60 shadow-lg backdrop-blur-sm transition-transform ${
                   dragging ? 'scale-110' : ''
                 }`}
               >
                 <svg
                   viewBox="0 0 16 16"
-                  className="h-3.5 w-3.5 stroke-white/80"
+                  className="h-4 w-4 stroke-white/90"
                   fill="none"
                   aria-hidden
                 >
@@ -256,9 +265,17 @@ export function ImagePreview({
               </span>
             </div>
 
-            <div className="pointer-events-none absolute left-3 top-3 rounded bg-black/55 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/70 backdrop-blur-sm">
-              {t('image_preview.before_after')}
-            </div>
+            {/* Which side is which - on the image, so it reads without a legend. */}
+            {showBefore && (
+              <div className="pointer-events-none absolute bottom-3 left-3 rounded-md bg-black/55 px-2.5 py-1 text-xs font-medium text-white/85 backdrop-blur-sm">
+                {t('image_preview.before')}
+              </div>
+            )}
+            {showAfter && (
+              <div className="pointer-events-none absolute bottom-3 right-3 rounded-md bg-black/55 px-2.5 py-1 text-xs font-medium text-white/85 backdrop-blur-sm">
+                {t('image_preview.after')}
+              </div>
+            )}
 
             <div
               className="absolute right-3 top-3 flex cursor-default items-center gap-0.5 rounded-md border border-white/10 bg-black/55 p-0.5 text-white/80 backdrop-blur-sm"
@@ -324,10 +341,20 @@ export function ImagePreview({
         )}
       </div>
 
+      {children}
+
       {histogram && (
-        <div className="panel-inset">
-          <HistogramDisplay data={histogram} />
-        </div>
+        // Folded by default: useful to a few, noise to most - and kept out of
+        // the pinned phone preview entirely.
+        <details className="group max-lg:hidden">
+          <summary className="flex w-fit cursor-pointer list-none items-center gap-1 text-xs font-medium text-faint outline-none hover:text-muted focus-visible:ring-2 focus-visible:ring-accent [&::-webkit-details-marker]:hidden">
+            <ChevronIcon className="h-3 w-3 transition-transform group-open:rotate-90" />
+            {t('histogram.toggle')}
+          </summary>
+          <div className="panel-inset mt-2">
+            <HistogramDisplay data={histogram} />
+          </div>
+        </details>
       )}
     </div>
   );

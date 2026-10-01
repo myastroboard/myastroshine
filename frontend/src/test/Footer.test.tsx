@@ -59,7 +59,7 @@ describe('Footer', () => {
     mocked.checkForUpdates.mockResolvedValue({ ...BASE_RESULT });
     renderFooter();
 
-    expect(screen.getByRole('combobox', { name: 'Theme' })).toBeInTheDocument();
+    expect(screen.getByRole('radiogroup', { name: 'Theme' })).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Language' })).toBeInTheDocument();
     await waitFor(() => expect(mocked.checkForUpdates).toHaveBeenCalled());
   });

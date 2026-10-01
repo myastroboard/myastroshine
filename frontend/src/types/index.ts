@@ -358,10 +358,17 @@ export type EditorStepId =
   | 'depth'
   | 'export';
 
+/**
+ * The rail groups the steps into phases so eleven tools read as four moves:
+ * begin (one-click start), prepare the raw image, enhance it, finish it - then
+ * deliver. Labels live in `editor.rail.phase.<phase>`.
+ */
+export type EditorPhase = 'begin' | 'prepare' | 'enhance' | 'finish' | 'deliver';
+
 export interface EditorStep {
   id: EditorStepId;
-  /** Position in the workflow (1-8), or null for the start/stack/export brackets. */
-  number: number | null;
+  /** Which rail group the step sits in. */
+  phase: EditorPhase;
   /** Slider parameters shown in this step's panel, in display order. */
   params: SliderParameterKey[];
   /** Only shown for a stacked-composite session. */
@@ -373,12 +380,12 @@ export const EDITOR_STEPS: EditorStep[] = [
   // EditorView's initial activeStep), and Auto Astro (on 'start') analyses the
   // rendered image - it belongs *after* the stack render is dialled in, not
   // before. This order also drives the inspector's "next step" button.
-  { id: 'stack', number: null, params: [], stackOnly: true },
-  { id: 'start', number: null, params: [] },
-  { id: 'frame', number: 1, params: [] },
+  { id: 'stack', phase: 'begin', params: [], stackOnly: true },
+  { id: 'start', phase: 'begin', params: [] },
+  { id: 'frame', phase: 'prepare', params: [] },
   {
     id: 'sky',
-    number: 2,
+    phase: 'prepare',
     params: [
       'temperature',
       'tint',
@@ -390,23 +397,66 @@ export const EDITOR_STEPS: EditorStep[] = [
   },
   {
     id: 'light',
-    number: 3,
+    phase: 'enhance',
     params: ['exposure', 'contrast', 'highlights', 'shadows', 'whites', 'blacks'],
   },
-  { id: 'curves', number: 4, params: [] },
-  { id: 'colour', number: 5, params: ['saturation', 'vibrance'] },
-  { id: 'detail', number: 6, params: ['clarity', 'denoise', 'chromaDenoise', 'sharpness'] },
+  { id: 'curves', phase: 'enhance', params: [] },
+  { id: 'colour', phase: 'enhance', params: ['saturation', 'vibrance'] },
+  { id: 'detail', phase: 'finish', params: ['clarity', 'denoise', 'chromaDenoise', 'sharpness'] },
   {
     id: 'stars',
-    number: 7,
+    phase: 'finish',
     // Reduce (shrink in place), remove (starless split + recombine), and the
     // shared detection controls - all rendered as one grouped panel, see
     // EditorInspector's StarsPanel.
     params: ['starReduction', 'starRemoval', 'starRecombine', 'starSensitivity', 'starMaxSize'],
   },
-  { id: 'depth', number: 8, params: [] },
-  { id: 'export', number: null, params: [] },
+  { id: 'depth', phase: 'finish', params: [] },
+  { id: 'export', phase: 'deliver', params: [] },
 ];
+
+/** True when a step's controls hold different values in two edit states - the
+ * rail's "modified" dot (against the defaults) and the names given to the
+ * editor's go-back points (against the previous point). */
+export function stepChanged(
+  step: EditorStep,
+  a: ProcessingParameters,
+  b: ProcessingParameters,
+  focalA: FocusPoint | null,
+  focalB: FocusPoint | null,
+): boolean {
+  switch (step.id) {
+    case 'start':
+    case 'export':
+      return false;
+    case 'stack':
+      return !stackParametersEqual(a.stack, b.stack);
+    case 'frame':
+      return !geometryEquals(a.geometry, b.geometry);
+    case 'curves':
+      return (
+        !curvePointsEqual(a.curvePoints, b.curvePoints) ||
+        !curvePointsEqual(a.redCurvePoints, b.redCurvePoints) ||
+        !curvePointsEqual(a.greenCurvePoints, b.greenCurvePoints) ||
+        !curvePointsEqual(a.blueCurvePoints, b.blueCurvePoints)
+      );
+    case 'depth':
+      return focalA === null || focalB === null
+        ? focalA !== focalB
+        : focalA.x !== focalB.x || focalA.y !== focalB.y;
+    default:
+      return step.params.some((key) => a[key] !== b[key]);
+  }
+}
+
+/** True when a step's controls hold a value that differs from the default. */
+export function stepIsModified(
+  step: EditorStep,
+  parameters: ProcessingParameters,
+  focalPoint: FocusPoint | null,
+): boolean {
+  return stepChanged(step, DEFAULT_PARAMETERS, parameters, null, focalPoint);
+}
 
 /** The workflow steps visible for this session - the "Stack" step only for a composite. */
 export function editorStepsFor(isStack: boolean): EditorStep[] {

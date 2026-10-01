@@ -52,18 +52,20 @@
   },
   "app": {
     "nav_settings": "Einstellungen",
-    "opening_from_astrodex": "Ihr Bild wird aus Astrodex geöffnet..."
+    "opening_from_astrodex": "Ihr Bild wird aus Astrodex geöffnet...",
+    "back_to_single": "Doch nur ein Foto"
   },
   "image_upload": {
     "format_not_supported": "Format {ext} wird nicht unterstützt",
     "file_too_large": "Die Datei überschreitet das Limit von {mb} MB",
-    "drop_hint": "Astronomisches Bild hier ablegen",
-    "choose_file_hint": "oder wählen Sie eine Datei, um zu beginnen",
-    "choose_file_button": "Datei auswählen",
-    "uploading_percent": "Wird hochgeladen… {percent}%",
-    "processing": "Ihr Bild wird vorbereitet…",
+    "drop_hint": "oder hier ablegen",
+    "choose_file_button": "Foto auswählen",
+    "uploading_percent": "Wird hochgeladen... {percent}%",
+    "processing": "Ihr Bild wird vorbereitet...",
     "accepted_formats": "JPEG, PNG, TIFF, FITS oder Kamera-RAW",
-    "max_size": "bis zu {mb} MB"
+    "max_size": "bis zu {mb} MB",
+    "title": "Ein Foto",
+    "subtitle": "Eine einzelne Aufnahme oder ein bereits gestacktes Bild."
   },
   "editor": {
     "depth_shift_failed": "Tiefenverschiebung fehlgeschlagen: {error}",
@@ -72,9 +74,10 @@
     "auto_astro_button": "Auto Astro",
     "auto_astro_analyzing": "Analyse läuft...",
     "auto_astro_failed": "Auto Astro fehlgeschlagen: {error}",
-    "save_as_preset": "Als Voreinstellung speichern",
+    "save_as_preset": "Diese Einstellungen für andere Fotos behalten",
     "reset_all": "Alle Anpassungen zurücksetzen",
     "next_step": "Weiter: {step}",
+    "next_step_eyebrow": "Nächster Schritt",
     "new_photo": "Neues Foto",
     "discard_title": "Änderungen verwerfen?",
     "discard_body": "Wenn Sie ein anderes Foto laden, gehen die an diesem vorgenommenen Anpassungen verloren.",
@@ -85,58 +88,86 @@
       "start": "Start",
       "stack": "Stapel",
       "frame": "Ausschnitt",
-      "sky": "Hintergrund",
+      "sky": "Himmel säubern",
       "light": "Licht",
       "curves": "Kurven",
       "colour": "Farbe",
       "detail": "Detail",
       "stars": "Sterne",
-      "depth": "Tiefe",
-      "export": "Export"
+      "depth": "3D-Effekt",
+      "export": "Export",
+      "phase": {
+        "prepare": "Vorbereiten",
+        "enhance": "Verschönern",
+        "finish": "Feinschliff"
+      },
+      "hint": {
+        "start": "Ein Klick oder ein Preset",
+        "stack": "Signal hervorholen",
+        "frame": "Zuschneiden, ausrichten, drehen",
+        "sky": "Lichtverschmutzung, Farbstich",
+        "light": "Helligkeit und Kontrast",
+        "curves": "Tonwerte feinjustieren",
+        "colour": "Wie kräftig die Farben sind",
+        "detail": "Schärfe, Rauschen",
+        "stars": "Verkleinern oder entfernen",
+        "depth": "Animierte Parallaxe",
+        "export": "Herunterladen oder teilen"
+      }
     },
     "steps": {
       "start": {
-        "help": "Hier beginnen: ein Ein-Klick-Startpunkt mit Auto Astro, oder eine gespeicherte Voreinstellung anwenden. Dann die Schritte der Reihe nach durchgehen."
+        "help": "Lassen Sie Auto Astro mit einem Klick alles einstellen oder starten Sie mit einem Preset. Danach können Sie jeden Schritt verfeinern."
       },
       "stack": {
-        "help": "Das lineare Stapelkomposit, vor jeder kreativen Bearbeitung: das schwache Signal strecken, den Himmelsgradienten abziehen, die Farbe neutralisieren. Zerstörungsfrei - alles wird aus den 32-Bit-Daten neu berechnet."
+        "help": "Holen Sie die schwachen Details aus Ihrem gestackten Bild.",
+        "more": "Das lineare Stapelkomposit, vor jeder kreativen Bearbeitung: das schwache Signal strecken, den Himmelsgradienten abziehen, die Farbe neutralisieren. Zerstörungsfrei - alles wird aus den 32-Bit-Daten neu berechnet."
       },
       "frame": {
         "help": "Legen Sie zuerst den Ausschnitt fest - zuschneiden, Horizont begradigen, drehen oder spiegeln. Alles danach arbeitet mit dem zugeschnittenen Bild.",
         "unavailable": "Für den Ausschnitt werden die ursprünglichen Bildabmessungen benötigt, die bei einem gestapelten Komposit nicht verfügbar sind."
       },
       "sky": {
-        "help": "Bereinigen Sie das Rohsignal vor jeder kreativen Bearbeitung: Weißabgleich, Objektivvignettierung, Lichtverschmutzungsgradienten und Dunst."
+        "help": "Entfernen Sie Lichtverschmutzung und Farbstiche für einen natürlichen Himmel.",
+        "more": "Bereinigen Sie das Rohsignal vor jeder kreativen Bearbeitung: Weißabgleich, Objektivvignettierung, Lichtverschmutzungsgradienten und Dunst."
       },
       "light": {
-        "help": "Gesamtbelichtung und Tonwertbalance - wie hell, kontrastreich und detailreich Schatten und Lichter im Bild erscheinen."
+        "help": "Wie hell und knackig das Bild wirkt.",
+        "more": "Gesamtbelichtung und Tonwertbalance - wie hell, kontrastreich und detailreich Schatten und Lichter im Bild erscheinen."
       },
       "curves": {
-        "help": "Feinabstimmung von Tonwert und Farbe mit einer Hauptkurve, dann kanalweise Rot-/Grün-/Blaukurven für die Farbgebung."
+        "help": "Feine Kontrolle über helle und dunkle Töne - optional.",
+        "more": "Feinabstimmung von Tonwert und Farbe mit einer Hauptkurve, dann kanalweise Rot-/Grün-/Blaukurven für die Farbgebung."
       },
       "colour": {
-        "help": "Wie kräftig die Farben sind. Dynamik schützt bereits gesättigte Bereiche; Sättigung wirkt auf alles gleichermaßen."
+        "help": "Machen Sie die Farben kräftiger oder dezenter.",
+        "more": "Wie kräftig die Farben sind. Dynamik schützt bereits gesättigte Bereiche; Sättigung wirkt auf alles gleichermaßen."
       },
       "detail": {
-        "help": "Lokale Textur: Mikrokontrast, Rauschunterdrückung und Schärfung. Erst durchführen, wenn Tonwert und Farbe feststehen."
+        "help": "Glätten Sie Rauschen und betonen Sie feine Strukturen.",
+        "more": "Lokale Textur: Mikrokontrast, Rauschunterdrückung und Schärfung. Erst durchführen, wenn Tonwert und Farbe feststehen."
       },
       "stars": {
-        "help": "Zwei Wege, Sterne zu behandeln: sie an Ort und Stelle verkleinern, oder sie vollständig entfernen, damit der Rest Ihrer Bearbeitung nur den Nebel betrifft."
+        "help": "Machen Sie Sterne kleiner oder entfernen Sie sie, um nur den Nebel zu bearbeiten.",
+        "more": "Zwei Wege, Sterne zu behandeln: sie an Ort und Stelle verkleinern, oder sie vollständig entfernen, damit der Rest Ihrer Bearbeitung nur den Nebel betrifft."
       },
       "depth": {
-        "help": "Wählen Sie den Brennpunkt, dann öffnen Sie den Depth-Shift-Betrachter für eine interaktive Parallaxenvorschau."
+        "help": "Verwandeln Sie Ihr Bild in einen sanften animierten 3D-Effekt.",
+        "more": "Wählen Sie den Brennpunkt, dann öffnen Sie den Depth-Shift-Betrachter für eine interaktive Parallaxenvorschau."
       },
       "export": {
-        "help": "Holen Sie das Ergebnis heraus: herunterladen, an Astrodex übergeben, oder die aktuellen Einstellungen als wiederverwendbare Voreinstellung speichern."
+        "help": "Speichern Sie Ihr Bild oder behalten Sie diese Einstellungen für die nächsten Fotos."
       }
     },
     "milestones": {
-      "title": "Meilensteine",
-      "help": "Speichern Sie die aktuellen Anpassungen, um zu diesem Punkt zurückzukehren, falls Sie einen Regler zu weit verschieben. Nur für dieses Bild aufbewahrt.",
-      "add": "Meilenstein speichern",
-      "origin": "Original",
-      "point": "Meilenstein {n}",
-      "restore_aria": "{label} wiederherstellen"
+      "title": "Rückkehrpunkte",
+      "help": "Setzen Sie einen Punkt, bevor Sie etwas ausprobieren - geht es schief, bringt Sie ein Klick zurück. Nichts geht verloren.",
+      "saved": "Punkt {n} gesetzt - ein Klick darauf bringt Sie jederzeit hierher zurück.",
+      "add": "Rückkehrpunkt setzen",
+      "origin": "Originalfoto",
+      "point": "Punkt {n}",
+      "point_named": "{n} - {steps}",
+      "restore_aria": "Zurück zu {label}"
     },
     "capture_info": {
       "title": "Aufnahme",
@@ -148,7 +179,12 @@
       "date": "Datum",
       "gain": "Gain",
       "sensor_temp": "Sensortemperatur"
-    }
+    },
+    "learn_more": "Mehr erfahren",
+    "slider_tip": "Tipp: Ein Doppelklick auf einen Regler setzt ihn auf neutral zurück.",
+    "auto_astro_hint": "Analysiert Ihr Foto und stellt jeden Schritt für Sie ein.",
+    "auto_astro_done": "Fertig - jeder Schritt ist eingestellt. Passen Sie nach Wunsch an oder gehen Sie direkt zum Export.",
+    "presets_hint": "Oder starten Sie mit einem Look für Ihr Motiv."
   },
   "export_panel": {
     "filename_label": "Dateiname",
@@ -158,7 +194,11 @@
     "returned": "Als neues Bild zum Astrodex-Objekt hinzugefügt.",
     "return_hint": "Fügt dem Astrodex-Objekt eine Kopie mit Ihrem verbesserten Bild hinzu - das Original bleibt erhalten.",
     "return_hint_named": "Fügt zu '{object}' im Astrodex eine Kopie mit Ihrem verbesserten Bild hinzu - das Original bleibt erhalten.",
-    "return_failed": "Rücksendung an Astrodex fehlgeschlagen: {error}"
+    "return_failed": "Rücksendung an Astrodex fehlgeschlagen: {error}",
+    "ready_title": "Ihr Bild ist fertig",
+    "recap": "Bearbeitet: {steps}",
+    "recap_none": "Noch keine Anpassungen - das ist das Original.",
+    "result_alt": "Ihr bearbeitetes Bild"
   },
   "image_preview": {
     "processed_alt": "Bearbeitet",
@@ -169,11 +209,12 @@
     "zoom_in": "Vergrößern",
     "processing": "Wird verarbeitet",
     "removing_stars_starnet2": "Sterne werden entfernt (StarNet2)",
-    "before_after": "Vorher / Nachher",
     "open_depth_shift": "Depth-Shift-Betrachter öffnen",
     "change_focal_point": "Brennpunkt ändern",
     "set_focal_point": "Brennpunkt festlegen",
-    "clear_focal_point": "Brennpunkt löschen"
+    "clear_focal_point": "Brennpunkt löschen",
+    "before": "Vorher",
+    "after": "Nachher"
   },
   "preset_buttons": {
     "confirm_delete_aria": "Löschen der Voreinstellung {name} bestätigen",
@@ -261,7 +302,7 @@
         "hint": "Positiv hellt die Ecken auf (wirkt Objektivvignettierung entgegen); negativ verdunkelt sie (Vignette verstärken oder einen übermäßig korrigierten Stapel zähmen)."
       },
       "gradientReduction": {
-        "label": "Gradientenreduzierung",
+        "label": "Lichtverschmutzungs-Verlauf",
         "hint": "Glättet sanfte Hintergrundgradienten - Lichtverschmutzung, Himmelsaufhellung."
       },
       "dehaze": {
@@ -285,11 +326,11 @@
         "hint": "Verkleinert und dämpft Sternpunkte, damit schwache Nebelstrukturen stärker hervortreten."
       },
       "starSensitivity": {
-        "label": "Sternempfindlichkeit",
+        "label": "Schwächere Sterne erfassen",
         "hint": "Wie schwach ein Punkt sein darf und trotzdem als Stern zählt. Höher findet mehr, schwächere Sterne."
       },
       "starMaxSize": {
-        "label": "Max. Sterngröße",
+        "label": "Maximale Sterngröße",
         "hint": "Begrenzt, wie groß ein heller Fleck sein darf und trotzdem als Stern zählt, damit helle Kerne nicht verkleinert werden."
       },
       "starRemoval": {
@@ -326,7 +367,7 @@
         "hint": "Weißabgleich: verschiebt den Farbstich zwischen Grün und Magenta."
       },
       "greenRemoval": {
-        "label": "Grünentfernung",
+        "label": "Grünstich entfernen",
         "hint": "Entfernt einen verbleibenden Grünstich (SCNR). Am Deep-Sky-Himmel ist fast nichts grün; ein türkises OIII-Filament behält seine Farbe, weil Blau es stützt."
       }
     }
@@ -354,12 +395,12 @@
   },
   "stars_panel": {
     "reduce": {
-      "heading": "Reduzieren",
-      "help": "Verkleinert jeden Stern an Ort und Stelle. Schnell, alle Sterne bleiben erhalten - dafür geeignet, wenn Sie einfach ein kompakteres Feld möchten."
+      "heading": "Sterne verkleinern",
+      "help": "Verkleinert jeden Stern an Ort und Stelle - schnell, alle Sterne bleiben erhalten."
     },
     "remove": {
-      "heading": "Entfernen (sternenlos)",
-      "help": "Entfernt die Sterne, damit alle anderen Schritte nur den Nebel betreffen, dann blendet Sterne zurückholen sie am Ende ein (0 = Bild bleibt sternenlos). Langsamer, erlaubt aber, den Nebel zu strecken und zu schärfen, ohne die Sterne aufzublähen.",
+      "heading": "Sterne entfernen",
+      "help": "Hebt die Sterne heraus, damit die übrigen Schritte nur den Nebel bearbeiten; der zweite Regler blendet sie am Ende wieder ein.",
       "engine": {
         "aria": "Sternentfernungs-Engine",
         "classic": "Klassisch",
@@ -368,8 +409,8 @@
       }
     },
     "detection": {
-      "heading": "Erkennung",
-      "help": "Was als Stern zählt. Sowohl Reduzieren als auch Entfernen nutzen diese Einstellungen. Aktivieren Sie die Maske, um vor der Anwendung zu prüfen."
+      "heading": "Welche Punkte Sterne sind",
+      "help": "Beide Werkzeuge oben nutzen dies. Schalten Sie die Sternmaske ein, um die Erkennung zu prüfen."
     }
   },
   "detail_panel": {
@@ -384,7 +425,8 @@
     }
   },
   "histogram": {
-    "aria_label": "RGB-Histogramm"
+    "aria_label": "RGB-Histogramm",
+    "toggle": "Histogramm"
   },
   "settings": {
     "back_to_editor": "Zurück zum Editor",
@@ -645,10 +687,6 @@
   },
   "stacking": {
     "combination_label": "Kombination",
-    "mode": {
-      "single": "Einzelbild",
-      "stack": "Mehrbild-Stapel"
-    },
     "progress": {
       "heading": "Stapelung"
     },
@@ -658,7 +696,7 @@
       "status": {
         "waiting_for_frames": "{count} Bilder aufgenommen, warte auf weitere",
         "ready": "{count} Bilder aufgenommen, warte auf weitere",
-        "processing": "{count} Bilder werden gestapelt…",
+        "processing": "{count} Bilder werden gestapelt...",
         "completed": "Fertig - {count} Bilder gestapelt",
         "failed": "Stapelung fehlgeschlagen"
       }
@@ -730,17 +768,18 @@
     },
     "upload_zone": {
       "add_frames": "Bilder hinzufügen",
-      "select_multiple_hint": "Mehrere Dateien gleichzeitig auswählen",
       "status": {
         "queued": "wartend",
         "uploading": "wird hochgeladen",
         "done": "fertig",
         "error": "Fehler"
       },
-      "drop_hint": "Ihre Light-Frames hier ablegen",
+      "drop_hint": "oder alle auf einmal hier ablegen",
       "choose_files_button": "Dateien auswählen",
       "accepted_formats": "JPEG, PNG, TIFF, FITS oder Kamera-RAW",
-      "max_size": "bis zu {mb} MB je Datei"
+      "max_size": "bis zu {mb} MB je Datei",
+      "title": "Mehrere Aufnahmen desselben Objekts",
+      "subtitle": "Sie werden ausgerichtet und zu einem saubereren, tieferen Bild kombiniert."
     },
     "view": {
       "stacking_button": "Wird gestapelt...",
@@ -751,7 +790,7 @@
       "back_to_composite": "Zurück zum Komposit",
       "restack_n_frames": "{count} Bilder neu stapeln",
       "upload_more": "{count} weitere hochladen",
-      "frames_summary": "{total} Bilder · {excluded} ausgeschlossen",
+      "frames_summary": "{total} Bilder - {excluded} ausgeschlossen",
       "result_pending": "Starten Sie die Stapelung, um das Ergebnis zu sehen."
     },
     "errors": {
@@ -763,7 +802,7 @@
       "frame_aria": "Bild {n}",
       "exclude": "Dieses Bild vom Stapel ausschließen",
       "remove": "{name} entfernen",
-      "quality_title": "{stars} Sterne · FWHM {fwhm}",
+      "quality_title": "{stars} Sterne - FWHM {fwhm}",
       "reject": {
         "clouds": "Wolken",
         "soft": "unscharf",

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 
+import { PhotoStackIcon } from '@/components/icons';
 import { useTranslation } from '@/hooks/useTranslation';
 
 const ACCEPT =
@@ -43,7 +44,7 @@ export function StackUploadZone({ compact, maxSizeMb = 100, onAddFiles }: StackU
 
   return (
     <div
-      className={`dropzone ${dragActive ? 'dropzone-active' : ''}`}
+      className={`dropzone h-full ${dragActive ? 'dropzone-active' : ''}`}
       onDragOver={(event) => {
         event.preventDefault();
         setDragActive(true);
@@ -55,24 +56,18 @@ export function StackUploadZone({ compact, maxSizeMb = 100, onAddFiles }: StackU
         onAddFiles(Array.from(event.dataTransfer.files));
       }}
     >
-      <div className="grid h-12 w-12 place-items-center rounded-full border border-line bg-raised">
-        <svg viewBox="0 0 24 24" className="h-5 w-5 stroke-muted" fill="none" aria-hidden>
-          <path
-            d="M12 16V4m0 0-4 4m4-4 4 4M5 20h14"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+      <div className="grid h-14 w-14 place-items-center rounded-full border border-line bg-raised text-accent">
+        <PhotoStackIcon className="h-7 w-7" />
       </div>
       <div className="flex flex-col gap-1">
-        <p className="text-sm text-ink">{t('stacking.upload_zone.drop_hint')}</p>
-        <p className="text-xs text-faint">{t('stacking.upload_zone.select_multiple_hint')}</p>
+        <h2 className="text-base font-semibold text-ink">{t('stacking.upload_zone.title')}</h2>
+        <p className="text-sm text-muted">{t('stacking.upload_zone.subtitle')}</p>
       </div>
-      <button type="button" className="btn btn-primary" onClick={() => inputRef.current?.click()}>
+      <button type="button" className="btn btn-outline" onClick={() => inputRef.current?.click()}>
         {t('stacking.upload_zone.choose_files_button')}
       </button>
-      <p className="text-[11px] text-ghost">
+      <p className="text-xs text-faint">{t('stacking.upload_zone.drop_hint')}</p>
+      <p className="mt-auto text-[11px] text-faint">
         {t('stacking.upload_zone.accepted_formats')} &middot;{' '}
         {t('stacking.upload_zone.max_size', { mb: maxSizeMb })}
       </p>

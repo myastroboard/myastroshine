@@ -8,6 +8,25 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **A friendlier editor for people who are not photographers.** The start
+  screen offers two drop zones side by side (one photo / several shots of the
+  same target) instead of a mode toggle. The workflow rail groups the steps into
+  Prepare / Enhance / Finish with an icon and a plain-language subtitle each;
+  every step opens on one short sentence with the details behind "Learn more",
+  and ends on a distinct "Next step" button. Auto Astro is the Start step's main
+  action and confirms when it has set everything; presets are cards with an icon
+  and a visible description. Sliders fill from their neutral value, white
+  balance / tint / exposure / colour show a gradient track, and a double-click
+  puts a slider back to neutral. Before / After are labelled on the image, the
+  histogram is folded away, and Export ends on a "your image is ready" recap.
+  Several labels say what they do ("Clean the sky", "3D effect", "Remove
+  haze"). Own line-icon set, no emoji; footer theme toggle as icons.
+- **Go-back points** (formerly milestones) explain themselves, are named after
+  the steps that changed ("2 - Light, Colour"), and going back from an unsaved
+  edit keeps that edit as a new point first - nothing is lost.
+- **Phone layout:** the preview is pinned above the controls and the rail is a
+  bottom tab bar; the editor no longer overflows horizontally.
+
 - **One container, no Redis, no worker.** Image and stack processing now run as
   background jobs inside the application process, and the app runs its own
   maintenance (hourly cleanup, minute-by-minute watch-folder poll). `/process`
@@ -99,6 +118,12 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the `worker` and `redis` compose services, `worker.log`, and the `redis` field
   of `GET /api/health`. `celery`, `redis` and `celery-types` leave the
   dependencies.
+
+### Fixed
+
+- The Depth Shift viewer opened underneath the inspector column (the modal was
+  rendered inside the sticky preview column's stacking context).
+- Ellipses and middle dots in the translations are ASCII now ("...", "-").
 
 ### Dependencies
 

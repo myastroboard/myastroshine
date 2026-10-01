@@ -1,14 +1,17 @@
+import { STEP_ICONS } from '@/components/EditorRail';
 import { ExportPanel } from '@/components/ExportPanel';
 import { FramingControls } from '@/components/FramingControls';
 import { PresetButtons } from '@/components/PresetButtons';
 import { SliderGroup } from '@/components/SliderGroup';
 import { ToneCurveEditor } from '@/components/ToneCurveEditor';
+import { ChevronIcon, SparkleIcon } from '@/components/icons';
 import type { SliderRevert } from '@/hooks/useImageProcessing';
 import { useTranslation } from '@/hooks/useTranslation';
 import {
   DEFAULT_STACK_PARAMETERS,
   editorStepsFor,
   stackParametersEqual,
+  stepIsModified,
   STRETCH_MODES,
   type CurveChannel,
   type CurvePoint,
@@ -28,6 +31,8 @@ export interface StartBundle {
   onAutoAstro: () => void;
   autoAstroLoading: boolean;
   autoAstroError: string | null;
+  /** Auto Astro's settings are in place and untouched since - show the "done" note. */
+  autoAstroApplied: boolean;
   presets: Preset[];
   activePreset?: string;
   onPresetApply: (id: string) => void;
@@ -85,6 +90,8 @@ export interface DepthBundle {
 }
 
 export interface ExportBundle {
+  /** The edited image, shown as the "ready" thumbnail. */
+  resultUrl: string;
   canReturnToAstroDex: boolean;
   astrodexObjectName: string | null;
   astrodexReturning: boolean;
@@ -118,6 +125,18 @@ export interface EditorInspectorProps {
   exportActions: ExportBundle;
 }
 
+/** Steps whose help has a longer "learn more" explanation (`editor.steps.<id>.more`). */
+const STEPS_WITH_DETAILS = new Set<EditorStepId>([
+  'stack',
+  'sky',
+  'light',
+  'curves',
+  'colour',
+  'detail',
+  'stars',
+  'depth',
+]);
+
 /** The single panel of controls for whichever workflow step the rail selects. */
 export function EditorInspector(props: EditorInspectorProps) {
   const { t } = useTranslation();
@@ -144,6 +163,12 @@ export function EditorInspector(props: EditorInspectorProps) {
 
   const showHeaderReset =
     sectionResettable || activeStep === 'curves' || (activeStep === 'stack' && stackModified);
+  const StepIcon = STEP_ICONS[step.id];
+  const NextIcon = nextStep ? STEP_ICONS[nextStep.id] : null;
+  // The steps that touched the image, for the Export step's recap.
+  const touchedSteps = steps
+    .filter((entry) => stepIsModified(entry, parameters, props.depth.focalPoint))
+    .map((entry) => t(`editor.rail.${entry.id}`));
 
   return (
     // z-10 lifts this column (and the parameter-hint popovers that spill out of
@@ -151,7 +176,10 @@ export function EditorInspector(props: EditorInspectorProps) {
     // otherwise paint over an escaping tooltip.
     <div className="panel relative z-10 flex flex-col gap-4">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="eyebrow">{t(`editor.rail.${step.id}`)}</h2>
+        <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight text-ink">
+          <StepIcon className="h-5 w-5 text-accent" />
+          {t(`editor.rail.${step.id}`)}
+        </h2>
         {showHeaderReset && (
           <button type="button" className="btn btn-ghost btn-sm -mr-2" onClick={handleHeaderReset}>
             {t('common.reset')}
@@ -159,7 +187,20 @@ export function EditorInspector(props: EditorInspectorProps) {
         )}
       </div>
 
-      <p className="text-xs text-faint">{t(`editor.steps.${step.id}.help`)}</p>
+      <div className="-mt-2 flex flex-col gap-1">
+        <p className="text-sm text-muted">{t(`editor.steps.${step.id}.help`)}</p>
+        {STEPS_WITH_DETAILS.has(step.id) && (
+          // Native disclosure: the long explanation stays one click away
+          // instead of standing between the user and the first control.
+          <details className="group text-xs text-faint">
+            <summary className="flex w-fit cursor-pointer list-none items-center gap-1 font-medium text-accent outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-accent [&::-webkit-details-marker]:hidden">
+              <ChevronIcon className="h-3 w-3 transition-transform group-open:rotate-90" />
+              {t('editor.learn_more')}
+            </summary>
+            <p className="mt-1.5 leading-relaxed">{t(`editor.steps.${step.id}.more`)}</p>
+          </details>
+        )}
+      </div>
 
       {activeStep === 'start' && <StartPanel {...props.start} isProcessing={props.isProcessing} />}
 
@@ -246,23 +287,43 @@ export function EditorInspector(props: EditorInspectorProps) {
           astrodexReturned={props.exportActions.astrodexReturned}
           astrodexError={props.exportActions.astrodexError}
           defaultFilename={props.exportActions.defaultFilename}
+          resultUrl={props.exportActions.resultUrl}
+          touchedSteps={touchedSteps}
           onDownload={props.exportActions.onDownload}
           onReturnToAstroDex={props.exportActions.onReturnToAstroDex}
           onSaveAsPreset={props.exportActions.onSaveAsPreset}
         />
       )}
 
-      {nextStep && (
-        <button
-          type="button"
-          className="mt-1 inline-flex items-center gap-1 self-start text-xs font-medium text-accent transition-opacity hover:opacity-80"
-          onClick={() => onStepChange(nextStep.id)}
-        >
-          {t('editor.next_step', { step: t(`editor.rail.${nextStep.id}`) })}
-          <svg viewBox="0 0 12 12" className="h-3 w-3 stroke-current" fill="none" aria-hidden>
-            <path d="M4 2l4 4-4 4" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
+      {sliderKeys.length > 0 && (
+        <p className="text-[11px] text-faint">{t('editor.slider_tip')}</p>
+      )}
+
+      {NextIcon && nextStep && (
+        // Workflow navigation, not a setting: set off below a hairline, on
+        // the accent wash, with the next step's own icon - it must never read
+        // as one more control of this step.
+        <div className="-mx-4 -mb-4 mt-1 border-t border-hairline p-3 sm:-mx-5 sm:-mb-5">
+          <button
+            type="button"
+            className="group flex w-full items-center gap-3 rounded-lg bg-accent-wash px-3 py-2.5 text-left outline-none ring-1 ring-accent/25 transition-[background-color,box-shadow] duration-150 hover:ring-accent/50 focus-visible:ring-2 focus-visible:ring-accent"
+            aria-label={t('editor.next_step', { step: t(`editor.rail.${nextStep.id}`) })}
+            onClick={() => onStepChange(nextStep.id)}
+          >
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-surface text-accent shadow-panel">
+              <NextIcon className="h-4 w-4" />
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-accent">
+                {t('editor.next_step_eyebrow')}
+              </span>
+              <span className="truncate text-sm font-medium text-ink">
+                {t(`editor.rail.${nextStep.id}`)}
+              </span>
+            </span>
+            <ChevronIcon className="h-4 w-4 text-accent transition-transform duration-150 group-hover:translate-x-0.5" />
+          </button>
+        </div>
       )}
     </div>
   );
@@ -272,6 +333,7 @@ function StartPanel({
   onAutoAstro,
   autoAstroLoading,
   autoAstroError,
+  autoAstroApplied,
   presets,
   activePreset,
   onPresetApply,
@@ -281,22 +343,34 @@ function StartPanel({
 }: StartBundle & { isProcessing: boolean }) {
   const { t } = useTranslation();
   return (
-    <div className="flex flex-col gap-3">
-      <button
-        type="button"
-        className="btn btn-primary btn-sm w-full"
-        disabled={isProcessing || autoAstroLoading}
-        onClick={onAutoAstro}
-      >
-        {autoAstroLoading ? t('editor.auto_astro_analyzing') : t('editor.auto_astro_button')}
-      </button>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-2">
+        <button
+          type="button"
+          className="btn btn-primary w-full py-2.5 text-[15px]"
+          disabled={isProcessing || autoAstroLoading}
+          onClick={onAutoAstro}
+        >
+          <SparkleIcon className={`h-5 w-5 ${autoAstroLoading ? 'animate-pulse' : ''}`} />
+          {autoAstroLoading ? t('editor.auto_astro_analyzing') : t('editor.auto_astro_button')}
+        </button>
+        <p className="text-xs text-faint">{t('editor.auto_astro_hint')}</p>
+      </div>
+      {autoAstroApplied && !autoAstroError && (
+        <p className="rounded-md border border-accent/30 bg-accent-wash px-3 py-2 text-xs text-ink" role="status">
+          {t('editor.auto_astro_done')}
+        </p>
+      )}
       {autoAstroError && (
         <p className="rounded-md border border-danger/30 bg-danger-wash px-3 py-2 text-xs text-danger">
           {t('editor.auto_astro_failed', { error: autoAstroError })}
         </p>
       )}
       <div className="flex flex-col gap-2">
-        <span className="eyebrow">{t('editor.presets_heading')}</span>
+        <span className="flex flex-col gap-0.5">
+          <span className="eyebrow">{t('editor.presets_heading')}</span>
+          <span className="text-xs text-faint">{t('editor.presets_hint')}</span>
+        </span>
         <PresetButtons
           presets={presets}
           activePreset={activePreset}

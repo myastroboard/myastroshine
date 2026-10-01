@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -40,7 +41,8 @@ const h = vi.hoisted(() => ({
 function stub<K extends keyof Captured>(name: K) {
   return (props: Captured[K]) => {
     h.captured[name] = props;
-    return <div data-testid={name} />;
+    // Pass children through: the preview card hosts the versions strip.
+    return <div data-testid={name}>{(props as { children?: ReactNode }).children}</div>;
   };
 }
 
@@ -129,7 +131,7 @@ function makeState(parameters: ProcessingParameters) {
       success: false,
       error: null,
     },
-    milestones: { milestones: [], activeId: null, capture: vi.fn() },
+    milestones: { milestones: [], activeId: null as string | null, capture: vi.fn() },
   };
 }
 
@@ -488,6 +490,19 @@ describe('EditorView', () => {
       h.state.depth.layerUrls = ['/l0'];
       act(() => captured('milestones').onRestore({ ...milestone, focalPoint: null }));
       expect(h.state.depth.generate).toHaveBeenCalledWith(7, undefined);
+    });
+
+    it('keeps unsaved work as a new point before going back, so nothing is lost', () => {
+      renderEditor();
+      act(() => captured('milestones').onRestore(milestone));
+      expect(h.state.milestones.capture).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not duplicate a point when the current state already matches one', () => {
+      h.state.milestones.activeId = 'm0';
+      renderEditor();
+      act(() => captured('milestones').onRestore(milestone));
+      expect(h.state.milestones.capture).not.toHaveBeenCalled();
     });
 
     it('picks and clears the focal point, and stops picking when leaving the Depth step', () => {

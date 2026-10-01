@@ -48,31 +48,29 @@ vi.mock('@/components/SettingsView', () => ({
   ),
 }));
 
-vi.mock('@/components/stacking/StackMode', () => ({
-  StackMode: ({
-    mode,
-    onModeChange,
-  }: {
-    mode: string;
-    onModeChange: (mode: 'single' | 'stack') => void;
-  }) => (
-    <div data-testid="stack-mode">
-      <span data-testid="current-mode">{mode}</span>
-      <button onClick={() => onModeChange('stack')}>go-stack</button>
-      <button onClick={() => onModeChange('single')}>go-single</button>
+vi.mock('@/components/stacking/StackUploadZone', () => ({
+  StackUploadZone: ({ onAddFiles }: { onAddFiles: (files: File[]) => void }) => (
+    <div data-testid="stack-upload">
+      <button onClick={() => onAddFiles([new File(['a'], 'a.fit'), new File(['b'], 'b.fit')])}>
+        go-stack
+      </button>
+      <button onClick={() => onAddFiles([])}>go-stack-empty</button>
     </div>
   ),
 }));
 
 vi.mock('@/components/stacking/StackView', () => ({
   StackView: ({
+    initialFiles,
     onEnhanceComposite,
     onWorkingChange,
   }: {
+    initialFiles?: File[];
     onEnhanceComposite: (sessionId: string) => void;
     onWorkingChange: (working: boolean) => void;
   }) => (
     <div data-testid="stack-view">
+      <span data-testid="seeded-frames">{(initialFiles ?? []).map((f) => f.name).join(',')}</span>
       <button onClick={() => onEnhanceComposite('composite-session-1')}>enhance</button>
       <button onClick={() => onWorkingChange(true)}>set-working</button>
       <button onClick={() => onWorkingChange(false)}>clear-working</button>
@@ -118,7 +116,8 @@ describe('App', () => {
 
     expect(screen.getByTestId('image-upload')).toBeInTheDocument();
     expect(screen.getByTestId('upload-state')).toHaveTextContent('false:null:42');
-    expect(screen.getByTestId('stack-mode')).toBeInTheDocument();
+    // Both ways in sit side by side: one photo, or several frames to stack.
+    expect(screen.getByTestId('stack-upload')).toBeInTheDocument();
     expect(screen.getByTestId('footer')).toBeInTheDocument();
   });
 
@@ -169,22 +168,34 @@ describe('App', () => {
     await screen.findByTestId('image-upload');
   });
 
-  it('switches to stack mode, hiding the mode picker while a stack is working', () => {
+  it('opens stacking with the frames dropped on the stacking zone, back link hidden while working', () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole('button', { name: 'go-stack' }));
-    expect(screen.getByTestId('current-mode')).toHaveTextContent('stack');
     expect(screen.getByTestId('stack-view')).toBeInTheDocument();
-    expect(screen.getByTestId('stack-mode')).toBeInTheDocument();
+    expect(screen.getByTestId('seeded-frames')).toHaveTextContent('a.fit,b.fit');
+    expect(screen.queryByTestId('image-upload')).not.toBeInTheDocument();
+    const back = screen.getByRole('button', { name: 'One photo instead' });
+    expect(back).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'set-working' }));
-    expect(screen.queryByTestId('stack-mode')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'One photo instead' })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'clear-working' }));
-    expect(screen.getByTestId('stack-mode')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'One photo instead' }));
+    expect(screen.queryByTestId('stack-view')).not.toBeInTheDocument();
+    expect(screen.getByTestId('image-upload')).toBeInTheDocument();
   });
 
-  it('hides the mode picker once a single-image session is open', async () => {
+  it('stays on the landing screen when the stacking picker returns no files', () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'go-stack-empty' }));
+    expect(screen.queryByTestId('stack-view')).not.toBeInTheDocument();
+    expect(screen.getByTestId('image-upload')).toBeInTheDocument();
+  });
+
+  it('hides both landing zones once a single-image session is open', async () => {
     mocked.uploadImage.mockResolvedValue({
       sessionId: 'sess-1',
       imageUrl: '/x',
@@ -200,7 +211,7 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'do-upload' }));
     await screen.findByTestId('editor-view');
 
-    expect(screen.queryByTestId('stack-mode')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('stack-upload')).not.toBeInTheDocument();
   });
 
   it('hands a stacked composite to the single-image editor', () => {
@@ -209,9 +220,9 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'go-stack' }));
     fireEvent.click(screen.getByRole('button', { name: 'enhance' }));
 
-    // Back on 'single' mode with a session open - the mode picker (which only
-    // shows pre-session) is gone, along with the stacking view.
-    expect(screen.queryByTestId('stack-mode')).not.toBeInTheDocument();
+    // Back on 'single' mode with a session open - the landing zones (which only
+    // show pre-session) are gone, along with the stacking view.
+    expect(screen.queryByTestId('stack-upload')).not.toBeInTheDocument();
     expect(screen.queryByTestId('stack-view')).not.toBeInTheDocument();
     const session = JSON.parse(screen.getByTestId('editor-session').textContent ?? '{}');
     expect(session).toEqual({ sessionId: 'composite-session-1', isStack: true });
@@ -342,7 +353,7 @@ describe('App', () => {
     expect(window.location.hash).toBe('#/');
     expect(await screen.findByText('Opening your image from Astrodex...')).toBeInTheDocument();
     expect(mocked.resumeAstrodexHandoff).toHaveBeenCalledWith('tok-123');
-    expect(screen.queryByTestId('stack-mode')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('stack-upload')).not.toBeInTheDocument();
 
     await act(async () => {
       resolveHandoff({

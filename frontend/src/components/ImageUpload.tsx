@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 
+import { PhotoIcon } from '@/components/icons';
 import { useTranslation } from '@/hooks/useTranslation';
 
 const ACCEPTED = [
@@ -89,9 +90,9 @@ export function ImageUpload({
   const percent = progress == null ? null : Math.round(progress * 100);
 
   return (
-    <div className="mx-auto w-full max-w-xl">
+    <div className="h-full w-full">
       <div
-        className={`dropzone ${dragActive && !isLoading ? 'dropzone-active' : ''}`}
+        className={`dropzone h-full ${dragActive && !isLoading ? 'dropzone-active' : ''}`}
         onDragOver={(event) => {
           event.preventDefault();
           if (!isLoading) {
@@ -129,19 +130,12 @@ export function ImageUpload({
           </div>
         ) : (
           <>
-            <div className="grid h-12 w-12 place-items-center rounded-full border border-line bg-raised">
-              <svg viewBox="0 0 24 24" className="h-5 w-5 stroke-muted" fill="none" aria-hidden>
-                <path
-                  d="M12 16V4m0 0-4 4m4-4 4 4M5 20h14"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+            <div className="grid h-14 w-14 place-items-center rounded-full border border-line bg-raised text-accent">
+              <PhotoIcon className="h-7 w-7" />
             </div>
             <div className="flex flex-col gap-1">
-              <p className="text-sm text-ink">{t('image_upload.drop_hint')}</p>
-              <p className="text-xs text-faint">{t('image_upload.choose_file_hint')}</p>
+              <h2 className="text-base font-semibold text-ink">{t('image_upload.title')}</h2>
+              <p className="text-sm text-muted">{t('image_upload.subtitle')}</p>
             </div>
             <button
               type="button"
@@ -150,7 +144,8 @@ export function ImageUpload({
             >
               {t('image_upload.choose_file_button')}
             </button>
-            <p className="text-[11px] text-ghost">
+            <p className="text-xs text-faint">{t('image_upload.drop_hint')}</p>
+            <p className="mt-auto text-[11px] text-faint">
               {t('image_upload.accepted_formats')} &middot;{' '}
               {t('image_upload.max_size', { mb: maxSizeMb })}
             </p>

@@ -14,7 +14,7 @@ no account and no cloud upload.** It integrates optionally with
 photo over for enhancement, get it back as a new picture on the same object - and
 runs just as well standalone, in a web browser.
 
-![The MyAstroShine editor: a numbered workflow rail, the active step's inspector, and a pinned before/after preview with the histogram below](docs/export.png)
+![The MyAstroShine editor: a workflow rail grouped into phases, the active step's inspector, and a pinned before/after preview with the histogram below](docs/export.png)
 
 > **Status: Alpha.** `v0.4.0` is tagged and published to `ghcr.io` and Docker
 > Hub. The full feature set is implemented and the frontend is wired end to end,
@@ -59,7 +59,7 @@ runs just as well standalone, in a web browser.
   [StarNet2](https://starnetastro.com/) / DeepSNR binary for star removal and
   denoise (**nothing is bundled** - see [THIRD_PARTY.md](THIRD_PARTY.md)).
 - **Wide input support** - 8/16-bit JPEG/PNG/TIFF, FITS, and camera RAW.
-- **Edit milestones**, **English + French** UI, light / dark themes.
+- **Go-back points** (a one-click safety net), **English + French** UI, light / dark themes.
 - **Astrodex integration** - open a photo straight from MyAstroBoard's Astrodex
   with a signed handoff, enhance it here, then send it back as a new picture on
   the same object (the original is never touched). Or work fully standalone:

@@ -67,7 +67,7 @@ describe('PresetButtons', () => {
 
     const chip = screen.getByRole('button', { name: 'Nebula' });
     expect(chip).toHaveAttribute('aria-pressed', 'true');
-    expect(chip).toHaveClass('chip-active');
+    expect(chip).toHaveClass('option-card-active');
   });
 
   it('does not offer a delete affordance for a built-in preset even with a handler', () => {
@@ -105,5 +105,25 @@ describe('PresetButtons', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('shows each preset as a card with its description, kept out of the button name', () => {
+    render(<PresetButtons presets={[preset({ presetId: 'system_lunar' })]} onPresetApply={vi.fn()} />);
+
+    const card = screen.getByRole('button', { name: 'Lunar' });
+    expect(card).toHaveClass('option-card');
+    expect(card).toHaveAccessibleDescription(/muted colour for the Moon/);
+    expect(card.querySelector('svg')).toBeInTheDocument();
+  });
+
+  it('gives a user preset without a description no description line', () => {
+    render(
+      <PresetButtons
+        presets={[preset({ presetId: 'user_y', name: 'Bare', author: 'user', description: '' })]}
+        onPresetApply={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Bare' })).not.toHaveAttribute('aria-describedby');
   });
 });

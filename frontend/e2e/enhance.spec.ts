@@ -5,7 +5,7 @@ const SAMPLE = 'e2e/fixtures/sample.png';
 /** Upload the sample and wait for the editor (its workflow rail) to mount. */
 async function openEditor(page: Page): Promise<void> {
   await page.goto('/');
-  await page.locator('input[type=file]').setInputFiles(SAMPLE);
+  await page.locator('input[type=file]:not([multiple])').setInputFiles(SAMPLE);
   await expect(page.locator('nav[aria-label="Editing workflow"]')).toBeVisible();
 }
 
@@ -120,7 +120,7 @@ test('the before/after divider drags without selecting content', async ({ page }
 
 test('opens the depth shift viewer', async ({ page }) => {
   await openEditor(page);
-  await openStep(page, 'Depth');
+  await openStep(page, '3D effect');
 
   await page.getByRole('button', { name: 'Open Depth Shift viewer' }).click();
 
@@ -142,7 +142,7 @@ test('save the current parameters as a preset', async ({ page }) => {
   await openEditor(page);
   await openStep(page, 'Export');
 
-  await page.getByRole('button', { name: 'Save as preset' }).click();
+  await page.getByRole('button', { name: 'Keep these settings for other photos' }).click();
 
   const dialog = page.getByRole('heading', { name: 'Save as preset' });
   await expect(dialog).toBeVisible();
@@ -215,10 +215,10 @@ test('"New photo" confirms before discarding edits, then returns to upload', asy
 
   // no edits yet -> leaves straight away
   await page.getByRole('button', { name: 'New photo' }).click();
-  await expect(page.getByRole('button', { name: 'Choose a file' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Choose a photo' })).toBeVisible();
 
   // re-enter, make an edit (dirty client-side at once), and the exit is guarded
-  await page.locator('input[type=file]').setInputFiles(SAMPLE);
+  await page.locator('input[type=file]:not([multiple])').setInputFiles(SAMPLE);
   await openStep(page, 'Light');
   await page.getByRole('slider', { name: 'Contrast' }).fill('1.7');
 
@@ -232,7 +232,7 @@ test('"New photo" confirms before discarding edits, then returns to upload', asy
 
   await page.getByRole('button', { name: 'New photo' }).click();
   await dialog.getByRole('button', { name: 'Discard and continue' }).click();
-  await expect(page.getByRole('button', { name: 'Choose a file' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Choose a photo' })).toBeVisible();
 });
 
 test('applying a preset moves the sliders and star reduction works', async ({ page }) => {

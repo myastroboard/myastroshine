@@ -5,54 +5,46 @@ import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { THEME_STORAGE_KEY } from '@/theme/config';
 import { ThemeProvider } from '@/theme/ThemeContext';
 
+function renderSwitcher() {
+  return render(
+    <ThemeProvider>
+      <ThemeSwitcher />
+    </ThemeProvider>,
+  );
+}
+
 describe('ThemeSwitcher', () => {
   afterEach(() => {
     localStorage.clear();
     document.documentElement.classList.remove('dark');
   });
 
-  it('defaults to System and offers all three options', () => {
-    render(
-      <ThemeProvider>
-        <ThemeSwitcher />
-      </ThemeProvider>,
-    );
+  it('defaults to System and offers all three options as labelled icon radios', () => {
+    renderSwitcher();
 
-    const select = screen.getByRole('combobox', { name: 'Theme' });
-    expect(select).toHaveValue('system');
-    expect(screen.getByRole('option', { name: 'Light' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'Dark' })).toBeInTheDocument();
+    expect(screen.getByRole('radiogroup', { name: 'Theme' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'System' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: 'Light' })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('radio', { name: 'Dark' })).toHaveAttribute('aria-checked', 'false');
   });
 
   it('switches to Dark, applies the class, and persists the choice', () => {
-    render(
-      <ThemeProvider>
-        <ThemeSwitcher />
-      </ThemeProvider>,
-    );
+    renderSwitcher();
 
-    fireEvent.change(screen.getByRole('combobox', { name: 'Theme' }), {
-      target: { value: 'dark' },
-    });
+    fireEvent.click(screen.getByRole('radio', { name: 'Dark' }));
 
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark');
     expect(document.documentElement.classList.contains('dark')).toBe(true);
+    expect(screen.getByRole('radio', { name: 'Dark' })).toHaveAttribute('aria-checked', 'true');
   });
 
-  it('ignores a change event carrying an unsupported preference', () => {
-    render(
-      <ThemeProvider>
-        <ThemeSwitcher />
-      </ThemeProvider>,
-    );
+  it('switches back to Light and drops the dark class', () => {
+    renderSwitcher();
 
-    const select = screen.getByRole('combobox', { name: 'Theme' });
-    // Setting a <select>'s value to something with no matching <option> leaves
-    // it unselected (value reads back as ''), which is itself unsupported -
-    // this exercises the guard's false branch without needing to bypass the DOM.
-    fireEvent.change(select, { target: { value: 'zz' } });
+    fireEvent.click(screen.getByRole('radio', { name: 'Dark' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Light' }));
 
-    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBeNull();
-    expect(select).toHaveValue('system');
+    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('light');
+    expect(document.documentElement.classList.contains('dark')).toBe(false);
   });
 });

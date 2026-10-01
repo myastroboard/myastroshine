@@ -5,7 +5,7 @@ const SAMPLE = 'e2e/fixtures/sample.png';
 /** Upload the sample and wait for the editor (its workflow rail) to mount. */
 async function openEditor(page: Page): Promise<void> {
   await page.goto('/');
-  await page.locator('input[type=file]').setInputFiles(SAMPLE);
+  await page.locator('input[type=file]:not([multiple])').setInputFiles(SAMPLE);
   await expect(page.locator('nav[aria-label="Editing workflow"]')).toBeVisible();
 }
 
@@ -20,16 +20,16 @@ const processed = (page: Page) =>
 test('captures milestones and restores an earlier one', async ({ page }) => {
   await openEditor(page);
 
-  const original = page.getByRole('button', { name: 'Restore Original' });
+  const original = page.getByRole('button', { name: 'Go back to Original photo' });
   await expect(original).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByRole('button', { name: 'Restore Milestone 1' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Go back to 1 - Light' })).toHaveCount(0);
 
   await openStep(page, 'Light');
   const contrast = page.getByRole('slider', { name: 'Contrast' });
   await Promise.all([processed(page), contrast.fill('2')]);
 
-  await page.getByRole('button', { name: 'Save milestone' }).click();
-  const milestone1 = page.getByRole('button', { name: 'Restore Milestone 1' });
+  await page.getByRole('button', { name: 'Mark this point' }).click();
+  const milestone1 = page.getByRole('button', { name: 'Go back to 1 - Light' });
   await expect(milestone1).toHaveAttribute('aria-pressed', 'true');
   await expect(original).toHaveAttribute('aria-pressed', 'false');
 
@@ -41,6 +41,8 @@ test('captures milestones and restores an earlier one', async ({ page }) => {
   await Promise.all([processed(page), milestone1.click()]);
   await expect(contrast).toHaveValue('2');
   await expect(milestone1).toHaveAttribute('aria-pressed', 'true');
+  // Nothing was lost: the 2.8 edit, held by no point, was kept as point 2 first.
+  await expect(page.getByRole('button', { name: 'Go back to 2 - Light' })).toBeVisible();
 
   // Restore the original.
   await Promise.all([processed(page), original.click()]);
@@ -53,16 +55,16 @@ test('a new photo clears the milestones', async ({ page }) => {
 
   await openStep(page, 'Light');
   await Promise.all([processed(page), page.getByRole('slider', { name: 'Contrast' }).fill('1.8')]);
-  await page.getByRole('button', { name: 'Save milestone' }).click();
-  await expect(page.getByRole('button', { name: 'Restore Milestone 1' })).toBeVisible();
+  await page.getByRole('button', { name: 'Mark this point' }).click();
+  await expect(page.getByRole('button', { name: 'Go back to 1 - Light' })).toBeVisible();
 
   await page.getByRole('button', { name: 'New photo' }).click();
   const dialog = page.getByRole('dialog', { name: 'Discard your edits?' });
   await dialog.getByRole('button', { name: 'Discard and continue' }).click();
 
-  await page.locator('input[type=file]').setInputFiles(SAMPLE);
+  await page.locator('input[type=file]:not([multiple])').setInputFiles(SAMPLE);
   await expect(page.locator('nav[aria-label="Editing workflow"]')).toBeVisible();
 
-  await expect(page.getByRole('button', { name: 'Restore Milestone 1' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Restore Original' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Go back to 1 - Light' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Go back to Original photo' })).toBeVisible();
 });

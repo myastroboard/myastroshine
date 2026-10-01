@@ -39,7 +39,7 @@ test('the editor works end to end behind the ingress prefix', async ({ page }) =
   const traffic = watchTraffic(page);
 
   await page.goto(APP);
-  await page.locator('input[type=file]').setInputFiles(SAMPLE);
+  await page.locator('input[type=file]:not([multiple])').setInputFiles(SAMPLE);
   const rail = page.locator('nav[aria-label="Editing workflow"]');
   await expect(rail).toBeVisible();
   await expect(page.locator('img[alt="Original"], img').first()).toBeVisible();
@@ -67,8 +67,8 @@ test('stacking, its thumbnails and its progress socket stay behind the prefix', 
   const traffic = watchTraffic(page);
 
   await page.goto(APP);
-  await page.getByRole('button', { name: 'Multi-Image Stack' }).click();
-  await page.locator('input[type=file]').first().setInputFiles(FRAMES);
+  // The landing screen's stacking zone takes the frames straight away.
+  await page.locator('input[type=file][multiple]').setInputFiles(FRAMES);
   await page.getByRole('button', { name: /Upload 3 frames/ }).click();
   await expect(page.getByRole('checkbox')).toHaveCount(3);
   await expect(page.locator(`img[src^="${PREFIX}api/stack/"]`).first()).toBeVisible();

@@ -19,7 +19,7 @@ the tour.
   - [7. Stars](#7-stars)
   - [8. Depth](#8-depth)
   - [Export](#export)
-- [Edit milestones](#edit-milestones)
+- [Go-back points](#go-back-points)
 - [Stacking](#stacking)
   - [The Stack step](#the-stack-step)
   - [Calibration frames](#calibration-frames)
@@ -32,13 +32,15 @@ the tour.
 
 ## Two modes
 
-A toggle at the top of the app switches between:
+The start screen offers two drop zones side by side - what you have decides
+where it goes:
 
-- **Single image** - upload one frame (or a stacked composite from elsewhere),
-  edit it with the workflow below, download or hand it back to Astrodex.
-- **Stacking** - upload many sub-exposures, review and calibrate them, combine
-  them into one high-SNR composite, then edit that composite in the single-image
-  editor.
+- **One photo** - one frame (or a composite already stacked elsewhere): edit it
+  with the workflow below, download it or hand it back to Astrodex.
+- **Several shots of the same target** - many sub-exposures: review and
+  calibrate them, combine them into one high-SNR composite, then edit that
+  composite in the single-image editor. Files dropped here open the stacking
+  view with them already queued; **One photo instead** leads back.
 
 ## Uploading
 
@@ -56,20 +58,36 @@ both enforced. Anything else is rejected with `415 UNSUPPORTED_FORMAT`.
 
 ## The single-image editor
 
-Three panes: a numbered **workflow rail** on the left, the active step's
-**inspector** in the middle, and a **pinned preview + histogram** on the right.
-The steps run in the same order as the backend pipeline, so working top to bottom
-gives predictable results. Each step shows a dot on the rail once its values
-leave the default. Every change re-renders the preview automatically (debounced).
+Three panes: the **workflow rail** on the left, the active step's **inspector**
+in the middle, and a **pinned before/after preview** on the right. The rail
+groups the steps into **Prepare**, **Enhance** and **Finish**, each step with an
+icon and a one-line plain-language subtitle. The steps run in the same order as
+the backend pipeline, so working top to bottom gives predictable results. Each
+step shows a dot on the rail once its values leave the default, and every
+inspector ends on a **Next step** button. Every change re-renders the preview
+automatically (debounced).
+
+Each step opens on one short sentence; the longer explanation sits behind
+**Learn more**. Sliders fill from their neutral value to the thumb (a tick marks
+neutral when it sits mid-range); white balance, tint, exposure and the colour
+sliders draw a gradient track that shows what they do. **Double-click a slider**
+to put it back to neutral. The histogram is folded under the preview (click
+**Histogram**).
+
+On a phone the preview is pinned above the controls - the effect of a slider
+stays in view while you drag it - and the rail becomes a tab bar at the bottom
+of the screen.
 
 ### Start: Auto Astro and presets
 
-**Auto Astro** analyses the image (histogram black/white point, star density) and
-applies a computed starting point - a contrast/exposure stretch that separates
+**Auto Astro** - the main button of the Start step - analyses the image
+(histogram black/white point, star density) and applies a computed starting point - a contrast/exposure stretch that separates
 the object from the background, plus a gentle log-scaled star reduction. It is a
-starting point, not a finished edit.
+starting point, not a finished edit: once applied, the Start step says so and
+points to the other steps for fine-tuning, or straight to Export.
 
-**Presets** apply a saved look in one click. Auto Astro and presets both keep
+**Presets** apply a saved look in one click; each is a card with an icon of the
+subject it is tuned for and a one-line description. Auto Astro and presets both keep
 your current framing - a look is not a composition.
 
 ### 1. Framing
@@ -79,15 +97,15 @@ and flip. Edited directly on the preview. Everything after this works on the
 framed image. (Not available for a stacked composite - its dimensions aren't
 carried through.)
 
-### 2. Background
+### 2. Clean the sky
 
 Corrections to the raw signal, before any creative grading:
 
 - **White balance** - temperature (2000-8000 K) and tint.
 - **Vignette correction** - lifts the corners against lens falloff (a generic
   radial model, not a per-lens profile).
-- **Gradient reduction** - flattens smooth light-pollution / sky-glow gradients.
-- **Dehaze** - dark-channel-prior haze removal for contrast lost to a veiling
+- **Light-pollution gradient** - flattens smooth light-pollution / sky-glow gradients.
+- **Remove haze** - dark-channel-prior haze removal for contrast lost to a veiling
   glow.
 
 ### 3. Light
@@ -116,19 +134,19 @@ tolerates far more smoothing than brightness detail), and **sharpness**.
 
 ### 7. Stars
 
-Two independent tools, sharing one detector (`star sensitivity` / `star max
-size`, previewable as a live "N sources detected" overlay):
+Two independent tools, sharing one detector (**Catch fainter stars** / **Largest
+star size**, previewable as a live "N sources detected" overlay):
 
-- **Reduce** - shrink detected stars in place. Each star erodes toward its own
+- **Reduce stars** - shrink detected stars in place. Each star erodes toward its own
   local background, so it can't crush to a black dot or bloat into a flat disc.
-- **Remove (starless)** - split the stars out right after the background
+- **Remove stars** - split the stars out right after the background
   corrections; every creative stage then works on the nebula alone, and **bring
   stars back** screen-blends them in at the end (0 = fully starless, 100 = full
   strength). The classical reconstruction handles a nebula or galaxy over a
   normal star field well; a dense Milky Way field is its known ceiling - that is
   what the StarNet2 engine is for.
 
-### 8. Depth
+### 8. 3D effect
 
 **Depth Shift** adds a parallax sense of 3D to a single frame. Pick a focal point
 on the preview (click), then open the viewer for an interactive parallax preview.
@@ -137,14 +155,21 @@ sky as far); the focal point pulls the chosen spot forward too.
 
 ### Export
 
-Download the result (JPEG), **Send back to Astrodex** (when the session was
-opened from Astrodex), or **Save as preset** to reuse the current settings later.
+The end of the workflow: **Your image is ready**, a thumbnail of the result and a
+recap of the steps that changed it. Download the result (JPEG), **Send back to
+Astrodex** (when the session was opened from Astrodex), or **Keep these settings
+for other photos** to save them as a preset.
 
-## Edit milestones
+## Go-back points
 
-A timeline under the preview. Save the current state (sliders, curves, framing,
-and the Depth Shift focal point) as a checkpoint and click back to it if an edit
-goes too far. The first milestone is the unedited original.
+A safety net under the preview: **Mark this point** saves the current state
+(sliders, curves, framing, and the Depth Shift focal point); one click on a point
+brings the edit back to it. Each point is named after the steps that changed
+since the previous one ("2 - Light, Colour"); the first is the **Original
+photo**. The button is highlighted while the current edit is held by no point.
+Nothing is lost: going back from an edit no point holds saves that edit as a new
+point first, so going back is itself undoable. Points live in memory for the
+current image only.
 
 ## Stacking
 
@@ -223,9 +248,9 @@ falls back to the classical path. Setup and licensing:
 ## Presets
 
 Five built-ins are always present: **Nebula**, **Galaxy**, **Deep Field**,
-**Lunar**, **Cluster** (translated, not deletable). Save your own from the
-**Export** step (up to 50); a user preset carries a delete affordance in the
-chip list.
+**Lunar**, **Star cluster** (translated, not deletable). Save your own from the
+**Export** step (up to 50); a user preset carries a delete affordance on its
+card.
 
 ## Astrodex integration
 
@@ -240,7 +265,7 @@ configured. See [ARCHITECTURE.md](ARCHITECTURE.md#astrodex-integration).
 
 ## Themes and language
 
-Light theme is the default; a footer control switches System / Light / Dark. The
+Light theme is the default; a footer icon toggle switches System / Light / Dark. The
 interface is available in **English and French** - a header selector, defaulting
 to the browser language on first load. (Image processing is language-independent;
 a few backend detail strings stay English.)

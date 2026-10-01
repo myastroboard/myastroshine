@@ -1,6 +1,9 @@
+import { useState, type CSSProperties } from 'react';
+
 import { useTranslation } from '@/hooks/useTranslation';
 import type { SliderRevert } from '@/hooks/useImageProcessing';
 import {
+  DEFAULT_PARAMETERS,
   NEUTRAL_TEMPERATURE,
   PARAMETER_BOUND_BY_KEY,
   STANDARD_TEMPERATURES,
@@ -26,6 +29,93 @@ function decimalPlaces(step: number): number {
   const text = step.toString();
   const dot = text.indexOf('.');
   return dot === -1 ? 0 : text.length - dot - 1;
+}
+
+/**
+ * Sliders whose track shows what they do instead of the plain accent fill -
+ * see the `.slider-track-*` classes in `styles/index.css`.
+ */
+const TRACK_CLASS: Partial<Record<SliderParameterKey, string>> = {
+  temperature: 'slider-track-temperature',
+  tint: 'slider-track-tint',
+  exposure: 'slider-track-exposure',
+  saturation: 'slider-track-colour',
+  vibrance: 'slider-track-colour',
+};
+
+/** Where `value` sits along `[min, max]` (static bounds, `max > min`), as a
+ * 0-1 fraction - clamped, since an old preset can hold an out-of-range value. */
+function fractionOf(value: number, min: number, max: number): number {
+  return Math.max(0, Math.min(1, (value - min) / (max - min)));
+}
+
+/**
+ * The per-instance track geometry: the accent fill runs from the neutral value
+ * to the thumb. Dynamic CSS custom properties, the one inline style allowed here.
+ */
+function trackStyle(neutral: number, value: number): CSSProperties {
+  return { '--fill-from': neutral, '--fill-to': value } as CSSProperties;
+}
+
+/**
+ * A range input with the neutral-point tick, the neutral-to-thumb fill and a
+ * double-click back to neutral. Values are slider positions (`min..max`).
+ */
+function SliderTrack({
+  id,
+  min,
+  max,
+  step,
+  value,
+  neutral,
+  trackClass = '',
+  disabled,
+  list,
+  onChange,
+}: {
+  id: string;
+  min: number;
+  max: number;
+  step: number;
+  value: number;
+  neutral: number;
+  trackClass?: string;
+  disabled: boolean;
+  list?: string;
+  onChange: (value: number) => void;
+}) {
+  const neutralFraction = fractionOf(neutral, min, max);
+  // A tick only means something when "no change" sits inside the range.
+  const showTick = neutralFraction > 0 && neutralFraction < 1;
+  return (
+    <span className="relative block">
+      {showTick && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute top-1/2 h-2.5 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-line-strong"
+          style={{ left: `calc(8px + (100% - 16px) * ${neutralFraction})` }}
+        />
+      )}
+      <input
+        id={id}
+        type="range"
+        className={`slider relative ${trackClass}`}
+        style={trackClass ? undefined : trackStyle(neutralFraction, fractionOf(value, min, max))}
+        min={min}
+        max={max}
+        step={step}
+        list={list}
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(Number(event.target.value))}
+        onDoubleClick={() => {
+          if (!disabled && value !== neutral) {
+            onChange(neutral);
+          }
+        }}
+      />
+    </span>
+  );
 }
 
 /** A vertical list of labelled adjustment sliders with per-parameter hints. */
@@ -84,16 +174,16 @@ export function SliderGroup({
                 {parameters[key].toFixed(decimalPlaces(bound.step))}
               </span>
             </span>
-            <input
+            <SliderTrack
               id={`param-${key}`}
-              type="range"
-              className="slider"
               min={bound.min}
               max={bound.max}
               step={bound.step}
               value={parameters[key]}
+              neutral={DEFAULT_PARAMETERS[key]}
+              trackClass={TRACK_CLASS[key]}
               disabled={isProcessing}
-              onChange={(event) => onParameterChange(key, Number(event.target.value))}
+              onChange={(value) => onParameterChange(key, value)}
             />
           </div>
         );
@@ -179,20 +269,20 @@ function TemperatureRow({
               onClick={onRevert}
             />
           )}
-          {t(`slider_panel.params.temperature.tone.${tone}`)} · {value} K
+          {t(`slider_panel.params.temperature.tone.${tone}`)} &middot; {value} K
         </span>
       </span>
-      <input
+      <SliderTrack
         id="param-temperature"
-        type="range"
-        className="slider"
         min={0}
         max={STANDARD_TEMPERATURES.length - 1}
         step={1}
         list="temperature-stops"
         value={temperatureIndex(value)}
+        neutral={temperatureIndex(NEUTRAL_TEMPERATURE)}
+        trackClass={TRACK_CLASS.temperature}
         disabled={isProcessing}
-        onChange={(event) => onChange(STANDARD_TEMPERATURES[Number(event.target.value)])}
+        onChange={(index) => onChange(STANDARD_TEMPERATURES[index])}
       />
       <datalist id="temperature-stops">
         {STANDARD_TEMPERATURES.map((kelvin, index) => (
@@ -203,7 +293,9 @@ function TemperatureRow({
   );
 }
 
-/** Small "i" affordance; reveals `hint` in a popover on hover or keyboard focus. */
+/** Small "i" affordance; reveals `hint` in a popover on hover, keyboard focus,
+ * or a tap (touch screens have no hover). The visible dot stays small; an
+ * invisible inset pad gives it a finger-sized hit area. */
 function ParameterHint({
   paramKey,
   label,
@@ -214,6 +306,7 @@ function ParameterHint({
   hint: string;
 }) {
   const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
   const tooltipId = `param-hint-${paramKey}`;
   return (
     <span className="group/hint relative inline-flex">
@@ -221,7 +314,10 @@ function ParameterHint({
         type="button"
         aria-describedby={tooltipId}
         aria-label={t('slider_panel.about_param_aria', { label })}
-        className="grid h-4 w-4 shrink-0 place-items-center rounded-full border border-line-strong text-[10px] font-semibold leading-none text-muted outline-none transition-colors hover:border-accent/60 hover:text-ink focus-visible:border-accent/60 focus-visible:text-ink"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        onBlur={() => setOpen(false)}
+        className="relative grid h-4 w-4 shrink-0 place-items-center rounded-full border border-line-strong text-[10px] font-semibold leading-none text-muted outline-none transition-colors after:absolute after:-inset-2.5 after:content-[''] hover:border-accent/60 hover:text-ink focus-visible:border-accent/60 focus-visible:text-ink"
       >
         i
       </button>
@@ -230,7 +326,9 @@ function ParameterHint({
         role="tooltip"
         // Opens rightward on a full-width mobile panel, leftward in the narrow
         // desktop inspector column so it stays over the controls, not the photo.
-        className="pointer-events-none absolute bottom-full left-0 z-20 mb-1.5 w-52 rounded-md border border-line bg-overlay px-2.5 py-1.5 text-xs font-normal text-muted opacity-0 shadow-pop transition-opacity duration-100 group-hover/hint:opacity-100 group-focus-within/hint:opacity-100 lg:left-auto lg:right-0"
+        className={`pointer-events-none absolute bottom-full left-0 z-20 mb-1.5 w-56 rounded-md border border-line bg-overlay px-2.5 py-1.5 text-xs font-normal leading-relaxed text-muted shadow-pop transition-opacity duration-100 group-hover/hint:opacity-100 group-focus-within/hint:opacity-100 lg:left-auto lg:right-0 ${
+          open ? 'opacity-100' : 'opacity-0'
+        }`}
       >
         {hint}
       </span>
