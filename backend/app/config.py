@@ -15,9 +15,10 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from app.constants import LOG_FILE_NAME
+from app.constants import ADMIN_RESET_MARKER, HA_APP_CONFIG_DIR, LOG_FILE_NAME
 
 
 class Settings(BaseSettings):
@@ -42,9 +43,33 @@ class Settings(BaseSettings):
     # Gates /api/admin/* and /api/tokens. Single-user local deployments leave it on.
     admin_enabled: bool = True
 
+    # Injected by the Home Assistant Supervisor into every app container: its
+    # presence is how the app knows it runs as an HA app (app/utils/ingress.py).
+    # Never logged.
+    supervisor_token: str = Field(default="", repr=False)
+    # The Supervisor's ingress proxy. Only the e2e fake Supervisor overrides it.
+    ingress_proxy_ip: str = "172.30.32.2"
+
     @property
     def is_test(self) -> bool:
         return self.app_env == "test"
+
+    @property
+    def on_home_assistant(self) -> bool:
+        return bool(self.supervisor_token)
+
+    @property
+    def admin_reset_markers(self) -> list[Path]:
+        """Files whose presence at startup clears the admin password.
+
+        ``reset-admin`` in the data directory, and under Home Assistant also in
+        the app's config folder (``/addon_configs/<slug>/`` on the host, reached
+        through Samba or the File editor - tools only HA admins have).
+        """
+        markers = [self.data_dir / ADMIN_RESET_MARKER]
+        if self.on_home_assistant:
+            markers.append(HA_APP_CONFIG_DIR / ADMIN_RESET_MARKER)
+        return markers
 
     @property
     def db_dir(self) -> Path:

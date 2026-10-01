@@ -636,7 +636,8 @@
       "login": {
         "title": "Connexion administrateur",
         "blurb": "Les paramètres sont réservés à l'administrateur. Saisissez le mot de passe admin pour continuer.",
-        "submit": "Se connecter"
+        "submit": "Se connecter",
+        "lost_password": "Mot de passe perdu ? Créez un fichier vide nommé reset-admin dans le dossier de données - pour l'app Home Assistant, dans son dossier sous addon_configs - puis redémarrez l'app. Les paramètres demanderont un nouveau mot de passe."
       },
       "errors": {
         "invalid_password": "Mot de passe incorrect.",

@@ -168,6 +168,7 @@ export function AdminLoginForm({ onSubmit }: { onSubmit: (password: string) => P
       <button type="submit" className="btn btn-primary btn-sm w-fit" disabled={busy}>
         {busy ? t('common.loading') : t('settings.auth.login.submit')}
       </button>
+      <p className="text-xs text-muted">{t('settings.auth.login.lost_password')}</p>
     </GateCard>
   );
 }

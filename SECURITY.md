@@ -35,7 +35,17 @@ public internet without a reverse proxy that adds authentication in front of it.
 locked (never open), and the first visitor to open Settings chooses the
 password. Set it right after installing, before the instance is reachable by
 others. A lost password is reset from the host with
-`docker exec myastroshine-api python -m app.cli reset-admin`.
+`docker exec myastroshine-api python -m app.cli reset-admin`, or by creating an
+empty `reset-admin` file in the data directory (in the Home Assistant app: in
+its folder under `addon_configs`, which only HA admins reach) and restarting.
+Whoever can do either already controls the container.
+
+**Home Assistant app.** Through the ingress panel, Home Assistant's own login is
+in front of the app. The Supervisor's proxy headers (`X-Ingress-Path`,
+`X-Forwarded-For`, `X-Remote-User-*`) are trusted only when the app runs under
+Home Assistant (`SUPERVISOR_TOKEN` present) **and** the request comes from the
+Supervisor's address; from anyone else they are removed
+(`app/utils/ingress.py`). The direct port is off by default in the HA app.
 
 ### What's protected today
 
@@ -46,7 +56,9 @@ others. A lost password is reset from the host with
   without use and 30 days at most, and at once on a password change for every
   other browser. Failed logins are throttled per IP with doubling lockouts.
   State-changing admin requests from another origin are refused, which
-  `SameSite` alone would not catch for another app on the same host.
+  `SameSite` alone would not catch for another app on the same host. Under a
+  Home Assistant ingress the cookie is path-scoped to the app's prefix (every
+  ingress app shares the HA origin).
 
 - **Input validation**: every request body is a Pydantic model; session/stack
   identifiers are validated as well-formed UUIDs and checked against the

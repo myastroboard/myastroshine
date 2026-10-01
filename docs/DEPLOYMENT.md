@@ -110,6 +110,8 @@ Set only to change the deployment shape (see `backend/.env.example`):
 | `DATA_DIR` | `./data` (local), `/data` (image) | the single persistence root |
 | `DATABASE_URL` | *(derived)* | another database URL to override the SQLite default |
 | `ADMIN_ENABLED` | `true` | set `false` to turn the administration surface (`/api/admin/*`, `/api/tokens`, admin login) off entirely |
+| `SUPERVISOR_TOKEN` | *(unset)* | injected by the Home Assistant Supervisor, never set by hand: marks the container as an HA app (ingress headers trusted from the Supervisor, `reset-admin` also read from `/config`) |
+| `INGRESS_PROXY_IP` | `172.30.32.2` | the Supervisor's address; only the e2e fake Supervisor changes it |
 
 ## Admin password
 
@@ -128,6 +130,13 @@ admin login, and the next visit to Settings asks for a new one:
 ```bash
 docker exec myastroshine-api python -m app.cli reset-admin
 ```
+
+Without a shell on the host (the Home Assistant app), create an empty file named
+`reset-admin` in the data directory - for the HA app, in its folder under
+`addon_configs` (Samba share or File editor) - and restart the app. It is
+consumed at startup: the password and every admin login are cleared and the
+file deleted. If the file cannot be deleted, nothing is reset (it would wipe the
+password at every start) and the log says so.
 
 ## Runtime settings (edited in the UI)
 
@@ -308,6 +317,14 @@ forwarding (`location /astro/ { proxy_pass http://myastroshine:8002/; }` with th
 trailing slashes), forward WebSocket upgrades on `/ws/`, and pass the browser's
 host in `X-Forwarded-Host` (the admin routes compare it with the request's
 `Origin`).
+
+A generic reverse proxy's `X-Forwarded-For` is **not** used: per-IP limits see
+the proxy's address. Only the Home Assistant Supervisor's headers are honoured,
+and only under Home Assistant (`SUPERVISOR_TOKEN`, injected by the Supervisor)
+from the Supervisor's address (`172.30.32.2`): the client IP becomes the
+rightmost `X-Forwarded-For` hop outside the hassio network, `X-Ingress-Path`
+scopes the admin cookie, `X-Forwarded-Proto` sets the scheme
+(`app/utils/ingress.py`).
 
 ## Health checks
 

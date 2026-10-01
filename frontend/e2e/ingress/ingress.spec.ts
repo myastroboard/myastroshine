@@ -102,6 +102,10 @@ test('the admin login works behind the prefix', async ({ page }) => {
   await expect(page.getByLabel('Maximum upload size')).toBeVisible();
   await page.reload(); // the session cookie survives a reload behind the prefix
   await expect(page.getByLabel('Maximum upload size')).toBeVisible();
+  // Every ingress app shares the Home Assistant origin: the admin cookie is
+  // scoped to this app's prefix.
+  const cookies = await page.context().cookies(APP);
+  expect(cookies.find((cookie) => cookie.name === 'myastroshine_admin')?.path).toBe(PREFIX);
 
   expect(traffic.escaped).toEqual([]);
   expect(traffic.failed.filter((line) => !line.includes('/api/auth/'))).toEqual([]);

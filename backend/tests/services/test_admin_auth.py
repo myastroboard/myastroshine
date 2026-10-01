@@ -328,6 +328,47 @@ def test_reset_forgets_the_password_and_every_session(auth) -> None:
     assert auth.setup("the new first password", None, None) != raw
 
 
+def test_reset_marker_clears_the_password_once_and_is_consumed(auth, tmp_path) -> None:
+    """A marker file present at startup resets the admin and is deleted, so the
+    next start keeps the new password."""
+    auth.setup(PASSWORD, None, None)
+    marker = tmp_path / "reset-admin"
+    marker.touch()
+
+    assert auth.reset_if_requested([tmp_path / "absent", marker]) is True
+
+    assert not auth.is_configured()
+    assert not marker.exists()
+    auth.setup("the new first password", None, None)
+    assert auth.reset_if_requested([marker]) is False
+    assert auth.is_configured()
+
+
+def test_reset_without_a_marker_keeps_the_password(auth, tmp_path) -> None:
+    auth.setup(PASSWORD, None, None)
+
+    assert auth.reset_if_requested([tmp_path / "reset-admin"]) is False
+    assert auth.is_configured()
+
+
+def test_reset_marker_that_cannot_be_removed_keeps_the_password(
+    auth, tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A marker that would survive the restart must not wipe the password at
+    every start: it is reported and nothing is reset."""
+    auth.setup(PASSWORD, None, None)
+    marker = tmp_path / "reset-admin"
+    marker.touch()
+
+    def _read_only(self: object, missing_ok: bool = False) -> None:
+        raise PermissionError("read-only file system")
+
+    monkeypatch.setattr(type(marker), "unlink", _read_only)
+
+    assert auth.reset_if_requested([marker]) is False
+    assert auth.is_configured()
+
+
 def test_prune_removes_only_expired_or_idle_sessions(auth, db_session) -> None:
     """Hard-expired and idle sessions go; a live one stays."""
     auth.setup(PASSWORD, None, None)

@@ -180,9 +180,12 @@ the admin login) off entirely. Set it back to `true` (the default) to edit
 settings, or edit `app_settings.json` on the volume directly and restart.
 
 **Lost the admin password.**
-Run `docker exec myastroshine-api python -m app.cli reset-admin` on the host.
-It forgets the password and logs every admin browser out; opening Settings then
-asks for a new password.
+Run `docker exec myastroshine-api python -m app.cli reset-admin` on the host,
+or create an empty file named `reset-admin` in the data directory and restart
+(Home Assistant app: in its folder under `addon_configs`, via Samba or the File
+editor). It forgets the password and logs every admin browser out; opening
+Settings then asks for a new password. If it did not work, the log says why
+(a marker that cannot be deleted is ignored).
 
 **"Too many failed login attempts".**
 Five wrong passwords within a minute lock that IP out of the admin login for a

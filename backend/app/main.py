@@ -48,12 +48,14 @@ from app.routes import (
     version,
     websockets,
 )
+from app.services.admin_auth import AdminAuthService
 from app.services.background_jobs import fail_interrupted_jobs
 from app.services.job_runner import get_job_runner, reset_job_runner
 from app.services.preset import PresetService
 from app.services.scheduler import Scheduler
 from app.types import JsonDict
 from app.utils.app_settings import get_app_settings, load_or_generate_secret_key
+from app.utils.ingress import IngressMiddleware
 from app.utils.uploads import request_body_limit
 
 logger = get_logger(__name__)
@@ -89,6 +91,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     init_db()
     with database.SessionLocal() as db:
         PresetService(db).ensure_defaults()
+        AdminAuthService(db).reset_if_requested(settings.admin_reset_markers)
     fail_interrupted_jobs()
     scheduler = Scheduler()
     scheduler.start()
@@ -145,6 +148,10 @@ def create_app() -> FastAPI:
     @app.exception_handler(AppError)
     async def _handle_app_error(_request: Request, exc: AppError) -> JSONResponse:
         return _error_body(exc.error_code, exc.message, exc.details, exc.status_code)
+
+    # Added last so it runs first: every middleware and route below sees the
+    # browser's address and the ingress prefix, not the HA Supervisor's.
+    app.add_middleware(IngressMiddleware)
 
     @app.exception_handler(RequestValidationError)
     async def _handle_validation(_request: Request, exc: RequestValidationError) -> JSONResponse:

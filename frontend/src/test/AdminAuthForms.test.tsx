@@ -47,6 +47,11 @@ describe('AdminSetupForm', () => {
 });
 
 describe('AdminLoginForm', () => {
+  it('tells how to get back in after losing the password', () => {
+    render(<AdminLoginForm onSubmit={vi.fn()} />);
+    expect(screen.getByText(/empty file named reset-admin/)).toBeInTheDocument();
+  });
+
   it('does nothing on an empty password', () => {
     const onSubmit = vi.fn();
     render(<AdminLoginForm onSubmit={onSubmit} />);

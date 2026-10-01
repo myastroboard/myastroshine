@@ -77,6 +77,25 @@ async def test_lifespan_fails_leftover_jobs_runs_the_scheduler_and_stops_the_run
     assert job_runner.get_job_runner() is not runner  # a fresh one after shutdown
 
 
+async def test_lifespan_consumes_an_admin_reset_marker(_fresh_db: None) -> None:
+    """A ``reset-admin`` file in the data directory clears the admin password at
+    startup - the way back in when the CLI is out of reach (Home Assistant)."""
+    from app.config import get_settings
+    from app.db.database import init_db
+    from app.services.admin_auth import AdminAuthService
+
+    init_db()
+    with database_module.SessionLocal() as db:
+        AdminAuthService(db).setup("a long enough password", None, None)
+    marker = get_settings().data_dir / "reset-admin"
+    marker.touch()
+
+    async with main_module.lifespan(FastAPI()):
+        with database_module.SessionLocal() as db:
+            assert not AdminAuthService(db).is_configured()
+    assert not marker.exists()
+
+
 def test_create_app_mounts_the_frontend_when_the_static_dir_exists(
     tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

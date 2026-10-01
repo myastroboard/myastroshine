@@ -6,6 +6,8 @@ Deployment shape lives in :mod:`app.config`; user-tunable settings live in
 
 from __future__ import annotations
 
+from pathlib import Path
+
 API_TITLE = "MyAstroShine"
 
 # Logging - rotating file handler in DATA_DIR (see app/logging_config.py).
@@ -94,6 +96,11 @@ LOGIN_MAX_FAILURES = 5
 LOGIN_FAILURE_WINDOW_SECONDS = 60
 LOGIN_LOCKOUT_BASE_SECONDS = 60
 LOGIN_LOCKOUT_MAX_SECONDS = 60 * 60
+#: An empty file of this name in the data directory - or, in the Home Assistant
+#: app, in its config folder - clears the admin password at the next start.
+ADMIN_RESET_MARKER = "reset-admin"
+#: Where Home Assistant mounts the app's own config folder (``map: addon_config``).
+HA_APP_CONFIG_DIR = Path("/config")
 
 # Background jobs (app/services/job_runner.py), run inside the API process. Edits
 # and stacks get separate pools so a long stack never blocks the editor.

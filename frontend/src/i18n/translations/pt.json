@@ -636,7 +636,8 @@
       "login": {
         "title": "Acesso de administrador",
         "blurb": "As configurações são reservadas ao administrador. Introduza a senha de administrador para continuar.",
-        "submit": "Entrar"
+        "submit": "Entrar",
+        "lost_password": "Perdeu a senha? Crie um arquivo vazio chamado reset-admin na pasta de dados - no app do Home Assistant, na pasta dele em addon_configs - e reinicie o app. As configurações vão pedir uma nova senha."
       },
       "errors": {
         "invalid_password": "Senha incorreta.",
