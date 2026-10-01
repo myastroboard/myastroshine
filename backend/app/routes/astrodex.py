@@ -1,13 +1,13 @@
-"""AstroDex handoff routes.
+"""Astrodex handoff routes.
 
 POST /api/astrodex/handoff/resume  - open an editing session from a signed
                                      handoff token minted by MyAstroBoard.
-POST /api/astrodex/handoff/return  - send the enhanced result back to AstroDex,
+POST /api/astrodex/handoff/return  - send the enhanced result back to Astrodex,
                                      where it is filed as a new picture.
 
 Neither route uses a bearer token: the signed handoff token is the credential
 (its ``kid`` selects the webhook token whose ``signing_secret`` verifies it).
-See docs/API.md "AstroDex integration".
+See docs/API.md "Astrodex integration".
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ async def resume_handoff(
     storage: StorageDep,
     _rate_limit: RequireRateLimit,
 ) -> HandoffResumeResponse:
-    """Verify the handoff, pull the source image from AstroDex, open a session."""
+    """Verify the handoff, pull the source image from Astrodex, open a session."""
     record, link = await handoff.resume(request.handoff)
 
     image = storage.load_original(record.session_id)
@@ -59,7 +59,7 @@ async def return_handoff(
     handoff: AstroDexHandoffServiceDep,
     _rate_limit: RequireRateLimit,
 ) -> HandoffReturnResponse:
-    """Sign and POST the enhanced image back to AstroDex."""
+    """Sign and POST the enhanced image back to Astrodex."""
     link = await handoff.return_enhanced(request.session_id)
     logger.info(
         "enhanced image returned", session_id=request.session_id, status=link.webhook_status

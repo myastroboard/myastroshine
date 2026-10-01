@@ -4,7 +4,7 @@ Base URL: `http://localhost:8002/api` (configurable via `VITE_API_URL` on the
 frontend). Using the app is open: upload, processing, presets, stacking and
 download need no credentials. The **administration surface** (`/admin/*`,
 `/tokens`, `/auth/password`, `/auth/sessions`) needs an admin login - see
-[Admin authentication](#admin-authentication). The AstroDex
+[Admin authentication](#admin-authentication). The Astrodex
 handoff routes (`/astrodex/handoff/resume`, `/astrodex/handoff/return`) are
 authenticated by the signed handoff token in the request body, not a bearer
 header - the token's `kid` selects the webhook token (created in the Settings UI,
@@ -26,7 +26,7 @@ header - the token's `kid` selects the webhook token (created in the Settings UI
 - [Update check](#update-check)
 - [Admin authentication](#admin-authentication)
 - [Webhook tokens](#webhook-tokens)
-- [AstroDex integration](#astrodex-integration)
+- [Astrodex integration](#astrodex-integration)
 - [Stacking](#stacking)
 
 The runtime topology (services, job queue, storage) is in
@@ -135,8 +135,8 @@ Every route is implemented and tested end to end.
 | GET | `/tokens` | List webhook tokens (metadata only) - every `/tokens` route needs an admin login |
 | POST | `/tokens` | Create a webhook token (raw value shown once) |
 | DELETE | `/tokens/{token_id}` | Revoke a token |
-| POST | `/astrodex/handoff/resume` | Open a session from an AstroDex handoff token |
-| POST | `/astrodex/handoff/return` | Send the enhanced image back to AstroDex |
+| POST | `/astrodex/handoff/resume` | Open a session from an Astrodex handoff token |
+| POST | `/astrodex/handoff/return` | Send the enhanced image back to Astrodex |
 | GET | `/version` | The version this instance is running |
 | GET | `/version/check-updates` | Latest GitHub release, cached ~4h |
 
@@ -589,12 +589,12 @@ admin surface off: every admin route and `/auth/setup` / `/auth/login` answer
 
 ## Webhook tokens
 
-A webhook token pairs the AstroDex integration with this instance. Create one
+A webhook token pairs the Astrodex integration with this instance. Create one
 from the Settings UI or `POST /tokens { name, expires_in_days? }` -> `201`:
 
 ```json
 {
-  "id": "...", "name": "AstroDex prod", "token_prefix": "mas_1wZcTkdO",
+  "id": "...", "name": "Astrodex prod", "token_prefix": "mas_1wZcTkdO",
   "created_at": "...", "expires_at": null, "revoked": false,
   "token": "mas_<long secret>",        // the value; its first 12 chars are the kid
   "signing_secret": "<64 hex chars>"   // HMAC key, both directions
@@ -605,7 +605,7 @@ from the Settings UI or `POST /tokens { name, expires_in_days? }` -> `201`:
 never returns them. `DELETE /tokens/{id}` revokes immediately. Paste both into
 MyAstroBoard's MyAstroShine connector; it mints the handoff tokens below.
 
-## AstroDex integration
+## Astrodex integration
 
 The browser is opened here from MyAstroBoard with a signed **handoff token** in
 the URL. This instance never needs to be reachable *from* the board - it only

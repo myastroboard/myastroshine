@@ -2,7 +2,7 @@
 
 **A self-hosted astronomical image processing tool - enhancement, multi-image stacking, and depth effects.**
 
-MyAstroShine automatically enhances astrophotography images, aligns and stacks 2-2000 frames to raise signal-to-noise, and adds a parallax "Depth Shift" effect - all from one Docker image, no account or cloud upload required. It integrates optionally with [MyAstroBoard](https://github.com/myastroboard/myastroboard)'s AstroDex but also runs entirely standalone.
+MyAstroShine automatically enhances astrophotography images, aligns and stacks 2-2000 frames to raise signal-to-noise, and adds a parallax "Depth Shift" effect - all from one Docker image, no account or cloud upload required. It integrates optionally with [MyAstroBoard](https://github.com/myastroboard/myastroboard)'s Astrodex but also runs entirely standalone.
 
 ---
 
@@ -18,7 +18,7 @@ MyAstroShine automatically enhances astrophotography images, aligns and stacks 2
 - **Optional ML engines** - point it at an operator-installed StarNet2 / DeepSNR binary (nothing bundled)
 - **FITS / camera RAW / 16-bit** upload support, plus edit milestones and a folder-watch stacking mode
 - **English + French** UI, light / dark themes
-- **AstroDex integration** - capture in AstroDex, enhance here, send back via a signed webhook
+- **Astrodex integration** - capture in Astrodex, enhance here, send back via a signed webhook
 - **Standalone workflow** - manual upload, edit, download - no other MyAstroBoard component required
 
 ---

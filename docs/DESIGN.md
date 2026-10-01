@@ -11,7 +11,7 @@ MyAstroShine shares its visual charter with **MyAstroBoard** - the two apps
 should feel like one product family. The language:
 
 - a **teal primary accent** (`--color-accent`) and an **amber ecosystem accent**
-  (`--color-amber`, `#f59e0b`, reserved for AstroDex) - deep teal `#0e7490` in
+  (`--color-amber`, `#f59e0b`, reserved for Astrodex) - deep teal `#0e7490` in
   light, sky `#38bdf8` in dark;
 - **surfaces in four elevation steps** - frosted white in light, deep navy-teal
   in dark;
@@ -38,7 +38,7 @@ here, extend the token layer or the component classes in
    (`canvas` -> `surface` -> `raised` -> `overlay`), hairline borders, and glass
    depth on panels.
 3. **Two accents, used deliberately.** Teal for the primary action and selection;
-   amber for anything AstroDex (the "Send to AstroDex" button, the integration
+   amber for anything Astrodex (the "Send to Astrodex" button, the integration
    banner). Exactly one filled/primary action is visible in any view; everything
    else is `outline` or `ghost`.
 4. **Text is cool off-white, never `#fff`.** Three weights of foreground:
@@ -91,7 +91,7 @@ Compose these; do not re-implement them per component.
 | `.panel` | Frames a region - a grid column, a settings pane, a result block. Glass, hairline border, soft shadow. |
 | `.panel-inset` | A block nested *inside* a `.panel` - a stat list, the histogram, an image mat. Recessed (`bg-raised`), no shadow. |
 | `.eyebrow` | Uppercase section label |
-| `.btn` + `.btn-primary\|-amber\|-outline\|-ghost\|-danger` | Buttons (`.btn-sm` for compact). `-primary` is the teal gradient, `-amber` is the AstroDex gradient |
+| `.btn` + `.btn-primary\|-amber\|-outline\|-ghost\|-danger` | Buttons (`.btn-sm` for compact). `-primary` is the teal gradient, `-amber` is the Astrodex gradient |
 | `.field` | Text input / select / textarea |
 | `.label` | Form field label |
 | `.slider` | Range input (custom track + thumb) |

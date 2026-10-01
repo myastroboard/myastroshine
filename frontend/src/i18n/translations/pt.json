@@ -52,7 +52,7 @@
   },
   "app": {
     "nav_settings": "Definições",
-    "opening_from_astrodex": "A abrir a sua imagem a partir do AstroDex..."
+    "opening_from_astrodex": "A abrir a sua imagem a partir do Astrodex..."
   },
   "image_upload": {
     "format_not_supported": "O formato {ext} não é suportado",
@@ -127,7 +127,7 @@
         "help": "Escolha o ponto focal e depois abra o visualizador Depth Shift para uma pré-visualização interativa de paralaxe."
       },
       "export": {
-        "help": "Obtenha o resultado: descarregue-o, envie-o para o AstroDex, ou guarde os ajustes atuais como uma predefinição reutilizável."
+        "help": "Obtenha o resultado: descarregue-o, envie-o para o Astrodex, ou guarde os ajustes atuais como uma predefinição reutilizável."
       }
     },
     "milestones": {
@@ -153,12 +153,12 @@
   "export_panel": {
     "filename_label": "Nome do ficheiro",
     "download": "Descarregar",
-    "return_to_astrodex": "Reenviar para o AstroDex",
+    "return_to_astrodex": "Reenviar para o Astrodex",
     "returning": "A enviar...",
-    "returned": "Adicionada ao objeto AstroDex como nova imagem.",
-    "return_hint": "Adiciona uma cópia ao objeto AstroDex com a sua imagem melhorada - o original é mantido.",
-    "return_hint_named": "Adiciona uma cópia a '{object}' no AstroDex com a sua imagem melhorada - o original é mantido.",
-    "return_failed": "Não foi possível reenviar para o AstroDex: {error}"
+    "returned": "Adicionada ao objeto Astrodex como nova imagem.",
+    "return_hint": "Adiciona uma cópia ao objeto Astrodex com a sua imagem melhorada - o original é mantido.",
+    "return_hint_named": "Adiciona uma cópia a '{object}' no Astrodex com a sua imagem melhorada - o original é mantido.",
+    "return_failed": "Não foi possível reenviar para o Astrodex: {error}"
   },
   "image_preview": {
     "processed_alt": "Processada",
@@ -189,10 +189,10 @@
     "save": "Guardar"
   },
   "token_manager": {
-    "heading": "Tokens de webhook do AstroDex",
+    "heading": "Tokens de webhook do Astrodex",
     "copy_now_warning": "Copie-os agora, não voltarão a ser apresentados.",
     "done": "Concluído",
-    "name_placeholder": "AstroDex prod",
+    "name_placeholder": "Astrodex prod",
     "expires_label": "Expira (dias, opcional)",
     "create_button": "Criar token",
     "revoke_button": "Revogar",
@@ -407,8 +407,8 @@
         "blurb": "Remoção de estrelas com StarNet2 e redução de ruído com DeepSNR opcionais."
       },
       "astrodex": {
-        "label": "AstroDex",
-        "blurb": "Ligação ao AstroDex do MyAstroBoard: tokens e entrega de callbacks."
+        "label": "Astrodex",
+        "blurb": "Ligação ao Astrodex do MyAstroBoard: tokens e entrega de callbacks."
       },
       "security": {
         "label": "Segurança",
@@ -480,12 +480,12 @@
     },
     "webhooks": {
       "allowlist": {
-        "label": "Lista de permissões de origens do AstroDex",
-        "hint": "Um prefixo de URL por linha - a(s) origem(ns) MyAstroBoard de onde pode vir uma transferência, por ex. https://astro.example.com. Vazio significa que toda a transferência do AstroDex é recusada."
+        "label": "Lista de permissões de origens do Astrodex",
+        "hint": "Um prefixo de URL por linha - a(s) origem(ns) MyAstroBoard de onde pode vir uma transferência, por ex. https://astro.example.com. Vazio significa que toda a transferência do Astrodex é recusada."
       },
       "max_retries": {
         "label": "Número máximo de tentativas",
-        "hint": "Tentativas de entrega antes de o reenvio para o AstroDex ser marcado como falhado."
+        "hint": "Tentativas de entrega antes de o reenvio para o Astrodex ser marcado como falhado."
       },
       "retry_delay": {
         "label": "Atraso entre tentativas",
@@ -517,7 +517,7 @@
         "label": "Nível do registo na consola",
         "hint": "Nível refletido nos registos do contentor."
       },
-      "external_engines_blurb": "Remoção de estrelas (StarNet2) e redução de ruído (DeepSNR) opcionais. Nada vem incluído: descarregue o pacote CLI Linux x64 de starnetastro.com e instale-o abaixo, ou indique o caminho de um binário que montou por si. É responsável pelos termos de licença da ferramenta. Deixe vazio para manter os motores clássicos.",
+      "external_engines_blurb": "Nada vem incluído: descarregue o pacote CLI Linux x64 de starnetastro.com e instale-o abaixo, ou indique o caminho de um binário que montou por si. É responsável pelos termos de licença da ferramenta. Deixe vazio para manter os motores clássicos.",
       "starnet2_path": {
         "label": "Caminho do binário StarNet2",
         "hint": "Caminho absoluto dentro do contentor, por ex. /opt/engines/starnet2/starnet2."

@@ -81,7 +81,7 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-4 pb-24 pt-8 sm:px-6">
+    <main className="mx-auto w-full max-w-[1360px] px-4 pb-24 pt-8 sm:px-6">
       <div className="flex flex-col gap-1">
         <button
           type="button"
@@ -172,7 +172,7 @@ function SettingsPanels({ onSignedOut }: { onSignedOut: () => void }) {
 
       {dirty && (
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-canvas/90 backdrop-blur">
-          <div className="mx-auto flex max-w-4xl items-center gap-3 px-4 py-3 sm:px-6">
+          <div className="mx-auto flex max-w-[1360px] items-center gap-3 px-4 py-3 sm:px-6">
             <span className="mr-auto text-xs text-muted">{t('settings.unsaved_changes')}</span>
             <button
               type="button"
@@ -471,6 +471,7 @@ function EnginesSection({
       <p className="mb-2 text-xs text-muted">
         {t('settings.advanced.external_engines_blurb')}
       </p>
+      <GroupLabel>StarNet2</GroupLabel>
       <TextRow
         id="starnet2-path"
         label={t('settings.advanced.starnet2_path.label')}
@@ -503,6 +504,7 @@ function EnginesSection({
         step={2}
         onChange={(starnet2Stride) => patch({ starnet2Stride })}
       />
+      <GroupLabel>DeepSNR</GroupLabel>
       <TextRow
         id="deepsnr-path"
         label={t('settings.advanced.deepsnr_path.label')}
@@ -697,6 +699,8 @@ function MaintenanceSection({
 
   return (
     <div className="flex flex-col">
+      {diskUsage && <DiskUsagePanel usage={diskUsage} />}
+
       <GroupLabel>{t('settings.groups.job_history')}</GroupLabel>
       <NumberRow
         id="job-history-retention"
@@ -708,12 +712,9 @@ function MaintenanceSection({
         onChange={(jobHistoryRetentionHours) => patch({ jobHistoryRetentionHours })}
       />
 
-      {diskUsage && <DiskUsagePanel usage={diskUsage} />}
-
-      <GroupLabel>{t('settings.operations.jobs.heading')}</GroupLabel>
       {error && <p className="mb-2 text-xs text-danger">{error}</p>}
 
-      <div className="mb-3 flex flex-wrap items-center gap-3">
+      <div className="mt-4 mb-3 flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-xs text-muted">
           {t('settings.operations.jobs.status_label')}
           <select

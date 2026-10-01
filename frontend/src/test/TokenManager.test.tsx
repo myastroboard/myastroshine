@@ -23,7 +23,7 @@ describe('TokenManager', () => {
   it('creates a token and shows its secret once', async () => {
     mocked.createToken.mockResolvedValue({
       id: 't1',
-      name: 'AstroDex prod',
+      name: 'Astrodex prod',
       tokenPrefix: 'mas_abcd',
       createdAt: '2026-09-03T00:00:00Z',
       lastUsedAt: null,
@@ -34,8 +34,8 @@ describe('TokenManager', () => {
     });
 
     render(<TokenManager />);
-    fireEvent.change(screen.getByPlaceholderText('AstroDex prod'), {
-      target: { value: 'AstroDex prod' },
+    fireEvent.change(screen.getByPlaceholderText('Astrodex prod'), {
+      target: { value: 'Astrodex prod' },
     });
     fireEvent.click(screen.getByRole('button', { name: /create token/i }));
 
@@ -43,7 +43,7 @@ describe('TokenManager', () => {
       expect(screen.getByText(/not shown again/i)).toBeInTheDocument();
     });
     expect(screen.getByText(/mas_secret-value/)).toBeInTheDocument();
-    expect(mocked.createToken).toHaveBeenCalledWith('AstroDex prod', undefined);
+    expect(mocked.createToken).toHaveBeenCalledWith('Astrodex prod', undefined);
   });
 
   it('passes the expiry in days when one is set', async () => {
@@ -60,7 +60,7 @@ describe('TokenManager', () => {
     });
     render(<TokenManager />);
 
-    fireEvent.change(screen.getByPlaceholderText('AstroDex prod'), { target: { value: '  temp  ' } });
+    fireEvent.change(screen.getByPlaceholderText('Astrodex prod'), { target: { value: '  temp  ' } });
     fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '30' } });
     fireEvent.click(screen.getByRole('button', { name: /create token/i }));
 
@@ -69,7 +69,7 @@ describe('TokenManager', () => {
 
   it('ignores a blank name submitted with Enter', () => {
     render(<TokenManager />);
-    const field = screen.getByPlaceholderText('AstroDex prod');
+    const field = screen.getByPlaceholderText('Astrodex prod');
 
     fireEvent.change(field, { target: { value: '   ' } });
     fireEvent.submit(field.closest('form') as HTMLFormElement);
@@ -90,7 +90,7 @@ describe('TokenManager', () => {
       signingSecret: 'cafe',
     });
     render(<TokenManager />);
-    fireEvent.change(screen.getByPlaceholderText('AstroDex prod'), { target: { value: 'x' } });
+    fireEvent.change(screen.getByPlaceholderText('Astrodex prod'), { target: { value: 'x' } });
     fireEvent.click(screen.getByRole('button', { name: /create token/i }));
     await screen.findByText(/mas_shown_once/);
 

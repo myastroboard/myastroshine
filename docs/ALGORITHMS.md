@@ -33,7 +33,7 @@ the faint signal never gets quantised to 256 levels on the way in. The response
 carries `is_stack: true`.
 
 `decode_image` (`app/utils/image_utils.py`) is what remains for **ordinary 8-bit
-photos and camera RAW** (and any other `decode_image` caller, e.g. an AstroDex
+photos and camera RAW** (and any other `decode_image` caller, e.g. an Astrodex
 handoff that hands in a FITS). It produces the BGR `uint8` array the single-image
 pipeline works on. The file extension picks the decoder:
 

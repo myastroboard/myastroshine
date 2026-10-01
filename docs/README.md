@@ -2,7 +2,7 @@
 
 | Document | What it covers |
 |----------|----------------|
-| [FEATURES.md](FEATURES.md) | What the app does, step by step - the editor workflow, stacking, presets, AstroDex, settings |
+| [FEATURES.md](FEATURES.md) | What the app does, step by step - the editor workflow, stacking, presets, Astrodex, settings |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Runtime topology: the three services, the request paths for an edit and a stack, storage layout, module boundaries |
 | [API.md](API.md) | HTTP + WebSocket contract - every endpoint, the processing parameters, the error envelope, rate limits |
 | [ALGORITHMS.md](ALGORITHMS.md) | The maths: upload ingest, the enhancement pipeline stage by stage, star removal, Auto Astro, depth, the stacking pipeline |

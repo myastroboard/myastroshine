@@ -33,7 +33,7 @@ def _isolated_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[N
     app_settings._cache.settings = None
     app_settings._cache.secret_key = None
     logging_config.configure_logging(force=True)
-    # The AstroDex tests expect this callback host allow-listed and no retry backoff.
+    # The Astrodex tests expect this callback host allow-listed and no retry backoff.
     app_settings.save_app_settings(
         {
             "astrodex_callback_urls": ["http://astrodex.test/api/webhooks/enhanced-images"],

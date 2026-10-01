@@ -17,7 +17,7 @@ code holds to.
 - [Storage layout](#storage-layout)
 - [Background schedule](#background-schedule)
 - [Frontend](#frontend)
-- [AstroDex integration](#astrodex-integration)
+- [Astrodex integration](#astrodex-integration)
 
 ## One image, one service
 
@@ -186,8 +186,8 @@ Eight tables (`app/db/models.py`):
 | `jobs` | an async processing job: status, progress, current step, client IP |
 | `presets` | a named `ProcessingParameters` set (5 built-ins + user presets) |
 | `stacks` | a stacking session: frame count, settings, per-frame quality report, result stats |
-| `astrodex_links` | ties a session to the AstroDex picture it was handed off from + the return-delivery status |
-| `webhook_tokens` | webhook token (hash only) + its signing secret, for the AstroDex handoff |
+| `astrodex_links` | ties a session to the Astrodex picture it was handed off from + the return-delivery status |
+| `webhook_tokens` | webhook token (hash only) + its signing secret, for the Astrodex handoff |
 | `admin_credentials` | the admin password (salted scrypt hash, single row) + its version |
 | `admin_sessions` | logged-in admin browsers: session token hash, IP, user agent, expiry |
 
@@ -248,7 +248,7 @@ React 19 + TypeScript + Vite + Tailwind v4 (configured CSS-first in
 (`#/settings`), no router dependency.
 
 - **`App.tsx`** is the orchestrator: a single-image editor, a stacking view, and
-  a Settings screen. It reads a `?handoff=` token on load to detect an AstroDex
+  a Settings screen. It reads a `?handoff=` token on load to detect an Astrodex
   hand-off and resume straight into the editor.
 - **`components/`** are function components with typed props; **`hooks/`** own
   state and side effects (`useImageProcessing`, `useStackProcessing`,
@@ -260,7 +260,7 @@ React 19 + TypeScript + Vite + Tailwind v4 (configured CSS-first in
 
 See [DESIGN.md](DESIGN.md) for the visual system.
 
-## AstroDex integration
+## Astrodex integration
 
 Optional, and off unless configured. MyAstroBoard opens MyAstroShine with a
 single signed **handoff token** in the URL; this instance is never called *by*

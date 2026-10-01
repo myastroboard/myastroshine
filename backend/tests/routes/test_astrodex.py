@@ -1,4 +1,4 @@
-"""AstroDex handoff routes: resume opens a session, return delivers the result."""
+"""Astrodex handoff routes: resume opens a session, return delivers the result."""
 
 from __future__ import annotations
 

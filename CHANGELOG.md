@@ -70,7 +70,7 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the host with `python -m app.cli reset-admin`. New routes under `/api/auth`
   (docs/API.md "Admin authentication"); migration `0a1b2c3d4e5f` adds the
   `admin_credentials` and `admin_sessions` tables.
-- **Settings reorganised by subject**: General, Stacking, ML engines, AstroDex
+- **Settings reorganised by subject**: General, Stacking, ML engines, Astrodex
   (was Webhooks), Security, Logs, Maintenance (was Operations). The catch-all
   Advanced tab is gone: CORS and rate limiting moved to Security, log levels to
   Logs, the ML engines to their own tab, configuration backup to Maintenance.
@@ -205,7 +205,7 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   paraboloid can't bend to (a Seestar footprint the crop only partly removes) is
   taken too - while a galaxy halo or a frame-filling nebula in the interior is
   left exactly as before.
-- A 3-plane (RGB) FITS that still goes through `decode_image` (an AstroDex
+- A 3-plane (RGB) FITS that still goes through `decode_image` (an Astrodex
   handoff, say) is stretched with one shared, colour-preserving transform and a
   deep sky target, not three independent per-channel stretches that lifted the
   sky to a milky grey and rebalanced the colour.
@@ -240,7 +240,7 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   composite session already opens on Stack, and Auto Astro (on Start)
   analyses the rendered image, so it belongs after the stack render is
   dialled in, not before.
-- A trailing slash on a **CORS origin** or **AstroDex callback allowlist** entry
+- A trailing slash on a **CORS origin** or **Astrodex callback allowlist** entry
   in Settings is now stripped on save (`https://host/` -> `https://host`). A
   pasted slash previously made the entry silently match nothing - the CORS
   origin never carries one and the allowlist is checked against a slash-stripped
@@ -255,17 +255,17 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- **AstroDex integration rebuilt around a signed handoff.** MyAstroBoard now
+- **Astrodex integration rebuilt around a signed handoff.** MyAstroBoard now
   opens the editor with a single `?handoff=` token; the backend verifies it,
   pulls the source image from the board itself, and drops you straight into the
-  editor. The Export step gains **Send back to AstroDex**, which posts the
+  editor. The Export step gains **Send back to Astrodex**, which posts the
   processed image back as a signed `multipart/form-data` request - the board
   files it as a **new** picture on the same object, never a replacement. This
   instance is never contacted *by* the board, only ever calls *out* to it, so
   the flow works whether the board is on the LAN or behind a reverse proxy. The
   handoff token is HMAC-SHA256 signed with a webhook token's `signing_secret`,
   expires after 12 h, and is single-use for the return. See `docs/API.md`
-  "AstroDex integration" and `initial_plan/PASSATION_MYASTROBOARD_INTEGRATION.md`.
+  "Astrodex integration" and `initial_plan/PASSATION_MYASTROBOARD_INTEGRATION.md`.
 
 ### Removed
 
@@ -686,7 +686,7 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   retired key on the way in, so a stored preset from an older version still
   loads instead of hitting `extra_forbidden`.
 - Dead-code sweep before the release: the unused `useAstroDexIntegration`
-  hook is now wired to the "Send to AstroDex" button (which gains
+  hook is now wired to the "Send to Astrodex" button (which gains
   sending / sent / error feedback); the unused `react-router-dom` dependency
   (routing is hand-rolled hash-based), the unreachable `UpstreamUnavailableError`
   exception, the never-called `StorageService.count_stack_frames`, the unused
@@ -764,7 +764,7 @@ tagged yet.
 - Parallax layer generation (2-12 BGRA layers, far to near).
 - `POST /api/depth-shift/{id}`, plus metadata, depth-map, and per-layer endpoints.
 
-#### AstroDex integration (Sprint 4)
+#### Astrodex integration (Sprint 4)
 
 - `AstroDexService`: canonical-JSON HMAC-SHA256 signing, payload composition,
   retry with exponential backoff on 5xx.
@@ -808,7 +808,7 @@ tagged yet.
   combination, cosmic-ray/background toggles), step-by-step progress over the
   WebSocket, results panel with statistics, and "enhance composite" handoff.
 - Webhook token manager (create with one-time secret display, revoke).
-- AstroDex context detection from URL parameters and "send to AstroDex" action.
+- Astrodex context detection from URL parameters and "send to Astrodex" action.
 - snake_case <-> camelCase conversion isolated to the API/WS clients.
 
 #### Tooling and infra
@@ -905,7 +905,7 @@ tagged yet.
   `DATA_DIR/secret_key.txt` (`secrets.token_hex(32)`) and never regenerated.
   `ASTRODEX_WEBHOOK_SECRET` is gone.
 - New `app_settings.json` holds every runtime-tunable value (CORS origins,
-  AstroDex callback allowlist and retry policy, upload limit, session lifetime,
+  Astrodex callback allowlist and retry policy, upload limit, session lifetime,
   preview size, ML denoise, depth method, stacking defaults, log levels). It is
   edited from a rebuilt **Settings** screen (General / Webhooks / Advanced tabs)
   via `GET`/`POST /api/admin/app-settings`, gated by `ADMIN_ENABLED`.
@@ -926,7 +926,7 @@ tagged yet.
 #### Visual charter aligned with MyAstroBoard (PASSATION alignment, part 5)
 
 - `docs/DESIGN.md` rewritten: the sky/teal primary accent (`#38bdf8`), the amber
-  ecosystem accent (`#f59e0b`, used for AstroDex actions), deep navy-teal
+  ecosystem accent (`#f59e0b`, used for Astrodex actions), deep navy-teal
   surfaces, a fixed background gradient with two ambient halos, and glass panels
   - the charter now shared with MyAstroBoard. The image still stays the loudest
   thing on screen.
@@ -991,7 +991,7 @@ tagged yet.
 
 #### Release-hardening pass
 
-- AstroDex callback-URL allowlist now fails closed: an empty
+- Astrodex callback-URL allowlist now fails closed: an empty
   `astrodex_callback_urls` rejects every callback URL (previously it allowed
   any), closing an SSRF path through `/api/send-to-astrodex` and
   `/api/astrodex/receive`.
@@ -1005,7 +1005,7 @@ tagged yet.
   to the existing compressed-upload-size limit, closing a decompression-bomb
   path in `decode_image`.
 - Rate limiting now covers `/api/tokens`, `/api/admin/*`, `/api/download/*`,
-  and the AstroDex routes (previously only upload/process/stack/preset-apply).
+  and the Astrodex routes (previously only upload/process/stack/preset-apply).
 - Removed the dead `DEBUG` setting (never read anywhere; misleadingly implied
   a debug mode that didn't exist).
 - `pip-audit` and `npm audit --audit-level=high` run in CI; a Trivy scan runs

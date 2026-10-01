@@ -52,7 +52,7 @@
   },
   "app": {
     "nav_settings": "Settings",
-    "opening_from_astrodex": "Opening your image from AstroDex..."
+    "opening_from_astrodex": "Opening your image from Astrodex..."
   },
   "image_upload": {
     "format_not_supported": "Format {ext} not supported",
@@ -127,7 +127,7 @@
         "help": "Pick the focal point, then open the Depth Shift viewer for an interactive parallax preview."
       },
       "export": {
-        "help": "Get the result out: download it, hand it to AstroDex, or save the current settings as a reusable preset."
+        "help": "Get the result out: download it, hand it to Astrodex, or save the current settings as a reusable preset."
       }
     },
     "milestones": {
@@ -153,12 +153,12 @@
   "export_panel": {
     "filename_label": "File name",
     "download": "Download",
-    "return_to_astrodex": "Send back to AstroDex",
+    "return_to_astrodex": "Send back to Astrodex",
     "returning": "Sending...",
-    "returned": "Added to the AstroDex object as a new picture.",
-    "return_hint": "Adds a copy to the AstroDex object with your enhanced image - the original is kept.",
-    "return_hint_named": "Adds a copy to '{object}' in the AstroDex with your enhanced image - the original is kept.",
-    "return_failed": "Could not send back to AstroDex: {error}"
+    "returned": "Added to the Astrodex object as a new picture.",
+    "return_hint": "Adds a copy to the Astrodex object with your enhanced image - the original is kept.",
+    "return_hint_named": "Adds a copy to '{object}' in the Astrodex with your enhanced image - the original is kept.",
+    "return_failed": "Could not send back to Astrodex: {error}"
   },
   "image_preview": {
     "processed_alt": "Processed",
@@ -189,10 +189,10 @@
     "save": "Save"
   },
   "token_manager": {
-    "heading": "AstroDex webhook tokens",
+    "heading": "Astrodex webhook tokens",
     "copy_now_warning": "Copy these now, they are not shown again.",
     "done": "Done",
-    "name_placeholder": "AstroDex prod",
+    "name_placeholder": "Astrodex prod",
     "expires_label": "Expires (days, optional)",
     "create_button": "Create token",
     "revoke_button": "Revoke",
@@ -407,8 +407,8 @@
         "blurb": "Optional StarNet2 star removal and DeepSNR denoise."
       },
       "astrodex": {
-        "label": "AstroDex",
-        "blurb": "Pairing with MyAstroBoard's AstroDex: tokens and callback delivery."
+        "label": "Astrodex",
+        "blurb": "Pairing with MyAstroBoard's Astrodex: tokens and callback delivery."
       },
       "security": {
         "label": "Security",
@@ -480,12 +480,12 @@
     },
     "webhooks": {
       "allowlist": {
-        "label": "AstroDex origin allowlist",
-        "hint": "One URL prefix per line - the MyAstroBoard origin(s) a handoff may come from, e.g. https://astro.example.com. Empty means every AstroDex handoff is refused."
+        "label": "Astrodex origin allowlist",
+        "hint": "One URL prefix per line - the MyAstroBoard origin(s) a handoff may come from, e.g. https://astro.example.com. Empty means every Astrodex handoff is refused."
       },
       "max_retries": {
         "label": "Maximum retries",
-        "hint": "Delivery attempts before the return to AstroDex is marked failed."
+        "hint": "Delivery attempts before the return to Astrodex is marked failed."
       },
       "retry_delay": {
         "label": "Retry delay",
@@ -517,7 +517,7 @@
         "label": "Console log level",
         "hint": "Level echoed to the container logs."
       },
-      "external_engines_blurb": "Optional star removal (StarNet2) and denoise (DeepSNR). Nothing is bundled: download the Linux x64 CLI package from starnetastro.com and install it below, or point a path at a binary you mounted yourself. You are responsible for the tool's own licence terms. Leave empty to keep the classical engines.",
+      "external_engines_blurb": "Nothing is bundled: download the Linux x64 CLI package from starnetastro.com and install it below, or point a path at a binary you mounted yourself. You are responsible for the tool's own licence terms. Leave empty to keep the classical engines.",
       "starnet2_path": {
         "label": "StarNet2 binary path",
         "hint": "Absolute path inside the container, e.g. /opt/engines/starnet2/starnet2."

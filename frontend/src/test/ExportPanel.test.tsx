@@ -29,11 +29,11 @@ describe('ExportPanel', () => {
     expect(screen.getByRole('button', { name: 'Download' })).toBeDisabled();
   });
 
-  it('hides the AstroDex button and its feedback outside an AstroDex session', () => {
+  it('hides the Astrodex button and its feedback outside an Astrodex session', () => {
     render(<ExportPanel {...base} astrodexReturned astrodexError="boom" />);
 
     expect(screen.queryByRole('button', { name: /astrodex/i })).not.toBeInTheDocument();
-    expect(screen.queryByText(/Added to the AstroDex/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Added to the Astrodex/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Could not send back/)).not.toBeInTheDocument();
   });
 
@@ -43,7 +43,7 @@ describe('ExportPanel', () => {
       <ExportPanel {...base} canReturnToAstroDex onReturnToAstroDex={onReturnToAstroDex} />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Send back to AstroDex' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Send back to Astrodex' }));
     expect(onReturnToAstroDex).toHaveBeenCalledTimes(1);
 
     rerender(<ExportPanel {...base} canReturnToAstroDex astrodexReturning />);
@@ -54,7 +54,7 @@ describe('ExportPanel', () => {
     render(<ExportPanel {...base} isProcessing canReturnToAstroDex />);
 
     expect(screen.getByRole('button', { name: 'Download' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Send back to AstroDex' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Send back to Astrodex' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Save as preset' })).toBeDisabled();
   });
 
@@ -66,24 +66,24 @@ describe('ExportPanel', () => {
     expect(onSaveAsPreset).toHaveBeenCalledTimes(1);
   });
 
-  it('names the AstroDex object in the return hint when known', () => {
+  it('names the Astrodex object in the return hint when known', () => {
     render(<ExportPanel {...base} canReturnToAstroDex astrodexObjectName="M 31" />);
 
-    expect(screen.getByText(/Adds a copy to 'M 31' in the AstroDex/)).toBeInTheDocument();
+    expect(screen.getByText(/Adds a copy to 'M 31' in the Astrodex/)).toBeInTheDocument();
   });
 
   it('confirms a successful return and surfaces a failure', () => {
     const { rerender } = render(<ExportPanel {...base} canReturnToAstroDex astrodexReturned />);
-    expect(screen.getByText('Added to the AstroDex object as a new picture.')).toBeInTheDocument();
+    expect(screen.getByText('Added to the Astrodex object as a new picture.')).toBeInTheDocument();
 
     rerender(
-      <ExportPanel {...base} canReturnToAstroDex astrodexError="AstroDex unreachable" />,
+      <ExportPanel {...base} canReturnToAstroDex astrodexError="Astrodex unreachable" />,
     );
     expect(
-      screen.getByText(/Could not send back to AstroDex: AstroDex unreachable/),
+      screen.getByText(/Could not send back to Astrodex: Astrodex unreachable/),
     ).toBeInTheDocument();
     expect(
-      screen.queryByText('Added to the AstroDex object as a new picture.'),
+      screen.queryByText('Added to the Astrodex object as a new picture.'),
     ).not.toBeInTheDocument();
   });
 });

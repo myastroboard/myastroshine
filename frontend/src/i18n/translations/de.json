@@ -52,7 +52,7 @@
   },
   "app": {
     "nav_settings": "Einstellungen",
-    "opening_from_astrodex": "Ihr Bild wird aus AstroDex geöffnet..."
+    "opening_from_astrodex": "Ihr Bild wird aus Astrodex geöffnet..."
   },
   "image_upload": {
     "format_not_supported": "Format {ext} wird nicht unterstützt",
@@ -127,7 +127,7 @@
         "help": "Wählen Sie den Brennpunkt, dann öffnen Sie den Depth-Shift-Betrachter für eine interaktive Parallaxenvorschau."
       },
       "export": {
-        "help": "Holen Sie das Ergebnis heraus: herunterladen, an AstroDex übergeben, oder die aktuellen Einstellungen als wiederverwendbare Voreinstellung speichern."
+        "help": "Holen Sie das Ergebnis heraus: herunterladen, an Astrodex übergeben, oder die aktuellen Einstellungen als wiederverwendbare Voreinstellung speichern."
       }
     },
     "milestones": {
@@ -153,12 +153,12 @@
   "export_panel": {
     "filename_label": "Dateiname",
     "download": "Herunterladen",
-    "return_to_astrodex": "An AstroDex zurücksenden",
+    "return_to_astrodex": "An Astrodex zurücksenden",
     "returning": "Wird gesendet...",
-    "returned": "Als neues Bild zum AstroDex-Objekt hinzugefügt.",
-    "return_hint": "Fügt dem AstroDex-Objekt eine Kopie mit Ihrem verbesserten Bild hinzu - das Original bleibt erhalten.",
-    "return_hint_named": "Fügt zu '{object}' im AstroDex eine Kopie mit Ihrem verbesserten Bild hinzu - das Original bleibt erhalten.",
-    "return_failed": "Rücksendung an AstroDex fehlgeschlagen: {error}"
+    "returned": "Als neues Bild zum Astrodex-Objekt hinzugefügt.",
+    "return_hint": "Fügt dem Astrodex-Objekt eine Kopie mit Ihrem verbesserten Bild hinzu - das Original bleibt erhalten.",
+    "return_hint_named": "Fügt zu '{object}' im Astrodex eine Kopie mit Ihrem verbesserten Bild hinzu - das Original bleibt erhalten.",
+    "return_failed": "Rücksendung an Astrodex fehlgeschlagen: {error}"
   },
   "image_preview": {
     "processed_alt": "Bearbeitet",
@@ -189,10 +189,10 @@
     "save": "Speichern"
   },
   "token_manager": {
-    "heading": "AstroDex-Webhook-Tokens",
+    "heading": "Astrodex-Webhook-Tokens",
     "copy_now_warning": "Kopieren Sie diese jetzt, sie werden nicht erneut angezeigt.",
     "done": "Fertig",
-    "name_placeholder": "AstroDex prod",
+    "name_placeholder": "Astrodex prod",
     "expires_label": "Läuft ab (Tage, optional)",
     "create_button": "Token erstellen",
     "revoke_button": "Widerrufen",
@@ -407,8 +407,8 @@
         "blurb": "Optionale Sternentfernung mit StarNet2 und Entrauschung mit DeepSNR."
       },
       "astrodex": {
-        "label": "AstroDex",
-        "blurb": "Kopplung mit dem AstroDex von MyAstroBoard: Tokens und Callback-Zustellung."
+        "label": "Astrodex",
+        "blurb": "Kopplung mit dem Astrodex von MyAstroBoard: Tokens und Callback-Zustellung."
       },
       "security": {
         "label": "Sicherheit",
@@ -480,12 +480,12 @@
     },
     "webhooks": {
       "allowlist": {
-        "label": "AstroDex-Ursprungs-Positivliste",
-        "hint": "Ein URL-Präfix pro Zeile - der/die MyAstroBoard-Ursprung(e), von dem/denen eine Übergabe kommen darf, z. B. https://astro.example.com. Leer bedeutet, dass jede AstroDex-Übergabe abgelehnt wird."
+        "label": "Astrodex-Ursprungs-Positivliste",
+        "hint": "Ein URL-Präfix pro Zeile - der/die MyAstroBoard-Ursprung(e), von dem/denen eine Übergabe kommen darf, z. B. https://astro.example.com. Leer bedeutet, dass jede Astrodex-Übergabe abgelehnt wird."
       },
       "max_retries": {
         "label": "Maximale Wiederholungen",
-        "hint": "Zustellversuche, bevor die Rücksendung an AstroDex als fehlgeschlagen markiert wird."
+        "hint": "Zustellversuche, bevor die Rücksendung an Astrodex als fehlgeschlagen markiert wird."
       },
       "retry_delay": {
         "label": "Wiederholungsverzögerung",
@@ -517,7 +517,7 @@
         "label": "Konsolenprotokoll-Stufe",
         "hint": "Stufe, die in den Container-Protokollen ausgegeben wird."
       },
-      "external_engines_blurb": "Optionale Sternentfernung (StarNet2) und Entrauschung (DeepSNR). Nichts ist enthalten: Laden Sie das Linux-x64-CLI-Paket von starnetastro.com herunter und installieren Sie es unten, oder geben Sie den Pfad zu einer selbst eingebundenen Binärdatei an. Sie sind für die Lizenzbedingungen des Werkzeugs verantwortlich. Leer lassen, um die klassischen Verfahren zu behalten.",
+      "external_engines_blurb": "Nichts ist enthalten: Laden Sie das Linux-x64-CLI-Paket von starnetastro.com herunter und installieren Sie es unten, oder geben Sie den Pfad zu einer selbst eingebundenen Binärdatei an. Sie sind für die Lizenzbedingungen des Werkzeugs verantwortlich. Leer lassen, um die klassischen Verfahren zu behalten.",
       "starnet2_path": {
         "label": "Pfad zur StarNet2-Binärdatei",
         "hint": "Absoluter Pfad im Container, z. B. /opt/engines/starnet2/starnet2."

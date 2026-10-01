@@ -4,7 +4,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 
 export interface ExportPanelProps {
   isProcessing?: boolean;
-  /** True when the session was opened from an AstroDex handoff. */
+  /** True when the session was opened from an Astrodex handoff. */
   canReturnToAstroDex?: boolean;
   astrodexObjectName?: string | null;
   astrodexReturning?: boolean;
@@ -18,7 +18,7 @@ export interface ExportPanelProps {
 }
 
 /** Getting the enhanced image out of the editor: download, send it back to the
- * AstroDex object it came from, or save the current parameters as a preset. */
+ * Astrodex object it came from, or save the current parameters as a preset. */
 export function ExportPanel({
   isProcessing = false,
   canReturnToAstroDex = false,

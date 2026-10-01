@@ -23,7 +23,7 @@ describe('useAstroDexIntegration', () => {
     expect(result.current.error).toBeNull();
   });
 
-  it('sends the session back to AstroDex and reports success', async () => {
+  it('sends the session back to Astrodex and reports success', async () => {
     mocked.returnToAstrodex.mockResolvedValue({
       sessionId: 's1',
       status: 'received',
@@ -94,7 +94,7 @@ describe('useAstroDexIntegration', () => {
       await result.current.returnImage('s1');
     });
 
-    expect(result.current.error).toBe('Failed to send back to AstroDex');
+    expect(result.current.error).toBe('Failed to send back to Astrodex');
   });
 
   it('resets success/error on a subsequent call', async () => {

@@ -272,7 +272,7 @@ export const apiClient = {
     return response.blob();
   },
 
-  /** Open an editing session from an AstroDex handoff token (the browser was
+  /** Open an editing session from an Astrodex handoff token (the browser was
    * sent here by MyAstroBoard). The backend verifies the token and pulls the
    * source image itself. */
   resumeAstrodexHandoff(handoff: string): Promise<HandoffResumeResponse> {
@@ -282,7 +282,7 @@ export const apiClient = {
     });
   },
 
-  /** Send the enhanced result back to AstroDex, where it is filed as a new
+  /** Send the enhanced result back to Astrodex, where it is filed as a new
    * picture on the same object. */
   returnToAstrodex(sessionId: string): Promise<HandoffReturnResponse> {
     return request<HandoffReturnResponse>('/astrodex/handoff/return', {

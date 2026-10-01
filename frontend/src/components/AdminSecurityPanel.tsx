@@ -58,27 +58,29 @@ function ChangePasswordForm() {
         <h3 className="text-sm font-semibold text-ink">{t('settings.security.change_password.title')}</h3>
         <p className="mt-0.5 text-xs text-muted">{t('settings.security.change_password.blurb')}</p>
       </div>
-      <PasswordField
-        id="admin-current-password"
-        label={t('settings.auth.current_password')}
-        value={current}
-        onChange={setCurrent}
-        autoComplete="current-password"
-      />
-      <PasswordField
-        id="admin-new-password"
-        label={t('settings.auth.new_password')}
-        value={next}
-        onChange={setNext}
-        autoComplete="new-password"
-      />
-      <PasswordField
-        id="admin-confirm-password"
-        label={t('settings.auth.confirm_password')}
-        value={confirm}
-        onChange={setConfirm}
-        autoComplete="new-password"
-      />
+      <div className="flex max-w-md flex-col gap-3">
+        <PasswordField
+          id="admin-current-password"
+          label={t('settings.auth.current_password')}
+          value={current}
+          onChange={setCurrent}
+          autoComplete="current-password"
+        />
+        <PasswordField
+          id="admin-new-password"
+          label={t('settings.auth.new_password')}
+          value={next}
+          onChange={setNext}
+          autoComplete="new-password"
+        />
+        <PasswordField
+          id="admin-confirm-password"
+          label={t('settings.auth.confirm_password')}
+          value={confirm}
+          onChange={setConfirm}
+          autoComplete="new-password"
+        />
+      </div>
       {error && <FormError>{error}</FormError>}
       {done && (
         <p role="status" className="text-xs text-success">

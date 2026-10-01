@@ -75,7 +75,7 @@ class PresetRecord(Base):
 
 
 class AstroDexLink(Base):
-    """Links an editing session to the AstroDex picture it was handed off from.
+    """Links an editing session to the Astrodex picture it was handed off from.
 
     Created by ``POST /api/astrodex/handoff/resume``: MyAstroBoard opens the
     editor with a signed handoff token, the backend pulls the source image and
@@ -154,7 +154,7 @@ class StackRecord(Base):
 
 
 class WebhookToken(Base):
-    """A long-lived bearer token that authenticates AstroDex to this instance.
+    """A long-lived bearer token that authenticates Astrodex to this instance.
 
     Created and revoked from the UI. The raw value is shown once; only its hash
     is stored. ``signing_secret`` is used to HMAC-sign outbound webhooks.

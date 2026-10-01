@@ -125,11 +125,11 @@ describe('SettingsView', () => {
     );
   });
 
-  it('shows the token manager under the AstroDex section', async () => {
+  it('shows the token manager under the Astrodex section', async () => {
     renderView();
     await screen.findByLabelText('Maximum upload size');
 
-    fireEvent.click(screen.getByRole('button', { name: 'AstroDex' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Astrodex' }));
 
     expect(screen.getByText(/webhook tokens/i)).toBeInTheDocument();
   });
@@ -447,13 +447,13 @@ describe('SettingsView', () => {
       });
     });
 
-    it('AstroDex', async () => {
+    it('Astrodex', async () => {
       renderView();
       await screen.findByLabelText('Maximum upload size');
-      fireEvent.click(screen.getByRole('button', { name: 'AstroDex' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Astrodex' }));
       await waitFor(() => expect(document.querySelector('textarea')).not.toBeNull());
 
-      editEverything('AstroDex');
+      editEverything('Astrodex');
       const saved = await saveAndRead();
 
       expect(saved).toMatchObject({
@@ -519,7 +519,7 @@ describe('SettingsView', () => {
 
       // The panels mount once the admin gate opens; until the settings land
       // they show a loading line.
-      await screen.findByRole('button', { name: 'AstroDex' });
+      await screen.findByRole('button', { name: 'Astrodex' });
       expect(await screen.findByText('Loading...')).toBeInTheDocument();
     });
 

@@ -52,7 +52,7 @@
   },
   "app": {
     "nav_settings": "Ajustes",
-    "opening_from_astrodex": "Abriendo su imagen desde AstroDex..."
+    "opening_from_astrodex": "Abriendo su imagen desde Astrodex..."
   },
   "image_upload": {
     "format_not_supported": "El formato {ext} no es compatible",
@@ -127,7 +127,7 @@
         "help": "Elija el punto focal y luego abra el visor Depth Shift para una vista previa interactiva de paralaje."
       },
       "export": {
-        "help": "Obtenga el resultado: descárguelo, envíelo a AstroDex, o guarde los ajustes actuales como un preajuste reutilizable."
+        "help": "Obtenga el resultado: descárguelo, envíelo a Astrodex, o guarde los ajustes actuales como un preajuste reutilizable."
       }
     },
     "milestones": {
@@ -153,12 +153,12 @@
   "export_panel": {
     "filename_label": "Nombre del archivo",
     "download": "Descargar",
-    "return_to_astrodex": "Reenviar a AstroDex",
+    "return_to_astrodex": "Reenviar a Astrodex",
     "returning": "Enviando...",
-    "returned": "Añadida al objeto de AstroDex como nueva imagen.",
-    "return_hint": "Añade una copia al objeto de AstroDex con su imagen mejorada - se conserva la original.",
-    "return_hint_named": "Añade una copia a '{object}' en AstroDex con su imagen mejorada - se conserva la original.",
-    "return_failed": "No se pudo reenviar a AstroDex: {error}"
+    "returned": "Añadida al objeto de Astrodex como nueva imagen.",
+    "return_hint": "Añade una copia al objeto de Astrodex con su imagen mejorada - se conserva la original.",
+    "return_hint_named": "Añade una copia a '{object}' en Astrodex con su imagen mejorada - se conserva la original.",
+    "return_failed": "No se pudo reenviar a Astrodex: {error}"
   },
   "image_preview": {
     "processed_alt": "Procesada",
@@ -189,10 +189,10 @@
     "save": "Guardar"
   },
   "token_manager": {
-    "heading": "Tokens de webhook de AstroDex",
+    "heading": "Tokens de webhook de Astrodex",
     "copy_now_warning": "Cópielos ahora, no se volverán a mostrar.",
     "done": "Listo",
-    "name_placeholder": "AstroDex prod",
+    "name_placeholder": "Astrodex prod",
     "expires_label": "Caduca (días, opcional)",
     "create_button": "Crear token",
     "revoke_button": "Revocar",
@@ -407,8 +407,8 @@
         "blurb": "Eliminación de estrellas con StarNet2 y reducción de ruido con DeepSNR opcionales."
       },
       "astrodex": {
-        "label": "AstroDex",
-        "blurb": "Vinculación con el AstroDex de MyAstroBoard: tokens y entrega de devoluciones."
+        "label": "Astrodex",
+        "blurb": "Vinculación con el Astrodex de MyAstroBoard: tokens y entrega de devoluciones."
       },
       "security": {
         "label": "Seguridad",
@@ -480,12 +480,12 @@
     },
     "webhooks": {
       "allowlist": {
-        "label": "Lista blanca de orígenes de AstroDex",
-        "hint": "Un prefijo de URL por línea - el o los orígenes de MyAstroBoard desde los que puede llegar una transferencia, p. ej. https://astro.example.com. Vacío significa que se rechaza toda transferencia de AstroDex."
+        "label": "Lista blanca de orígenes de Astrodex",
+        "hint": "Un prefijo de URL por línea - el o los orígenes de MyAstroBoard desde los que puede llegar una transferencia, p. ej. https://astro.example.com. Vacío significa que se rechaza toda transferencia de Astrodex."
       },
       "max_retries": {
         "label": "Número máximo de reintentos",
-        "hint": "Intentos de entrega antes de que el reenvío a AstroDex se marque como fallido."
+        "hint": "Intentos de entrega antes de que el reenvío a Astrodex se marque como fallido."
       },
       "retry_delay": {
         "label": "Retardo entre reintentos",
@@ -517,7 +517,7 @@
         "label": "Nivel del registro en consola",
         "hint": "Nivel reflejado en los registros del contenedor."
       },
-      "external_engines_blurb": "Eliminación de estrellas (StarNet2) y reducción de ruido (DeepSNR) opcionales. No se incluye nada: descargue el paquete CLI Linux x64 de starnetastro.com e instálelo abajo, o indique la ruta de un binario que haya montado usted mismo. Usted es responsable de los términos de licencia de la herramienta. Déjelo vacío para mantener los motores clásicos.",
+      "external_engines_blurb": "No se incluye nada: descargue el paquete CLI Linux x64 de starnetastro.com e instálelo abajo, o indique la ruta de un binario que haya montado usted mismo. Usted es responsable de los términos de licencia de la herramienta. Déjelo vacío para mantener los motores clásicos.",
       "starnet2_path": {
         "label": "Ruta del binario de StarNet2",
         "hint": "Ruta absoluta dentro del contenedor, p. ej. /opt/engines/starnet2/starnet2."
