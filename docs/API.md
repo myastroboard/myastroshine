@@ -55,7 +55,8 @@ Engine uploads add `INVALID_ENGINE_ARCHIVE` (400). Admin authentication adds
 
 ## Rate Limiting
 
-Per IP, on `/upload`, `/process/{id}`, `/presets/{id}/apply/{session_id}`,
+Per client IP (under a Home Assistant ingress, the browser's address restored
+from the Supervisor's `X-Forwarded-For`, see docs/DEPLOYMENT.md), on `/upload`, `/process/{id}`, `/presets/{id}/apply/{session_id}`,
 `/star-mask/{id}`, `/auto-astro/{id}`, and `/stack/*`:
 
 - **Requests per minute** (`rate_limit_per_minute`, default **600**): a fixed
@@ -579,9 +580,11 @@ own origin (`Host`, or the `X-Forwarded-Host` set by a reverse proxy) or from
 `cors_origins`; anything else is `403`. `SameSite` alone would still let another
 app on the same host and a different port send the cookie.
 
-**Lost password.** Run `python -m app.cli reset-admin` inside the container
-(see docs/DEPLOYMENT.md): it forgets the password and every session, and the next
-visit to Settings asks for a new one.
+**Lost password.** Run `python -m app.cli reset-admin` inside the container,
+or create an empty `reset-admin` file in the data directory (the Home Assistant
+app: its `addon_configs` folder) and restart (see docs/DEPLOYMENT.md): it forgets
+the password and every session, and the next visit to Settings asks for a new
+one.
 
 `ADMIN_ENABLED=false` (structural, see docs/DEPLOYMENT.md) still turns the whole
 admin surface off: every admin route and `/auth/setup` / `/auth/login` answer

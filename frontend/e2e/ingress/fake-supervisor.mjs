@@ -40,13 +40,17 @@ function stripPrefix(url) {
 }
 
 /** The headers the Supervisor adds (see HA_APP_RETEX.md, "Ingress"): the app is
- * reached on its own host, the browser's host comes as X-Forwarded-Host. */
+ * reached on its own host, the browser's host comes as X-Forwarded-Host, and HA
+ * core's own hop (172.30.32.1) follows the browser's in X-Forwarded-For. The
+ * backend trusts them because playwright.config.ts starts it as an HA app
+ * (SUPERVISOR_TOKEN) with this proxy's address (INGRESS_PROXY_IP). */
 function forwardedHeaders(req) {
   return {
     ...req.headers,
     host: `${BACKEND_HOST}:${BACKEND_PORT}`,
     'x-ingress-path': PREFIX,
-    'x-forwarded-for': req.socket.remoteAddress ?? '',
+    'x-forwarded-for': `${req.socket.remoteAddress ?? ''}, 172.30.32.1`,
+    'x-remote-user-id': 'e2e-ha-user',
     'x-forwarded-host': req.headers.host ?? '',
     'x-forwarded-proto': 'http',
   };

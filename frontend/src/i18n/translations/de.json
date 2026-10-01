@@ -636,7 +636,8 @@
       "login": {
         "title": "Administrator-Anmeldung",
         "blurb": "Die Einstellungen sind dem Administrator vorbehalten. Geben Sie das Admin-Passwort ein, um fortzufahren.",
-        "submit": "Anmelden"
+        "submit": "Anmelden",
+        "lost_password": "Passwort vergessen? Legen Sie eine leere Datei namens reset-admin im Datenordner an - bei der Home-Assistant-App in ihrem Ordner unter addon_configs - und starten Sie die App neu. Die Einstellungen fragen dann nach einem neuen Passwort."
       },
       "errors": {
         "invalid_password": "Falsches Passwort.",

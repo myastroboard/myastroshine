@@ -22,8 +22,10 @@ import hashlib
 import hmac
 import secrets
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
@@ -191,13 +193,41 @@ class AdminAuthService:
     def reset(self) -> None:
         """Forget the password and every session; the next visit shows setup again.
 
-        Reached from the ``reset-admin`` CLI (``python -m app.cli``) - the way back
+        Reached from the ``reset-admin`` CLI (``python -m app.cli``) and from a
+        reset marker file at startup (:meth:`reset_if_requested`) - the ways back
         in for an operator who lost the password.
         """
         self.db.execute(delete(AdminSession))
         self.db.execute(delete(AdminCredential))
         self.db.commit()
         logger.warning("admin password reset")
+
+    def reset_if_requested(self, markers: Iterable[Path]) -> bool:
+        """Reset once if any marker file exists, consuming it; ``True`` if reset.
+
+        The marker is removed before the reset: one that cannot be removed would
+        otherwise wipe the password at every start, so it is reported and the
+        password kept.
+        """
+        found = [marker for marker in markers if marker.is_file()]
+        if not found:
+            return False
+        for marker in found:
+            try:
+                marker.unlink()
+            except OSError as exc:
+                logger.error(
+                    "admin reset marker could not be removed, password kept",
+                    marker=str(marker),
+                    error=str(exc),
+                )
+                return False
+        self.reset()
+        logger.warning(
+            "admin password cleared by a reset marker - open Settings to set a new one",
+            markers=[str(marker) for marker in found],
+        )
+        return True
 
     # --- sessions -----------------------------------------------------------
 

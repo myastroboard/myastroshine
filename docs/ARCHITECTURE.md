@@ -66,9 +66,15 @@ the health check - never stalls behind pixel work.
 
 `app/main.py:create_app()` wires:
 
+- The **ingress middleware** (`app/utils/ingress.py`, outermost): under Home
+  Assistant, a request from the Supervisor gets the browser's address, the
+  ingress prefix (`root_path`) and the scheme from its headers; anyone else's
+  copies of those headers are dropped.
 - **CORS** (`cors_origins`, credentials on - a literal `"*"` is rejected),
   **GZip**, and a small middleware that adds the security headers a reverse proxy
   would normally supply (`X-Frame-Options`, `X-Content-Type-Options`, ...).
+- At startup, an admin **reset marker** (`reset-admin` in the data directory,
+  or the HA app's config folder) clears the admin password once.
 - A **shared error envelope**: every `AppError` and request-validation failure is
   rendered as `{ error, error_code, details, request_id, timestamp }` (see
   [API.md](API.md)). No stack traces or paths leak into a response.

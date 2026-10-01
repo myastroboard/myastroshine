@@ -47,7 +47,10 @@ export default defineConfig({
   webServer: [
     {
       command:
-        'python -m uvicorn app.main:app ' +
+        // --no-proxy-headers like the image (app/serve.py): uvicorn's own
+        // X-Forwarded-For handling would rewrite the peer before the ingress
+        // middleware checks it is the Supervisor.
+        'python -m uvicorn app.main:app --no-proxy-headers ' +
         `--host 127.0.0.1 --port ${BACKEND_PORT}`,
       cwd: '../backend',
       port: BACKEND_PORT,
@@ -56,6 +59,11 @@ export default defineConfig({
       env: {
         APP_ENV: 'development',
         DATA_DIR: './.e2e-tmp',
+        // Run as a Home Assistant app whose Supervisor is the fake one on
+        // loopback (e2e/ingress/fake-supervisor.mjs), so the ingress project
+        // exercises the trusted-proxy path: client IP, prefix-scoped cookie.
+        SUPERVISOR_TOKEN: 'e2e',
+        INGRESS_PROXY_IP: '127.0.0.1',
       },
     },
     {

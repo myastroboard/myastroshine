@@ -89,6 +89,18 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Ready for Home Assistant ingress.** Running as a Home Assistant app (the
+  Supervisor injects `SUPERVISOR_TOKEN`), requests from the Supervisor get the
+  browser's own address back from `X-Forwarded-For`, so the rate limit, the
+  login throttle and the concurrent-job cap count each HA user apart instead of
+  all of them as one; the admin cookie is scoped to the ingress prefix and
+  `Secure` when HA is served over HTTPS. The Supervisor's headers are honoured
+  only from its address (IPv4-mapped forms included) and removed from anyone
+  else's requests; nothing changes for a plain Docker install.
+- **Reset the admin password without a shell.** An empty `reset-admin` file in
+  the data directory - for the Home Assistant app, in its folder under
+  `addon_configs` - clears the admin password at the next start and is deleted.
+  The login form says how.
 - **Admin password.** Settings - and every `/api/admin/*` and `/api/tokens`
   route - now need an admin login; using the app (upload, edit, stack, download,
   presets) stays open. On first start the Settings page asks to create the
@@ -135,6 +147,7 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Frontend (dev): vitest / @vitest/coverage-v8 5.0.2 -> 5.0.3, typescript-eslint
   8.70.1 -> 8.71.0, globals 17.12.0 -> 17.13.0; brace-expansion 5.0.12 (transitive, via eslint) for
   GHSA-q2hr-2g5m-vwhr / GHSA-qhr7-859c-m2p7 / GHSA-6j4f-fj2g-mc7p.
+- Frontend (dev): vite 8.3.1 -> 8.3.2.
 
 ## [0.4.2] - 2026-09-11
 

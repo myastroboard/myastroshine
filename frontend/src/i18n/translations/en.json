@@ -636,7 +636,8 @@
       "login": {
         "title": "Administrator login",
         "blurb": "Settings are reserved for the administrator. Enter the admin password to continue.",
-        "submit": "Log in"
+        "submit": "Log in",
+        "lost_password": "Lost the password? Create an empty file named reset-admin in the data folder - for the Home Assistant app, in its folder under addon_configs - then restart the app. Settings will ask for a new password."
       },
       "errors": {
         "invalid_password": "Wrong password.",

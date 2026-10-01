@@ -636,7 +636,8 @@
       "login": {
         "title": "Accesso amministratore",
         "blurb": "Le impostazioni sono riservate all'amministratore. Inserisci la password di amministratore per continuare.",
-        "submit": "Accedi"
+        "submit": "Accedi",
+        "lost_password": "Password persa? Crea un file vuoto chiamato reset-admin nella cartella dei dati - per l'app Home Assistant, nella sua cartella sotto addon_configs - poi riavvia l'app. Le impostazioni chiederanno una nuova password."
       },
       "errors": {
         "invalid_password": "Password errata.",
