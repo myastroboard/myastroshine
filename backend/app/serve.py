@@ -42,7 +42,7 @@ def listening_socket(port: int = SERVER_PORT) -> socket.socket:
     else:
         sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind(("::", port))
+        sock.bind(("::", port))  # the server listens on every interface (dual stack)
     sock.listen(_BACKLOG)
     sock.set_inheritable(True)
     return sock
