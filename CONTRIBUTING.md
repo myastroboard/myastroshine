@@ -80,6 +80,43 @@ All dependencies are pinned to their latest release. `scripts/check_deps_fresh.p
 When you bump one, update the pin in `backend/requirements*.txt` or
 `frontend/package.json`, or add a documented hold to `scripts/deps_fresh_ignore.txt`.
 
+### CPU compatibility
+
+The amd64 image must keep running on x86-64 CPUs without x86-64-v2 (no
+SSE4.2/POPCNT). In practice that is a VM with a generic CPU model, e.g. Proxmox
+`kvm64` - the default of the Home Assistant OS VM scripts, so a common setup, not
+a legacy one. Some PyPI wheels (current NumPy, for one) require x86-64-v2 and
+crash at import there with "Illegal instruction". The `Dockerfile` therefore
+rebuilds NumPy from source on amd64 (`REBUILD_FOR_OLD_CPUS`, in the
+`python-wheels` stage) with no CPU baseline; it still picks its SSE4 / AVX
+kernels at run time on CPUs that have them.
+
+The `CPU compatibility` workflow checks this on every PR that touches
+`backend/requirements.txt` or the `Dockerfile`, and the release workflow runs the
+same check on the image it is about to publish - a failure there blocks the
+release. Run it locally with:
+
+```bash
+docker build -t myastroshine:cpu-compat .
+sh scripts/check_cpu_compat.sh myastroshine:cpu-compat   # CPU_MODEL=kvm64 by default
+```
+
+It runs `scripts/cpu_compat_smoke.py` (imports the app, runs the enhancement
+pipeline, star detection, FITS / 16-bit / linear ingest) under QEMU's emulation of
+that CPU. When it fails, the log names the root-cause package(s). Then, in order
+of preference:
+
+1. **Stay on the current version** - keep the old pin and add a documented hold
+   to `scripts/deps_fresh_ignore.txt`. Right for most bumps.
+2. **Rebuild the package from source** - add it to `REBUILD_FOR_OLD_CPUS` in the
+   `Dockerfile` (e.g. `"numpy rawpy"`), when the update is needed (security fix,
+   Python support). The compiler defaults target any x86-64 CPU; a package that
+   raises its own baseline (as NumPy does) also needs its build option in the
+   rebuild loop, and one with extra build dependencies needs them in the
+   `python-wheels` stage. Rebuilding OpenCV would take very long - prefer 1.
+3. **Drop support for these CPUs** - a maintainer decision, to be documented and
+   announced.
+
 ## Branching and commits
 
 - Branch from `main` as `feature/<short-description>` or `fix/<short-description>`.

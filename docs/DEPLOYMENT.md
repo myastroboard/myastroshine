@@ -313,3 +313,22 @@ host in `X-Forwarded-Host` (the admin routes compare it with the request's
 
 The `api` container has a Docker healthcheck hitting `/api/health`. Check status
 with `docker compose ps`.
+
+## Listening and stopping
+
+The image's server (`python -m app.serve`) listens on port 8002 on **IPv4 and
+IPv6 at once** (one dual-stack socket), so a host name that resolves to IPv6 -
+`homeassistant.local` often does - reaches it as well as `127.0.0.1`. Without
+IPv6 in the kernel it falls back to IPv4 only.
+
+A container stop is clean and quick: open connections get 3 s, then a running
+processing job stops at its next step and is marked failed ("interrupted by a
+server shutdown"), jobs still waiting are dropped; the container exits with
+code 0 well inside Docker's 10 s.
+
+## CPU requirements
+
+The amd64 image runs on any x86-64 CPU, including VMs with a generic CPU model
+such as Proxmox `kvm64` (no SSE4.2/POPCNT): NumPy is built without a CPU
+baseline and picks faster kernels at run time where the CPU has them. The arm64
+image runs on 64-bit ARM (Raspberry Pi 4/5 with a 64-bit OS).

@@ -28,7 +28,7 @@ stage runs FastAPI and, in the default final stage, also serves that built SPA).
 
 | Service | Role | Port |
 |---------|------|------|
-| `api` | FastAPI under uvicorn - the REST API, the progress WebSockets, the static web UI, the background processing jobs and the periodic maintenance, all in one process | 8002 |
+| `api` | FastAPI under uvicorn (`python -m app.serve`: one dual-stack IPv4 + IPv6 socket) - the REST API, the progress WebSockets, the static web UI, the background processing jobs and the periodic maintenance, all in one process | 8002 |
 
 There is no worker process, no queue broker and no Redis: one container is the
 whole application, which is also what a Home Assistant app or a NAS package

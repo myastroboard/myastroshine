@@ -122,3 +122,9 @@ ENGINE_ARCHIVE_MAX_ENTRIES = 5000
 #: A staged (unpacked, not yet accepted) package is dropped after this long.
 ENGINE_STAGING_MAX_AGE_SECONDS = 60 * 60
 ENGINE_LICENSE_MAX_BYTES = 64 * 1024
+
+# The production server (app/serve.py).
+SERVER_PORT = 8002
+#: How long open connections (WebSockets, a running upload) get to finish when the
+#: container stops, before the lifespan stops the background jobs.
+SERVER_SHUTDOWN_GRACE_SECONDS = 3
