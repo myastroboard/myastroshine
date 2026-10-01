@@ -19,8 +19,10 @@ that two measured levels land where they should:
 * the **object** (a high percentile of that same star-suppressed copy - the
   bright nebula / galaxy body, not the star cores) maps to ``_OBJECT_TARGET``.
 
-Negative family values lower the white point (a pure midtone transfer, for a
-faint object that needs lifting); positive values keep the white point and add an
+Negative family values lower the white point (a midtone transfer, for a faint
+object that needs lifting), with a highlight shoulder above the lowered white's
+knee so everything brighter than the object rolls off toward 1 instead of
+clipping to a flat white plateau; positive values keep the white point and add an
 arcsinh stage underneath the midtone transfer, compressing the highlights so a
 bright core keeps its structure. The black point is the sky minus a noise-scaled
 margin, as in every STF-style auto-stretch.
@@ -45,6 +47,7 @@ _OBJECT_TARGET = 0.72
 _WHITE_PERCENTILE = 99.99  # of the brightest channel - stars included
 _FAMILY_RANGE = (-1.0, 1.0)  # lowered white point .. strongest arcsinh compression
 _ARCSINH_DECADES = 3.0  # family value 1 -> arcsinh beta ~ 10^3
+_SHOULDER_KNEE = 0.6  # of the lowered white point - above it highlights roll off, never clip
 _SOLVE_ITERATIONS = 40
 _CLIPPED_SOURCE_LEVEL = 0.9  # a source pixel this bright may be clipped - its colour is not trusted
 _CLIPPED_RAMP = 0.08
@@ -148,7 +151,10 @@ def _curve(
     """One member of the stretch family, applied to normalised luminance ``x``."""
     if family < 0.0:
         white = white_floor ** (-family)  # 0 -> 1, -1 -> white_floor
-        xs, sky = x / white, x_sky / white
+        u_max = 1.0 / white
+        rate = _shoulder_rate(u_max)
+        xs = _shoulder(x / white, u_max, rate)
+        sky = float(_shoulder(np.array(x_sky / white), u_max, rate))
     else:
         beta = 10.0 ** (_ARCSINH_DECADES * family) - 1.0
         if beta > _MIN_ARCSINH_BETA:
@@ -159,6 +165,47 @@ def _curve(
             xs, sky = x, x_sky
     sky = min(max(sky, _TINY), 1.0 - _TINY)
     return _mtf(np.clip(xs, 0.0, 1.0), _mtf_balance(sky, target))
+
+
+def _shoulder(u: np.ndarray, u_max: float, rate: float) -> np.ndarray:
+    """Highlight shoulder: identity up to the knee, then log roll-off to ``u_max -> 1``.
+
+    Lowering the white point lifts a faint object, but a hard clip at the lowered
+    white would burn everything brighter than it - nebula filaments and stars -
+    to a flat plateau. Above ``_SHOULDER_KNEE`` the range ``(knee, u_max]`` is
+    instead compressed into ``(knee, 1]`` with a slope-continuous log curve (the
+    role of GHS's highlight protection), so the brightest pixel lands exactly on 1.
+    """
+    if rate <= 0.0:
+        return u
+    knee = _SHOULDER_KNEE
+    span = 1.0 - knee
+    over = np.clip(u - knee, 0.0, None)
+    rolled = knee + span * np.log1p(rate * over) / np.log1p(rate * (u_max - knee))
+    result: np.ndarray = np.where(u > knee, rolled, u)
+    return result
+
+
+def _shoulder_rate(u_max: float) -> float:
+    """The log rate giving the shoulder unit slope at the knee (0 = no shoulder).
+
+    Solves ``span * a / log1p(a * (u_max - knee)) == 1`` by bisection in log
+    space; the left side rises monotonically with ``a`` from ``span / (u_max -
+    knee)`` (< 1 whenever ``u_max > 1``), so the root always exists.
+    """
+    depth = u_max - _SHOULDER_KNEE
+    span = 1.0 - _SHOULDER_KNEE
+    if u_max <= 1.0 + _TINY:
+        return 0.0
+    low, high = -9.0, 12.0  # log10 of the rate
+    for _ in range(_SOLVE_ITERATIONS * 2):
+        mid = 0.5 * (low + high)
+        rate = 10.0**mid
+        if span * rate / np.log1p(rate * depth) > 1.0:
+            high = mid
+        else:
+            low = mid
+    return float(10.0 ** (0.5 * (low + high)))
 
 
 def _solve_family(x_sky: float, x_obj: float, target: float, white_floor: float) -> float:
