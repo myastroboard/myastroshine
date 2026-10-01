@@ -72,7 +72,7 @@ describe('useImageProcessing.trackJob', () => {
     vi.clearAllMocks();
   });
 
-  it('waits for the WebSocket "completed" before bumping previewVersion (queue mode)', async () => {
+  it('waits for the WebSocket "completed" before bumping previewVersion (queued job)', async () => {
     const { result } = renderHook(() => useImageProcessing('s1'));
     expect(result.current.previewVersion).toBe(0);
 
@@ -99,7 +99,7 @@ describe('useImageProcessing.trackJob', () => {
     expect(result.current.status).toBe('completed');
   });
 
-  it('bumps previewVersion at once when the job is already completed (sync mode)', () => {
+  it('bumps previewVersion at once when the job is already completed', () => {
     const { result } = renderHook(() => useImageProcessing('s1'));
 
     act(() => {
@@ -423,7 +423,7 @@ describe('useImageProcessing.trackJob', () => {
     expect(FakeWs.last?.disconnected).toBe(false);
   });
 
-  it('trackJob handles an already-failed response with no WebSocket (sync mode)', () => {
+  it('trackJob handles an already-failed response with no WebSocket', () => {
     const { result } = renderHook(() => useImageProcessing('s1'));
 
     act(() => {

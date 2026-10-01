@@ -1,8 +1,9 @@
 """Watch-folder ingest for stacking (``initial_plan/12_STACKING_REBUILD.md`` Phase 5).
 
-A Celery beat task calls :func:`run_watch_tick` on a schedule. When
-``stacking_watch_dir`` is set, new image files that land there are ingested into a
-rolling "watch" :class:`~app.db.models.StackRecord`; once the folder has been
+The in-process scheduler (``app.services.scheduler``) calls :func:`run_watch_tick`
+every minute. When ``stacking_watch_dir`` is set, new image files that land
+there are ingested into a rolling "watch" :class:`~app.db.models.StackRecord`;
+once the folder has been
 quiet for ``stacking_watch_idle_minutes`` the stack is processed (if
 ``stacking_watch_auto_process`` is on) and the next file starts a fresh one.
 
@@ -127,24 +128,24 @@ def _ingest(
 
     remaining = max_frames - record.received_frames
     batch, overflow = new[:remaining], new[remaining:]
-    prepared = []
-    for path in batch:
-        try:
-            prepared.append(stacking.prepare_frame(path.read_bytes(), path.name))
-        except Exception as exc:  # one unreadable file must not wedge the watch
-            logger.warning("watch: skipping unreadable file", file=path.name, error=str(exc))
-        seen[str(path)] = _fingerprint(path)
-    for path in overflow:  # mark as seen so we don't rescan them every tick
-        seen[str(path)] = _fingerprint(path)
-
-    if prepared:
+    added = 0
+    if batch:
         start = max(storage.stack_frame_indices(record.stack_id), default=-1) + 1
-        stacking.add_frames(record.stack_id, start, prepared)
+        # One file at a time from disk; an unreadable one is logged and skipped
+        # so it can never wedge the watch.
+        _record, added = stacking.add_frames(
+            record.stack_id,
+            start,
+            [(path.read_bytes, path.name) for path in batch],
+            skip_unreadable=True,
+        )
+    for path in new:  # overflow too, so we don't rescan them every tick
+        seen[str(path)] = _fingerprint(path)
     _save_seen(seen)
     logger.info(
         "watch ingest",
         stack_id=record.stack_id,
-        added=len(prepared),
+        added=added,
         overflow=len(overflow),
     )
-    return {"status": "ingested", "count": len(prepared), "stack_id": record.stack_id}
+    return {"status": "ingested", "count": added, "stack_id": record.stack_id}

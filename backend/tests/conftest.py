@@ -40,7 +40,20 @@ def _isolated_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[N
             "astrodex_retry_delay_seconds": 0,
         }
     )
+    # Admin auth: a cheap scrypt cost (the real one costs ~0.1 s per hash) and a
+    # clean login throttle for every test.
+    from app.services import admin_auth
+    from app.utils.rate_limit import login_throttle
+
+    monkeypatch.setattr(admin_auth, "SCRYPT", admin_auth.ScryptParams(n=2**4, r=8, p=1))
+    login_throttle.clear()
+    # A fresh background job runner per test (inline under APP_ENV=test).
+    from app.services.job_runner import reset_job_runner
+
+    reset_job_runner()
     yield
+    reset_job_runner()
+    login_throttle.clear()
     get_settings.cache_clear()
     app_settings._cache.settings = None
     app_settings._cache.secret_key = None
@@ -78,6 +91,20 @@ def db_session(db_engine) -> Iterator[object]:
 
 
 @pytest.fixture
+def job_db(db_engine, monkeypatch: pytest.MonkeyPatch) -> object:
+    """Point ``database.SessionLocal`` - what background jobs and the scheduler
+    open for themselves - at the test engine, for tests that call services
+    directly instead of going through the ``client`` fixture (which does the same)."""
+    from sqlalchemy.orm import sessionmaker
+
+    import app.db.database as database_module
+
+    factory = sessionmaker(bind=db_engine, autoflush=False, autocommit=False, future=True)
+    monkeypatch.setattr(database_module, "SessionLocal", factory)
+    return factory
+
+
+@pytest.fixture
 def client(db_engine) -> Iterator[object]:
     """A FastAPI TestClient wired to the test engine.
 
@@ -101,7 +128,7 @@ def client(db_engine) -> Iterator[object]:
         finally:
             session.close()
 
-    # Background jobs / Celery tasks open their own session via
+    # Background jobs open their own session via
     # database.SessionLocal(); point that at the test engine too.
     original_session_local = database_module.SessionLocal
     database_module.SessionLocal = factory
@@ -113,6 +140,18 @@ def client(db_engine) -> Iterator[object]:
         test_client.close()
         main_module.app.dependency_overrides.clear()
         database_module.SessionLocal = original_session_local
+
+
+ADMIN_TEST_PASSWORD = "correct horse battery"
+
+
+@pytest.fixture
+def admin_client(client) -> object:
+    """The test client with the admin password set up and this client logged in
+    (the session cookie lives in the client's cookie jar)."""
+    response = client.post("/api/auth/setup", json={"password": ADMIN_TEST_PASSWORD})
+    assert response.status_code == 204, response.text
+    return client
 
 
 @pytest.fixture

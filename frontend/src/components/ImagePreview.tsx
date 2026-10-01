@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type PointerEvent } from 'react';
+import { useCallback, useState, type PointerEvent } from 'react';
 
 import { FramingLayer } from '@/components/FramingLayer';
 import { HistogramDisplay } from '@/components/HistogramDisplay';
@@ -63,7 +63,6 @@ export function ImagePreview({
   onFocalPointPick,
 }: ImagePreviewProps) {
   const { t } = useTranslation();
-  const containerRef = useRef<HTMLDivElement>(null);
   const [splitPercent, setSplitPercent] = useState(50);
   const [dragging, setDragging] = useState(false);
   const [zoom, setZoom] = useState(1);
@@ -80,11 +79,7 @@ export function ImagePreview({
   );
 
   const moveSplitTo = useCallback(
-    (clientX: number) => {
-      const el = containerRef.current;
-      if (!el) {
-        return;
-      }
+    (el: HTMLElement, clientX: number) => {
       const rect = el.getBoundingClientRect();
       const percent = toImageFraction((clientX - rect.left) / rect.width) * 100;
       setSplitPercent(Math.max(0, Math.min(100, percent)));
@@ -104,12 +99,12 @@ export function ImagePreview({
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
     setDragging(true);
-    moveSplitTo(event.clientX);
+    moveSplitTo(event.currentTarget, event.clientX);
   }
 
   function handlePointerMove(event: PointerEvent<HTMLDivElement>): void {
     if (dragging) {
-      moveSplitTo(event.clientX);
+      moveSplitTo(event.currentTarget, event.clientX);
     }
   }
 
@@ -142,7 +137,6 @@ export function ImagePreview({
   return (
     <div className="panel flex flex-col gap-3">
       <div
-        ref={containerRef}
         className={`relative mx-auto max-h-[70vh] w-full touch-pan-y select-none overflow-hidden rounded-lg border border-hairline bg-black ${
           framingActive ? '' : pickingFocalPoint ? 'cursor-crosshair' : 'cursor-ew-resize'
         }`}

@@ -14,32 +14,52 @@ fixes.
 
 ## Security Model
 
-MyAstroShine is a **self-hosted, single-operator application**. It has no
-built-in user-account system - it's designed for one person or household
-running one deployment, on:
+MyAstroShine is a **self-hosted, single-operator application**, designed for
+one person or household running one deployment, on:
 
 - A personal home server or NAS
 - A private network / VPN
 - Optionally behind a reverse proxy with its own authentication
 
-There is no login screen and no per-user permission model. The `ADMIN_ENABLED`
-setting (on by default, see `docs/DEPLOYMENT.md`) is a coarse kill-switch for
-the administrative surface (`/api/admin/*`, `/api/tokens`) - not
-authentication. Anyone who can reach the API is trusted to the same degree the
-UI is trusted. Treat network exposure as the actual access-control boundary:
-don't expose this API directly to the public internet without a reverse proxy
-that adds real authentication in front of it.
+It works like professional software: anyone who reaches it can **use** it
+(upload, edit, stack, download, presets), but the **administration** - Settings,
+logs, job history, webhook tokens, configuration import/export - is behind an
+**admin password** (`docs/API.md` "Admin authentication"). There is one admin
+password and no user accounts or per-user permissions.
+
+Using the app stays open by design, so network exposure is still the
+access-control boundary for that part: don't expose MyAstroShine directly to the
+public internet without a reverse proxy that adds authentication in front of it.
+
+**First run.** Until an admin password is set, the administration surface is
+locked (never open), and the first visitor to open Settings chooses the
+password. Set it right after installing, before the instance is reachable by
+others. A lost password is reset from the host with
+`docker exec myastroshine-api python -m app.cli reset-admin`.
 
 ### What's protected today
+
+- **Admin authentication**: the admin password is stored as a salted scrypt
+  hash (N=2^15, r=8, p=3 - an OWASP Password Storage Cheat Sheet equivalent of
+  N=2^17, p=1; a hash made with a weaker cost is upgraded at the next login); a login is a random token in an `HttpOnly`, `SameSite=Strict` cookie
+  (only its SHA-256 hash is stored), ending after `admin_session_idle_days`
+  without use and 30 days at most, and at once on a password change for every
+  other browser. Failed logins are throttled per IP with doubling lockouts.
+  State-changing admin requests from another origin are refused, which
+  `SameSite` alone would not catch for another app on the same host.
 
 - **Input validation**: every request body is a Pydantic model; session/stack
   identifiers are validated as well-formed UUIDs and checked against the
   database before touching the filesystem - user input never builds a file
   path directly (`app/utils/validators.py`, `app/services/storage.py`).
-- **Upload safety**: uploads are size-capped before decoding
-  (`max_image_size_mb`), and the decoded pixel count is capped too
-  (`app/utils/image_utils.py:decode_image`) - a small file that would
-  decompress into a huge array is rejected rather than trusted.
+- **Upload safety**: every file is size-capped (`max_image_size_mb`) from
+  its spooled size before it is read, a request declaring more than its route
+  can carry is refused before its body is received, batches are capped at 20
+  files, and an archive member is checked on its declared size before it is
+  unpacked. Uploads are processed a file at a time, never held in memory whole.
+  The decoded pixel count is capped too (`app/utils/image_utils.py:decode_image`)
+  - a small file that would decompress into a huge array is rejected rather
+  than trusted.
 - **AstroDex callback URLs fail closed**: an empty `astrodex_callback_urls`
   allowlist rejects every callback. A handoff token carries the board origin it
   was minted with (`callback_base`); `/api/astrodex/handoff/resume` refuses it
@@ -70,12 +90,11 @@ that adds real authentication in front of it.
 
 ### Intentional scope boundaries
 
-- **No multi-user auth.** This is a deliberate design choice for a
-  single-operator tool, not an oversight - see "Security Model" above.
-- **`ADMIN_ENABLED` is a feature toggle, not a credential.** When it's `true`
-  (the default), `/api/admin/*` and `/api/tokens` behave like the rest of the
-  API: reachable by anyone who can reach the API at all. Set it `false` to
-  disable that surface entirely on a deployment where you don't need it.
+- **No multi-user auth.** One admin password, no accounts or roles - a
+  deliberate choice for a single-operator tool. Using the app (as opposed to
+  administering it) needs no login at all.
+- **`ADMIN_ENABLED`** is a structural kill-switch, on top of the admin
+  password: set it `false` to turn the administration surface off entirely.
 - **Denial of service** from a determined attacker with network access isn't
   in scope - the in-memory, single-process rate limiter is meant to keep a
   normal editing session (and accidental client bugs) from overwhelming the

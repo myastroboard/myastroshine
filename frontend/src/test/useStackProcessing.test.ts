@@ -291,6 +291,20 @@ describe('useStackProcessing', () => {
       expect(result.current.calibration.frames.dark).toBe(3);
     });
 
+    it('uploads a large calibration set in batches of twenty', async () => {
+      mockedApi.initiateStack.mockResolvedValue(session({ stackId: 'stack-9' }));
+      mockedApi.uploadCalibrationFrames.mockResolvedValue(EMPTY_CALIBRATION);
+      const darks = Array.from({ length: 45 }, (_, i) => new File(['d'], `d${i}.fits`));
+
+      const { result } = renderHook(() => useStackProcessing(SETTINGS, 50));
+      await act(async () => {
+        await result.current.addCalibrationFiles('dark', darks);
+      });
+
+      const sizes = mockedApi.uploadCalibrationFrames.mock.calls.map((call) => call[2].length);
+      expect(sizes).toEqual([20, 20, 5]);
+    });
+
     it('surfaces an Error message from a failed calibration upload', async () => {
       mockedApi.initiateStack.mockResolvedValue(session({ stackId: 'stack-9' }));
       mockedApi.uploadCalibrationFrames.mockRejectedValue(new Error('upload failed'));

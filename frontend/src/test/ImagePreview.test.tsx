@@ -39,6 +39,9 @@ describe('ImagePreview', () => {
     expect(reset).toHaveTextContent('400%');
     expect(zoomIn).toBeDisabled();
 
+    fireEvent.click(zoomOut);
+    expect(reset).toHaveTextContent('350%');
+
     fireEvent.click(reset);
     expect(reset).toHaveTextContent('100%');
   });
@@ -264,7 +267,7 @@ describe('ImagePreview', () => {
     mockContainerRect();
     const { container } = render(<ImagePreview originalUrl="/a" processedUrl="/b" />);
 
-    const controls = container.querySelector('.cursor-default') as HTMLElement;
+    const controls = screen.getByRole('button', { name: 'Zoom out' }).parentElement as HTMLElement;
     fireEvent.pointerDown(controls, { clientX: 100, clientY: 50, pointerId: 1, bubbles: true });
 
     const divider = container.querySelector('.bg-white\\/70') as HTMLElement;
@@ -291,4 +294,20 @@ describe('ImagePreview', () => {
     expect(screen.getByText('Removing stars (StarNet2)')).toBeInTheDocument();
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '45');
   });
+
+  it('releases the pointer capture it took when the drag ends', () => {
+    mockContainerRect();
+    const { container } = render(<ImagePreview originalUrl="/a" processedUrl="/b" />);
+    const stage = container.querySelector('.cursor-ew-resize') as HTMLElement;
+    const hasCapture = vi.spyOn(stage, 'hasPointerCapture').mockReturnValue(true);
+    const release = vi.spyOn(stage, 'releasePointerCapture').mockImplementation(() => undefined);
+
+    fireEvent.pointerDown(stage, { clientX: 50, clientY: 50, pointerId: 7 });
+    fireEvent.pointerUp(stage, { pointerId: 7 });
+
+    expect(release).toHaveBeenCalledWith(7);
+    hasCapture.mockRestore();
+    release.mockRestore();
+  });
 });
+

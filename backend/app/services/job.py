@@ -1,8 +1,8 @@
 """JobService - the durable record of a processing job.
 
-Every ``/process`` and ``/stack/*/process`` call creates a :class:`JobRecord`,
-whether it runs inline (sync mode) or on the Celery queue. The WebSocket reads
-the latest state here for late subscribers / catch-up.
+Every ``/process`` and ``/stack/*/process`` call creates a :class:`JobRecord`
+before the work runs in the background (``app.services.job_runner``). The
+WebSocket reads the latest state here for late subscribers / catch-up.
 """
 
 from __future__ import annotations
@@ -51,8 +51,8 @@ class JobService:
     def count_active_for_ip(self, client_ip: str) -> int:
         """Non-terminal jobs from ``client_ip`` that are still plausibly running.
 
-        A job left non-terminal for longer than ``STALE_JOB_SECONDS`` (a worker
-        died mid-run, or the queue never picked it up) is treated as dead and
+        A job left non-terminal for longer than ``STALE_JOB_SECONDS`` (its thread
+        died mid-run, or it was never picked up) is treated as dead and
         does not count - otherwise a handful of stuck rows would permanently
         exhaust the per-IP concurrency budget. ``cleanup_stale_jobs`` sweeps
         those rows for good on the hourly schedule.
@@ -74,8 +74,8 @@ class JobService:
 
         The editor re-processes on every settled slider move; without this, a
         burst of edits leaves a queue of stale jobs that each still count against
-        the per-IP concurrency budget (429) and each still run to completion on
-        the worker for a result nobody will look at. ``EnhancementService.run``
+        the per-IP concurrency budget (429) and each still run to completion in
+        the background for a result nobody will look at. ``EnhancementService.run``
         skips a job it finds already superseded.
         """
         pending = self.db.scalars(
@@ -88,10 +88,23 @@ class JobService:
             record.status = "superseded"
         self.db.commit()
         # Tell any open progress socket now, so it closes instead of waiting for
-        # the worker to reach this job and emit the terminal event itself.
+        # the job thread to reach this job and emit the terminal event itself.
         for record in pending:
             progress.publish(record.job_id, self.to_event(record))
         return len(pending)
+
+    def fail_unfinished(self, reason: str) -> int:
+        """Mark every non-terminal job failed with ``reason``. Returns the count."""
+        unfinished = self.db.scalars(
+            select(JobRecord).where(JobRecord.status.notin_(TERMINAL_STATUSES))
+        ).all()
+        for record in unfinished:
+            record.status = "failed"
+            record.error = reason
+        self.db.commit()
+        if unfinished:
+            logger.info("unfinished jobs failed", count=len(unfinished), reason=reason)
+        return len(unfinished)
 
     def cleanup_stale_jobs(self) -> int:
         """Mark long-abandoned non-terminal jobs failed. Returns the count."""
@@ -158,10 +171,8 @@ class JobService:
 
         The "5 concurrent processing jobs per IP" API-spec limit. Queries the
         shared ``jobs`` table rather than counting in-process, so it is correct
-        regardless of ``PROCESSING_MODE`` (sync or Celery queue) - unlike a
-        request-rate limiter, a per-process counter can't see jobs finishing on
-        a different worker process. A no-op under ``APP_ENV=test`` and when the
-        caller couldn't attribute a client IP.
+        across both job pools. A no-op under ``APP_ENV=test`` and when the caller
+        couldn't attribute a client IP.
         """
         if get_settings().is_test or client_ip is None:
             return

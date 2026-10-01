@@ -157,17 +157,17 @@ def test_process_can_re_stack_with_a_changed_setting(client, star_field: np.ndar
     assert second["statistics"]["combination_method"] == "median"
 
 
-def test_queue_restack_reports_processing_not_the_previous_result(
+def test_restack_reports_processing_not_the_previous_result(
     client, star_field: np.ndarray, monkeypatch
 ) -> None:
-    """Re-stacking in queue mode must answer "processing", not the finished run.
+    """Re-stacking must answer "processing", not the finished run.
 
-    The worker flips the record to "processing" a moment later, but the route
+    The job thread flips the record to "processing" a moment later, but the route
     response is built now: if it echoed the previous run's "completed" (and its
     stale session), the client would skip the progress stream and only pick the
     new run up on a second click.
     """
-    from app.config import get_settings
+    from app.services.job_runner import get_job_runner
 
     init = client.post("/api/stack/initiate", json={"frame_count": 3})
     stack_id = init.json()["stack_id"]
@@ -182,22 +182,17 @@ def test_queue_restack_reports_processing_not_the_previous_result(
     assert first["status"] == "completed"
     first_session = first["session_id"]
 
-    # Switch to queue mode and stub the worker so the new run stays pending.
-    monkeypatch.setenv("PROCESSING_MODE", "queue")
-    get_settings.cache_clear()
+    # Hold the background job so the new run stays pending.
     enqueued: list[tuple] = []
     monkeypatch.setattr(
-        "app.tasks.processing.task_process_stack.delay",
-        lambda *args: enqueued.append(args),
+        get_job_runner(), "submit", lambda pool, job_id, _fn: enqueued.append((pool, job_id))
     )
-    try:
-        second = client.post(
-            f"/api/stack/{stack_id}/process", json={"combination_method": "median"}
-        ).json()
-    finally:
-        get_settings.cache_clear()
+    second = client.post(
+        f"/api/stack/{stack_id}/process", json={"combination_method": "median"}
+    ).json()
 
-    assert enqueued, "the worker task should have been enqueued"
+    assert enqueued, "the stack job should have been submitted"
+    assert enqueued[0][0] == "stack"
     assert second["status"] == "processing"
     assert second["job_id"]
     assert second["ws_status_url"] == f"/ws/stack-status/{second['job_id']}"

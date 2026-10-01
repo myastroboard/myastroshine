@@ -6,6 +6,7 @@ envelope (see docs/API.md) together.
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
@@ -22,18 +23,20 @@ from fastapi.staticfiles import StaticFiles
 
 from app import __version__
 from app.config import get_settings
-from app.constants import API_TITLE
+from app.constants import API_TITLE, JOB_SHUTDOWN_GRACE_SECONDS
 from app.db import database
 from app.db.database import init_db
-from app.exceptions import AppError, InvalidParameterError
+from app.exceptions import AppError, InvalidParameterError, PayloadTooLargeError
 from app.logging_config import apply_runtime_log_levels, configure_logging, get_logger
 from app.routes import (
     admin,
     astrodex,
+    auth,
     auto_astro,
     config,
     depth_shift,
     download,
+    engines,
     health,
     presets,
     processing,
@@ -45,9 +48,13 @@ from app.routes import (
     version,
     websockets,
 )
+from app.services.background_jobs import fail_interrupted_jobs
+from app.services.job_runner import get_job_runner, reset_job_runner
 from app.services.preset import PresetService
+from app.services.scheduler import Scheduler
 from app.types import JsonDict
 from app.utils.app_settings import get_app_settings, load_or_generate_secret_key
+from app.utils.uploads import request_body_limit
 
 logger = get_logger(__name__)
 
@@ -82,10 +89,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     init_db()
     with database.SessionLocal() as db:
         PresetService(db).ensure_defaults()
+    fail_interrupted_jobs()
+    scheduler = Scheduler()
+    scheduler.start()
 
     logger.info("startup complete", env=settings.app_env, version=__version__)
     yield
     logger.info("shutdown")
+    await scheduler.stop()
+    await asyncio.to_thread(get_job_runner().shutdown, JOB_SHUTDOWN_GRACE_SECONDS)
+    reset_job_runner()
 
 
 def create_app() -> FastAPI:
@@ -103,6 +116,21 @@ def create_app() -> FastAPI:
     # gzip + the security headers a reverse proxy would usually add - this app
     # is served directly (no nginx in front of it).
     app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+    @app.middleware("http")
+    async def _limit_upload_size(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        """Refuse an upload whose declared size is over the cap before Starlette
+        spools the whole body to disk (the routes then check each file)."""
+        limit = request_body_limit(request.method, request.url.path)
+        declared = request.headers.get("content-length", "")
+        if limit is not None and declared.isdigit() and int(declared) > limit:
+            err = PayloadTooLargeError(
+                f"Upload exceeds the {get_app_settings().max_image_size_mb}MB per-file limit"
+            )
+            return _error_body(err.error_code, err.message, {}, err.status_code)
+        return await call_next(request)
 
     @app.middleware("http")
     async def _security_headers(
@@ -139,6 +167,8 @@ def create_app() -> FastAPI:
         star_mask.router,
         auto_astro.router,
         admin.router,
+        engines.router,
+        auth.router,
         version.router,
     ):
         app.include_router(router, prefix="/api")

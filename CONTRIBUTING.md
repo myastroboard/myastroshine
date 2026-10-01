@@ -13,7 +13,7 @@ Thanks for helping build MyAstroShine. This guide covers the practical workflow;
 Both stacks build from the single root `Dockerfile` (multi-stage: a Node
 stage builds the frontend, a Python stage runs it); the compose file decides
 the command, mounts, environment, and which `target:` to build (`backend` -
-API/worker only, skips the frontend build - or the default last stage,
+API only, skips the frontend build - or the default last stage,
 `backend-with-frontend`, which also bakes in the built web UI).
 
 ### Debug stack (hot reload)
@@ -22,10 +22,9 @@ API/worker only, skips the frontend build - or the default last stage,
 docker compose -f docker-compose.dev.yml up          # add --build after editing a Dockerfile or requirements
 ```
 
-- API under `uvicorn --reload`, worker restarted by `watchmedo`, web on the Vite
-  dev server - all with the source bind-mounted from the host.
-- `APP_ENV=development`, `LOG_LEVEL=debug`, `PROCESSING_MODE=sync`.
-  Prefix with `PROCESSING_MODE=queue` to exercise the Celery + Redis path.
+- API under `uvicorn --reload` (it also runs the processing jobs), web on the
+  Vite dev server - both with the source bind-mounted from the host.
+- `APP_ENV=development`, `LOG_LEVEL=debug`.
 - Data and the SQLite DB land in `./data/` on the host.
 - Follow one service: `docker compose -f docker-compose.dev.yml logs -f api`
 - Tear down: `docker compose -f docker-compose.dev.yml down` (`-v` also drops the
@@ -47,8 +46,7 @@ docker compose ps                                   # api must reach "healthy"
 docker compose down -v                              # clean up (drops data volumes)
 ```
 
-This runs `APP_ENV=production` with `PROCESSING_MODE=queue`, so it also covers the
-worker and Redis services that the debug stack skips by default.
+This runs `APP_ENV=production` from the baked image, exactly as users get it.
 
 ### Cutting a release
 
@@ -140,7 +138,7 @@ UPDATE_GOLDEN=1 pytest tests/regression -v
   context as keywords: `logger.info("stack combined", stack_id=sid, frames=n)`.
 - Two sinks: the console (`docker logs`, level `console_log_level`) and a
   rotating file `DATA_DIR/myastroshine.log` (10 MB x 5, level `log_level`). Both
-  levels are runtime settings; the Celery worker writes `worker.log`.
+  levels are runtime settings.
 - Users read and export logs from **Settings -> Logs**; the export ZIP is what
   to attach to a bug report.
 
@@ -151,10 +149,16 @@ Run from `frontend/`:
 ```bash
 npm run lint           # eslint
 npm run typecheck      # tsc --noEmit
-npm test               # vitest (unit + component)
+npm test               # vitest (unit + component) + coverage, 95% per file enforced
 npm run build          # production build must succeed
+npm run check:dist     # after build: the bundle only uses relative URLs
 npm run test:e2e       # Playwright (boots the backend + Vite, drives Chromium)
 ```
+
+The e2e run starts its own servers on ports 8012 / 3012 / 3112 (never the dev
+stack's 8002 / 3000, and it never reuses a running server). Its `ingress`
+project builds the app and walks it behind a fake Home Assistant ingress proxy
+(`e2e/ingress/`), failing on any request that escapes the path prefix.
 
 `test:e2e` needs the browser (`npx playwright install chromium`, once) and the
 backend importable (`pip install -r ../backend/requirements.txt`). It runs as its

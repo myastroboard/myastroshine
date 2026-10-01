@@ -10,6 +10,14 @@ export default tseslint.config(
   tseslint.configs.recommended,
   reactRefresh.configs.vite,
   {
+    // Node scripts: the dist URL check and the e2e fake ingress proxy.
+    files: ['scripts/**/*.mjs', 'e2e/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      globals: globals.node,
+    },
+  },
+  {
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
       ecmaVersion: 2022,

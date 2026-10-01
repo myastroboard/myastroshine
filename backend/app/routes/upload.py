@@ -6,7 +6,10 @@ GET  /api/preview/{id}      - current preview JPEG (?full=true for full res)
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from fastapi import APIRouter, File, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, Response
 
 from app.dependencies import ProcessingServiceDep, RequireRateLimit, SessionServiceDep, StorageDep
@@ -14,12 +17,11 @@ from app.exceptions import SessionNotFoundError, UnsupportedImageError
 from app.logging_config import get_logger
 from app.models import Dimensions, GeometryParameters, HistogramData, UploadResponse
 from app.services.linear_upload import LinearUploadService, is_linear_stack_upload
+from app.services.session import SessionService
+from app.services.storage import StorageService
 from app.utils import image_utils
-from app.utils.validators import (
-    is_valid_session_id,
-    validate_image_extension,
-    validate_upload_size,
-)
+from app.utils.uploads import check_upload, upload_reader
+from app.utils.validators import is_valid_session_id
 
 logger = get_logger(__name__)
 
@@ -34,25 +36,36 @@ async def upload_image(
     file: UploadFile = File(...),
 ) -> UploadResponse:
     """Accept an image file and open a processing session."""
-    data = await file.read()
+    check_upload(file)
+    # Reading the spooled file, decoding (a FITS / camera RAW takes a while) and
+    # the disk writes: off the event loop.
+    return await run_in_threadpool(
+        _open_session, upload_reader(file), file.filename, sessions, storage
+    )
+
+
+def _open_session(
+    read: Callable[[], bytes],
+    filename: str | None,
+    sessions: SessionService,
+    storage: StorageService,
+) -> UploadResponse:
+    """Decode the upload and open its session."""
+    data = read()
     if not data:
         raise UnsupportedImageError("Empty upload")
-    validate_upload_size(len(data))
-    if file.filename:
-        validate_image_extension(file.filename)
-
     # Linear stack data (a FITS, a 16-bit export) opens as a composite session so
     # the editor's linear "Stack" step runs on the 32-bit data instead of a
     # one-shot 8-bit auto-stretch. An ordinary photo takes the plain path.
-    if is_linear_stack_upload(data, file.filename):
-        record, composite = LinearUploadService(sessions, storage).ingest(data, file.filename)
+    if is_linear_stack_upload(data, filename):
+        record, composite = LinearUploadService(sessions, storage).ingest(data, filename)
         display = storage.load_processed(record.session_id)
         height, width = composite.shape[:2]
         is_stack = True
     else:
-        display = image_utils.decode_image(data, file.filename)
+        display = image_utils.decode_image(data, filename)
         height, width = display.shape[:2]
-        record = sessions.create_session(image_path="", original_filename=file.filename)
+        record = sessions.create_session(image_path="", original_filename=filename)
         storage.save_original(record.session_id, display)
         record.image_path = str(storage.original_path(record.session_id))
         sessions.db.commit()

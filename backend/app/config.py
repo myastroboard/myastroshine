@@ -17,7 +17,7 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from app.constants import LOG_FILE_NAME, WORKER_LOG_FILE_NAME
+from app.constants import LOG_FILE_NAME
 
 
 class Settings(BaseSettings):
@@ -37,17 +37,7 @@ class Settings(BaseSettings):
     data_dir: Path = Path("./data")
 
     # Optional database override. Empty -> a SQLite file under ``data_dir``.
-    # Set this (to a Postgres URL) before scaling the worker out.
     database_url: str = ""
-
-    # Container topology. Defaults match the docker-compose service names.
-    redis_url: str = "redis://localhost:6379/0"
-    celery_broker_url: str = "redis://localhost:6379/1"
-
-    # "sync"  - run the pipeline inside the request (default; no worker needed)
-    # "queue" - enqueue a Celery task; progress streams over the WebSocket
-    # Tied to whether the compose worker/redis services run, so it stays here.
-    processing_mode: str = "sync"
 
     # Gates /api/admin/* and /api/tokens. Single-user local deployments leave it on.
     admin_enabled: bool = True
@@ -80,10 +70,6 @@ class Settings(BaseSettings):
     @property
     def log_file(self) -> Path:
         return self.data_dir / LOG_FILE_NAME
-
-    @property
-    def worker_log_file(self) -> Path:
-        return self.data_dir / WORKER_LOG_FILE_NAME
 
     @property
     def secret_key_file(self) -> Path:

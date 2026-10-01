@@ -1,11 +1,10 @@
-"""Progress WebSocket - DB catch-up path (no Redis needed)."""
+"""Progress WebSocket - DB catch-up, relayed events, idle-tick reconciliation."""
 
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from typing import Any
 
-import pytest
 from fastapi import WebSocketDisconnect
 
 from app.services.job import JobService
@@ -125,7 +124,7 @@ def test_an_unexpected_error_mid_stream_closes_the_socket(client, db_session, mo
     service.update(job.job_id, status="processing", progress_percent=10)
 
     async def fake_subscribe(_job_id: str, *, idle_timeout: float = 3.0) -> AsyncIterator[None]:
-        raise RuntimeError("redis blew up")
+        raise RuntimeError("relay blew up")
         yield  # pragma: no cover - unreachable, satisfies the async generator shape
 
     monkeypatch.setattr(ws_mod.progress, "subscribe", fake_subscribe)
@@ -134,29 +133,34 @@ def test_an_unexpected_error_mid_stream_closes_the_socket(client, db_session, mo
         assert sock.receive_json()["status"] == "processing"  # catch-up only
 
 
-@pytest.mark.asyncio
-async def test_subscribe_yields_none_on_idle(monkeypatch: pytest.MonkeyPatch) -> None:
-    """progress.subscribe emits an idle tick so the socket handler can poll."""
+def test_live_events_published_by_a_job_reach_the_socket(client, db_session) -> None:
+    """End to end through the real in-memory broker: an event published from
+    another thread while the socket is open is relayed, and a terminal one closes it."""
+    import threading
+    import time
+
     from app.services import progress
 
-    class _FakePubSub:
-        async def subscribe(self, *_a: object) -> None: ...
-        async def get_message(self, **_k: object) -> None: ...  # always idle
-        async def unsubscribe(self, *_a: object) -> None: ...
-        async def aclose(self) -> None: ...
+    service = JobService(db_session)
+    job = service.create("sess-broker")
+    service.update(job.job_id, status="processing", progress_percent=10)
 
-    class _FakeRedis:
-        def pubsub(self) -> _FakePubSub:
-            return _FakePubSub()
+    def _publish_when_subscribed() -> None:
+        deadline = time.monotonic() + 5
+        while progress.subscriber_count(job.job_id) == 0 and time.monotonic() < deadline:
+            time.sleep(0.01)
+        progress.publish(
+            job.job_id, {"job_id": job.job_id, "status": "processing", "progress_percent": 60}
+        )
+        progress.publish(
+            job.job_id, {"job_id": job.job_id, "status": "completed", "progress_percent": 100}
+        )
 
-        async def aclose(self) -> None: ...
-
-    monkeypatch.setattr(
-        progress.aioredis.Redis, "from_url", staticmethod(lambda *_a, **_k: _FakeRedis())
-    )
-
-    gen = progress.subscribe("job-x", idle_timeout=0.01)
-    try:
-        assert await gen.__anext__() is None
-    finally:
-        await gen.aclose()
+    publisher = threading.Thread(target=_publish_when_subscribed)
+    with client.websocket_connect(f"/ws/processing-status/{job.job_id}") as sock:
+        publisher.start()
+        assert sock.receive_json()["status"] == "processing"  # catch-up
+        assert sock.receive_json()["progress_percent"] == 60
+        assert sock.receive_json()["status"] == "completed"
+    publisher.join()
+    assert progress.subscriber_count(job.job_id) == 0

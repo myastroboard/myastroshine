@@ -46,6 +46,37 @@ async def test_lifespan_runs_startup_and_shutdown_without_error(_fresh_db: None)
         pass  # startup completed; shutdown logging runs on context exit
 
 
+async def test_lifespan_fails_leftover_jobs_runs_the_scheduler_and_stops_the_runner(
+    _fresh_db: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Startup closes jobs a previous process left unfinished and starts the
+    periodic tasks; shutdown stops them and the job runner."""
+    from app.db.database import init_db
+    from app.db.models import JobRecord
+    from app.services import job_runner
+    from app.services.job import JobService
+
+    init_db()
+    with database_module.SessionLocal() as db:
+        JobService(db).create(None, job_id="job-left-over")
+    events: list[str] = []
+    monkeypatch.setattr(main_module.Scheduler, "start", lambda self: events.append("start"))
+
+    async def _stop(self: object) -> None:
+        events.append("stop")
+
+    monkeypatch.setattr(main_module.Scheduler, "stop", _stop)
+
+    async with main_module.lifespan(FastAPI()):
+        runner = job_runner.get_job_runner()
+        with database_module.SessionLocal() as db:
+            assert db.get(JobRecord, "job-left-over").status == "failed"
+
+    assert events == ["start", "stop"]
+    assert runner.stopping.is_set()
+    assert job_runner.get_job_runner() is not runner  # a fresh one after shutdown
+
+
 def test_create_app_mounts_the_frontend_when_the_static_dir_exists(
     tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

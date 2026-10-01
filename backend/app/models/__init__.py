@@ -6,6 +6,14 @@ from app.models.astrodex import (
     HandoffReturnRequest,
     HandoffReturnResponse,
 )
+from app.models.auth import (
+    AdminSessionListResponse,
+    AdminSessionOut,
+    AuthStatusResponse,
+    ChangePasswordRequest,
+    LoginRequest,
+    SetupRequest,
+)
 from app.models.auto_astro import AutoAstroResponse
 from app.models.config_export import (
     ConfigExportPreset,
@@ -21,7 +29,13 @@ from app.models.depth_shift import (
     DepthStatistics,
     FocusPoint,
 )
-from app.models.engines import EngineStatus, EngineStatusResponse
+from app.models.engines import (
+    EngineStatus,
+    EngineStatusResponse,
+    InstalledEngineOut,
+    InstallEngineRequest,
+    StagedEngineResponse,
+)
 from app.models.image import Dimensions, HistogramData, UploadResponse
 from app.models.job import DiskUsageResponse, JobListResponse, JobSummary
 from app.models.logs import LogLevels, LogLevelUpdate, LogTailResponse
@@ -64,12 +78,16 @@ from app.models.token import (
 )
 
 __all__ = [
+    "AdminSessionListResponse",
+    "AdminSessionOut",
     "AppSettingsResponse",
     "AppSettingsUpdate",
+    "AuthStatusResponse",
     "AutoAstroResponse",
     "CalibrationFrameCounts",
     "CalibrationSummary",
     "CaptureInfo",
+    "ChangePasswordRequest",
     "ConfigExportPreset",
     "ConfigExportResponse",
     "ConfigImportRequest",
@@ -96,11 +114,14 @@ __all__ = [
     "HandoffReturnResponse",
     "HistogramData",
     "InitiateStackRequest",
+    "InstallEngineRequest",
+    "InstalledEngineOut",
     "JobListResponse",
     "JobSummary",
     "LogLevelUpdate",
     "LogLevels",
     "LogTailResponse",
+    "LoginRequest",
     "PresetListResponse",
     "PresetOut",
     "ProcessRequest",
@@ -110,11 +131,13 @@ __all__ = [
     "SavePresetRequest",
     "SavePresetResponse",
     "SessionInfo",
+    "SetupRequest",
     "StackFrameInfo",
     "StackParameters",
     "StackResultResponse",
     "StackSessionResponse",
     "StackStatistics",
+    "StagedEngineResponse",
     "StarMaskRequest",
     "StarMaskResponse",
     "StarSourceInfo",

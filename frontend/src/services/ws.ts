@@ -3,9 +3,12 @@
 
 import type { ProcessingStatus } from '@/types';
 
+import { appPath } from './appUrl';
 import { keysToCamelCase } from './caseConvert';
 
-/** Absolute ws:// base. `VITE_WS_URL` wins; otherwise `/ws` on the page origin. */
+/** Absolute ws:// base. `VITE_WS_URL` wins; otherwise `ws` under the page
+ * directory on the page origin - `/ws` at the root, `/<prefix>/ws` behind a path
+ * prefix (see appUrl.ts). */
 const WS_URL = ((): string => {
   const configured = import.meta.env.VITE_WS_URL;
   if (configured) {
@@ -15,7 +18,7 @@ const WS_URL = ((): string => {
     return 'ws://localhost:3000/ws';
   }
   const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${scheme}//${window.location.host}/ws`;
+  return `${scheme}//${window.location.host}${appPath('ws')}`;
 })();
 
 type StatusListener = (status: ProcessingStatus) => void;

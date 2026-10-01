@@ -30,33 +30,28 @@ session secret is generated on first start.
 
 ## Services
 
-`docker-compose.yml` defines three services on the `myastroshine` network. A
-single image (FastAPI + OpenCV, serving the built React UI alongside the API)
-backs both `api` and `worker`:
+`docker-compose.yml` defines **one** service, `api`, on the `myastroshine`
+network - a single image (FastAPI + OpenCV, serving the built React UI alongside
+the API):
 
 | Service | Image / build | Port | Volumes |
 |---------|---------------|------|---------|
-| `api` | `.` (API + web UI) | 8002 | `myastroshine_data:/data`, `./engines:/opt/engines:ro` |
-| `worker` | `.` (Celery worker + embedded beat, `target: backend`) | - | `myastroshine_data:/data`, `./engines:/opt/engines:ro` |
-| `redis` | `redis:7-alpine` | 6379 | `myastroshine_redis:/data` |
+| `api` | `.` (API + web UI + background jobs) | 8002 | `myastroshine_data:/data`, `./engines:/opt/engines:ro` |
 
-This stack sets `PROCESSING_MODE=queue`, so `/api/process` and
-`/api/stack/{id}/process` enqueue a Celery task the `worker` runs, and progress
-streams over `/ws/processing-status/{job_id}` (or `/ws/stack-status/{id}`). Set
-`PROCESSING_MODE=sync` to run everything inside the request instead - `worker`
-and `redis` are then optional for processing, but dropping `worker` also drops
-the beat-scheduled session cleanup below; keep it running if you want that.
+Image and stack processing run as background jobs inside that process:
+`/api/process` and `/api/stack/{id}/process` answer at once with a `queued` job
+and progress streams over `/ws/processing-status/{job_id}` (or
+`/ws/stack-status/{id}`). The same process runs the maintenance: an hourly
+cleanup (expired sessions and stacks, stuck jobs, old job history, expired admin
+logins) and the minute-by-minute watch-folder poll. See
+[ARCHITECTURE.md](ARCHITECTURE.md#background-jobs).
 
-> SQLite is shared between `api` and `worker` over the volume. This is fine for a
-> single worker and short writes; set `DATABASE_URL` to a Postgres URL before
-> scaling the worker out.
-
-`worker` also runs Celery beat in-process (`-B`), which hourly runs
-`task_cleanup_sessions` - deletes sessions past `session_expiry_hours` (and
-their files) regardless of `PROCESSING_MODE`. Its schedule state lives at
-`DATA_DIR/celerybeat-schedule`. Beat only ever runs once as long as `worker`
-stays at one replica; scaling it out would run the schedule multiple times, so
-move beat to its own service first if you ever do that.
+**Upgrading from a version with `worker` and `redis` services** (0.4.x and
+earlier): use the new `docker-compose.yml`, or delete the `worker` and `redis`
+services and the `PROCESSING_MODE` / `REDIS_URL` / `CELERY_BROKER_URL`
+variables from yours. The `myastroshine_data` volume is unchanged; the
+`myastroshine_redis` volume and any `worker.log` / `celerybeat-schedule` files
+in the data volume can be deleted. Leftover variables are ignored.
 
 ## Clean-machine quick start (no repo clone)
 
@@ -99,8 +94,6 @@ container):
   secret_key.txt          auto-generated once (0600); HMAC fallback + session signing
   app_settings.json       runtime settings edited in the UI
   myastroshine.log        rotating application log (10 MB x 5)
-  worker.log              rotating worker log
-  celerybeat-schedule     beat's persisted schedule state
 ```
 
 Back up this volume. Session images are transient and pruned after
@@ -115,10 +108,26 @@ Set only to change the deployment shape (see `backend/.env.example`):
 |----------|---------|-------|
 | `APP_ENV` | `development` | `development` renders logs for humans; `production` emits JSON |
 | `DATA_DIR` | `./data` (local), `/data` (image) | the single persistence root |
-| `PROCESSING_MODE` | `sync` | `sync` or `queue` (compose sets `queue`) |
-| `REDIS_URL` / `CELERY_BROKER_URL` | `redis://localhost:6379/0` `/1` | only used with `queue`; compose points them at the `redis` service |
-| `DATABASE_URL` | *(derived)* | set to a Postgres URL to override the SQLite default |
-| `ADMIN_ENABLED` | `true` | set `false` to make `/api/admin/*` reject writes |
+| `DATABASE_URL` | *(derived)* | another database URL to override the SQLite default |
+| `ADMIN_ENABLED` | `true` | set `false` to turn the administration surface (`/api/admin/*`, `/api/tokens`, admin login) off entirely |
+
+## Admin password
+
+Settings (and every `/api/admin/*` / `/api/tokens` route) is reserved for the
+administrator. On a fresh install - or the first start after upgrading from a
+version without it - the Settings page asks you to **create the admin
+password** (10 characters minimum); until then the administration surface is
+locked. Using the app itself (upload, edit, stack, download) never asks for it.
+
+Change the password, see the browsers logged in as admin, and set how long a
+login lasts under **Settings -> Security**.
+
+Lost the password? Reset it from the host - it forgets the password and every
+admin login, and the next visit to Settings asks for a new one:
+
+```bash
+docker exec myastroshine-api python -m app.cli reset-admin
+```
 
 ## Runtime settings (edited in the UI)
 
@@ -153,7 +162,7 @@ shells out to it; with no path set, the classical engines are the only option an
 nothing changes.
 
 The `./engines` directory next to the compose file is **already bind-mounted
-read-only into `api` and `worker`** at `/opt/engines` (empty and inert until you
+read-only into `api`** at `/opt/engines` (empty and inert until you
 set a path). Its contents are git-ignored.
 
 1. Download the CLI build for **linux-x64** from `starnetastro.com` (there is no
@@ -227,7 +236,7 @@ path under `DATA_DIR`). `606a1e113989_create_core_tables` creates the six tables
 later revisions add the stacking columns, per-frame quality, calibration,
 drizzle, folder-watch, and the job client IP.
 
-`init_db()` runs on API startup and worker init and brings the schema to Alembic
+`init_db()` runs on API startup and brings the schema to Alembic
 `head` automatically:
 
 - a brand-new database is built entirely from the migrations;
@@ -255,16 +264,14 @@ alembic revision --autogenerate -m "describe the change"
 alembic upgrade head   # apply it locally and eyeball the generated SQL
 ```
 
-`api` and `worker` share the same SQLite file under `DATA_DIR`.
 
 ## Logs
 
-- The API writes `DATA_DIR/myastroshine.log`, the worker `DATA_DIR/worker.log` -
-  both rotating (10 MB x 5). The console (`docker compose logs api`) carries the
+- The app writes `DATA_DIR/myastroshine.log`, rotating (10 MB x 5). The console (`docker compose logs api`) carries the
   same events at `console_log_level`.
 - Timestamps are in the `TZ` zone with the UTC offset always shown.
 - **Settings -> Logs** tails the file, changes filter level, clears it, and
-  exports a ZIP of the log plus its rotations and the worker log - attach that
+  exports a ZIP of the log plus its rotations - attach that
   ZIP to bug reports. `log_level` / `console_log_level` are on the Advanced tab
   and apply without a restart.
 - CLI equivalents: `GET/POST /api/admin/logs*` (see `docs/API.md`).
@@ -272,8 +279,7 @@ alembic upgrade head   # apply it locally and eyeball the generated SQL
 ## Backup
 
 Back up the `myastroshine_data` volume regularly - it holds the database, the
-settings file, and the session secret. `myastroshine_redis` is a transient
-broker and does not need backing up.
+settings file, and the session secret.
 
 ## Reverse proxy
 
@@ -281,6 +287,14 @@ The `api` container serves the web UI, the API, and the WebSocket endpoints
 directly on :8002 - there's no internal proxy to configure. For anything
 beyond localhost, place Caddy or nginx in front of it for TLS (application-
 level rate limiting is already in place, see `docs/API.md` "Rate Limiting").
+
+The app also works **under a path prefix** (`https://example.com/astro/`, or a
+Home Assistant ingress): every URL the web UI builds - assets, API calls, images,
+WebSockets - is relative to the page. The proxy must strip the prefix before
+forwarding (`location /astro/ { proxy_pass http://myastroshine:8002/; }` with the
+trailing slashes), forward WebSocket upgrades on `/ws/`, and pass the browser's
+host in `X-Forwarded-Host` (the admin routes compare it with the request's
+`Origin`).
 
 ## Health checks
 

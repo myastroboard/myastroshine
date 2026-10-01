@@ -29,15 +29,15 @@ MyAstroShine automatically enhances astrophotography images, aligns and stacks 2
 docker pull myastroboard/myastroshine:latest
 ```
 
-Simplest run (in-request processing, no queue):
+One container is the whole application (web UI, API and background
+processing):
 
 ```bash
 docker run -d -p 8002:8002 -e APP_ENV=production \
   -v myastroshine_data:/data myastroboard/myastroshine:latest
 ```
 
-Full setup with Docker Compose (adds a Celery worker + Redis for queued
-processing and background session cleanup):
+Or with Docker Compose:
 
 ```yaml
 services:
@@ -47,27 +47,8 @@ services:
       - "8002:8002"
     environment:
       - APP_ENV=production
-      - PROCESSING_MODE=queue
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/1
     volumes:
       - myastroshine_data:/data
-    depends_on: [redis]
-    restart: unless-stopped
-  worker:
-    image: myastroboard/myastroshine:latest
-    command: celery -A app.tasks.celery_app worker -B --loglevel=info
-    environment:
-      - APP_ENV=production
-      - PROCESSING_MODE=queue
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/1
-    volumes:
-      - myastroshine_data:/data
-    depends_on: [redis]
-    restart: unless-stopped
-  redis:
-    image: redis:7-alpine
     restart: unless-stopped
 volumes:
   myastroshine_data:

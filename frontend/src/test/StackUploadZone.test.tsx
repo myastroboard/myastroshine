@@ -71,4 +71,13 @@ describe('StackUploadZone', () => {
     expect(dropzone.className).not.toContain('dropzone-active');
     expect(onAddFiles).toHaveBeenCalledWith([expect.any(File)]);
   });
+
+  it('forwards an empty list when the picker reports no file list', () => {
+    const onAddFiles = vi.fn();
+    const { container } = render(<StackUploadZone compact maxSizeMb={100} onAddFiles={onAddFiles} />);
+
+    fireEvent.change(fileInput(container), { target: { files: null } });
+
+    expect(onAddFiles).toHaveBeenCalledWith([]);
+  });
 });

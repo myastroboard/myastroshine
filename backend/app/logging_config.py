@@ -8,9 +8,9 @@ Two sinks, two independently controlled levels (PASSATION section 4):
 
 - **console** -> ``stdout`` (``docker logs``); level ``console_log_level``
   (default ``warning``), ``ConsoleRenderer`` in development else JSON.
-- **file** -> ``DATA_DIR/myastroshine.log`` (or ``worker.log`` for the Celery
-  worker), rotating 10 MB x 5; level ``log_level`` (default ``info``); a plain
-  line with the timestamp in the ``TZ`` zone and the UTC offset always shown.
+- **file** -> ``DATA_DIR/myastroshine.log``, rotating 10 MB x 5; level
+  ``log_level`` (default ``info``); a plain line with the timestamp in the
+  ``TZ`` zone and the UTC offset always shown.
 
 The levels live in ``app_settings.json`` and change at runtime via
 :func:`apply_runtime_log_levels` (called at startup and by the admin API).
@@ -125,11 +125,10 @@ def _build_file_handler(path: Path) -> logging.Handler:
     return handler
 
 
-def configure_logging(*, role: str = "api", force: bool = False) -> None:
+def configure_logging(*, force: bool = False) -> None:
     """Wire structlog + stdlib handlers once, at process start.
 
-    ``role="worker"`` sends the file sink to ``worker.log``. No file handler is
-    attached under ``APP_ENV=test``.
+    No file handler is attached under ``APP_ENV=test``.
     """
     if _state.configured and not force:
         return
@@ -158,8 +157,7 @@ def configure_logging(*, role: str = "api", force: bool = False) -> None:
 
     file_handler: logging.Handler | None = None
     if not settings.is_test:
-        target = settings.worker_log_file if role == "worker" else settings.log_file
-        file_handler = _build_file_handler(target)
+        file_handler = _build_file_handler(settings.log_file)
         root.addHandler(file_handler)
     _state.file = file_handler
 

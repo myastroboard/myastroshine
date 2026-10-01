@@ -92,6 +92,10 @@ published image; if you cloned the repo, `docker compose up -d --build` builds
 from the local `Dockerfile` instead. Pin a version with
 `MYASTROSHINE_VERSION=0.2.0 docker compose up -d`.
 
+Then open **Settings** once to create the admin password. Using the app is open
+to anyone who reaches it; only Settings is reserved for the administrator (see
+[SECURITY.md](SECURITY.md)).
+
 For development with hot reload (uvicorn `--reload` + Vite HMR, source
 bind-mounted):
 
@@ -153,7 +157,7 @@ The docs index is [docs/README.md](docs/README.md).
 - **Backend** - FastAPI, Python 3.14, OpenCV, Pillow, NumPy, astropy (FITS),
   rawpy/libraw (camera RAW)
 - **Frontend** - React 19, TypeScript, Vite, Tailwind CSS v4
-- **Jobs** - Celery + Redis (optional; `PROCESSING_MODE=queue`)
+- **Jobs** - in-process background threads, progress over WebSockets (no queue or Redis)
 - **Storage** - local filesystem + SQLite (Alembic migrations; Postgres-ready)
 - **Packaging** - one multi-arch Docker image (`linux/amd64`, `linux/arm64`)
 

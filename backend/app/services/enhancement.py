@@ -1,8 +1,8 @@
 """EnhancementService - orchestrates a single-image enhancement.
 
-``run`` is the shared work: it drives the pipeline, updates the :class:`JobRecord`
-at each stage, and best-effort publishes progress to Redis. Both the sync route
-and the Celery task call it.
+``dispatch`` records the job and hands ``run`` to the background job runner;
+``run`` drives the pipeline, updates the :class:`JobRecord` at each stage, and
+publishes progress for the WebSocket (``app.services.progress``).
 """
 
 from __future__ import annotations
@@ -10,7 +10,6 @@ from __future__ import annotations
 import numpy as np
 from sqlalchemy import select
 
-from app.config import get_settings
 from app.db.models import JobRecord, StackRecord
 from app.exceptions import AppError, ImageProcessingError
 from app.logging_config import get_logger
@@ -26,6 +25,7 @@ from app.services.external_starless import (
 )
 from app.services.image_processing import DenoiseStageFn, ImageProcessingService, StepCallback
 from app.services.job import JobService
+from app.services.job_runner import JobInterruptedError, get_job_runner, raise_if_stopping
 from app.services.session import SessionService
 from app.services.storage import StorageService
 from app.utils.app_settings import get_app_settings
@@ -86,7 +86,7 @@ class EnhancementService:
     def dispatch(
         self, session_id: str, params: ProcessingParameters, client_ip: str | None = None
     ) -> ProcessResponse:
-        """Create a job and either run it inline or hand it to the queue."""
+        """Create a job and run it in the background; answers while it is ``queued``."""
         self.sessions.get_session(session_id)  # 404/410 before any work
         # A newer edit obsoletes any still-pending one for this session - retire
         # them so a burst of slider moves can't exhaust the concurrency budget.
@@ -94,15 +94,15 @@ class EnhancementService:
         self.jobs.assert_under_concurrency_limit(client_ip)
         job = self.jobs.create(session_id, client_ip=client_ip)
 
-        if get_settings().processing_mode == "queue":
-            # Lazy import: app.tasks.processing imports this module.
-            from app.tasks.processing import task_process_image  # noqa: PLC0415
+        # Lazy import: app.services.background_jobs imports this module.
+        from app.services.background_jobs import run_image_job  # noqa: PLC0415
 
-            task_process_image.delay(session_id, params.model_dump(), job.job_id)
-        else:
-            self.run(session_id, params, job.job_id)
-
-        return self._response(self.jobs.get(job.job_id), session_id)
+        job_id = job.job_id
+        get_job_runner().submit("edit", job_id, lambda: run_image_job(session_id, params, job_id))
+        # The job commits through its own session; re-read so the answer carries
+        # whatever state it reached (still "queued" unless it already ran).
+        self.jobs.db.refresh(job)
+        return self._response(job, session_id)
 
     @staticmethod
     def _response(job: JobRecord, session_id: str) -> ProcessResponse:
@@ -242,10 +242,11 @@ class EnhancementService:
                 # A newer edit for this session retires this job (dispatch ->
                 # supersede_pending_for_session). Bail out here rather than
                 # grinding a full pipeline - and a burst of DB writes - to a
-                # result nobody will look at; the worker's other slot is then
-                # free for the edit that replaced it.
+                # result nobody will look at; the job thread is then free
+                # for the edit that replaced it.
                 if self.jobs.get(job_id).status == "superseded":
                     raise _JobSuperseded
+                raise_if_stopping()
                 progress_floor = max(progress_floor, percent)
                 self.jobs.update(job_id, current_step=name, progress_percent=progress_floor)
                 self._emit(job_id)
@@ -285,6 +286,10 @@ class EnhancementService:
             self._emit(job_id)
             logger.info("dropped superseded job mid-run", session_id=session_id, job_id=job_id)
             return
+        except JobInterruptedError:
+            self.jobs.update(job_id, status="failed", error="interrupted by a server shutdown")
+            self._emit(job_id)
+            raise
         except AppError as exc:
             self.jobs.update(job_id, status="failed", error=exc.message)
             self._emit(job_id)

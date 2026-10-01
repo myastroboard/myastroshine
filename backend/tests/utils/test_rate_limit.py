@@ -7,10 +7,17 @@ from typing import cast
 import pytest
 from fastapi import Request
 
+from app.constants import (
+    LOGIN_FAILURE_WINDOW_SECONDS,
+    LOGIN_LOCKOUT_BASE_SECONDS,
+    LOGIN_LOCKOUT_MAX_SECONDS,
+    LOGIN_MAX_FAILURES,
+)
 from app.exceptions import RateLimitedError
-from app.utils import app_settings
+from app.utils import app_settings, rate_limit
 from app.utils.rate_limit import (
     InMemoryRateLimiter,
+    LoginThrottle,
     _request_limiter,
     enforce_request_rate_limit,
     get_client_ip,
@@ -140,3 +147,73 @@ def test_enforce_dependency_raises_once_over_budget(monkeypatch: pytest.MonkeyPa
             enforce_request_rate_limit(request)
     finally:
         _request_limiter._counts.pop("9.9.9.9", None)
+
+
+# --- LoginThrottle ------------------------------------------------------------
+
+
+def _throttle_at(monkeypatch: pytest.MonkeyPatch, now: list[float]) -> LoginThrottle:
+    monkeypatch.setattr(rate_limit.time, "time", lambda: now[0])
+    return LoginThrottle()
+
+
+def test_login_throttle_locks_out_after_the_failure_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The last allowed failure trips the lockout; checks then 429 until it ends."""
+    now = [1000.0]
+    throttle = _throttle_at(monkeypatch, now)
+    for _ in range(LOGIN_MAX_FAILURES - 1):
+        assert throttle.record_failure("1.2.3.4") is False
+        throttle.check("1.2.3.4")
+
+    assert throttle.record_failure("1.2.3.4") is True
+    with pytest.raises(RateLimitedError):
+        throttle.check("1.2.3.4")
+    throttle.check("5.6.7.8")  # other IPs unaffected
+
+    now[0] += LOGIN_LOCKOUT_BASE_SECONDS + 1
+    throttle.check("1.2.3.4")
+
+
+def test_login_throttle_forgets_failures_outside_the_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Failures spread wider than the window never add up to a lockout."""
+    now = [1000.0]
+    throttle = _throttle_at(monkeypatch, now)
+    for _ in range(LOGIN_MAX_FAILURES * 2):
+        assert throttle.record_failure("1.2.3.4") is False
+        now[0] += LOGIN_FAILURE_WINDOW_SECONDS / (LOGIN_MAX_FAILURES - 1) + 1
+
+
+def test_login_throttle_lockouts_double_up_to_the_cap(monkeypatch: pytest.MonkeyPatch) -> None:
+    now = [1000.0]
+    throttle = _throttle_at(monkeypatch, now)
+    durations = []
+    for _ in range(8):
+        for _ in range(LOGIN_MAX_FAILURES):
+            throttle.record_failure("ip")
+        with pytest.raises(RateLimitedError) as info:
+            throttle.check("ip")
+        durations.append(info.value.details["retry_after_seconds"] - 1)
+        now[0] += durations[-1] + 1
+
+    assert durations[:3] == [
+        LOGIN_LOCKOUT_BASE_SECONDS,
+        LOGIN_LOCKOUT_BASE_SECONDS * 2,
+        LOGIN_LOCKOUT_BASE_SECONDS * 4,
+    ]
+    assert max(durations) == LOGIN_LOCKOUT_MAX_SECONDS
+
+
+def test_login_throttle_success_and_clear_reset_the_ip(monkeypatch: pytest.MonkeyPatch) -> None:
+    now = [1000.0]
+    throttle = _throttle_at(monkeypatch, now)
+    for _ in range(LOGIN_MAX_FAILURES - 1):
+        throttle.record_failure("ip")
+    throttle.record_success("ip")
+    assert throttle.record_failure("ip") is False  # the count started over
+
+    for _ in range(LOGIN_MAX_FAILURES):
+        throttle.record_failure("ip")
+    throttle.clear()
+    throttle.check("ip")

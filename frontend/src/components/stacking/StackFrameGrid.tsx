@@ -8,8 +8,9 @@ export interface StackFrameGridProps {
   selected: number | null;
   interactive: boolean;
   onRemovePending: (id: string) => void;
-  onSelect: (index: number) => void;
-  onToggleExclude: (index: number, excluded: boolean) => void;
+  /** Omit both when ``uploaded`` is empty (the pre-upload chip list). */
+  onSelect?: (index: number) => void;
+  onToggleExclude?: (index: number, excluded: boolean) => void;
 }
 
 /** The frame panel: pending files as name chips, then uploaded frames as a
@@ -41,7 +42,7 @@ export function StackFrameGrid({
               <div key={frame.index} className="relative">
                 <button
                   type="button"
-                  onClick={() => onSelect(frame.index)}
+                  onClick={() => onSelect?.(frame.index)}
                   aria-pressed={isSelected}
                   aria-label={t('stacking.grid.frame_aria', { n: frame.index + 1 })}
                   className={`block w-full overflow-hidden rounded-md border ${
@@ -91,7 +92,7 @@ export function StackFrameGrid({
                     className="size-3.5 accent-danger"
                     checked={frame.excluded}
                     disabled={!interactive}
-                    onChange={(event) => onToggleExclude(frame.index, event.target.checked)}
+                    onChange={(event) => onToggleExclude?.(frame.index, event.target.checked)}
                   />
                 </label>
               </div>

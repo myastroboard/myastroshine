@@ -60,4 +60,14 @@ describe('SavePresetDialog', () => {
     });
     expect(onClose).not.toHaveBeenCalled();
   });
+
+  it('shows a generic message when saving fails with a non-Error value', async () => {
+    const onSave = vi.fn().mockRejectedValue('offline');
+    render(<SavePresetDialog onSave={onSave} onClose={vi.fn()} />);
+
+    fireEvent.change(screen.getByPlaceholderText('My nebula look'), { target: { value: 'Nebula' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByText('Could not save the preset')).toBeInTheDocument();
+  });
 });

@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ApiError, apiClient } from '@/services/api';
+import {
+  ADMIN_LOGIN_REQUIRED,
+  ApiError,
+  apiClient,
+  onAdminLoginRequired,
+  resolveApiPath,
+} from '@/services/api';
 import { DEFAULT_PARAMETERS } from '@/types';
 import type { AppSettings, CalibrationKind, ConfigExport, FocusPoint, StackSettings } from '@/types';
 
@@ -858,3 +864,135 @@ describe('uploadImage / uploadWithProgress', () => {
     await expect(promise).rejects.toMatchObject({ status: 0, message: 'Upload cancelled' });
   });
 });
+
+// --- admin authentication --------------------------------------------------
+
+describe('admin auth', () => {
+  it('getAuthStatus GETs the status and camelCases it', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, { admin_enabled: true, configured: true, authenticated: false }),
+    );
+    await expect(apiClient.getAuthStatus()).resolves.toEqual({
+      adminEnabled: true,
+      configured: true,
+      authenticated: false,
+    });
+    expect(lastCall()[0]).toBe('/api/auth/status');
+  });
+
+  it('setupAdmin and loginAdmin POST the password', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(204, null));
+    await apiClient.setupAdmin('a long password');
+    expect(lastCall()[0]).toBe('/api/auth/setup');
+    expect(JSON.parse(lastCall()[1]?.body as string)).toEqual({ password: 'a long password' });
+
+    await apiClient.loginAdmin('pw');
+    expect(lastCall()[0]).toBe('/api/auth/login');
+    expect(lastCall()[1]?.method).toBe('POST');
+  });
+
+  it('logoutAdmin POSTs with no body', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(204, null));
+    await apiClient.logoutAdmin();
+    expect(lastCall()[0]).toBe('/api/auth/logout');
+    expect(lastCall()[1]?.body).toBeUndefined();
+  });
+
+  it('changeAdminPassword POSTs snake_cased current and new passwords', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(204, null));
+    await apiClient.changeAdminPassword('old one', 'new one');
+    expect(lastCall()[0]).toBe('/api/auth/password');
+    expect(JSON.parse(lastCall()[1]?.body as string)).toEqual({
+      current_password: 'old one',
+      new_password: 'new one',
+    });
+  });
+
+  it('listAdminSessions unwraps the sessions array', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        sessions: [{ id: 's1', client_ip: '10.0.0.2', user_agent: null, current: true }],
+      }),
+    );
+    const sessions = await apiClient.listAdminSessions();
+    expect(sessions[0]).toMatchObject({ id: 's1', clientIp: '10.0.0.2', current: true });
+  });
+
+  it('revokeAdminSession DELETEs the encoded id', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(204, null));
+    await apiClient.revokeAdminSession('a/b');
+    expect(lastCall()[0]).toBe('/api/auth/sessions/a%2Fb');
+    expect(lastCall()[1]?.method).toBe('DELETE');
+  });
+
+  it('carries the error_code on ApiError', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(401, { error: 'Wrong password', error_code: 'INVALID_CREDENTIALS' }),
+    );
+    await expect(apiClient.loginAdmin('x')).rejects.toMatchObject({
+      status: 401,
+      message: 'Wrong password',
+      code: 'INVALID_CREDENTIALS',
+    });
+  });
+
+  it('notifies listeners on 401 ADMIN_LOGIN_REQUIRED, and only then', async () => {
+    const listener = vi.fn();
+    const unsubscribe = onAdminLoginRequired(listener);
+
+    fetchMock.mockResolvedValueOnce(jsonResponse(401, { error: 'x', error_code: 'INVALID_CREDENTIALS' }));
+    await expect(apiClient.loginAdmin('x')).rejects.toBeInstanceOf(ApiError);
+    fetchMock.mockResolvedValueOnce(jsonResponse(403, { error: 'x', error_code: ADMIN_LOGIN_REQUIRED }));
+    await expect(apiClient.getAppSettings()).rejects.toBeInstanceOf(ApiError);
+    expect(listener).not.toHaveBeenCalled();
+
+    fetchMock.mockResolvedValueOnce(jsonResponse(401, { error: 'x', error_code: ADMIN_LOGIN_REQUIRED }));
+    await expect(apiClient.getAppSettings()).rejects.toBeInstanceOf(ApiError);
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    unsubscribe();
+    fetchMock.mockResolvedValueOnce(jsonResponse(401, { error: 'x', error_code: ADMIN_LOGIN_REQUIRED }));
+    await expect(apiClient.getAppSettings()).rejects.toBeInstanceOf(ApiError);
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+});
+
+// --- server-built URLs stay inside the app ----------------------------------
+
+describe('server URLs in responses', () => {
+  it('resolves /api paths against the API base and leaves other values alone', () => {
+    expect(resolveApiPath('/api/preview/s1?full=true')).toBe('/api/preview/s1?full=true');
+    expect(resolveApiPath('/api')).toBe('/api');
+    expect(resolveApiPath('https://github.com/x')).toBe('https://github.com/x');
+    expect(resolveApiPath('/apiary')).toBe('/apiary');
+  });
+
+  it('rewrites every *Url / *Urls field, however deep, and nothing else', async () => {
+    vi.resetModules();
+    vi.stubGlobal('location', { ...window.location, pathname: '/api/hassio_ingress/abc/' });
+    const { apiClient: prefixed } = await import('@/services/api');
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        stacked_image_url: '/api/preview/s1?full=true',
+        release_url: 'https://github.com/x',
+        frames: [{ index: 0, thumb_url: '/api/stack/k/frame/0/thumb' }],
+        layer_urls: ['/api/depth-shift/s1/layer_0', 7],
+        statistics: null,
+        note: '/api/not-a-url-field',
+      }),
+    );
+
+    const result = (await prefixed.getStack('k')) as unknown as Record<string, unknown>;
+
+    expect(result.stackedImageUrl).toBe('/api/hassio_ingress/abc/api/preview/s1?full=true');
+    expect(result.releaseUrl).toBe('https://github.com/x');
+    expect((result.frames as { thumbUrl: string }[])[0].thumbUrl).toBe(
+      '/api/hassio_ingress/abc/api/stack/k/frame/0/thumb',
+    );
+    expect(result.layerUrls).toEqual(['/api/hassio_ingress/abc/api/depth-shift/s1/layer_0', 7]);
+    expect(result.note).toBe('/api/not-a-url-field');
+    expect(lastCall()[0]).toBe('/api/hassio_ingress/abc/api/stack/k');
+    vi.resetModules();
+  });
+});
+

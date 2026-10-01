@@ -2,28 +2,9 @@
 #
 #   docker compose -f docker-compose.dev.yml up
 #
-# - api: uvicorn --reload, source bind-mounted
-# - worker: celery worker + embedded beat, restarted on code change by watchmedo (source bind-mounted)
+# - api: uvicorn --reload, source bind-mounted; runs the processing jobs too
 # - web: Vite dev server with HMR, source bind-mounted
 # - data and the SQLite db live in ./data on the host
-
-x-backend-env: &backend-env
-  PYTHONUNBUFFERED: "1"
-  APP_ENV: development
-  LOG_LEVEL: debug
-  DATA_DIR: /data
-  REDIS_URL: redis://redis:6379/0
-  CELERY_BROKER_URL: redis://redis:6379/1
-  # queue: the Celery worker runs image / stack processing so a long job (a
-  # thousand-frame stack) never blocks the API. Override to `sync` for a
-  # worker-free run.
-  PROCESSING_MODE: ${PROCESSING_MODE:-queue}
-  # inotify does not fire over a Docker Desktop bind mount on Windows/macOS, so
-  # uvicorn --reload (watchfiles) misses code edits without polling - same reason
-  # the web service sets VITE_USE_POLLING. The worker (watchmedo) can still miss
-  # them; `docker compose -f docker-compose.dev.yml restart worker` after a
-  # backend change is the reliable path there.
-  WATCHFILES_FORCE_POLLING: "true"
 
 services:
   api:
@@ -34,7 +15,15 @@ services:
       target: backend
     container_name: myastroshine-api-dev
     command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8002
-    environment: *backend-env
+    environment:
+      PYTHONUNBUFFERED: "1"
+      APP_ENV: development
+      LOG_LEVEL: debug
+      DATA_DIR: /data
+      # inotify does not fire over a Docker Desktop bind mount on Windows/macOS, so
+      # uvicorn --reload (watchfiles) misses code edits without polling - same
+      # reason the web service sets VITE_USE_POLLING.
+      WATCHFILES_FORCE_POLLING: "true"
     ports:
       - "8002:8002"
     volumes:
@@ -45,40 +34,7 @@ services:
       # mounted (empty and inert by default); drop the binary in it and set
       # starnet2_path (e.g. /opt/engines/starnet2/starnet2) in Settings.
       - ./engines:/opt/engines:ro
-    depends_on:
-      - redis
     restart: unless-stopped
-
-  worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: backend
-    container_name: myastroshine-worker-dev
-    # -B: embedded beat scheduler (expired-session cleanup) - see docker-compose.yml.
-    command: >
-      sh -c "pip install --quiet watchdog &&
-      watchmedo auto-restart --directory=/app/app --pattern='*.py' --recursive --
-      celery -A app.tasks.celery_app worker -B --loglevel=info --concurrency=1"
-    environment: *backend-env
-    volumes:
-      - ./backend:/app
-      - ./data:/data
-      # External ML engines - queue mode runs the pass here, so the worker needs
-      # the same mount as api (see the api service above).
-      - ./engines:/opt/engines:ro
-    depends_on:
-      - redis
-    restart: unless-stopped
-    # Never serves HTTP, so the image's own HEALTHCHECK (curl :8002/api/health)
-    # would always fail here - a real Celery ping instead of inheriting that.
-    healthcheck:
-      test: ["CMD", "celery", "-A", "app.tasks.celery_app", "inspect", "ping", "--timeout", "10"]
-      interval: 30s
-      timeout: 15s
-      retries: 3
-      start_period: 15s
-
   web:
     image: node:24-alpine
     container_name: myastroshine-web-dev
@@ -97,14 +53,6 @@ services:
     depends_on:
       - api
     restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    container_name: myastroshine-redis-dev
-    ports:
-      - "6379:6379"
-    restart: unless-stopped
-    command: redis-server --save "" --appendonly no
 
 volumes:
   myastroshine_web_node_modules:

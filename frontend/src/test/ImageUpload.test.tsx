@@ -62,4 +62,86 @@ describe('ImageUpload', () => {
     expect(onUpload).not.toHaveBeenCalled();
     expect(screen.getByText(/not supported/i)).toBeInTheDocument();
   });
+
+  it('uploads a dropped file and highlights the zone while dragging over it', () => {
+    const onUpload = vi.fn();
+    const { container } = render(<ImageUpload onUpload={onUpload} />);
+    const zone = container.querySelector('.dropzone') as HTMLElement;
+    const file = new File(['data'], 'm42.jpg', { type: 'image/jpeg' });
+
+    fireEvent.dragOver(zone);
+    expect(zone).toHaveClass('dropzone-active');
+    fireEvent.dragLeave(zone);
+    expect(zone).not.toHaveClass('dropzone-active');
+    fireEvent.dragOver(zone);
+    fireEvent.drop(zone, { dataTransfer: { files: [file] } });
+
+    expect(onUpload).toHaveBeenCalledWith(file);
+    expect(zone).not.toHaveClass('dropzone-active');
+  });
+
+  it('ignores a drop with no file', () => {
+    const onUpload = vi.fn();
+    const { container } = render(<ImageUpload onUpload={onUpload} />);
+
+    fireEvent.drop(container.querySelector('.dropzone') as HTMLElement, { dataTransfer: { files: [] } });
+
+    expect(onUpload).not.toHaveBeenCalled();
+  });
+
+  it('ignores drags and drops while an upload is running', () => {
+    const onUpload = vi.fn();
+    const { container } = render(<ImageUpload onUpload={onUpload} isLoading />);
+    const zone = container.querySelector('.dropzone') as HTMLElement;
+
+    fireEvent.dragOver(zone);
+    expect(zone).not.toHaveClass('dropzone-active');
+    fireEvent.drop(zone, { dataTransfer: { files: [new File(['x'], 'm42.jpg')] } });
+
+    expect(onUpload).not.toHaveBeenCalled();
+  });
+
+  it('opens the file picker from the button', () => {
+    render(<ImageUpload onUpload={vi.fn()} />);
+    const click = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => undefined);
+
+    fireEvent.click(screen.getByRole('button', { name: /choose a file/i }));
+
+    expect(click).toHaveBeenCalled();
+    click.mockRestore();
+  });
+
+  it('ignores a picker change that carries no file', () => {
+    const onUpload = vi.fn();
+    render(<ImageUpload onUpload={onUpload} />);
+
+    fireEvent.change(fileInput(), { target: { files: [] } });
+
+    expect(onUpload).not.toHaveBeenCalled();
+  });
+
+  it('names the file going up and its size, then forgets it once the upload settles', () => {
+    const onUpload = vi.fn();
+    const { rerender } = render(<ImageUpload onUpload={onUpload} />);
+    const big = new File([new Uint8Array(3 * 1024 * 1024)], 'stack.fits');
+    fireEvent.change(fileInput(), { target: { files: [big] } });
+
+    rerender(<ImageUpload onUpload={onUpload} isLoading progress={0.5} />);
+    expect(screen.getByText(/stack\.fits/)).toHaveTextContent('3.0 MB');
+
+    rerender(<ImageUpload onUpload={onUpload} />);
+    rerender(<ImageUpload onUpload={onUpload} isLoading />);
+    expect(screen.queryByText(/stack\.fits/)).not.toBeInTheDocument();
+  });
+
+  it('shows a small file size in KB, never below 1 KB', () => {
+    const onUpload = vi.fn();
+    const { rerender } = render(<ImageUpload onUpload={onUpload} />);
+    fireEvent.change(fileInput(), { target: { files: [new File(['tiny'], 'tiny.png')] } });
+
+    rerender(<ImageUpload onUpload={onUpload} isLoading />);
+
+    expect(screen.getByText(/tiny\.png/)).toHaveTextContent('1 KB');
+  });
 });
+

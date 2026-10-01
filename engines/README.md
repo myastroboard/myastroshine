@@ -1,7 +1,7 @@
 # External ML engines
 
-This directory is **bind-mounted read-only into the `api` and `worker` containers
-at `/opt/engines`** (see `docker-compose.yml` / `docker-compose.dev.yml`). It is
+This directory is **bind-mounted read-only into the `api` container at
+`/opt/engines`** (see `docker-compose.yml` / `docker-compose.dev.yml`). It is
 empty by default and has no effect until you point a setting at a binary in it.
 
 MyAstroShine **bundles no models or binaries** - see `../THIRD_PARTY.md`. Anything

@@ -74,7 +74,7 @@ _MONO_NDIM = 2
 _RGB_LUMA = np.array([0.299, 0.587, 0.114], dtype=np.float32)  # data is R, G, B
 _NOISE_FLOOR = 1e-6
 _SCALE_PERCENTILE = 95
-_MAX_AUTO_WORKERS = 4  # cap the per-stack thread pool; the Celery worker itself is concurrency 1-2
+_MAX_AUTO_WORKERS = 4  # cap the per-stack thread pool
 _CHECKPOINT_NAME = "plan.json"  # sidecar next to accum/aligned.npy for resume / instant re-combine
 
 _T = TypeVar("_T")
@@ -167,11 +167,10 @@ class IntegrationService:
     ) -> list[_R]:
         """Ordered map over frames, on a thread pool, with throttled progress.
 
-        Threads not processes: a Celery prefork worker is daemonic and cannot
-        spawn child processes, and the per-frame hot path (decode, calibrate,
-        debayer, ``warpAffine``, connected-components) is all GIL-releasing C.
-        The pool is capped (``_MAX_AUTO_WORKERS``) since the Celery worker itself
-        already runs 1-2 stacks in parallel.
+        Threads not processes: the per-frame hot path (decode, calibrate,
+        debayer, ``warpAffine``, connected-components) is all GIL-releasing C,
+        and the stack already runs on a background job thread. The pool is
+        capped (``_MAX_AUTO_WORKERS``) so a stack leaves CPU for the editor.
         """
         n = len(items)
         count = self._worker_count(n)

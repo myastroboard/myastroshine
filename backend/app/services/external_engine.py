@@ -232,7 +232,7 @@ def _run_blocking(cmd: list[str], name: str) -> None:
 def _run_streaming(cmd: list[str], name: str, progress_cb: ProgressCallback) -> None:
     """Stream output, forwarding each ``--machine-progress`` line to the callback.
 
-    The read loop runs on the calling thread (so the callback's job / Redis writes
+    The read loop runs on the calling thread (so the callback's job / progress writes
     stay on the thread that owns the DB session); a one-shot timer is the only
     other thread and it just kills a runaway process. Progress is on stderr, which
     is merged into the read pipe.
@@ -266,6 +266,11 @@ def _run_streaming(cmd: list[str], name: str, progress_cb: ProgressCallback) -> 
         returncode = proc.wait()
     finally:
         watchdog.cancel()
+        # The callback raised (a newer edit superseded the job, or the server is
+        # stopping): do not leave the engine running as an orphan.
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait()
 
     if timed_out.is_set():
         raise ExternalEngineError(f"{name} timed out after {EXTERNAL_ENGINE_TIMEOUT_SECONDS}s")

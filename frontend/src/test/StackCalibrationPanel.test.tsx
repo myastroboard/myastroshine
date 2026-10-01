@@ -127,4 +127,23 @@ describe('StackCalibrationPanel', () => {
     fireEvent.click(checkbox);
     expect(onToggleCosmetic).toHaveBeenCalledWith(true);
   });
+
+  it('forwards an empty list when the picker reports no file list', () => {
+    const onAdd = vi.fn();
+    const { container } = render(
+      <StackCalibrationPanel
+        calibration={EMPTY}
+        cosmeticCorrection={false}
+        disabled={false}
+        onAdd={onAdd}
+        onClear={vi.fn()}
+        onToggleCosmetic={vi.fn()}
+      />,
+    );
+
+    const inputs = container.querySelectorAll<HTMLInputElement>('input[type="file"]');
+    fireEvent.change(inputs[0], { target: { files: null } });
+
+    expect(onAdd).toHaveBeenCalledWith('dark', []);
+  });
 });

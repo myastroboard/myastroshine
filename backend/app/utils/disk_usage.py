@@ -50,8 +50,7 @@ def data_breakdown() -> JsonDict:
     stacks_dir = settings.images_dir / "stacks"
     logs_bytes = sum(
         p.stat().st_size
-        for pattern in (f"{settings.log_file.name}*", f"{settings.worker_log_file.name}*")
-        for p in settings.data_dir.glob(pattern)
+        for p in settings.data_dir.glob(f"{settings.log_file.name}*")
         if p.is_file()
     )
     return {

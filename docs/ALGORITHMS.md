@@ -733,8 +733,8 @@ picks the frame nearest the **session's temporal middle** (which halves the
 field rotation to either end) with a typical star count and good sharpness.
 
 Each pass runs on a **thread pool** (`_map_frames`, auto-sized to the CPU count
-and capped at 4, `stacking_workers` to tune). Threads not processes - a Celery
-prefork worker is daemonic - which is fine because the per-frame hot path
+and capped at 4, `stacking_workers` to tune). Threads not processes, which is
+fine because the per-frame hot path
 (decode, calibrate, `warpAffine`, connected components) and the combine's
 `partition` / `clip` / reduce are all GIL-releasing C. Progress carries a
 `"340/1066"` frame counter.
@@ -904,6 +904,6 @@ grayscale conversion + masked blend) but were measured at different times -
 if you see one much cheaper than the other, re-measure both rather than
 trusting either number blindly.
 
-With `PROCESSING_MODE=queue` the whole pipeline runs on the Celery worker, off
-the request path; the editor's 512 px preview keeps slider feedback fast while
-the full-resolution render is produced on demand.
+The whole pipeline runs as a background job, off the request path; the
+editor's 512 px preview keeps slider feedback fast while the full-resolution
+render is produced on demand.

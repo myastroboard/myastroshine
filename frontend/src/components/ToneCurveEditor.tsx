@@ -1,4 +1,4 @@
-import { useRef, useState, type PointerEvent } from 'react';
+import { useState, type PointerEvent } from 'react';
 
 import { useTranslation } from '@/hooks/useTranslation';
 import { curveToSvgPath } from '@/services/toneCurve';
@@ -34,7 +34,6 @@ function clamp(value: number, lo: number, hi: number): number {
  */
 export function ToneCurveEditor({ curves, onChange, bare = false }: ToneCurveEditorProps) {
   const { t } = useTranslation();
-  const svgRef = useRef<SVGSVGElement>(null);
   const [channel, setChannel] = useState<CurveChannel>('rgb');
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const points = curves[channel];
@@ -44,11 +43,8 @@ export function ToneCurveEditor({ curves, onChange, bare = false }: ToneCurveEdi
     onChange(channel, next);
   }
 
-  function toDataPoint(event: PointerEvent): CurvePoint {
-    const rect = svgRef.current?.getBoundingClientRect();
-    if (!rect) {
-      return { x: 0, y: 0 };
-    }
+  function toDataPoint(event: PointerEvent<SVGSVGElement>): CurvePoint {
+    const rect = event.currentTarget.getBoundingClientRect();
     const x = clamp(Math.round(((event.clientX - rect.left) / rect.width) * LEVEL_MAX), 0, LEVEL_MAX);
     const fromTop = ((event.clientY - rect.top) / rect.height) * LEVEL_MAX;
     const y = clamp(Math.round(LEVEL_MAX - fromTop), 0, LEVEL_MAX);
@@ -128,7 +124,6 @@ export function ToneCurveEditor({ curves, onChange, bare = false }: ToneCurveEdi
       </div>
       <p className="text-xs text-faint">{t('tone_curve.help')}</p>
       <svg
-        ref={svgRef}
         viewBox={`0 0 ${LEVEL_MAX} ${LEVEL_MAX}`}
         role="img"
         aria-label={t('tone_curve.title')}

@@ -248,4 +248,140 @@ describe('EditorInspector', () => {
     fireEvent.click(screen.getByRole('button', { name: /Open Depth Shift viewer/i }));
     expect(onOpenViewer).toHaveBeenCalledTimes(1);
   });
+
+  describe('start step', () => {
+    it('runs Auto Astro and resets all adjustments', () => {
+      const props = makeProps({ activeStep: 'start' });
+      render(<EditorInspector {...props} />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Auto Astro' }));
+      fireEvent.click(screen.getByRole('button', { name: /reset all adjustments/i }));
+
+      expect(props.start.onAutoAstro).toHaveBeenCalled();
+      expect(props.start.onResetAll).toHaveBeenCalled();
+    });
+
+    it('shows Auto Astro running, then its failure', () => {
+      const base = makeProps({ activeStep: 'start' });
+      const { rerender } = render(
+        <EditorInspector {...base} start={{ ...base.start, autoAstroLoading: true }} />,
+      );
+      expect(screen.getByRole('button', { name: /analyzing/i })).toBeDisabled();
+
+      rerender(
+        <EditorInspector {...base} start={{ ...base.start, autoAstroError: 'no stars found' }} />,
+      );
+      expect(screen.getByText('Auto Astro failed: no stars found')).toBeInTheDocument();
+    });
+  });
+
+  it('edits the stretch and background extraction sliders on the stack step', () => {
+    const onParameterChange = vi.fn();
+    render(
+      <EditorInspector
+        {...makeProps({
+          activeStep: 'stack',
+          stack: { available: true, onParameterChange, onReset: vi.fn() },
+        })}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText('Stretch'), { target: { value: '0.4' } });
+    fireEvent.change(screen.getByLabelText('Background extraction'), { target: { value: '60' } });
+
+    expect(onParameterChange).toHaveBeenCalledWith('stretch', 0.4);
+    expect(onParameterChange).toHaveBeenCalledWith('backgroundExtraction', 60);
+  });
+
+  it('shows the tone curve on the curves step and resets it from the header', () => {
+    const onResetCurves = vi.fn();
+    render(<EditorInspector {...makeProps({ activeStep: 'curves', onResetCurves })} />);
+
+    expect(screen.getByRole('img', { name: 'Tone curve' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
+
+    expect(onResetCurves).toHaveBeenCalled();
+  });
+
+  it('offers the StarNet2 engine on the stars step when the server has it', () => {
+    const base = makeProps({ activeStep: 'stars' });
+    const onEngineChange = vi.fn();
+    const { rerender } = render(
+      <EditorInspector
+        {...base}
+        stars={{ ...base.stars, engines: ['classic', 'starnet2'], onEngineChange }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('radio', { name: 'StarNet2' }));
+    expect(onEngineChange).toHaveBeenCalledWith('starnet2');
+    expect(screen.queryByText(/Uses the StarNet2 model/)).not.toBeInTheDocument();
+
+    rerender(
+      <EditorInspector
+        {...base}
+        stars={{ ...base.stars, engines: ['classic', 'starnet2'], engine: 'starnet2', onEngineChange }}
+      />,
+    );
+    expect(screen.getByRole('radio', { name: 'StarNet2' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText(/Uses the StarNet2 model/)).toBeInTheDocument();
+  });
+
+  it('shows the star mask source count once detection finishes', () => {
+    const base = makeProps({ activeStep: 'stars' });
+    const { rerender } = render(
+      <EditorInspector {...base} stars={{ ...base.stars, enabled: true, loading: true }} />,
+    );
+    expect(screen.getByText('...')).toBeInTheDocument();
+
+    rerender(
+      <EditorInspector {...base} stars={{ ...base.stars, enabled: true, sourceCount: 412 }} />,
+    );
+    expect(screen.getByText('412 sources')).toBeInTheDocument();
+
+    rerender(<EditorInspector {...base} stars={{ ...base.stars, enabled: true }} />);
+    expect(screen.queryByText(/sources/)).not.toBeInTheDocument();
+  });
+
+  it('offers the DeepSNR engine on the detail step when the server has it', () => {
+    const base = makeProps({ activeStep: 'detail' });
+    const onEngineChange = vi.fn();
+    render(
+      <EditorInspector
+        {...base}
+        denoise={{ engines: ['classic', 'deepsnr'], engine: 'deepsnr', onEngineChange }}
+      />,
+    );
+
+    expect(screen.getByText(/Uses the DeepSNR model/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('radio', { name: 'Classic' }));
+    expect(onEngineChange).toHaveBeenCalledWith('classic');
+  });
+
+  it('renders the export step', () => {
+    render(<EditorInspector {...makeProps({ activeStep: 'export' })} />);
+
+    expect(screen.getByDisplayValue('photo_myastroshine')).toBeInTheDocument();
+  });
+
+  it('walks the depth focal point states and reports a depth failure', () => {
+    const base = makeProps({ activeStep: 'depth' });
+    const onClear = vi.fn();
+    const { rerender } = render(
+      <EditorInspector {...base} depth={{ ...base.depth, picking: true }} />,
+    );
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+
+    rerender(
+      <EditorInspector
+        {...base}
+        depth={{ ...base.depth, focalPoint: { x: 0.5, y: 0.5 }, onClear, error: 'out of memory' }}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Change focal point' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Clear focal point' }));
+    expect(onClear).toHaveBeenCalled();
+    expect(screen.getByText('Depth shift failed: out of memory')).toBeInTheDocument();
+  });
 });
+

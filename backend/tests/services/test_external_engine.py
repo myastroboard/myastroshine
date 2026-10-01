@@ -196,6 +196,24 @@ def test_streaming_missing_binary_raises(monkeypatch: pytest.MonkeyPatch) -> Non
         _run(engine_image(), progress_cb=lambda _f: None)
 
 
+def test_streaming_kills_the_engine_when_the_progress_callback_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A job superseded or interrupted mid-pass stops through its progress
+    callback - the engine process must not be left running as an orphan."""
+    popen = fake_engine_popen(lines=['{"percent": 20}\n', '{"percent": 40}\n'])
+    monkeypatch.setattr(external_engine.subprocess, "Popen", popen)
+
+    def _stop(_fraction: float) -> None:
+        raise RuntimeError("stop")
+
+    with pytest.raises(RuntimeError, match="stop"):
+        _run(engine_image(), progress_cb=_stop)
+
+    assert popen.last is not None
+    assert popen.last.killed
+
+
 def test_streaming_timeout_kills_and_raises(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(external_engine.threading, "Timer", ImmediateTimer)
     monkeypatch.setattr(external_engine.subprocess, "Popen", fake_engine_popen())

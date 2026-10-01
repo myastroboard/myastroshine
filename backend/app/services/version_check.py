@@ -1,10 +1,8 @@
 """Checks GitHub for a newer myastroshine release.
 
 Cached in-memory with a long TTL so a busy frontend can't hammer GitHub's API
-(see ALIGNMENT.md #3). No disk-shared cache is needed the way
-``app/utils/rate_limit.py`` would need one across replicas: the ``worker``
-process never serves HTTP and so never calls this, and ``api`` itself is a
-single process.
+(see ALIGNMENT.md #3). The app is a single process, so an in-memory cache is
+the whole story.
 """
 
 from __future__ import annotations

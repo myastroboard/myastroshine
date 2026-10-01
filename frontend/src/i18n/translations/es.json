@@ -413,6 +413,10 @@
       "operations": {
         "label": "Operaciones",
         "blurb": "Trabajos de procesamiento recientes y uso de disco."
+      },
+      "security": {
+        "label": "Seguridad",
+        "blurb": "Contraseña de administrador y navegadores conectados."
       }
     },
     "groups": {
@@ -568,6 +572,52 @@
         "previous_page": "Anterior",
         "next_page": "Siguiente",
         "page_info": "{from}-{to} de {total}"
+      }
+    },
+    "auth": {
+      "admin_disabled": "La API de administración está desactivada en esta instancia (ADMIN_ENABLED=false).",
+      "logout": "Cerrar sesión",
+      "password": "Contraseña de administrador",
+      "current_password": "Contraseña actual",
+      "new_password": "Nueva contraseña",
+      "confirm_password": "Confirmar la contraseña",
+      "setup": {
+        "title": "Crear la contraseña de administrador",
+        "blurb": "La configuración está reservada al administrador. Elija una contraseña de al menos {min} caracteres: se pedirá para abrir esta página. Usar la aplicación en sí nunca la necesita.",
+        "submit": "Crear e iniciar sesión"
+      },
+      "login": {
+        "title": "Acceso de administrador",
+        "blurb": "La configuración está reservada al administrador. Introduzca la contraseña de administrador para continuar.",
+        "submit": "Iniciar sesión"
+      },
+      "errors": {
+        "invalid_password": "Contraseña incorrecta.",
+        "locked_out": "Demasiados intentos fallidos. Espere un momento y vuelva a intentarlo.",
+        "already_configured": "Ya existe una contraseña de administrador. Recargue la página para iniciar sesión.",
+        "generic": "Algo salió mal. Inténtelo de nuevo.",
+        "too_short": "La contraseña necesita al menos {min} caracteres.",
+        "mismatch": "Las dos contraseñas no coinciden."
+      }
+    },
+    "security": {
+      "session_idle": {
+        "label": "Mantener la sesión (días)",
+        "hint": "Una sesión de administrador sin uso durante este tiempo termina. Nunca más de 30 días."
+      },
+      "change_password": {
+        "title": "Cambiar la contraseña de administrador",
+        "blurb": "Se cierra la sesión de todos los demás navegadores conectados como administrador.",
+        "submit": "Cambiar contraseña",
+        "done": "Contraseña cambiada."
+      },
+      "sessions": {
+        "title": "Navegadores conectados",
+        "blurb": "Navegadores conectados actualmente como administrador.",
+        "this_browser": "este navegador",
+        "unknown_browser": "Navegador desconocido",
+        "details": "{ip} - última actividad {last_seen}",
+        "revoke": "Cerrar sesión"
       }
     }
   },

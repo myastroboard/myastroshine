@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { PresetButtons } from '@/components/PresetButtons';
@@ -80,5 +80,30 @@ describe('PresetButtons', () => {
     );
 
     expect(screen.queryByRole('button', { name: /delete preset/i })).not.toBeInTheDocument();
+  });
+
+  it('drops a pending delete confirmation after three seconds', () => {
+    vi.useFakeTimers();
+    try {
+      const onPresetDelete = vi.fn();
+      render(
+        <PresetButtons
+          presets={[preset({ presetId: 'user_y_cd34', name: 'Other look', author: 'user' })]}
+          onPresetApply={vi.fn()}
+          onPresetDelete={onPresetDelete}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Delete preset Other look' }));
+      expect(screen.getByRole('button', { name: 'Confirm delete preset Other look' })).toBeInTheDocument();
+      act(() => {
+        vi.advanceTimersByTime(3000);
+      });
+
+      expect(screen.getByRole('button', { name: 'Delete preset Other look' })).toBeInTheDocument();
+      expect(onPresetDelete).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

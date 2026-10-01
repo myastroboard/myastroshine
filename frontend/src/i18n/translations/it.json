@@ -413,6 +413,10 @@
       "operations": {
         "label": "Operazioni",
         "blurb": "Elaborazioni recenti e utilizzo del disco."
+      },
+      "security": {
+        "label": "Sicurezza",
+        "blurb": "Password di amministratore e browser connessi."
       }
     },
     "groups": {
@@ -568,6 +572,52 @@
         "previous_page": "Precedente",
         "next_page": "Successivo",
         "page_info": "{from}-{to} di {total}"
+      }
+    },
+    "auth": {
+      "admin_disabled": "L'API di amministrazione è disattivata su questa istanza (ADMIN_ENABLED=false).",
+      "logout": "Esci",
+      "password": "Password di amministratore",
+      "current_password": "Password attuale",
+      "new_password": "Nuova password",
+      "confirm_password": "Conferma la password",
+      "setup": {
+        "title": "Crea la password di amministratore",
+        "blurb": "Le impostazioni sono riservate all'amministratore. Scegli una password di almeno {min} caratteri: verrà richiesta per aprire questa pagina. L'uso dell'app in sé non la richiede mai.",
+        "submit": "Crea e accedi"
+      },
+      "login": {
+        "title": "Accesso amministratore",
+        "blurb": "Le impostazioni sono riservate all'amministratore. Inserisci la password di amministratore per continuare.",
+        "submit": "Accedi"
+      },
+      "errors": {
+        "invalid_password": "Password errata.",
+        "locked_out": "Troppi tentativi falliti. Attendi un momento e riprova.",
+        "already_configured": "Esiste già una password di amministratore. Ricarica la pagina per accedere.",
+        "generic": "Qualcosa è andato storto. Riprova.",
+        "too_short": "La password richiede almeno {min} caratteri.",
+        "mismatch": "Le due password non coincidono."
+      }
+    },
+    "security": {
+      "session_idle": {
+        "label": "Resta connesso (giorni)",
+        "hint": "Un accesso di amministratore inutilizzato per questo periodo termina. Mai più di 30 giorni."
+      },
+      "change_password": {
+        "title": "Cambia la password di amministratore",
+        "blurb": "Tutti gli altri browser connessi come amministratore vengono disconnessi.",
+        "submit": "Cambia password",
+        "done": "Password cambiata."
+      },
+      "sessions": {
+        "title": "Browser connessi",
+        "blurb": "Browser attualmente connessi come amministratore.",
+        "this_browser": "questo browser",
+        "unknown_browser": "Browser sconosciuto",
+        "details": "{ip} - ultima attività {last_seen}",
+        "revoke": "Disconnetti"
       }
     }
   },

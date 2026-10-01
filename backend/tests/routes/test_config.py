@@ -17,12 +17,12 @@ def test_config_reports_the_upload_and_stacking_limits(client) -> None:
     }
 
 
-def test_config_tracks_a_settings_change(client) -> None:
-    current = client.get("/api/admin/app-settings").json()
+def test_config_tracks_a_settings_change(admin_client) -> None:
+    current = admin_client.get("/api/admin/app-settings").json()
     current["max_image_size_mb"] = 250
-    client.post("/api/admin/app-settings", json=current)
+    admin_client.post("/api/admin/app-settings", json=current)
 
-    assert client.get("/api/config").json()["max_image_size_mb"] == 250
+    assert admin_client.get("/api/config").json()["max_image_size_mb"] == 250
 
 
 def test_config_needs_no_admin(client, monkeypatch) -> None:

@@ -13,7 +13,10 @@ step is still to come - see ``initial_plan/12_STACKING_REBUILD.md``.
 from __future__ import annotations
 
 import math
+import os
 import uuid
+from collections.abc import Callable, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -21,8 +24,11 @@ import numpy as np
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.config import get_settings
-from app.constants import ABANDONED_STACK_SECONDS, STALE_STACK_WORK_SECONDS
+from app.constants import (
+    ABANDONED_STACK_SECONDS,
+    STALE_STACK_WORK_SECONDS,
+    UPLOAD_INGEST_WORKERS,
+)
 from app.db.models import StackRecord
 from app.exceptions import InvalidParameterError, ResourceNotFoundError
 from app.logging_config import get_logger
@@ -37,9 +43,10 @@ from app.services.calibration import CALIBRATION_KINDS, CalibrationMasters, Cali
 from app.services.frame_quality import FrameQuality
 from app.services.integration import IntegrationService, highpass_noise
 from app.services.job import JobService
+from app.services.job_runner import get_job_runner, raise_if_stopping
 from app.services.post_stack import PostStackReport, apply_post_stack, render_stack_base
 from app.services.session import SessionService
-from app.services.storage import PreparedFrame, StorageService
+from app.services.storage import StorageService
 from app.utils.app_settings import get_app_settings
 from app.utils.linear_ingest import LinearFrame, ingest_frame, summarize_capture
 
@@ -48,6 +55,11 @@ logger = get_logger(__name__)
 _MIN_FRAMES = 2
 _COLOR_NDIM = 3
 _MAX_CALIBRATION_FRAMES = 256  # per kind - well above any real dark/flat/bias run
+
+#: One frame to ingest: a zero-argument reader returning its bytes, and its file
+#: name (for the format sniffing). An HTTP upload passes ``upload.file.read``;
+#: the folder watch passes ``path.read_bytes``.
+FrameSource = tuple[Callable[[], bytes], str | None]
 
 
 class StackingService:
@@ -122,31 +134,68 @@ class StackingService:
         self.db.refresh(record)
         return record
 
-    def prepare_frame(self, data: bytes, filename: str | None) -> PreparedFrame:
-        """Decode + pack + thumbnail one upload - pure CPU, run across a threadpool."""
-        return self.storage.prepare_linear_frame(ingest_frame(data, filename))
-
     def add_frames(
-        self, stack_id: str, start_index: int, prepared: list[PreparedFrame]
-    ) -> StackRecord:
-        """Write a batch of prepared frames to disk with a single DB commit."""
+        self,
+        stack_id: str,
+        start_index: int,
+        sources: Sequence[FrameSource],
+        *,
+        skip_unreadable: bool = False,
+    ) -> tuple[StackRecord, int]:
+        """Ingest a batch of frames, one at a time, with a single DB commit.
+
+        Each source is read, decoded, packed and written straight to disk, so a
+        batch never sits in memory all at once (a 20-frame batch of full-res FITS
+        is gigabytes). The work runs on a small thread pool, so memory is bounded
+        by ``UPLOAD_INGEST_WORKERS`` frames, not by the batch size.
+
+        Frames land at ``start_index`` upward. With ``skip_unreadable`` (the
+        folder watch) a file that fails to decode is logged and skipped and the
+        rest are ingested one by one on consecutive indices; otherwise the first
+        failure fails the whole call. Returns the record and how many frames were
+        added.
+        """
         record = self._get(stack_id)
         if record.status not in ("waiting_for_frames", "ready"):
             raise InvalidParameterError(f"Stack {stack_id} is not accepting frames")
         max_frames = get_app_settings().stacking_max_frames
-        for offset, item in enumerate(prepared):
-            index = start_index + offset
-            if not 0 <= index < max_frames:
-                raise InvalidParameterError(f"frame_index must be 0..{max_frames - 1}")
-            if not self.storage.has_linear_frame(stack_id, index):
+        last = start_index + len(sources) - 1
+        if sources and not (start_index >= 0 and last < max_frames):
+            raise InvalidParameterError(f"frame_index must be 0..{max_frames - 1}")
+
+        def ingest(index: int, source: FrameSource) -> bool:
+            """Write one frame at ``index``; ``True`` if it replaced an existing one."""
+            read, filename = source
+            prepared = self.storage.prepare_linear_frame(ingest_frame(read(), filename))
+            existed = self.storage.has_linear_frame(stack_id, index)
+            self.storage.write_linear_frame(stack_id, index, prepared)
+            return existed
+
+        written: list[tuple[int, bool]] = []
+        if skip_unreadable:
+            index = start_index
+            for source in sources:
+                try:
+                    written.append((index, ingest(index, source)))
+                except Exception as exc:  # one unreadable file must not wedge the batch
+                    logger.warning("skipping unreadable frame", file=source[1], error=str(exc))
+                    continue
+                index += 1
+        else:
+            indices = range(start_index, start_index + len(sources))
+            workers = max(1, min(UPLOAD_INGEST_WORKERS, os.cpu_count() or 1, len(sources)))
+            with ThreadPoolExecutor(workers, thread_name_prefix="frame-ingest") as pool:
+                written = list(zip(indices, pool.map(ingest, indices, sources), strict=True))
+
+        for index, existed in written:
+            if not existed:
                 record.received_frames += 1
-            self.storage.write_linear_frame(stack_id, index, item)
             record.frame_count = max(record.frame_count, index + 1)
         if record.received_frames >= _MIN_FRAMES:
             record.status = "ready"
         self.db.commit()
         self.db.refresh(record)
-        return record
+        return record, len(written)
 
     def set_frame_excluded(self, stack_id: str, index: int, excluded: bool) -> StackRecord:
         """Toggle a frame in/out of the stack.
@@ -175,19 +224,23 @@ class StackingService:
     # -- calibration frames (Phase 2) -----------------------------------
 
     def add_calibration_frames(
-        self, stack_id: str, kind: str, frames: list[LinearFrame]
+        self, stack_id: str, kind: str, sources: Sequence[FrameSource]
     ) -> StackRecord:
-        """Append dark / flat / bias / dark_flat subs; masters are built at ``process``."""
+        """Append dark / flat / bias / dark_flat subs; masters are built at ``process``.
+
+        Read, decoded and written one sub at a time, so a batch never sits in memory.
+        """
         record = self._get(stack_id)
         if kind not in CALIBRATION_KINDS:
             raise InvalidParameterError(f"Unknown calibration frame kind {kind!r}")
         existing = self.storage.cal_frame_indices(stack_id, kind)
-        if len(existing) + len(frames) > _MAX_CALIBRATION_FRAMES:
+        if len(existing) + len(sources) > _MAX_CALIBRATION_FRAMES:
             raise InvalidParameterError(f"Too many {kind} frames (max {_MAX_CALIBRATION_FRAMES})")
         start = existing[-1] + 1 if existing else 0
-        for offset, frame in enumerate(frames):
+        for offset, (read, filename) in enumerate(sources):
+            frame = ingest_frame(read(), filename)
             self.storage.save_cal_frame(stack_id, kind, start + offset, frame)
-        logger.info("calibration frames added", stack_id=stack_id, kind=kind, added=len(frames))
+        logger.info("calibration frames added", stack_id=stack_id, kind=kind, added=len(sources))
         return record
 
     def clear_calibration(self, stack_id: str, kind: str) -> StackRecord:
@@ -207,9 +260,9 @@ class StackingService:
 
         record.status = "processing"
         self.db.commit()
-        self._emit(job_id, stack_id, "calibration", 8)
 
         try:
+            self._emit(job_id, stack_id, "calibration", 8)
             masters = self._build_masters(stack_id, kept, job_id)
             self._emit(job_id, stack_id, "integration", 20)
             composite, stats = self._integrate(
@@ -354,6 +407,8 @@ class StackingService:
         error: str | None = None,
         detail: str | None = None,
     ) -> None:
+        if status == "processing":
+            raise_if_stopping()
         if job_id is None:
             return
         progress.publish(
@@ -376,7 +431,7 @@ class StackingService:
         client_ip: str | None = None,
         overrides: ProcessStackRequest | None = None,
     ) -> tuple[StackRecord, str]:
-        """Create a job and run the stack inline or on the queue.
+        """Create a job and run the stack in the background.
 
         ``overrides`` re-stacks with a changed setting (no re-upload); each run
         produces a fresh composite session.
@@ -391,31 +446,22 @@ class StackingService:
         jobs.assert_under_concurrency_limit(client_ip)
         job = jobs.create(None, client_ip=client_ip)
 
-        if get_settings().processing_mode == "queue":
-            from app.tasks.processing import task_process_stack  # noqa: PLC0415
+        # Lazy import: app.services.background_jobs imports this module.
+        from app.services.background_jobs import run_stack_job  # noqa: PLC0415
 
-            # The worker sets this a moment from now, but the route builds its
-            # response immediately. Without it, re-stacking an already-"completed"
-            # stack would answer "completed" (pointing at the previous run's
-            # session) and the client would skip straight past the progress
-            # stream - the new run only becomes visible on a second click.
-            record.status = "processing"
-            record.error = None
-            self.db.commit()
-            task_process_stack.delay(stack_id, job.job_id)
-        else:
-            # Sync mode: drive the JobRecord to a terminal state ourselves, the
-            # same way task_process_stack does on the queue - otherwise the row
-            # sits at "queued" forever and counts against the per-IP concurrency
-            # limit until the hourly stale-job sweep.
-            jobs.update(job.job_id, status="processing", progress_percent=5)
-            try:
-                self.process(stack_id, job.job_id)
-            except Exception as exc:
-                jobs.update(job.job_id, status="failed", error=str(exc))
-                raise
-            jobs.update(job.job_id, status="completed", progress_percent=100)
-        return self._get(stack_id), job.job_id
+        # The job thread sets this a moment from now, but the route builds its
+        # response immediately. Without it, re-stacking an already-"completed"
+        # stack would answer "completed" (pointing at the previous run's
+        # session) and the client would skip straight past the progress stream -
+        # the new run only becomes visible on a second click.
+        record.status = "processing"
+        record.error = None
+        self.db.commit()
+        job_id = job.job_id
+        get_job_runner().submit("stack", job_id, lambda: run_stack_job(stack_id, job_id))
+        # The job commits through its own session; re-read what it reached.
+        self.db.refresh(record)
+        return record, job_id
 
     def get_result(self, stack_id: str) -> StackRecord:
         return self._get(stack_id)

@@ -22,8 +22,9 @@ extend-immutable-calls = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-# Tests: magic values, assert, deferred imports, and subprocess calls are all fine.
-"tests/*" = ["PLR2004", "S101", "PLC0415", "S603"]
+# Tests: magic values, assert, deferred imports, subprocess calls, and fixture
+# passwords (S105, the admin-auth tests log in with literal test passwords) are all fine.
+"tests/*" = ["PLR2004", "S101", "PLC0415", "S603", "S105"]
 
 [tool.mypy]
 python_version = "3.14"

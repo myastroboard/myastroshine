@@ -28,7 +28,7 @@ router = APIRouter(tags=["auto-astro"])
 
 
 @router.post("/auto-astro/{session_id}", response_model=AutoAstroResponse)
-async def apply_auto_astro(
+def apply_auto_astro(
     session_id: str,
     auto_astro: AutoAstroServiceDep,
     enhancement: EnhancementServiceDep,
@@ -37,7 +37,11 @@ async def apply_auto_astro(
     http_request: Request,
     _rate_limit: RequireRateLimit,
 ) -> AutoAstroResponse:
-    """Analyse the original image and apply the resulting parameters."""
+    """Analyse the original image and apply the resulting parameters.
+
+    ``def``, not ``async``: the work is CPU-bound, so FastAPI runs it in its
+    threadpool instead of stalling the event loop (WebSockets, health).
+    """
     if not is_valid_session_id(session_id):
         raise SessionNotFoundError(f"Session {session_id} not found")
 
