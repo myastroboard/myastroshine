@@ -1,7 +1,10 @@
 # MyAstroShine API
 
 Base URL: `http://localhost:8002/api` (configurable via `VITE_API_URL` on the
-frontend). Most routes are unauthenticated (local deployment). The AstroDex
+frontend). Using the app is open: upload, processing, presets, stacking and
+download need no credentials. The **administration surface** (`/admin/*`,
+`/tokens`, `/auth/password`, `/auth/sessions`) needs an admin login - see
+[Admin authentication](#admin-authentication). The AstroDex
 handoff routes (`/astrodex/handoff/resume`, `/astrodex/handoff/return`) are
 authenticated by the signed handoff token in the request body, not a bearer
 header - the token's `kid` selects the webhook token (created in the Settings UI,
@@ -21,6 +24,7 @@ header - the token's `kid` selects the webhook token (created in the Settings UI
 - [Client config](#client-config)
 - [External ML engines](#external-ml-engines)
 - [Update check](#update-check)
+- [Admin authentication](#admin-authentication)
 - [Webhook tokens](#webhook-tokens)
 - [AstroDex integration](#astrodex-integration)
 - [Stacking](#stacking)
@@ -45,6 +49,8 @@ Common codes: `INVALID_PARAMETER` (400), `UNAUTHORIZED` (401), `FORBIDDEN` (403)
 `NOT_FOUND` / `SESSION_NOT_FOUND` (404), `UNSUPPORTED_FORMAT` (415),
 `DUPLICATE_RESOURCE` (400), `PAYLOAD_TOO_LARGE` (413), `SESSION_EXPIRED` (410),
 `PROCESSING_FAILED` (500), `ASTRODEX_UNREACHABLE` (503), `RATE_LIMITED` (429).
+Admin authentication adds `ADMIN_LOGIN_REQUIRED` (401), `INVALID_CREDENTIALS`
+(401), `ADMIN_SETUP_REQUIRED` (403) and `ADMIN_ALREADY_CONFIGURED` (409).
 
 ## Rate Limiting
 
@@ -59,8 +65,7 @@ Per IP, on `/upload`, `/process/{id}`, `/presets/{id}/apply/{session_id}`,
   user doing real work should never hit it (raise it further if a shared
   household IP does).
 - **Concurrent processing jobs** (`max_concurrent_jobs_per_ip`, default 5):
-  checked against non-terminal rows in the `jobs` table, so it holds under
-  both `PROCESSING_MODE=sync` and `queue`. A new `/process` for a session first
+  checked against non-terminal rows in the `jobs` table. A new `/process` for a session first
   retires (`superseded`) any still-pending job for that same session, so a burst
   of slider edits can't exhaust this budget against itself.
 
@@ -75,15 +80,22 @@ Every route is implemented and tested end to end.
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/health` | System health: DB connectivity, Redis (queue mode only), data-volume disk usage |
+| GET | `/health` | System health: DB connectivity, data-volume disk usage |
 | GET | `/config` | Public runtime limits (upload cap, stacking limits, engine lists) - no admin gate |
-| GET | `/admin/app-settings` | Current runtime settings (`app_settings.json`) |
-| POST | `/admin/app-settings` | Replace runtime settings (gated by `ADMIN_ENABLED`) |
+| GET | `/auth/status` | Admin API enabled / admin password set / this browser logged in |
+| POST | `/auth/setup` | Set the first admin password and log in (only while none exists) |
+| POST | `/auth/login` | Log in with the admin password (failures throttled per IP) |
+| POST | `/auth/logout` | End this browser's admin session |
+| POST | `/auth/password` | Change the admin password (admin); logs every other browser out |
+| GET | `/auth/sessions` | Logged-in admin browsers (admin) |
+| DELETE | `/auth/sessions/{id}` | Log one admin browser out (admin) |
+| GET | `/admin/app-settings` | Current runtime settings (`app_settings.json`) - every `/admin/*` route needs an admin login |
+| POST | `/admin/app-settings` | Replace runtime settings |
 | GET | `/admin/engine-status` | Probe the configured StarNet2 / DeepSNR paths |
 | GET | `/admin/logs` | Tail the log file, newest first (`limit`, `offset`, `level`) |
 | GET / POST | `/admin/logs/level` | Read / change the file and console log levels |
 | POST | `/admin/logs/clear` | Empty `myastroshine.log` |
-| GET | `/admin/logs/export` | ZIP of the logs (main + rotations + worker) |
+| GET | `/admin/logs/export` | ZIP of the log file and its rotations |
 | GET | `/admin/jobs` | Recent processing jobs, newest first (`status`, `limit`, `offset`) - hides `superseded` unless `status` asks for it explicitly |
 | GET | `/admin/disk-usage` | The data volume's total/used/free bytes, plus a breakdown by images / stacks / database / logs |
 | GET | `/admin/config-export` | Settings + user presets (never the 5 built-ins), bundled for backup or moving to a new instance |
@@ -115,7 +127,7 @@ Every route is implemented and tested end to end.
 | GET | `/stack/{stack_id}` | Stack result, statistics, and the frame list |
 | GET | `/stack/latest` | The current folder-watch stack, or `null` |
 | WS | `/ws/stack-status/{job_id}` | Real-time stacking progress |
-| GET | `/tokens` | List webhook tokens (metadata only) |
+| GET | `/tokens` | List webhook tokens (metadata only) - every `/tokens` route needs an admin login |
 | POST | `/tokens` | Create a webhook token (raw value shown once) |
 | DELETE | `/tokens/{token_id}` | Revoke a token |
 | POST | `/astrodex/handoff/resume` | Open a session from an AstroDex handoff token |
@@ -144,6 +156,16 @@ Every route is implemented and tested end to end.
 `415 UNSUPPORTED_FORMAT` for anything else, an unreadable file, or a decoded
 pixel count over the configured cap (`MAX_IMAGE_PIXELS` - a decompression-bomb
 guard, independent of `max_image_size_mb`'s compressed-byte-size check).
+
+**Size limits.** Every file is capped at `max_image_size_mb` (default 100), and
+checked from its spooled size before it is read: an oversized file is a `413
+PAYLOAD_TOO_LARGE` without being decoded. A request whose `Content-Length`
+already exceeds what its route can carry - one file plus 1 MiB of multipart
+framing for `/upload`, `/upload-frame` and `/upload-archive`, a full batch of
+20 files for `/upload-frames` and `/calibration/{kind}/frames` - is refused
+with the same `413` before its body is even received. A batch route accepts at
+most **20 files** per request (`400` above that). Uploads are read from disk a
+file at a time and never held in memory as a whole.
 
 The `/upload` response is `{ session_id, image_url, dimensions, file_size_bytes,
 histogram, upload_timestamp, expires_at, is_stack }`. `is_stack` is `true` when
@@ -244,8 +266,9 @@ The canonical model is `app/models/processing.py`; keep this table in sync with 
 
 `/ws/processing-status/{job_id}` and `/ws/stack-status/{job_id}` behave the same:
 on connect the server sends the current job state from the DB (catch-up for late
-subscribers), then, if the job is still running and `PROCESSING_MODE=queue`,
-relays live events from Redis until a terminal status arrives, then closes.
+subscribers), then, while the job is running, relays its live progress events
+until a terminal status arrives, then closes. Every 3 s without an event it
+re-reads the job from the DB, so a client never waits on an event it missed.
 
 ```json
 {
@@ -276,11 +299,14 @@ the creative stages. For a stacked-composite session a `stack_base` step runs
 first (the linear `stack` pre-stage). Stack steps: `calibration`,
 `registration`, `normalization`, `integration`, `post-processing`, `done`.
 
-In the default `PROCESSING_MODE=sync`, the job is already `completed` when
-`/process` returns; the WebSocket just replays that final state.
-
 `POST /process` / `POST /presets/{id}/apply/{sid}` return
-`{ session_id, job_id, status, preview_url, estimated_time_seconds, ws_status_url }`.
+`{ session_id, job_id, status, preview_url, estimated_time_seconds, ws_status_url }`
+as soon as the job is recorded - `status` is `queued` - and the pipeline runs in
+the background: follow `ws_status_url`. A job that fails after that answer ends
+`failed` on the socket (with `error`), not as an HTTP error. A job still running
+when the server stops ends `failed` ("interrupted by a server shutdown"); one
+left over from a crash is failed at the next start ("interrupted by a
+restart").
 
 ## Presets
 
@@ -392,7 +418,7 @@ See `docs/ALGORITHMS.md` "Auto Astro" for the heuristic.
 
 `GET /config` returns the non-sensitive runtime limits the web UI needs before a
 session exists - the upload size cap it pre-checks against and shows, and the
-stacking limits. No `ADMIN_ENABLED` gate (unlike `GET /admin/app-settings`,
+stacking limits. No admin login needed (unlike `GET /admin/app-settings`,
 which returns the full settings object):
 
 ```json
@@ -417,13 +443,13 @@ below, `docs/DEPLOYMENT.md`, and `THIRD_PARTY.md`).
 
 Optional star removal (StarNet2) and denoise (DeepSNR) via an operator-installed
 binary, invoked as a subprocess. **Nothing is bundled** - the operator downloads
-the tool from `starnetastro.com`, mounts it into the API and worker containers,
+the tool from `starnetastro.com`, mounts it into the container,
 and sets `starnet2_path` / `deepsnr_path` (and optional `starnet2_stride` /
 `deepsnr_stride`) in Settings. Empty paths (the default) leave the classical
 engines as the only option; a configured, working engine then appears in
 `starless_engines` / `denoise_engines` and as a per-edit picker in the editor.
 
-`GET /admin/engine-status` (gated by `ADMIN_ENABLED`) probes the configured paths
+`GET /admin/engine-status` (admin login) probes the configured paths
 with `<binary> --version` and drives the status line in Settings:
 
 ```json
@@ -479,6 +505,58 @@ The frontend (`useVersionCheck.ts`) polls this every 4h and re-verifies
 `update_available` itself before showing the discreet update banner
 (`UpdateBanner.tsx`), so a stale or incorrect cache can never present as a
 downgrade.
+
+## Admin authentication
+
+One admin password protects the administration surface: `/admin/*`, `/tokens`,
+and the `/auth` routes that manage the login itself. Everything else stays open.
+There are no user accounts.
+
+**First run.** `GET /auth/status` answers:
+
+```json
+{ "admin_enabled": true, "configured": false, "authenticated": false }
+```
+
+While `configured` is `false`, every admin route answers `403
+ADMIN_SETUP_REQUIRED`: the surface is locked, never open. `POST /auth/setup
+{ "password": "..." }` (10-256 characters) stores the password and logs the
+caller in (`204` + cookie). Once a password exists, setup answers `409
+ADMIN_ALREADY_CONFIGURED`.
+
+**Login.** `POST /auth/login { "password": "..." }` -> `204` + cookie, or `401
+INVALID_CREDENTIALS`. Failures are throttled per client IP, independently of the
+general rate limit and always on: 5 failures within a minute lock the IP out for
+60 s, each further lockout doubles (capped at 1 h); a locked-out login answers
+`429 RATE_LIMITED` with `details.retry_after_seconds`. An admin route called
+without a live session answers `401 ADMIN_LOGIN_REQUIRED`.
+
+**The session cookie** is `myastroshine_admin`: `HttpOnly`, `SameSite=Strict`,
+`Secure` when the request is https (directly or per `X-Forwarded-Proto`), and
+`Path` set to the app root (`/`, or the path prefix the app is served under). It
+holds a random token; the database keeps only its SHA-256 hash. A session ends
+after `admin_session_idle_days` (Settings -> Security, default 7) without use,
+and after 30 days whatever the use. `POST /auth/logout` ends it at once.
+
+**Password and sessions.** `POST /auth/password { "current_password",
+"new_password" }` changes the password and logs every other browser out.
+`GET /auth/sessions` lists the logged-in browsers (`id`, `client_ip`,
+`user_agent`, `created_at`, `last_seen_at`, `current`); `DELETE
+/auth/sessions/{id}` logs one out.
+
+**Cross-origin writes.** A state-changing request (`POST`, `DELETE`, ...) to an
+admin or `/auth` route that carries an `Origin` header must come from the app's
+own origin (`Host`, or the `X-Forwarded-Host` set by a reverse proxy) or from
+`cors_origins`; anything else is `403`. `SameSite` alone would still let another
+app on the same host and a different port send the cookie.
+
+**Lost password.** Run `python -m app.cli reset-admin` inside the container
+(see docs/DEPLOYMENT.md): it forgets the password and every session, and the next
+visit to Settings asks for a new one.
+
+`ADMIN_ENABLED=false` (structural, see docs/DEPLOYMENT.md) still turns the whole
+admin surface off: every admin route and `/auth/setup` / `/auth/login` answer
+`403`.
 
 ## Webhook tokens
 
@@ -563,29 +641,30 @@ memory. Full detail: [ALGORITHMS.md](ALGORITHMS.md#stacking).
    `202 { frame_index, received_frames, frame_count, status }`. `status` becomes
    `"ready"` once every frame is in.
 3. `POST /stack/{stack_id}/upload-frames` (multipart: `start_index`, `files` =
-   many files) -> `202 { stack_id, status, frame_count, received_frames }`. The
-   frontend sends frames in batches of a few dozen so a thousand-frame session is
-   tens of requests, not a thousand.
+   up to 20 files) -> `202 { stack_id, status, frame_count, received_frames }`.
+   The frontend sends batches of 20, so a thousand-frame session is tens of
+   requests, not a thousand. The frames are decoded and written a few at a time.
 4. `POST /stack/{stack_id}/upload-archive` (multipart: `file` = a `.zip`) ->
    the same response. Image members are ingested in filename order and assigned
-   indices from `received_frames` upward, up to `frame_count`.
+   indices from `received_frames` upward, up to `frame_count`. The archive is read
+   member by member from disk; a member whose declared size is over
+   `max_image_size_mb` is a `413` without being unpacked.
 5. `POST /stack/{stack_id}/frame/{index}/exclude` `{ excluded: bool }` ->
    `200 { index, thumb_url, excluded, quality }`. Toggles a frame in or out of
    the stack. `excluded: false` also **rescues** the frame from the quality
    auto-reject on the next run; `excluded: true` drops that protection.
 6. `GET /stack/{stack_id}/frame/{index}/thumb` -> a ~256 px auto-stretched JPEG
    for the frame grid. Not rate-limited.
-7. `POST /stack/{stack_id}/calibration/{kind}/frames` (multipart: `files` = many
-   files), `kind` = `dark` / `flat` / `bias` / `dark_flat` -> `202
+7. `POST /stack/{stack_id}/calibration/{kind}/frames` (multipart: `files` = up
+   to 20 files; the frontend batches a larger set), `kind` = `dark` / `flat` / `bias` / `dark_flat` -> `202
    { frames: { dark, flat, bias, dark_flat }, cosmetic_correction }`. Appends
    calibration subs; masters (per-pixel median) are built and cached at `process`,
    and rebuilt when more subs arrive.
 8. `DELETE /stack/{stack_id}/calibration/{kind}` -> the same body. Drops every
    sub of that kind and any master derived from it.
-9. `POST /stack/{stack_id}/process` -> `200`. In `PROCESSING_MODE=sync` the
-   pipeline runs in the request and the response is already `completed`; in
-   `queue` it returns `processing` with a `job_id` / `ws_status_url` and the
-   worker runs it (follow `/ws/stack-status/{job_id}`). An optional body
+9. `POST /stack/{stack_id}/process` -> `200` with status `processing`, a
+   `job_id` and a `ws_status_url`; the stack runs in the background (follow
+   `/ws/stack-status/{job_id}`). An optional body
    `{ registration_transform?, combination_method?, rejection_algo?, weighting?,
    cosmetic_correction?, quality_filter?, post_process?, drizzle_factor? }`
    re-stacks with a changed setting - no re-upload, each run makes a fresh

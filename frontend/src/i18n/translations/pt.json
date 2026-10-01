@@ -413,6 +413,10 @@
       "operations": {
         "label": "Operações",
         "blurb": "Trabalhos de processamento recentes e utilização de disco."
+      },
+      "security": {
+        "label": "Segurança",
+        "blurb": "Senha de administrador e navegadores conectados."
       }
     },
     "groups": {
@@ -568,6 +572,52 @@
         "previous_page": "Anterior",
         "next_page": "Seguinte",
         "page_info": "{from}-{to} de {total}"
+      }
+    },
+    "auth": {
+      "admin_disabled": "A API de administração está desativada nesta instância (ADMIN_ENABLED=false).",
+      "logout": "Sair",
+      "password": "Senha de administrador",
+      "current_password": "Senha atual",
+      "new_password": "Nova senha",
+      "confirm_password": "Confirmar a senha",
+      "setup": {
+        "title": "Criar a senha de administrador",
+        "blurb": "As configurações são reservadas ao administrador. Escolha uma senha com pelo menos {min} caracteres: ela será pedida para abrir esta página. Usar a aplicação em si nunca precisa dela.",
+        "submit": "Criar e entrar"
+      },
+      "login": {
+        "title": "Acesso de administrador",
+        "blurb": "As configurações são reservadas ao administrador. Introduza a senha de administrador para continuar.",
+        "submit": "Entrar"
+      },
+      "errors": {
+        "invalid_password": "Senha incorreta.",
+        "locked_out": "Demasiadas tentativas falhadas. Aguarde um momento e tente novamente.",
+        "already_configured": "Já existe uma senha de administrador. Recarregue a página para entrar.",
+        "generic": "Algo correu mal. Tente novamente.",
+        "too_short": "A senha precisa de pelo menos {min} caracteres.",
+        "mismatch": "As duas senhas não coincidem."
+      }
+    },
+    "security": {
+      "session_idle": {
+        "label": "Manter sessão (dias)",
+        "hint": "Um acesso de administrador sem uso durante este tempo termina. Nunca mais de 30 dias."
+      },
+      "change_password": {
+        "title": "Alterar a senha de administrador",
+        "blurb": "Todos os outros navegadores conectados como administrador são desconectados.",
+        "submit": "Alterar senha",
+        "done": "Senha alterada."
+      },
+      "sessions": {
+        "title": "Navegadores conectados",
+        "blurb": "Navegadores atualmente conectados como administrador.",
+        "this_browser": "este navegador",
+        "unknown_browser": "Navegador desconhecido",
+        "details": "{ip} - última atividade {last_seen}",
+        "revoke": "Desconectar"
       }
     }
   },

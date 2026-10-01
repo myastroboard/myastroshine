@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import { useEffect, useState, type MouseEvent } from 'react';
 
 import { useTranslation } from '@/hooks/useTranslation';
 
@@ -31,7 +31,6 @@ export function DepthShiftViewer({
   onClose,
 }: DepthShiftViewerProps) {
   const { t } = useTranslation();
-  const containerRef = useRef<HTMLDivElement>(null);
   const [offsets, setOffsets] = useState<Offset[]>(depthLayerUrls.map(() => ({ x: 0, y: 0 })));
 
   useEffect(() => {
@@ -41,10 +40,7 @@ export function DepthShiftViewer({
   }, [onClose]);
 
   function handleMouseMove(event: MouseEvent<HTMLDivElement>): void {
-    if (!containerRef.current) {
-      return;
-    }
-    const rect = containerRef.current.getBoundingClientRect();
+    const rect = event.currentTarget.getBoundingClientRect();
     const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     const y = ((event.clientY - rect.top) / rect.height) * 2 - 1;
     const maxShiftPx = (50 * intensity) / 100;
@@ -69,7 +65,6 @@ export function DepthShiftViewer({
       onClick={(event) => event.target === event.currentTarget && onClose()}
     >
       <div
-        ref={containerRef}
         className="relative max-h-[85vh] w-full max-w-5xl overflow-hidden rounded-xl border border-line bg-black shadow-pop"
         style={{
           aspectRatio: aspectRatio && aspectRatio > 0 ? aspectRatio : 16 / 9,

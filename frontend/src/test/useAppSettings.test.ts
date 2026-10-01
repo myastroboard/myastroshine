@@ -12,6 +12,7 @@ vi.mock('@/services/api', () => ({
 const mocked = vi.mocked(apiClient);
 
 const SETTINGS: AppSettings = {
+  adminSessionIdleDays: 7,
   corsOrigins: ['http://localhost:3000'],
   rateLimitEnabled: true,
   rateLimitPerMinute: 10,

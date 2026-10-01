@@ -11,6 +11,15 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 
+class InstalledEngineOut(BaseModel):
+    """A package installed by uploading it from Settings."""
+
+    version: str | None = None
+    archive_name: str
+    license_accepted_at: str  #: ISO timestamp of the admin's licence acceptance
+    path: str
+
+
 class EngineStatus(BaseModel):
     """Result of probing one configured engine path."""
 
@@ -19,6 +28,28 @@ class EngineStatus(BaseModel):
     version: str | None = None  #: parsed "x.y.z" from ``--version``, when readable
     known_good: bool = False  #: version is inside the range this app was tested against
     detail: str  #: one line for the Settings panel and the logs
+    #: Set by ``GET /api/admin/engine-status`` when the package was uploaded from
+    #: Settings (``None``: nothing uploaded - a manual path, or no engine).
+    installed: InstalledEngineOut | None = None
+
+
+class StagedEngineResponse(BaseModel):
+    """Body of ``POST /api/admin/engines/{engine}/stage``: the unpacked, checked
+    package waiting for the licence to be accepted."""
+
+    staging_id: str
+    engine: str
+    archive_name: str
+    status: EngineStatus
+    license_text: str
+
+
+class InstallEngineRequest(BaseModel):
+    """Body of ``POST /api/admin/engines/{engine}/install``."""
+
+    staging_id: str
+    #: The admin read the package's LICENSE.txt and accepts it.
+    accept_license: bool = False
 
 
 class EngineStatusResponse(BaseModel):

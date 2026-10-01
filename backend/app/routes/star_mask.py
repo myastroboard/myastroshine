@@ -20,13 +20,17 @@ router = APIRouter(tags=["star-mask"])
 
 
 @router.post("/star-mask/{session_id}", response_model=StarMaskResponse)
-async def detect_stars(
+def detect_stars(
     session_id: str,
     body: StarMaskRequest,
     star_mask: StarMaskServiceDep,
     _rate_limit: RequireRateLimit,
 ) -> StarMaskResponse:
-    """Detect stars in the session's preview image for a mask overlay."""
+    """Detect stars in the session's preview image for a mask overlay.
+
+    ``def``, not ``async``: the work is CPU-bound, so FastAPI runs it in its
+    threadpool instead of stalling the event loop (WebSockets, health).
+    """
     if not is_valid_session_id(session_id):
         raise SessionNotFoundError(f"Session {session_id} not found")
     return star_mask.preview(session_id, body.sensitivity, body.max_size)

@@ -4,7 +4,7 @@ Mounted at the application root (no ``/api`` prefix) to match the frontend
 contract and the nginx ``/ws/`` proxy location.
 
 Flow: send the current job state from the DB (catch-up for late subscribers),
-then, if the job is still running, relay progress events from Redis until a
+then, if the job is still running, relay its progress events (``app.services.progress``) until a
 terminal status arrives.
 """
 
@@ -53,7 +53,7 @@ async def _stream_job(websocket: WebSocket, job_id: str) -> None:
         async for update in progress.subscribe(job_id):
             if update is None:
                 # Idle tick: reconcile against the DB in case the terminal event
-                # was published before we subscribed, or lost by Redis.
+                # was published before we subscribed.
                 event, terminal = _catch_up(job_id)
                 if event.get("status") != last_status:
                     await websocket.send_json(event)

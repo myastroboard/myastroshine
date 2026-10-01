@@ -540,7 +540,30 @@ export interface CreatedToken extends WebhookToken {
 // Mirror of backend/app/utils/app_settings.py::AppSettings. The GET returns the
 // whole object; the POST takes the whole object back.
 
+/** `GET /api/auth/status` - which admin gate the Settings page shows. */
+export interface AuthStatus {
+  /** `false`: the structural `ADMIN_ENABLED` switch turned the admin API off. */
+  adminEnabled: boolean;
+  /** `false`: no admin password yet - show the setup form. */
+  configured: boolean;
+  /** This browser holds a live admin session. */
+  authenticated: boolean;
+}
+
+/** One logged-in admin browser (`GET /api/auth/sessions`). */
+export interface AdminSession {
+  id: string;
+  clientIp: string | null;
+  userAgent: string | null;
+  createdAt: string;
+  lastSeenAt: string;
+  /** The session making the request. */
+  current: boolean;
+}
+
 export interface AppSettings {
+  /** An admin login stays valid this many days without use (max 30). */
+  adminSessionIdleDays: number;
   corsOrigins: string[];
   rateLimitEnabled: boolean;
   rateLimitPerMinute: number;
@@ -579,6 +602,28 @@ export interface EngineStatus {
   version: string | null;
   knownGood: boolean;
   detail: string;
+  /** Set when the package was uploaded from Settings (`null`: a manual path, or none). */
+  installed?: InstalledEngine | null;
+}
+
+/** An engine package installed by uploading it from Settings. */
+export interface InstalledEngine {
+  version: string | null;
+  archiveName: string;
+  licenseAcceptedAt: string;
+  path: string;
+}
+
+export type ExternalEngine = 'starnet2' | 'deepsnr';
+
+/** An uploaded engine package, unpacked and checked, waiting for its licence to
+ * be accepted (`POST /api/admin/engines/{engine}/stage`). */
+export interface StagedEngine {
+  stagingId: string;
+  engine: ExternalEngine;
+  archiveName: string;
+  status: EngineStatus;
+  licenseText: string;
 }
 
 export interface EngineStatusResponse {

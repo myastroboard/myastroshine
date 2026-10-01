@@ -38,6 +38,13 @@ export function useAppSettings() {
 
   const reset = useCallback(() => setDraft(saved), [saved]);
 
+  /** Take in settings the server changed on its own (an engine install sets its
+   * path), without discarding the user's other unsaved edits. */
+  const applyServerChange = useCallback((changes: Partial<AppSettings>) => {
+    setSaved((current) => (current ? { ...current, ...changes } : current));
+    setDraft((current) => (current ? { ...current, ...changes } : current));
+  }, []);
+
   const save = useCallback(async () => {
     if (!draft) {
       return;
@@ -57,5 +64,16 @@ export function useAppSettings() {
 
   const dirty = Boolean(draft && saved && JSON.stringify(draft) !== JSON.stringify(saved));
 
-  return { draft, patch, reset, save, refresh, dirty, isLoading, isSaving, error };
+  return {
+    draft,
+    patch,
+    reset,
+    save,
+    refresh,
+    applyServerChange,
+    dirty,
+    isLoading,
+    isSaving,
+    error,
+  };
 }

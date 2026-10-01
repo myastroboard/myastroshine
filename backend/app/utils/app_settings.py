@@ -55,6 +55,10 @@ class AppSettings(BaseModel):
     rate_limit_per_minute: int = Field(default=600, ge=1, le=6000)
     max_concurrent_jobs_per_ip: int = Field(default=5, ge=1, le=100)
 
+    #: An admin login stays valid this long without use (sliding); it never
+    #: outlives ADMIN_SESSION_MAX_DAYS (app.constants) whatever this says.
+    admin_session_idle_days: int = Field(default=7, ge=1, le=30)
+
     # Uploads and sessions
     max_image_size_mb: int = Field(default=100, ge=1, le=1024)
     session_expiry_hours: int = Field(default=24, ge=1, le=8760)
@@ -71,14 +75,14 @@ class AppSettings(BaseModel):
     stacking_enabled: bool = True
     stacking_max_frames: int = Field(default=2000, ge=2, le=5000)
     #: Threads for the per-frame register / align passes. 0 = auto (CPU count,
-    #: capped at 4); 1 = sequential. The Celery worker itself runs 1-2 stacks.
+    #: capped at 4); 1 = sequential. One stack runs at a time (app.services.job_runner).
     stacking_workers: int = Field(default=0, ge=0, le=16)
     # How long a stack's uploaded frames + working files are kept. They are much
     # heavier than a normal session (thousands of full-res frames) and are only
     # needed to review and re-stack; the composite a run produces is a normal
     # session and lives session_expiry_hours. Default 12 h.
     stacking_retention_hours: int = Field(default=12, ge=1, le=168)
-    #: Watch-folder ingest: a directory the worker polls (empty = off). New image
+    #: Watch-folder ingest: a directory polled every minute (empty = off). New image
     #: files are ingested into a rolling "watch" stack; once the folder is quiet
     #: for stacking_watch_idle_minutes the stack is processed (if auto-process is
     #: on) and the next file starts a fresh one.
@@ -90,8 +94,7 @@ class AppSettings(BaseModel):
     # as a subprocess (docs/DEPLOYMENT.md "External ML engines"). Nothing is bundled:
     # the operator downloads the binary from starnetastro.com, mounts it into the
     # container, and points these at it. Empty (the default) = that engine is off and
-    # the classical path is the only star-removal / denoise engine. Both the API and
-    # the worker need the binary reachable at the same path.
+    # the classical path is the only star-removal / denoise engine.
     starnet2_path: str = ""
     deepsnr_path: str = ""
     #: -s/--stride for each tool; both require an even value in 2-512. 0 (the

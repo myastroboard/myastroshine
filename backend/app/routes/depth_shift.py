@@ -28,12 +28,16 @@ def _require_session(session_id: str) -> None:
 
 
 @router.post("/{session_id}", response_model=DepthShiftResponse)
-async def generate_depth_shift(
+def generate_depth_shift(
     session_id: str,
     request: DepthShiftRequest,
     depth_shift: DepthShiftServiceDep,
 ) -> DepthShiftResponse:
-    """Generate the depth map and parallax layers for a session."""
+    """Generate the depth map and parallax layers for a session.
+
+    ``def``, not ``async``: the work is CPU-bound, so FastAPI runs it in its
+    threadpool instead of stalling the event loop (WebSockets, health).
+    """
     _require_session(session_id)
     return depth_shift.generate(session_id, request.num_layers, request.focus_point)
 

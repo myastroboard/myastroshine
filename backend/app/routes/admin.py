@@ -10,7 +10,7 @@ Logs (see app/logging_config.py):
     GET  /api/admin/logs/level       - the two sink levels
     POST /api/admin/logs/level       - change them at runtime (persisted)
     POST /api/admin/logs/clear       - empty myastroshine.log
-    GET  /api/admin/logs/export      - ZIP: myastroshine.log + rotations + worker.log
+    GET  /api/admin/logs/export      - ZIP: myastroshine.log + rotations
 
 Operations:
     GET  /api/admin/jobs             - recent processing jobs, newest first
@@ -49,7 +49,9 @@ from app.models import (
     ConfigImportRequest,
     ConfigImportResponse,
     DiskUsageResponse,
+    EngineStatus,
     EngineStatusResponse,
+    InstalledEngineOut,
     JobListResponse,
     JobSummary,
     LogLevels,
@@ -57,6 +59,7 @@ from app.models import (
     LogTailResponse,
 )
 from app.models.config_export import CONFIG_EXPORT_FORMAT_VERSION
+from app.services.engine_install import EngineInstallService
 from app.services.engine_probe import get_engine_statuses
 from app.utils import disk_usage
 from app.utils.app_settings import get_app_settings, save_app_settings
@@ -100,7 +103,17 @@ async def read_engine_status(
     Memoised until the next settings change; a no-op for an engine with no path.
     """
     statuses = get_engine_statuses()
-    return EngineStatusResponse(starnet2=statuses["starnet2"], deepsnr=statuses["deepsnr"])
+    service = EngineInstallService()
+
+    def with_install(engine: str) -> EngineStatus:
+        installed = service.installed(engine)
+        if installed is None:
+            return statuses[engine]
+        return statuses[engine].model_copy(
+            update={"installed": InstalledEngineOut.model_validate(installed, from_attributes=True)}
+        )
+
+    return EngineStatusResponse(starnet2=with_install("starnet2"), deepsnr=with_install("deepsnr"))
 
 
 # --- logs ----------------------------------------------------------------
@@ -165,15 +178,13 @@ async def clear_logs(_admin: RequireAdmin, _rate_limit: RequireRateLimit) -> Non
 
 @router.get("/logs/export")
 async def export_logs(_admin: RequireAdmin, _rate_limit: RequireRateLimit) -> Response:
-    """Bundle the main and worker logs (with rotations) into a ZIP."""
-    settings = get_settings()
+    """Bundle the log file and its rotations into a ZIP."""
+    base = get_settings().log_file
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
-        for base in (settings.log_file, settings.worker_log_file):
-            rotations = sorted(base.parent.glob(f"{base.name}.*"))
-            for candidate in (base, *rotations):
-                if candidate.exists():
-                    archive.write(candidate, candidate.name)
+        for candidate in (base, *sorted(base.parent.glob(f"{base.name}.*"))):
+            if candidate.exists():
+                archive.write(candidate, candidate.name)
     stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     return Response(
         content=buffer.getvalue(),

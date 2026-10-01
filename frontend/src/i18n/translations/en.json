@@ -413,6 +413,10 @@
       "operations": {
         "label": "Operations",
         "blurb": "Recent processing jobs and disk usage."
+      },
+      "security": {
+        "label": "Security",
+        "blurb": "Admin password and logged-in browsers."
       }
     },
     "groups": {
@@ -568,6 +572,52 @@
         "previous_page": "Previous",
         "next_page": "Next",
         "page_info": "{from}-{to} of {total}"
+      }
+    },
+    "auth": {
+      "admin_disabled": "The administration API is turned off on this instance (ADMIN_ENABLED=false).",
+      "logout": "Log out",
+      "password": "Admin password",
+      "current_password": "Current password",
+      "new_password": "New password",
+      "confirm_password": "Confirm the password",
+      "setup": {
+        "title": "Create the admin password",
+        "blurb": "Settings are reserved for the administrator. Choose a password of at least {min} characters: it will be asked to open this page. Using the app itself never needs it.",
+        "submit": "Create and log in"
+      },
+      "login": {
+        "title": "Administrator login",
+        "blurb": "Settings are reserved for the administrator. Enter the admin password to continue.",
+        "submit": "Log in"
+      },
+      "errors": {
+        "invalid_password": "Wrong password.",
+        "locked_out": "Too many failed attempts. Wait a moment and try again.",
+        "already_configured": "An admin password already exists. Reload the page to log in.",
+        "generic": "Something went wrong. Try again.",
+        "too_short": "The password needs at least {min} characters.",
+        "mismatch": "The two passwords do not match."
+      }
+    },
+    "security": {
+      "session_idle": {
+        "label": "Stay logged in (days)",
+        "hint": "An admin login unused for this long ends. Never more than 30 days."
+      },
+      "change_password": {
+        "title": "Change the admin password",
+        "blurb": "Every other browser logged in as admin is logged out.",
+        "submit": "Change password",
+        "done": "Password changed."
+      },
+      "sessions": {
+        "title": "Logged-in browsers",
+        "blurb": "Browsers currently logged in as admin.",
+        "this_browser": "this browser",
+        "unknown_browser": "Unknown browser",
+        "details": "{ip} - last active {last_seen}",
+        "revoke": "Log out"
       }
     }
   },

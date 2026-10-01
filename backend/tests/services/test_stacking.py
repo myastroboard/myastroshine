@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
 import cv2
@@ -31,6 +32,12 @@ def _frame(array: np.ndarray) -> LinearFrame:
     return LinearFrame(
         data=(array.astype(np.float32) / 255.0), already_stretched=True, source_bit_depth=8
     )
+
+
+def _png_source(array: np.ndarray, name: str = "f.png") -> tuple[Callable[[], bytes], str]:
+    """A frame source (reader + file name) over an encoded PNG, as an upload gives."""
+    data = cv2.imencode(".png", array)[1].tobytes()
+    return (lambda: data), name
 
 
 def _shifted_frames(star_field: np.ndarray, n: int) -> list[LinearFrame]:
@@ -87,9 +94,8 @@ def test_add_frames_batch_rejects_once_the_stack_is_no_longer_accepting_frames(
     stacking.add_frame(record.stack_id, 1, _frame(star_field))
     stacking.process(record.stack_id)
 
-    prepared = [stacking.prepare_frame(cv2.imencode(".png", star_field)[1].tobytes(), "f.png")]
     with pytest.raises(InvalidParameterError, match="not accepting"):
-        stacking.add_frames(record.stack_id, 2, prepared)
+        stacking.add_frames(record.stack_id, 2, [_png_source(star_field)])
 
 
 def test_add_frames_batch_rejects_an_index_past_the_instance_cap(
@@ -99,9 +105,8 @@ def test_add_frames_batch_rejects_an_index_past_the_instance_cap(
 
     app_settings.save_app_settings({"stacking_max_frames": 3})
     record = stacking.initiate(InitiateStackRequest(frame_count=2))
-    prepared = [stacking.prepare_frame(cv2.imencode(".png", star_field)[1].tobytes(), "f.png")]
     with pytest.raises(InvalidParameterError, match="frame_index"):
-        stacking.add_frames(record.stack_id, 5, prepared)
+        stacking.add_frames(record.stack_id, 5, [_png_source(star_field)])
 
 
 def test_add_frames_batch_does_not_double_count_an_existing_index(
@@ -111,9 +116,91 @@ def test_add_frames_batch_does_not_double_count_an_existing_index(
     record = stacking.add_frame(record.stack_id, 0, _frame(star_field))
     assert record.received_frames == 1
 
-    prepared = [stacking.prepare_frame(cv2.imencode(".png", star_field)[1].tobytes(), "f.png")]
-    record = stacking.add_frames(record.stack_id, 0, prepared)  # index 0 again, in a batch
+    record, added = stacking.add_frames(record.stack_id, 0, [_png_source(star_field)])  # again
     assert record.received_frames == 1
+    assert added == 1
+
+
+def test_add_frames_ingests_a_batch_across_workers_in_index_order(
+    stacking: StackingService, star_field: np.ndarray
+) -> None:
+    """Each frame lands at its own index, whatever order the workers finish in,
+    and the batch is committed once."""
+    record = stacking.initiate(InitiateStackRequest(frame_count=5))
+    sources = [_png_source(translate(star_field, i, 0), f"f{i}.png") for i in range(5)]
+
+    record, added = stacking.add_frames(record.stack_id, 0, sources)
+
+    assert added == 5
+    assert (record.received_frames, record.frame_count, record.status) == (5, 5, "ready")
+    assert stacking.storage.stack_frame_indices(record.stack_id) == [0, 1, 2, 3, 4]
+
+
+def test_add_frames_reads_each_source_only_when_its_turn_comes(
+    stacking: StackingService, star_field: np.ndarray, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With one worker, a source is read only after the previous frame was written -
+    a batch is never held in memory at once."""
+    from app.services import stacking as stacking_module
+
+    monkeypatch.setattr(stacking_module, "UPLOAD_INGEST_WORKERS", 1)
+    record = stacking.initiate(InitiateStackRequest(frame_count=3))
+    events: list[str] = []
+    data = cv2.imencode(".png", star_field)[1].tobytes()
+
+    def source(i: int) -> tuple[Callable[[], bytes], str]:
+        def read() -> bytes:
+            events.append(f"read {i}")
+            return data
+
+        return read, f"f{i}.png"
+
+    original_write = stacking.storage.write_linear_frame
+
+    def write(stack_id: str, index: int, prepared: object) -> None:
+        events.append(f"write {index}")
+        original_write(stack_id, index, prepared)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(stacking.storage, "write_linear_frame", write)
+
+    stacking.add_frames(record.stack_id, 0, [source(i) for i in range(3)])
+
+    assert events == ["read 0", "write 0", "read 1", "write 1", "read 2", "write 2"]
+
+
+def test_add_frames_fails_the_batch_on_an_unreadable_frame(
+    stacking: StackingService, star_field: np.ndarray
+) -> None:
+    record = stacking.initiate(InitiateStackRequest(frame_count=2))
+
+    with pytest.raises(Exception):  # noqa: B017 - whatever the decoder raises for junk
+        stacking.add_frames(
+            record.stack_id, 0, [_png_source(star_field), ((lambda: b"junk"), "bad.png")]
+        )
+
+
+def test_add_frames_can_skip_unreadable_frames_on_consecutive_indices(
+    stacking: StackingService, star_field: np.ndarray
+) -> None:
+    """The folder watch mode: a broken file is skipped and leaves no gap."""
+    record = stacking.initiate(InitiateStackRequest(frame_count=2))
+    sources = [_png_source(star_field, "a.png"), ((lambda: b"junk"), "bad.png")]
+    sources.append(_png_source(translate(star_field, 2, 2), "b.png"))
+
+    record, added = stacking.add_frames(record.stack_id, 0, sources, skip_unreadable=True)
+
+    assert added == 2
+    assert stacking.storage.stack_frame_indices(record.stack_id) == [0, 1]
+    assert record.received_frames == 2
+
+
+def test_add_frames_with_an_empty_batch_changes_nothing(stacking: StackingService) -> None:
+    record = stacking.initiate(InitiateStackRequest(frame_count=2))
+
+    record, added = stacking.add_frames(record.stack_id, 0, [])
+
+    assert added == 0
+    assert record.received_frames == 0
 
 
 def test_uploading_a_frame_writes_the_npy_plus_a_thumbnail(
@@ -414,8 +501,8 @@ def test_process_calibrates_when_darks_and_flats_are_present(
 
     dark = np.full_like(star_field, 6)
     flat = np.full_like(star_field, 180)
-    stacking.add_calibration_frames(record.stack_id, "dark", [_frame(dark) for _ in range(3)])
-    stacking.add_calibration_frames(record.stack_id, "flat", [_frame(flat) for _ in range(3)])
+    stacking.add_calibration_frames(record.stack_id, "dark", [_png_source(dark)] * 3)
+    stacking.add_calibration_frames(record.stack_id, "flat", [_png_source(flat)] * 3)
 
     done = stacking.process(record.stack_id)
 
@@ -452,7 +539,7 @@ def test_add_calibration_frames_rejects_more_than_the_instance_cap(
     monkeypatch.setattr(stacking.storage, "cal_frame_indices", lambda *_a, **_k: list(range(256)))
 
     with pytest.raises(InvalidParameterError, match="Too many"):
-        stacking.add_calibration_frames(record.stack_id, "dark", [_frame(star_field)])
+        stacking.add_calibration_frames(record.stack_id, "dark", [_png_source(star_field)])
 
 
 def test_clear_calibration_rejects_an_unknown_kind(stacking: StackingService) -> None:
@@ -466,7 +553,7 @@ def test_clear_calibration_drops_the_subs_and_master(
 ) -> None:
     record = stacking.initiate(InitiateStackRequest(frame_count=2))
     stacking.add_calibration_frames(
-        record.stack_id, "bias", [_frame(np.full_like(star_field, 3)) for _ in range(2)]
+        record.stack_id, "bias", [_png_source(np.full_like(star_field, 3))] * 2
     )
     assert stacking.storage.cal_frame_counts(record.stack_id)["bias"] == 2
 
@@ -474,10 +561,10 @@ def test_clear_calibration_drops_the_subs_and_master(
     assert stacking.storage.cal_frame_counts(record.stack_id)["bias"] == 0
 
 
-def test_dispatch_drives_the_job_to_a_terminal_state_in_sync_mode(
-    stacking: StackingService, star_field: np.ndarray
+def test_dispatch_drives_the_job_to_a_terminal_state(
+    stacking: StackingService, star_field: np.ndarray, job_db
 ) -> None:
-    """A sync-mode stack must mark its JobRecord completed, or it counts against
+    """A stack job must end with its JobRecord completed, or it counts against
     the per-IP concurrency limit forever."""
     jobs = JobService(stacking.db)
     record = stacking.initiate(InitiateStackRequest(frame_count=3))
@@ -486,12 +573,13 @@ def test_dispatch_drives_the_job_to_a_terminal_state_in_sync_mode(
 
     _done, job_id = stacking.dispatch(record.stack_id, jobs, client_ip="1.2.3.4")
 
+    stacking.db.expire_all()  # the job committed through its own session
     assert jobs.get(job_id).status == "completed"
     assert jobs.count_active_for_ip("1.2.3.4") == 0
 
 
 def test_dispatch_with_an_all_default_overrides_body_skips_the_extra_commit(
-    stacking: StackingService, star_field: np.ndarray
+    stacking: StackingService, star_field: np.ndarray, job_db
 ) -> None:
     """overrides is not None, but every field is unset - nothing to change."""
     jobs = JobService(stacking.db)
@@ -501,36 +589,30 @@ def test_dispatch_with_an_all_default_overrides_body_skips_the_extra_commit(
 
     _done, job_id = stacking.dispatch(record.stack_id, jobs, overrides=ProcessStackRequest())
 
+    stacking.db.expire_all()
     assert jobs.get(job_id).status == "completed"
 
 
 def test_dispatch_marks_the_job_failed_when_processing_raises(
-    stacking: StackingService, star_field: np.ndarray, monkeypatch: pytest.MonkeyPatch
+    stacking: StackingService, star_field: np.ndarray, monkeypatch: pytest.MonkeyPatch, job_db
 ) -> None:
+    """The failure happens after dispatch answered: it must land on the job row."""
     jobs = JobService(stacking.db)
     record = stacking.initiate(InitiateStackRequest(frame_count=3))
     for i, frame in enumerate(_shifted_frames(star_field, 3)):
         stacking.add_frame(record.stack_id, i, frame)
 
-    created: dict[str, str] = {}
-    original_create = jobs.create
+    def _explode(*_a: object, **_k: object) -> None:
+        raise RuntimeError("integration exploded")
 
-    def spy_create(*args: object, **kwargs: object):  # type: ignore[no-untyped-def]
-        job = original_create(*args, **kwargs)
-        created["id"] = job.job_id
-        return job
+    monkeypatch.setattr(StackingService, "process", _explode)
 
-    monkeypatch.setattr(jobs, "create", spy_create)
-    monkeypatch.setattr(
-        stacking,
-        "process",
-        lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("integration exploded")),
-    )
+    _record, job_id = stacking.dispatch(record.stack_id, jobs)
 
-    with pytest.raises(RuntimeError, match="integration exploded"):
-        stacking.dispatch(record.stack_id, jobs)
-
-    assert jobs.get(created["id"]).status == "failed"
+    stacking.db.expire_all()
+    failed = jobs.get(job_id)
+    assert failed.status == "failed"
+    assert failed.error == "integration exploded"
 
 
 def _fake_integration_result(reference_noise: float, composite: np.ndarray) -> IntegrationResult:
@@ -584,3 +666,21 @@ def test_process_skips_noise_measurement_when_the_composite_is_perfectly_flat(
     done = stacking.process(record.stack_id)
 
     assert done.result["measured_noise_reduction"] is None
+
+
+def test_process_stops_at_its_next_step_when_the_server_shuts_down(
+    stacking: StackingService, star_field: np.ndarray
+) -> None:
+    """A shutdown mid-stack stops the integration and leaves the stack failed."""
+    from app.services import job_runner
+    from app.services.job_runner import JobInterruptedError
+
+    record = stacking.initiate(InitiateStackRequest(frame_count=3))
+    for i, frame in enumerate(_shifted_frames(star_field, 3)):
+        stacking.add_frame(record.stack_id, i, frame)
+    job_runner.get_job_runner().stopping.set()
+
+    with pytest.raises(JobInterruptedError):
+        stacking.process(record.stack_id, "job-interrupted")
+
+    assert stacking.get_result(record.stack_id).status == "failed"

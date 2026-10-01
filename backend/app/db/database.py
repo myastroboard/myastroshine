@@ -22,10 +22,10 @@ logger = get_logger(__name__)
 _settings = get_settings()
 _database_url = _settings.resolved_database_url
 # ``timeout`` lets a caller wait out a brief write lock (a stack upload commits
-# per frame; the beat runs cleanup writes) instead of erroring immediately. WAL
-# would remove reader/writer contention entirely but its shared-memory file does
-# not work over a Docker Desktop bind mount, so processing runs on the Celery
-# worker instead (PROCESSING_MODE=queue) to keep the API off the hot path.
+# per frame; background jobs write their progress; the scheduler runs cleanup
+# writes) instead of erroring immediately. WAL would remove reader/writer
+# contention entirely but its shared-memory file does not work over a Docker
+# Desktop bind mount.
 _connect_args = (
     {"check_same_thread": False, "timeout": 15} if _database_url.startswith("sqlite") else {}
 )
@@ -49,7 +49,7 @@ def _alembic_config() -> Config:
 def init_db() -> None:
     """Bring the database schema to Alembic ``head``.
 
-    Called on API startup and on Celery worker init. A brand-new database is
+    Called on API startup (and by the ``app.cli`` commands). A brand-new database is
     built entirely from the migrations; a legacy database from an earlier
     ``create_all`` (no ``alembic_version`` table) is filled in and stamped at
     ``head`` - one that predates a *column* change still needs a manual

@@ -175,4 +175,29 @@ describe('DepthShiftViewer', () => {
     const stage = container.querySelector('.overflow-hidden') as HTMLElement;
     expect(stage.style.aspectRatio).toBe(`${16 / 9} / 1`);
   });
+
+  it('keeps layers added after mount at rest until the pointer moves again', () => {
+    mockContainerRect();
+    const { container, rerender } = render(
+      <DepthShiftViewer
+        depthLayerUrls={layers}
+        intensity={100}
+        onIntensityChange={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    rerender(
+      <DepthShiftViewer
+        depthLayerUrls={[...layers, '/layer_extra.png']}
+        intensity={100}
+        onIntensityChange={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    const images = container.querySelectorAll('img');
+    expect((images[images.length - 1] as HTMLImageElement).style.transform).toBe('translate(0px, 0px)');
+  });
 });
+

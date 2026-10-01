@@ -6,8 +6,8 @@ code holds to.
 
 ## Contents
 
-- [One image, three services](#one-image-three-services)
-- [Processing modes](#processing-modes)
+- [One image, one service](#one-image-one-service)
+- [Background jobs](#background-jobs)
 - [The FastAPI application](#the-fastapi-application)
 - [Backend layers](#backend-layers)
 - [Request path: a single-image edit](#request-path-a-single-image-edit)
@@ -19,36 +19,48 @@ code holds to.
 - [Frontend](#frontend)
 - [AstroDex integration](#astrodex-integration)
 
-## One image, three services
+## One image, one service
 
 Everything ships in **one Docker image**, built from the single root
 `Dockerfile` (multi-stage: a Node stage builds the React app to `dist/`, a Python
 stage runs FastAPI and, in the default final stage, also serves that built SPA).
-`docker-compose.yml` runs three services from it:
+`docker-compose.yml` runs **one** service from it:
 
 | Service | Role | Port |
 |---------|------|------|
-| `api` | FastAPI under uvicorn - the REST API, the progress WebSockets, and the static web UI, all on one port | 8002 |
-| `worker` | Celery worker with an embedded beat scheduler (`-B`) - runs queued processing jobs and the hourly cleanup. Built with `target: backend`, so it skips the frontend build | - |
-| `redis` | Celery broker **and** the progress pub/sub channel | 6379 |
+| `api` | FastAPI under uvicorn - the REST API, the progress WebSockets, the static web UI, the background processing jobs and the periodic maintenance, all in one process | 8002 |
 
-`api` and `worker` run the *same* service code (`app/services/*`); the only
-difference is who calls it - the HTTP request thread, or the Celery task. Both
-mount the same data volume and the same optional `./engines` directory.
+There is no worker process, no queue broker and no Redis: one container is the
+whole application, which is also what a Home Assistant app or a NAS package
+runs.
 
-## Processing modes
+## Background jobs
 
-`PROCESSING_MODE` decides where the pixel work happens:
+Image and stack processing never run inside the HTTP request. `/process` and
+`/stack/{id}/process` record a `JobRecord`, hand the work to
+`app/services/job_runner.py` and answer at once with the `queued` job; the
+client follows it on the progress WebSocket.
 
-- **`sync`** (the default, and what local `uvicorn` and the tests use) - the
-  pipeline runs inside the HTTP request. No worker or Redis needed. The job row
-  is already `completed` when `/process` returns.
-- **`queue`** (what `docker-compose.yml` sets) - `/process` and
-  `/stack/{id}/process` enqueue a Celery task and return immediately with a
-  `queued` job; the `worker` runs it and streams progress through Redis.
+- **Two thread pools**, so a long stack never blocks the editor: `edit`
+  (single-image enhancement, `EDIT_JOB_WORKERS` = 2 threads) and `stack`
+  (`STACK_JOB_WORKERS` = 1). Threads, not processes: the heavy lifting is NumPy /
+  OpenCV, which release the GIL.
+- **Superseding**: a new edit for a session retires the session's pending jobs;
+  a job that finds itself superseded stops at its next step.
+- **Shutdown** is cooperative: the runner raises a stop flag that the pipelines
+  check between steps (`raise_if_stopping()`), drops the jobs still waiting,
+  and gives the running ones `JOB_SHUTDOWN_GRACE_SECONDS` (5 s) to stop. A job
+  stopped this way ends `failed` ("interrupted by a server shutdown"); an
+  external engine it was running is killed, not orphaned.
+- **Startup** fails every job a previous process left `queued` / `processing`
+  ("interrupted by a restart"), so the UI and the per-IP concurrency limit stop
+  waiting for them.
+- Under `APP_ENV=test` jobs run inline in the submitting thread, so a route test
+  sees the finished job.
 
-The rest of the app is identical in both modes - the same `JobRecord` lifecycle,
-the same WebSocket contract, the same results on disk.
+The other CPU-bound routes (star mask, Auto Astro, depth shift, upload decode)
+run in FastAPI's threadpool, so the event loop - and with it the WebSockets and
+the health check - never stalls behind pixel work.
 
 ## The FastAPI application
 
@@ -79,7 +91,6 @@ services/    business logic, one responsibility per file (enhancement, stacking,
 models/      Pydantic request/response models (the API contract)
 db/          SQLAlchemy ORM models + session/engine management
 utils/       shared helpers - image IO, linear ingest, math, validators, rate limiting
-tasks/       Celery app + the task functions (thin wrappers over services/)
 ```
 
 The one hard rule: **`routes/` may import `services/`; `services/` must never
@@ -98,8 +109,8 @@ POST /api/process/{session}          (also: preset apply, Auto Astro)
        - retires ("superseded") any still-pending job for this session
        - checks the per-IP concurrency limit
        - creates a JobRecord
-       - sync: runs inline  |  queue: task_process_image.delay(...)
-  -> EnhancementService.run()
+       - submits the job to the edit pool and answers "queued"
+  -> EnhancementService.run()             (background thread)
        - ImageProcessingService.apply_parameters() walks the pipeline
          (geometry -> sky/optics -> tone -> curves -> colour -> detail -> stars),
          calling on_step(name, percent) at each stage
@@ -119,12 +130,15 @@ the 512 px preview; the full-resolution render is produced on demand for
 
 ```
 POST /api/stack/initiate               -> a StackRecord, status "waiting_for_frames"
-POST /api/stack/{id}/upload-frames     -> linear_ingest.ingest_frame() per file:
+POST /api/stack/{id}/upload-frames     -> up to 20 files, read from their spooled
+                                          temp files a few at a time (never whole),
+                                          linear_ingest.ingest_frame() per file:
                                           float32 [0,1], linear, CFA mosaic kept intact;
                                           stored at source bit depth under stacks/{id}/frames/
 POST /api/stack/{id}/calibration/...   -> dark/flat/bias/dark_flat subs (optional)
-POST /api/stack/{id}/process           -> StackingService.dispatch() -> a JobRecord
-  -> StackingService.process()
+POST /api/stack/{id}/process           -> StackingService.dispatch() -> a JobRecord,
+                                          submitted to the stack pool, answers at once
+  -> StackingService.process()           (background thread)
        - CalibrationService builds (or loads cached) master frames
        - IntegrationService.integrate() runs three memory-bounded passes on a
          thread pool (stacking_workers):
@@ -149,25 +163,22 @@ resumes from the aligned frames (within ~30 min). Full detail:
 
 ## Progress over WebSockets
 
-`app/services/progress.py` is the seam:
-
-- **queue mode** - `run()` publishes each progress event to a Redis channel keyed
-  by `job_id`; the WebSocket handler subscribes and relays until a terminal
-  status, having first sent the current `JobRecord` from the DB as catch-up for a
-  late subscriber.
-- **sync mode** - the job is already terminal by the time the client can connect,
-  so the handler just replays that final state and closes.
-
-Either way the client sees the same message shape (see
-[API.md](API.md#websocket-messages)).
+`app/services/progress.py` is an in-process pub/sub: the job thread
+`publish`es each progress event, and every WebSocket following that job gets it
+through its own `asyncio.Queue` (fed with `loop.call_soon_threadsafe`, so any
+thread may publish). The handler first sends the current `JobRecord` from the DB
+as catch-up for a late subscriber, then relays events until a terminal status;
+every 3 s without an event it re-reads the DB, so an event published before the
+socket subscribed can never leave a client hanging. Message shape:
+[API.md](API.md#websocket-messages).
 
 ## Database
 
-SQLAlchemy ORM over **SQLite by default** (`DATA_DIR/db/myastroshine.db`, shared
-between `api` and `worker` over the volume - fine for one worker and short
-writes). Set `DATABASE_URL` to a Postgres URL before scaling the worker out.
+SQLAlchemy ORM over **SQLite by default** (`DATA_DIR/db/myastroshine.db`). The
+request handlers, the job threads and the scheduler each use their own session;
+writes are short. `DATABASE_URL` overrides it with another database URL.
 
-Six tables (`app/db/models.py`):
+Eight tables (`app/db/models.py`):
 
 | Table | Holds |
 |-------|-------|
@@ -177,6 +188,8 @@ Six tables (`app/db/models.py`):
 | `stacks` | a stacking session: frame count, settings, per-frame quality report, result stats |
 | `astrodex_links` | ties a session to the AstroDex picture it was handed off from + the return-delivery status |
 | `webhook_tokens` | webhook token (hash only) + its signing secret, for the AstroDex handoff |
+| `admin_credentials` | the admin password (salted scrypt hash, single row) + its version |
+| `admin_sessions` | logged-in admin browsers: session token hash, IP, user agent, expiry |
 
 **Migrations** live in `backend/migrations/` (Alembic). Apply them with
 `alembic upgrade head` before starting a production instance. For local dev and
@@ -206,9 +219,7 @@ Everything hangs off `DATA_DIR` (`/data` in the container):
   cache/                      server-side caches
   secret_key.txt              generated once (0600) - session signing + HMAC fallback
   app_settings.json           runtime settings edited in the UI
-  myastroshine.log            rotating API log (10 MB x 5)
-  worker.log                  rotating worker log
-  celerybeat-schedule         beat's persisted schedule state
+  myastroshine.log            rotating application log (10 MB x 5)
 ```
 
 Back up the whole volume. Session images are transient and pruned after
@@ -216,19 +227,19 @@ Back up the whole volume. Session images are transient and pruned after
 
 ## Background schedule
 
-The `worker` runs Celery beat in-process (`-B`). Hourly:
+`app/services/scheduler.py` runs two asyncio loops for the life of the
+application (started and stopped by the FastAPI lifespan), each calling its task
+in a worker thread (`asyncio.to_thread`); a failing run is logged and the loop
+carries on:
 
-- `task_cleanup_sessions` - deletes expired sessions and stacks (and their
-  files), fails jobs left stuck by a crash, and prunes finished job rows past
-  `job_history_retention_hours` (the admin Settings -> Operations job-history
-  view, otherwise unbounded - every debounced slider edit inserts a row).
-  Runs regardless of `PROCESSING_MODE` (drop the worker and you lose this).
-- `task_watch_stacking_folder` - a no-op unless `stacking_watch_dir` is set; when
-  it is, it ingests new frames dropped into that folder and (optionally)
-  auto-stacks once the folder goes idle.
-
-Beat only runs correctly at **one** worker replica. Move it to its own service
-before scaling the worker out.
+- **cleanup**, hourly (`cleanup_expired`) - deletes expired sessions and stacks
+  (and their files), fails jobs left stuck, prunes finished job rows past
+  `job_history_retention_hours` (the Settings -> Operations job-history view,
+  otherwise unbounded - every debounced slider edit inserts a row), and drops
+  expired admin logins.
+- **watch folder**, every minute (`watch_stacking_folder`) - a no-op unless
+  `stacking_watch_dir` is set; when it is, it ingests new frames dropped into
+  that folder and (optionally) auto-stacks once the folder goes idle.
 
 ## Frontend
 

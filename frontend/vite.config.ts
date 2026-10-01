@@ -22,6 +22,9 @@ function resolveAppVersion(): string {
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Relative asset URLs: the built app works at the root of its host and under
+  // any path prefix (a reverse proxy, a Home Assistant ingress) alike.
+  base: './',
   plugins: [react(), tailwindcss()],
   define: {
     'import.meta.env.VITE_APP_VERSION': JSON.stringify(resolveAppVersion()),

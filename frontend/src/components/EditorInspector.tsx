@@ -136,7 +136,8 @@ export function EditorInspector(props: EditorInspectorProps) {
       props.onResetCurves();
     } else if (activeStep === 'stack') {
       props.stack.onReset();
-    } else if (sectionResettable) {
+    } else {
+      // Only reachable with sliders: the button is hidden otherwise.
       props.onResetSection(sliderKeys);
     }
   }

@@ -168,4 +168,40 @@ describe('ToneCurveEditor', () => {
 
     expect(onChange).toHaveBeenCalledWith('red', []);
   });
+
+  it('dragging an interior point keeps it between its neighbours', () => {
+    mockGraphRect();
+    const onChange = vi.fn();
+    const points = [
+      { x: 0, y: 0 },
+      { x: 100, y: 120 },
+      { x: 255, y: 255 },
+    ];
+    render(<ToneCurveEditor curves={curvesWith(points)} onChange={onChange} />);
+    const svg = screen.getByRole('img', { name: 'Tone curve' });
+    const middle = svg.querySelectorAll('circle')[1];
+
+    fireEvent.pointerDown(middle, { clientX: 100, clientY: 135, pointerId: 1 });
+    fireEvent.pointerMove(svg, { clientX: 254, clientY: 55, pointerId: 1 }); // past the last point
+
+    const [, moved] = onChange.mock.calls.at(-1) as [string, CurvePoint[]];
+    expect(moved[1].x).toBeLessThan(255);
+    expect(moved[1].x).toBeGreaterThan(100);
+    expect(moved[1].y).toBe(200);
+  });
+
+  it('dragging the last endpoint changes its y but pins x to the top of the range', () => {
+    mockGraphRect();
+    const onChange = vi.fn();
+    render(<ToneCurveEditor curves={EMPTY_CURVES} onChange={onChange} />);
+    const svg = screen.getByRole('img', { name: 'Tone curve' });
+    const last = svg.querySelectorAll('circle')[1];
+
+    fireEvent.pointerDown(last, { clientX: 255, clientY: 0, pointerId: 1 });
+    fireEvent.pointerMove(svg, { clientX: 200, clientY: 55, pointerId: 1 });
+
+    const [, moved] = onChange.mock.calls.at(-1) as [string, CurvePoint[]];
+    expect(moved[1]).toEqual({ x: 255, y: 200 });
+  });
 });
+

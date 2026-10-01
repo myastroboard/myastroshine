@@ -2,7 +2,7 @@
 # SPA alongside it. Build context is the repo root.
 #
 #   docker build --target backend-with-frontend -t myastroshine .   # default
-#   docker build --target backend -t myastroshine-backend-only .    # worker / dev
+#   docker build --target backend -t myastroshine-backend-only .    # dev (no SPA)
 #
 # Version is baked in via build args (see app/__init__.py, vite.config.ts) -
 # the release workflow passes --build-arg {APP,VITE_APP}_VERSION=$(cat VERSION).
@@ -24,10 +24,9 @@ COPY frontend/ .
 RUN npm run build
 
 # ---------------------------------------------------------------------------
-# Stage: backend - the api/worker runtime, no static assets. This is the
-# target docker-compose.dev.yml and the worker service build (Vite's dev
-# server serves the frontend live in dev; worker never serves HTTP at all -
-# neither needs the frontend-builder stage above to run).
+# Stage: backend - the API runtime, no static assets. This is the target
+# docker-compose.dev.yml builds (Vite's dev server serves the frontend live in
+# dev, so it does not need the frontend-builder stage above).
 # ---------------------------------------------------------------------------
 FROM python:3.14-slim AS backend
 

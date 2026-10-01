@@ -11,15 +11,14 @@ DELETE /api/stack/{id}/calibration/{kind}        - drop every sub of one kind
 POST   /api/stack/{id}/process                   - integrate the frames
 GET    /api/stack/{id}                           - stack result, statistics, frame list
 
-Processing runs inline (``PROCESSING_MODE=sync``) or on the Celery queue
-(``PROCESSING_MODE=queue``); progress streams over ``/ws/stack-status/{job_id}``.
+Processing runs in the background (``app.services.job_runner``); progress
+streams over ``/ws/stack-status/{job_id}``.
 """
 
 from __future__ import annotations
 
-import asyncio
-import io
 import zipfile
+from typing import BinaryIO
 
 from fastapi import APIRouter, File, Form, Request, UploadFile, status
 from fastapi.concurrency import run_in_threadpool
@@ -43,10 +42,12 @@ from app.models import (
     UploadFrameResponse,
 )
 from app.services.calibration import CALIBRATION_KINDS
+from app.services.stacking import StackingService
 from app.services.storage import StorageService
 from app.utils.app_settings import get_app_settings
 from app.utils.linear_ingest import ingest_frame
 from app.utils.rate_limit import get_client_ip
+from app.utils.uploads import check_batch, check_upload, upload_reader
 from app.utils.validators import validate_image_extension, validate_upload_size
 
 logger = get_logger(__name__)
@@ -143,13 +144,11 @@ async def upload_frame(
     file: UploadFile = File(...),
 ) -> UploadFrameResponse:
     """Upload a single frame into an open stacking session."""
-    data = await file.read()
-    validate_upload_size(len(data))
-    if file.filename:
-        validate_image_extension(file.filename)
-    frame = ingest_frame(data, file.filename)
-
-    record = stacking.add_frame(stack_id, frame_index, frame)
+    check_upload(file)
+    read = upload_reader(file)
+    # Reading, decoding and the disk write are CPU / IO work: off the event loop.
+    frame = await run_in_threadpool(lambda: ingest_frame(read(), file.filename))
+    record = await run_in_threadpool(stacking.add_frame, stack_id, frame_index, frame)
     return UploadFrameResponse(
         frame_index=frame_index,
         received_frames=record.received_frames,
@@ -172,24 +171,14 @@ async def upload_frames(
 ) -> StackSessionResponse:
     """Upload a batch of frames in one request, indexed ``start_index`` upward.
 
-    The frontend sends frames in batches of a few dozen so a thousand-frame
-    session is tens of requests, not a thousand. Decoding + thumbnailing the
-    batch (the slow part - a FITS thumbnail is ~30 ms) runs across the
-    threadpool; the disk writes and the single DB commit are serial.
+    The frontend sends frames in batches of ``UPLOAD_BATCH_MAX_FILES`` so a
+    thousand-frame session is tens of requests, not a thousand. The files stay
+    spooled on disk; ``StackingService.add_frames`` reads, decodes and writes them
+    a few at a time, with a single DB commit.
     """
-    stacking.get_result(stack_id)  # 404 before any work
-    payloads: list[tuple[bytes, str | None]] = []
-    for upload in files:
-        data = await upload.read()
-        validate_upload_size(len(data))
-        if upload.filename:
-            validate_image_extension(upload.filename)
-        payloads.append((data, upload.filename))
-
-    prepared = await asyncio.gather(
-        *(run_in_threadpool(stacking.prepare_frame, data, name) for data, name in payloads)
-    )
-    record = await run_in_threadpool(stacking.add_frames, stack_id, start_index, list(prepared))
+    check_batch(files)
+    sources = [(upload_reader(upload), upload.filename) for upload in files]
+    record, _added = await run_in_threadpool(stacking.add_frames, stack_id, start_index, sources)
     return StackSessionResponse(
         stack_id=record.stack_id,
         status=record.status,
@@ -214,10 +203,18 @@ async def upload_archive(
     Image members are ingested in filename order and assigned frame indices from
     the current ``received_frames`` upward, up to the session's ``frame_count``.
     """
-    data = await file.read()
-    validate_upload_size(len(data))
+    check_upload(file, check_extension=False)
+    return await run_in_threadpool(_ingest_archive, file.file, stack_id, stacking)
+
+
+def _ingest_archive(
+    spooled: BinaryIO, stack_id: str, stacking: StackingService
+) -> StackSessionResponse:
+    """Ingest an archive's frames straight from the spooled upload, one member at a
+    time (threadpool: decode + disk work) - the archive is never read whole."""
     try:
-        archive = zipfile.ZipFile(io.BytesIO(data))
+        spooled.seek(0)
+        archive = zipfile.ZipFile(spooled)
     except zipfile.BadZipFile as exc:
         raise UnsupportedImageError("Not a valid zip archive") from exc
 
@@ -239,8 +236,8 @@ async def upload_archive(
     for member in image_members:
         if next_index >= ceiling:
             break
+        validate_upload_size(member.file_size)  # declared size: refuse a bomb unread
         member_bytes = archive.read(member)
-        validate_upload_size(len(member_bytes))
         record = stacking.add_frame(
             stack_id, next_index, ingest_frame(member_bytes, member.filename)
         )
@@ -305,19 +302,13 @@ async def upload_calibration_frames(
     """Upload a batch of ``dark`` / ``flat`` / ``bias`` / ``dark_flat`` subs.
 
     Masters are built (per-pixel median) and cached when the stack runs; adding
-    more subs later rebuilds them.
+    more subs later rebuilds them. Each sub is read, decoded and written in turn.
     """
     if kind not in CALIBRATION_KINDS:
         raise InvalidParameterError(f"Unknown calibration frame kind {kind!r}")
-    frames = []
-    for upload in files:
-        data = await upload.read()
-        validate_upload_size(len(data))
-        if upload.filename:
-            validate_image_extension(upload.filename)
-        frames.append(ingest_frame(data, upload.filename))
-
-    record = stacking.add_calibration_frames(stack_id, kind, frames)
+    check_batch(files)
+    sources = [(upload_reader(upload), upload.filename) for upload in files]
+    record = await run_in_threadpool(stacking.add_calibration_frames, stack_id, kind, sources)
     return _calibration_summary(record, storage)
 
 
@@ -346,9 +337,8 @@ def process_stack(
 ) -> StackResultResponse:
     """Integrate the frames into a composite.
 
-    An optional body re-stacks with a changed setting (no re-upload). Defined
-    ``def`` (not ``async``) so ``PROCESSING_MODE=sync`` runs the integration in a
-    worker thread rather than blocking the event loop for the whole stack.
+    An optional body re-stacks with a changed setting (no re-upload). The
+    integration itself runs in the background; this answers once it is queued.
     """
     record, job_id = stacking.dispatch(stack_id, jobs, get_client_ip(http_request), overrides)
     return _result(record, storage, job_id)

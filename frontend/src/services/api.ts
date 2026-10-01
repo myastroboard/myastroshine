@@ -5,7 +5,9 @@
 // this boundary (see caseConvert.ts) so the rest of the app stays camelCase.
 
 import type {
+  AdminSession,
   AppSettings,
+  AuthStatus,
   AutoAstroResult,
   CalibrationKind,
   CalibrationSummary,
@@ -15,7 +17,9 @@ import type {
   CreatedToken,
   DepthShiftResult,
   DiskUsage,
+  EngineStatus,
   EngineStatusResponse,
+  ExternalEngine,
   FocusPoint,
   HandoffResumeResponse,
   HandoffReturnResponse,
@@ -31,6 +35,7 @@ import type {
   StackResult,
   StackSession,
   StackSettings,
+  StagedEngine,
   StarMaskResult,
   UploadFrameResult,
   UploadResponse,
@@ -38,28 +43,94 @@ import type {
   WebhookToken,
 } from '@/types';
 
+import { appPath } from './appUrl';
 import { keysToCamelCase, keysToSnakeCase } from './caseConvert';
 
-const API_URL = import.meta.env.VITE_API_URL ?? '/api';
+/** The API base: `VITE_API_URL` when set (dev against another host), else `api`
+ * under the page directory - `/api` at the root, `/<prefix>/api` behind a path
+ * prefix (see appUrl.ts). */
+const API_URL = import.meta.env.VITE_API_URL ?? appPath('api');
+
+/**
+ * A server-built path (`/api/preview/...`, as responses carry it) resolved
+ * against {@link API_URL}, so it stays inside the app behind a path prefix. Any
+ * other value (an absolute `https://` link, a relative path) is returned as is.
+ */
+export function resolveApiPath(path: string): string {
+  return path === '/api' || path.startsWith('/api/') ? API_URL + path.slice('/api'.length) : path;
+}
+
+/** Rewrite every `...Url` / `...Urls` field of a response with {@link resolveApiPath}. */
+function resolveServerUrls<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((item: unknown) => resolveServerUrls(item)) as T;
+  }
+  if (value === null || typeof value !== 'object') {
+    return value;
+  }
+  const out: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+    if (/Urls?$/.test(key) && typeof item === 'string') {
+      out[key] = resolveApiPath(item);
+    } else if (/Urls$/.test(key) && Array.isArray(item)) {
+      out[key] = item.map((entry: unknown) =>
+        typeof entry === 'string' ? resolveApiPath(entry) : entry,
+      );
+    } else {
+      out[key] = resolveServerUrls(item);
+    }
+  }
+  return out as T;
+}
+
+/** A response body as the app uses it: camelCase keys, URLs inside the app. */
+function fromServer<T>(body: unknown): T {
+  return resolveServerUrls(keysToCamelCase<T>(body));
+}
 
 export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    /** The envelope's `error_code` (docs/API.md), when the body carried one. */
+    readonly code?: string,
   ) {
     super(message);
     this.name = 'ApiError';
   }
 }
 
-async function readError(response: Response): Promise<ApiError> {
-  const text = await response.text();
+/** `error_code` of an admin route called without a live admin session. */
+export const ADMIN_LOGIN_REQUIRED = 'ADMIN_LOGIN_REQUIRED';
+
+type AdminLoginRequiredListener = () => void;
+const adminLoginRequiredListeners = new Set<AdminLoginRequiredListener>();
+
+/**
+ * Be told when any admin call comes back `401 ADMIN_LOGIN_REQUIRED` (the session
+ * expired, or was revoked from another browser), so the Settings page can fall
+ * back to the login form. Returns the unsubscribe function.
+ */
+export function onAdminLoginRequired(listener: AdminLoginRequiredListener): () => void {
+  adminLoginRequiredListeners.add(listener);
+  return () => adminLoginRequiredListeners.delete(listener);
+}
+
+function parseError(status: number, text: string, fallback: string): ApiError {
   try {
-    const body = JSON.parse(text) as { error?: string };
-    return new ApiError(response.status, body.error ?? text);
+    const body = JSON.parse(text) as { error?: string; error_code?: string };
+    return new ApiError(status, body.error ?? text, body.error_code);
   } catch {
-    return new ApiError(response.status, text || response.statusText);
+    return new ApiError(status, text || fallback);
   }
+}
+
+async function readError(response: Response): Promise<ApiError> {
+  const error = parseError(response.status, await response.text(), response.statusText);
+  if (error.status === 401 && error.code === ADMIN_LOGIN_REQUIRED) {
+    adminLoginRequiredListeners.forEach((listener) => listener());
+  }
+  return error;
 }
 
 interface RequestOptions {
@@ -92,19 +163,13 @@ function uploadWithProgress<T>(
     xhr.addEventListener('load', () => {
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
-          resolve(keysToCamelCase<T>(JSON.parse(xhr.responseText)));
+          resolve(fromServer<T>(JSON.parse(xhr.responseText)));
         } catch {
           reject(new ApiError(xhr.status, 'Malformed server response'));
         }
         return;
       }
-      let message = xhr.responseText || xhr.statusText;
-      try {
-        message = (JSON.parse(xhr.responseText) as { error?: string }).error ?? message;
-      } catch {
-        /* not JSON - keep the raw text */
-      }
-      reject(new ApiError(xhr.status, message));
+      reject(parseError(xhr.status, xhr.responseText, xhr.statusText));
     });
     xhr.addEventListener('error', () => reject(new ApiError(0, 'Network error during upload')));
     xhr.addEventListener('abort', () => reject(new ApiError(0, 'Upload cancelled')));
@@ -130,7 +195,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   if (response.status === 204) {
     return undefined as T;
   }
-  return keysToCamelCase<T>(await response.json());
+  return fromServer<T>(await response.json());
 }
 
 export interface SavePresetInput {
@@ -227,6 +292,37 @@ export const apiClient = {
   },
 
   // --- Runtime settings (Settings screen) ---
+  getAuthStatus(): Promise<AuthStatus> {
+    return request<AuthStatus>('/auth/status');
+  },
+
+  setupAdmin(password: string): Promise<void> {
+    return request<void>('/auth/setup', { method: 'POST', json: { password } });
+  },
+
+  loginAdmin(password: string): Promise<void> {
+    return request<void>('/auth/login', { method: 'POST', json: { password } });
+  },
+
+  logoutAdmin(): Promise<void> {
+    return request<void>('/auth/logout', { method: 'POST' });
+  },
+
+  changeAdminPassword(currentPassword: string, newPassword: string): Promise<void> {
+    return request<void>('/auth/password', {
+      method: 'POST',
+      json: { currentPassword, newPassword },
+    });
+  },
+
+  async listAdminSessions(): Promise<AdminSession[]> {
+    return (await request<{ sessions: AdminSession[] }>('/auth/sessions')).sessions;
+  },
+
+  revokeAdminSession(sessionId: string): Promise<void> {
+    return request<void>(`/auth/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' });
+  },
+
   getAppSettings(): Promise<AppSettings> {
     return request<AppSettings>('/admin/app-settings');
   },
@@ -238,6 +334,35 @@ export const apiClient = {
   /** Probe the configured StarNet2 / DeepSNR paths (Settings -> engine status line). */
   getEngineStatus(): Promise<EngineStatusResponse> {
     return request<EngineStatusResponse>('/admin/engine-status');
+  },
+
+  /** Upload an engine package (the CLI archive from starnetastro.com); the server
+   * unpacks and checks it and answers with its licence text. */
+  stageEngine(
+    engine: ExternalEngine,
+    archive: File,
+    onProgress?: (fraction: number) => void,
+  ): Promise<StagedEngine> {
+    const form = new FormData();
+    form.append('file', archive);
+    return uploadWithProgress<StagedEngine>(`/admin/engines/${engine}/stage`, form, onProgress);
+  },
+
+  installEngine(engine: ExternalEngine, stagingId: string): Promise<EngineStatus> {
+    return request<EngineStatus>(`/admin/engines/${engine}/install`, {
+      method: 'POST',
+      json: { stagingId, acceptLicense: true },
+    });
+  },
+
+  discardStagedEngine(engine: ExternalEngine, stagingId: string): Promise<void> {
+    return request<void>(`/admin/engines/${engine}/stage/${encodeURIComponent(stagingId)}`, {
+      method: 'DELETE',
+    });
+  },
+
+  removeEngine(engine: ExternalEngine): Promise<void> {
+    return request<void>(`/admin/engines/${engine}`, { method: 'DELETE' });
   },
 
   // --- Logs (Settings -> Logs) ---
@@ -368,7 +493,7 @@ export const apiClient = {
     if (!response.ok) {
       throw await readError(response);
     }
-    return keysToCamelCase<UploadFrameResult>(await response.json());
+    return fromServer<UploadFrameResult>(await response.json());
   },
 
   async uploadStackFrames(
@@ -388,7 +513,7 @@ export const apiClient = {
     if (!response.ok) {
       throw await readError(response);
     }
-    return keysToCamelCase<StackSession>(await response.json());
+    return fromServer<StackSession>(await response.json());
   },
 
   async uploadStackArchive(stackId: string, file: File): Promise<StackSession> {
@@ -401,7 +526,7 @@ export const apiClient = {
     if (!response.ok) {
       throw await readError(response);
     }
-    return keysToCamelCase<StackSession>(await response.json());
+    return fromServer<StackSession>(await response.json());
   },
 
   excludeStackFrame(stackId: string, index: number, excluded: boolean): Promise<StackFrameInfo> {
@@ -427,7 +552,7 @@ export const apiClient = {
     if (!response.ok) {
       throw await readError(response);
     }
-    return keysToCamelCase<CalibrationSummary>(await response.json());
+    return fromServer<CalibrationSummary>(await response.json());
   },
 
   clearCalibration(stackId: string, kind: CalibrationKind): Promise<CalibrationSummary> {

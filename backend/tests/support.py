@@ -62,6 +62,9 @@ def fake_engine_popen(
     progress_lines = lines if lines is not None else ['{"percent": 100.0}\n']
 
     class _Popen:
+        #: The most recent instance, for tests that inspect it after the run.
+        last: _Popen | None = None
+
         def __init__(self, cmd: list[str], **_kwargs: object) -> None:
             if record is not None:
                 record.append(cmd)
@@ -70,12 +73,20 @@ def fake_engine_popen(
                 _copy_output(cmd)
             self.stdout = iter(progress_lines)
             self.returncode = returncode
+            self.finished = False
+            self.killed = False
+            _Popen.last = self
+
+        def poll(self) -> int | None:
+            return self.returncode if self.finished else None
 
         def wait(self, timeout: float | None = None) -> int:
+            self.finished = True
             return self.returncode
 
         def kill(self) -> None:
             self.returncode = -9
+            self.killed = True
 
     return _Popen
 

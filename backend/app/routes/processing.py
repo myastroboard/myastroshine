@@ -2,8 +2,8 @@
 
 POST /api/process/{session_id} - apply enhancement parameters.
 
-Runs inline (``PROCESSING_MODE=sync``) or on the Celery queue
-(``PROCESSING_MODE=queue``); either way progress is on the WebSocket in
+Records a job and runs it in the background (``app.services.job_runner``); the
+answer comes back while the job is ``queued``, and progress is on the WebSocket in
 ``app.routes.websockets`` (/ws/processing-status/{job_id}).
 """
 

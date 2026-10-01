@@ -413,6 +413,10 @@
       "operations": {
         "label": "Betrieb",
         "blurb": "Aktuelle Verarbeitungsaufgaben und Speicherplatznutzung."
+      },
+      "security": {
+        "label": "Sicherheit",
+        "blurb": "Admin-Passwort und angemeldete Browser."
       }
     },
     "groups": {
@@ -568,6 +572,52 @@
         "previous_page": "Zurück",
         "next_page": "Weiter",
         "page_info": "{from}-{to} von {total}"
+      }
+    },
+    "auth": {
+      "admin_disabled": "Die Administrations-API ist auf dieser Instanz deaktiviert (ADMIN_ENABLED=false).",
+      "logout": "Abmelden",
+      "password": "Admin-Passwort",
+      "current_password": "Aktuelles Passwort",
+      "new_password": "Neues Passwort",
+      "confirm_password": "Passwort bestätigen",
+      "setup": {
+        "title": "Admin-Passwort erstellen",
+        "blurb": "Die Einstellungen sind dem Administrator vorbehalten. Wählen Sie ein Passwort mit mindestens {min} Zeichen: Es wird zum Öffnen dieser Seite abgefragt. Die Nutzung der App selbst braucht es nie.",
+        "submit": "Erstellen und anmelden"
+      },
+      "login": {
+        "title": "Administrator-Anmeldung",
+        "blurb": "Die Einstellungen sind dem Administrator vorbehalten. Geben Sie das Admin-Passwort ein, um fortzufahren.",
+        "submit": "Anmelden"
+      },
+      "errors": {
+        "invalid_password": "Falsches Passwort.",
+        "locked_out": "Zu viele Fehlversuche. Warten Sie einen Moment und versuchen Sie es erneut.",
+        "already_configured": "Es gibt bereits ein Admin-Passwort. Laden Sie die Seite neu, um sich anzumelden.",
+        "generic": "Etwas ist schiefgelaufen. Versuchen Sie es erneut.",
+        "too_short": "Das Passwort braucht mindestens {min} Zeichen.",
+        "mismatch": "Die beiden Passwörter stimmen nicht überein."
+      }
+    },
+    "security": {
+      "session_idle": {
+        "label": "Angemeldet bleiben (Tage)",
+        "hint": "Eine so lange ungenutzte Admin-Anmeldung endet. Nie länger als 30 Tage."
+      },
+      "change_password": {
+        "title": "Admin-Passwort ändern",
+        "blurb": "Alle anderen als Admin angemeldeten Browser werden abgemeldet.",
+        "submit": "Passwort ändern",
+        "done": "Passwort geändert."
+      },
+      "sessions": {
+        "title": "Angemeldete Browser",
+        "blurb": "Browser, die derzeit als Admin angemeldet sind.",
+        "this_browser": "dieser Browser",
+        "unknown_browser": "Unbekannter Browser",
+        "details": "{ip} - zuletzt aktiv {last_seen}",
+        "revoke": "Abmelden"
       }
     }
   },

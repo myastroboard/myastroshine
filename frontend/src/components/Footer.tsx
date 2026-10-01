@@ -63,9 +63,9 @@ export function Footer() {
         )}
       </div>
 
-      {showWhatsNew && result?.releaseNotes && (
+      {showWhatsNew && result?.latestVersion && result.releaseNotes && (
         <WhatsNewModal
-          releaseName={result.releaseName ?? result.latestVersion ?? ''}
+          releaseName={result.releaseName ?? result.latestVersion}
           releaseNotes={result.releaseNotes}
           releaseUrl={result.releaseUrl}
           onClose={() => setShowWhatsNew(false)}

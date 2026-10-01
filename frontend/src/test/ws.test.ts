@@ -199,7 +199,7 @@ describe('WS_URL resolution', () => {
   it('derives ws:// from an http page origin when unconfigured', async () => {
     vi.resetModules();
     vi.stubEnv('VITE_WS_URL', '');
-    vi.stubGlobal('location', { protocol: 'http:', host: 'app.example:3000' });
+    vi.stubGlobal('location', { protocol: 'http:', host: 'app.example:3000', pathname: '/' });
     const { processingStatusClient } = await import('@/services/ws');
     processingStatusClient('job-1').connect();
     expect(FakeWebSocket.instances[0].url).toBe('ws://app.example:3000/ws/processing-status/job-1');
@@ -208,10 +208,25 @@ describe('WS_URL resolution', () => {
   it('derives wss:// from an https page origin when unconfigured', async () => {
     vi.resetModules();
     vi.stubEnv('VITE_WS_URL', '');
-    vi.stubGlobal('location', { protocol: 'https:', host: 'app.example' });
+    vi.stubGlobal('location', { protocol: 'https:', host: 'app.example', pathname: '/' });
     const { processingStatusClient } = await import('@/services/ws');
     processingStatusClient('job-1').connect();
     expect(FakeWebSocket.instances[0].url).toBe('wss://app.example/ws/processing-status/job-1');
+  });
+
+  it('stays under the page directory when the app is served behind a path prefix', async () => {
+    vi.resetModules();
+    vi.stubEnv('VITE_WS_URL', '');
+    vi.stubGlobal('location', {
+      protocol: 'https:',
+      host: 'ha.example',
+      pathname: '/api/hassio_ingress/abc123/',
+    });
+    const { processingStatusClient } = await import('@/services/ws');
+    processingStatusClient('job-1').connect();
+    expect(FakeWebSocket.instances[0].url).toBe(
+      'wss://ha.example/api/hassio_ingress/abc123/ws/processing-status/job-1',
+    );
   });
 
   it('falls back to a fixed default when window is unavailable (SSR-safe)', async () => {

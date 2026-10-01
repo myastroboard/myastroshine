@@ -81,3 +81,34 @@ class UpstreamError(AppError):
 class RateLimitedError(AppError):
     status_code = 429
     error_code = "RATE_LIMITED"
+
+
+class AdminLoginRequiredError(AppError):
+    """No valid admin session cookie on an admin route."""
+
+    status_code = 401
+    error_code = "ADMIN_LOGIN_REQUIRED"
+
+
+class InvalidCredentialsError(AppError):
+    status_code = 401
+    error_code = "INVALID_CREDENTIALS"
+
+
+class AdminSetupRequiredError(AppError):
+    """No admin password exists yet - the admin surface stays locked until one is set."""
+
+    status_code = 403
+    error_code = "ADMIN_SETUP_REQUIRED"
+
+
+class AdminAlreadyConfiguredError(AppError):
+    status_code = 409
+    error_code = "ADMIN_ALREADY_CONFIGURED"
+
+
+class InvalidEngineArchiveError(AppError):
+    """An uploaded engine package that is unreadable, unsafe, or not the expected tool."""
+
+    status_code = 400
+    error_code = "INVALID_ENGINE_ARCHIVE"

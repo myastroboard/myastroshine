@@ -2,16 +2,13 @@
 
 A single ``api`` process is the deployment target for now (mono-poste, see
 ALIGNMENT.md #1), so a plain in-memory fixed-window counter is enough - no
-Redis or other shared store needed. If ``api`` is ever scaled to multiple
-replicas this has to move to a shared backend, since each replica would
-otherwise track its own count.
+shared store needed.
 
 The companion "5 concurrent processing jobs per IP" limit (also in the API
 spec) is not handled here: it is a concurrency check, not a request-rate
 check, and lives in ``JobService.assert_under_concurrency_limit`` where it can
-query the shared ``jobs`` table (correct across the sync and Celery-queue
-processing modes, and across multiple ``api`` replicas, without any extra
-bookkeeping).
+query the ``jobs`` table (correct across both background job pools without
+any extra bookkeeping).
 """
 
 from __future__ import annotations
@@ -22,6 +19,12 @@ import time
 from fastapi import Request
 
 from app.config import get_settings
+from app.constants import (
+    LOGIN_FAILURE_WINDOW_SECONDS,
+    LOGIN_LOCKOUT_BASE_SECONDS,
+    LOGIN_LOCKOUT_MAX_SECONDS,
+    LOGIN_MAX_FAILURES,
+)
 from app.exceptions import RateLimitedError
 from app.utils.app_settings import get_app_settings
 
@@ -64,6 +67,60 @@ class InMemoryRateLimiter:
 
 
 _request_limiter = InMemoryRateLimiter()
+
+
+class LoginThrottle:
+    """Per-IP brute-force guard for the admin password.
+
+    Independent from the general request limiter: always on (``rate_limit_enabled``
+    does not switch it off, nor does ``APP_ENV=test``) and counting *failures*
+    only. ``LOGIN_MAX_FAILURES`` failures inside ``LOGIN_FAILURE_WINDOW_SECONDS``
+    lock the IP out for ``LOGIN_LOCKOUT_BASE_SECONDS``; each further lockout of
+    the same IP doubles, capped at ``LOGIN_LOCKOUT_MAX_SECONDS``. A success clears
+    the IP's record.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        # key -> (failure timestamps in the current window, locked_until, lockouts so far)
+        self._state: dict[str, tuple[list[float], float, int]] = {}
+
+    def check(self, key: str) -> None:
+        """Raise :class:`RateLimitedError` while ``key`` is locked out."""
+        now = time.time()
+        with self._lock:
+            _failures, locked_until, _lockouts = self._state.get(key, ([], 0.0, 0))
+            if locked_until > now:
+                raise RateLimitedError(
+                    "Too many failed login attempts, try again later",
+                    details={"retry_after_seconds": int(locked_until - now) + 1},
+                )
+
+    def record_failure(self, key: str) -> bool:
+        """Count a failed attempt; returns ``True`` if it just locked ``key`` out."""
+        now = time.time()
+        with self._lock:
+            failures, _locked_until, lockouts = self._state.get(key, ([], 0.0, 0))
+            failures = [t for t in failures if now - t < LOGIN_FAILURE_WINDOW_SECONDS]
+            failures.append(now)
+            if len(failures) < LOGIN_MAX_FAILURES:
+                self._state[key] = (failures, 0.0, lockouts)
+                return False
+            duration = min(LOGIN_LOCKOUT_BASE_SECONDS * 2**lockouts, LOGIN_LOCKOUT_MAX_SECONDS)
+            self._state[key] = ([], now + duration, lockouts + 1)
+            return True
+
+    def record_success(self, key: str) -> None:
+        with self._lock:
+            self._state.pop(key, None)
+
+    def clear(self) -> None:
+        """Forget every IP (tests, and after an admin password reset)."""
+        with self._lock:
+            self._state.clear()
+
+
+login_throttle = LoginThrottle()
 
 
 def get_client_ip(request: Request) -> str | None:

@@ -1,128 +1,100 @@
-"""The Redis pub/sub progress plumbing - the best-effort publish/subscribe
-contract described in ``app.services.progress``'s module docstring:
-``publish`` must never raise even when Redis is down (the job still has to
-finish), and ``subscribe`` must filter Redis's own subscribe-confirmation
-messages from real progress events.
-"""
+"""The in-process progress broker (``app.services.progress``): events published
+from job threads reach the WebSocket subscribers of that job, and nobody else."""
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+import asyncio
+import threading
 
 import pytest
 
 from app.services import progress
 
 
-@pytest.fixture(autouse=True)
-def _reset_publisher_state() -> None:
-    """``_pub`` is module-level singleton state - reset around every test so
-    one test's simulated Redis outage can't leak into the next."""
-    progress._pub.disabled = False
-    progress._pub.client = None
-    yield
-    progress._pub.disabled = False
-    progress._pub.client = None
-
-
-def test_publish_never_touches_redis_outside_queue_mode(monkeypatch: pytest.MonkeyPatch) -> None:
-    """sync mode (the default) is the common case - this must short-circuit
-    before ever constructing a Redis client."""
-
-    def _poison(*_a: object, **_k: object) -> None:
-        raise AssertionError("from_url should not be called outside queue mode")
-
-    monkeypatch.setattr(progress.redis.Redis, "from_url", staticmethod(_poison))
-    progress.publish("job-x", {"status": "processing"})  # must not raise
-
-
-def test_publish_disables_itself_and_never_raises_when_redis_is_unreachable(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("PROCESSING_MODE", "queue")
-    # Port 1 is reserved/unlistened - a fast connection refusal, not a hang.
-    monkeypatch.setenv("REDIS_URL", "redis://127.0.0.1:1/0")
-    from app.config import get_settings
-
-    get_settings.cache_clear()
-
-    progress.publish("job-x", {"status": "processing"})  # must not raise
-
-    assert progress._pub.disabled is True
-    assert progress._pub.client is None
-
-    def _poison(*_a: object, **_k: object) -> None:
-        raise AssertionError("a disabled publisher must not reconnect")
-
-    monkeypatch.setattr(progress.redis.Redis, "from_url", staticmethod(_poison))
-    progress.publish("job-x", {"status": "processing"})  # still a no-op
-
-
-class _FakePubSub:
-    def __init__(self, messages: list[dict[str, object] | None]) -> None:
-        self._messages = list(messages)
-        self.subscribed: list[str] = []
-        self.unsubscribed: list[str] = []
-
-    async def subscribe(self, name: str) -> None:
-        self.subscribed.append(name)
-
-    async def get_message(self, **_kwargs: object) -> dict[str, object] | None:
-        return self._messages.pop(0) if self._messages else None
-
-    async def unsubscribe(self, name: str) -> None:
-        self.unsubscribed.append(name)
-
-    async def aclose(self) -> None: ...
-
-
-class _FakeRedis:
-    def __init__(self, messages: list[dict[str, object] | None]) -> None:
-        self._pubsub = _FakePubSub(messages)
-
-    def pubsub(self) -> _FakePubSub:
-        return self._pubsub
-
-    async def aclose(self) -> None: ...
+async def _next(gen, timeout: float = 2.0):
+    return await asyncio.wait_for(gen.__anext__(), timeout=timeout)
 
 
 @pytest.mark.asyncio
-async def test_subscribe_filters_confirmations_and_yields_real_events(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A real Redis pubsub channel sends its own subscribe-confirmation message
-    first; ``subscribe`` must skip that and yield only the decoded event."""
-    messages: list[dict[str, object] | None] = [
-        {"type": "subscribe", "data": 1},
-        {"type": "message", "data": b'{"status": "processing", "progress_percent": 40}'},
-    ]
-    fake = _FakeRedis(messages)
-    monkeypatch.setattr(progress.aioredis.Redis, "from_url", staticmethod(lambda *_a, **_k: fake))
+async def test_publish_without_subscribers_is_a_silent_no_op() -> None:
+    """A job with nobody watching must never fail because of it."""
+    progress.publish("job-nobody", {"status": "processing"})
 
-    gen: AsyncIterator[dict[str, object] | None] = progress.subscribe("job-x", idle_timeout=0.01)
-    try:
-        event = await gen.__anext__()
-    finally:
-        await gen.aclose()
-
-    # the subscribe-confirmation message was skipped internally, with no yield -
-    # the first thing the caller sees is the real, decoded event.
-    assert event == {"status": "processing", "progress_percent": 40}
-    assert fake.pubsub().subscribed == [progress.channel("job-x")]
-    assert fake.pubsub().unsubscribed == [progress.channel("job-x")]
+    assert progress.subscriber_count("job-nobody") == 0
 
 
 @pytest.mark.asyncio
-async def test_subscribe_decodes_a_string_payload_too(monkeypatch: pytest.MonkeyPatch) -> None:
-    """``redis.asyncio`` can hand back ``data`` as ``str`` or ``bytes`` depending
-    on ``decode_responses`` - both must decode to the same event."""
-    fake = _FakeRedis([{"type": "message", "data": '{"status": "completed"}'}])
-    monkeypatch.setattr(progress.aioredis.Redis, "from_url", staticmethod(lambda *_a, **_k: fake))
+async def test_subscriber_receives_events_for_its_job_only() -> None:
+    gen = progress.subscribe("job-a", idle_timeout=5)
+    first = asyncio.ensure_future(_next(gen))
+    await asyncio.sleep(0)  # let the generator register its queue
 
-    gen = progress.subscribe("job-x", idle_timeout=0.01)
+    progress.publish("job-b", {"status": "processing", "job_id": "job-b"})
+    progress.publish("job-a", {"status": "processing", "job_id": "job-a"})
+
+    assert (await first)["job_id"] == "job-a"
+    await gen.aclose()
+
+
+@pytest.mark.asyncio
+async def test_events_published_from_another_thread_are_delivered_in_order() -> None:
+    """Jobs run on background threads; ``publish`` must be thread-safe."""
+    gen = progress.subscribe("job-t", idle_timeout=5)
+    first = asyncio.ensure_future(_next(gen))
+    await asyncio.sleep(0)
+
+    def _publish() -> None:
+        for percent in (10, 50, 100):
+            progress.publish("job-t", {"progress_percent": percent})
+
+    thread = threading.Thread(target=_publish)
+    thread.start()
+    thread.join()
+
+    received = [(await first)["progress_percent"]]
+    received += [(await _next(gen))["progress_percent"] for _ in range(2)]
+    assert received == [10, 50, 100]
+    await gen.aclose()
+
+
+@pytest.mark.asyncio
+async def test_every_subscriber_of_a_job_gets_the_event() -> None:
+    first_gen = progress.subscribe("job-m", idle_timeout=5)
+    second_gen = progress.subscribe("job-m", idle_timeout=5)
+    first = asyncio.ensure_future(_next(first_gen))
+    second = asyncio.ensure_future(_next(second_gen))
+    await asyncio.sleep(0)
+    assert progress.subscriber_count("job-m") == 2
+
+    progress.publish("job-m", {"status": "completed"})
+
+    assert (await first)["status"] == (await second)["status"] == "completed"
+    await first_gen.aclose()
+    assert progress.subscriber_count("job-m") == 1
+    await second_gen.aclose()
+    assert progress.subscriber_count("job-m") == 0
+
+
+@pytest.mark.asyncio
+async def test_subscribe_yields_none_on_idle() -> None:
+    """With no event for ``idle_timeout``, the subscriber gets a ``None`` tick so the
+    socket handler can re-read the job from the DB."""
+    gen = progress.subscribe("job-idle", idle_timeout=0.01)
+
+    assert await _next(gen) is None
+    await gen.aclose()
+    assert progress.subscriber_count("job-idle") == 0
+
+
+def test_publish_to_a_subscriber_whose_loop_is_closed_does_not_raise() -> None:
+    """At shutdown a socket's loop can close while a job thread still publishes."""
+    loop = asyncio.new_event_loop()
+    queue: asyncio.Queue[dict[str, object]] = asyncio.Queue()
+    loop.close()
+    with progress._broker.lock:
+        progress._broker.subscribers["job-closed"] = [(loop, queue)]
     try:
-        event = await gen.__anext__()
+        progress.publish("job-closed", {"status": "processing"})  # must not raise
     finally:
-        await gen.aclose()
-
-    assert event == {"status": "completed"}
+        with progress._broker.lock:
+            progress._broker.subscribers.pop("job-closed", None)

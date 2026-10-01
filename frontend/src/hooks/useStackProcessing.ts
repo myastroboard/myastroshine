@@ -13,7 +13,7 @@ import type {
 
 const TERMINAL = new Set(['completed', 'failed']);
 const MIN_FRAMES = 2;
-const UPLOAD_BATCH_SIZE = 20; // frames per request - keeps a 1000-frame night to ~50 requests
+const UPLOAD_BATCH_SIZE = 20; // files per request - keeps a 1000-frame night to ~50 requests; backend UPLOAD_BATCH_MAX_FILES
 
 const EMPTY_CALIBRATION: CalibrationSummary = {
   frames: { dark: 0, flat: 0, bias: 0, darkFlat: 0 },
@@ -96,7 +96,11 @@ export function useStackProcessing(settings: StackSettings, maxFrames: number) {
       }
       setError(null);
       try {
-        setCalibration(await apiClient.uploadCalibrationFrames(await ensureStack(), kind, files));
+        const stackId = await ensureStack();
+        // Same batch size as the light frames: the server caps files per request.
+        for (const batch of chunk(files, UPLOAD_BATCH_SIZE)) {
+          setCalibration(await apiClient.uploadCalibrationFrames(stackId, kind, batch));
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : t('stacking.errors.failed'));
       }

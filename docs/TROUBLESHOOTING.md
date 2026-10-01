@@ -10,7 +10,7 @@ logs (**Settings -> Logs -> Export**) and open a
 - [Uploads](#uploads)
 - [Stacking](#stacking)
 - [External ML engines](#external-ml-engines)
-- [Queue mode and the worker](#queue-mode-and-the-worker)
+- [Background jobs](#background-jobs)
 - [Settings and CORS](#settings-and-cors)
 - [Development](#development)
 - [Logs](#logs)
@@ -128,19 +128,23 @@ The engine only shows when its path points at a working binary. In
 **A pass falls back to the classical engine.**
 Any failure - missing binary, non-zero exit, a 15-minute timeout, bad output -
 logs a warning and uses the classical code so the edit still completes. Check
-`worker.log` (queue mode) or `myastroshine.log` (sync mode) for the reason.
+`myastroshine.log` for the reason.
 There is no linux-arm64 build of these tools - an ARM host can't use them.
 
 **Nothing to install here is shipped by MyAstroShine.** Download the linux-x64
 CLI from `starnetastro.com` yourself and accept its licence -
 [THIRD_PARTY.md](../THIRD_PARTY.md), [engines/README.md](../engines/README.md).
 
-## Queue mode and the worker
+## Background jobs
 
-**Jobs stay "queued" forever (`PROCESSING_MODE=queue`).**
-The `worker` isn't running or can't reach Redis. Check `docker compose ps` (the
-worker's healthcheck is a real Celery ping), and `docker compose logs worker`.
-If Redis is down, jobs queue but never run.
+**A stack waits a long time before it starts.**
+One stack runs at a time; the next waits for it (edits have their own threads
+and are never blocked by a stack). Settings -> Operations lists the jobs.
+
+**A job ended "interrupted by a server shutdown" or "by a restart".**
+The container stopped while the job ran. Run it again - a re-stack that only
+changes combination / rejection / weighting / drizzle resumes from the aligned
+frames of the previous run.
 
 **Progress bar never moves, then the result appears anyway.**
 The WebSocket to `/ws/...` couldn't connect (a reverse proxy not forwarding
@@ -148,9 +152,9 @@ The WebSocket to `/ws/...` couldn't connect (a reverse proxy not forwarding
 is lost. Proxy the `/ws/` path with WebSocket upgrade headers.
 
 **Expired sessions and stacks aren't being cleaned up.**
-The hourly cleanup runs inside the `worker` (Celery beat, `-B`). If you dropped
-the worker to run `PROCESSING_MODE=sync`, keep one worker running for the
-schedule, or prune the data volume yourself.
+The cleanup runs inside the app, an hour after start and hourly after that. A
+container restarted more often than hourly never reaches it; check
+`myastroshine.log` for "scheduled task failed".
 
 ## Settings and CORS
 
@@ -170,10 +174,20 @@ The container could not reach `callback_base`. If MyAstroBoard is behind a
 reverse proxy the LAN cannot hairpin, set the connector's callback-URL override
 on the board to an address this container can reach directly.
 
-**`ADMIN_ENABLED=false` and Settings won't save.**
-That flag disables `/api/admin/*` (and `/api/tokens`) entirely. It is a feature
-toggle, not authentication - set it back to `true` (the default) to edit
+**`ADMIN_ENABLED=false` and Settings won't open.**
+That flag turns the administration surface (`/api/admin/*`, `/api/tokens` and
+the admin login) off entirely. Set it back to `true` (the default) to edit
 settings, or edit `app_settings.json` on the volume directly and restart.
+
+**Lost the admin password.**
+Run `docker exec myastroshine-api python -m app.cli reset-admin` on the host.
+It forgets the password and logs every admin browser out; opening Settings then
+asks for a new password.
+
+**"Too many failed login attempts".**
+Five wrong passwords within a minute lock that IP out of the admin login for a
+minute, doubling on each further lockout (at most an hour). Wait it out, or
+restart the container to clear it.
 
 ## Development
 
@@ -185,10 +199,8 @@ An absolute `VITE_API_URL` makes `fetch` bypass the dev proxy while
 
 **Backend edits aren't picked up in the dev container.**
 `docker-compose.dev.yml` sets `WATCHFILES_FORCE_POLLING` so `uvicorn --reload`
-sees host edits over the bind mount. The **worker** (watchmedo) can still miss
-them - `docker compose -f docker-compose.dev.yml restart worker` after a backend
-change is the reliable path. If the editor was already wedged from an older
-build, restart `api` too (it clears the exhausted connection pool).
+sees host edits over the bind mount. If one is still missed, `docker compose
+-f docker-compose.dev.yml restart api`.
 
 **`pytest` fails on `test_deps_fresh.py`.**
 It queries PyPI/npm for stale pins. Offline, it skips itself; to skip it
@@ -196,11 +208,10 @@ explicitly, `SKIP_DEPS_FRESH=1 pytest`.
 
 ## Logs
 
-- API log: `DATA_DIR/myastroshine.log`; worker log: `DATA_DIR/worker.log`. Both
-  rotate (10 MB x 5). The console (`docker compose logs api`) carries the same
+- Log file: `DATA_DIR/myastroshine.log`, rotating (10 MB x 5). The console (`docker compose logs api`) carries the same
   events at `console_log_level`.
 - **Settings -> Logs** tails the file, changes the filter level (no restart),
-  clears it, and **exports a ZIP** of the log plus its rotations and the worker
-  log - attach that ZIP to a bug report.
+  clears it, and **exports a ZIP** of the log plus its rotations - attach that
+  ZIP to a bug report.
 - Levels: `log_level` (file) and `console_log_level` (console) on the
   **Advanced** tab.

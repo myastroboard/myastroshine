@@ -8,6 +8,31 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **One container, no Redis, no worker.** Image and stack processing now run as
+  background jobs inside the application process, and the app runs its own
+  maintenance (hourly cleanup, minute-by-minute watch-folder poll). `/process`
+  and `/stack/{id}/process` always answer at once with the queued job; progress
+  streams over the same WebSockets. Edits and stacks have separate thread pools,
+  so a long stack never blocks the editor. A job still running at shutdown stops
+  at its next step and ends `failed` (an external engine it ran is killed, not
+  orphaned); jobs left over from a crash are failed at the next start. The
+  star-mask, Auto Astro, depth-shift and upload-decoding routes no longer run on
+  the event loop. **Upgrading from compose**: take the new `docker-compose.yml`
+  (or drop the `worker` and `redis` services) - see docs/DEPLOYMENT.md.
+- **Uploads never sit in memory whole.** Files stay in their spooled temp files
+  and are read one at a time: a 20-frame batch, a calibration set or a `.zip`
+  archive no longer loads entirely into RAM (an archive was read whole before),
+  which matters on small hosts like a Raspberry Pi. Oversized files are refused
+  from their declared size before they are read, an over-cap request before its
+  body is received, and an archive member before it is unpacked. Batch routes
+  take at most 20 files per request; the web UI now also sends calibration
+  frames in batches of 20.
+- **Works under a path prefix.** The web UI builds every URL - assets, API calls,
+  images returned by the API, WebSockets - relative to the page, so it can be
+  served at `https://example.com/astro/` behind a reverse proxy or inside a Home
+  Assistant ingress. CI checks the source and the built bundle for root-absolute
+  URLs, and an e2e run walks the app behind a fake ingress proxy.
+
 - **Stack step: adaptive, colour-preserving stretch** (`stack.stretch_mode`,
   default `"adaptive"`). The stretch now works on luminance and carries colour
   as a ratio, and its curve is solved per image from the sky level and the
@@ -35,7 +60,24 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Admin password.** Settings - and every `/api/admin/*` and `/api/tokens`
+  route - now need an admin login; using the app (upload, edit, stack, download,
+  presets) stays open. On first start the Settings page asks to create the
+  password; until then the administration surface is locked. Settings ->
+  Security changes the password, lists the logged-in browsers (and logs them
+  out), and sets how long a login lasts (`admin_session_idle_days`, default 7,
+  30 at most). Failed logins are throttled per IP. A lost password is reset from
+  the host with `python -m app.cli reset-admin`. New routes under `/api/auth`
+  (docs/API.md "Admin authentication"); migration `0a1b2c3d4e5f` adds the
+  `admin_credentials` and `admin_sessions` tables.
 - `green_removal` (0-100): SCNR average-neutral green removal, in the Sky step.
+
+### Removed
+
+- `PROCESSING_MODE`, `REDIS_URL` and `CELERY_BROKER_URL` (ignored if still set),
+  the `worker` and `redis` compose services, `worker.log`, and the `redis` field
+  of `GET /api/health`. `celery`, `redis` and `celery-types` leave the
+  dependencies.
 
 ### Dependencies
 
@@ -43,6 +85,10 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   0.16.9 (dev).
 - Frontend (dev): vite 8.3.0 -> 8.3.1, vitest / @vitest/coverage-v8 5.0.1 ->
   5.0.2, @types/node 26.6.2 -> 26.6.3.
+- Backend: fastapi 0.141.1 -> 0.142.2.
+- Frontend (dev): vitest / @vitest/coverage-v8 5.0.2 -> 5.0.3, typescript-eslint
+  8.70.1 -> 8.71.0, globals 17.12.0 -> 17.13.0; brace-expansion 5.0.12 (transitive, via eslint) for
+  GHSA-q2hr-2g5m-vwhr / GHSA-qhr7-859c-m2p7 / GHSA-6j4f-fj2g-mc7p.
 
 ## [0.4.2] - 2026-09-11
 

@@ -18,8 +18,8 @@ class _NotTestEnv:
     """Stands in for ``get_settings()`` with ``is_test=False`` (real enforcement).
 
     Patched only on the two modules that check it, rather than flipping
-    ``APP_ENV`` globally - that would also disable Celery's eager test mode and
-    the no-file-logging guard, which this test has no business touching.
+    ``APP_ENV`` globally - that would also move background jobs onto threads and
+    drop the no-file-logging guard, which this test has no business touching.
     """
 
     is_test = False

@@ -154,8 +154,6 @@ export function StackView({ onEnhanceComposite, onWorkingChange }: StackViewProp
               selected={null}
               interactive={false}
               onRemovePending={removePending}
-              onSelect={() => {}}
-              onToggleExclude={() => {}}
             />
           </>
         )}

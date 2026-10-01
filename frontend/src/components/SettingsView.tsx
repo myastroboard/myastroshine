@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 
+import { AdminLoginForm, AdminSetupForm, FormError } from '@/components/AdminAuthForms';
+import { AdminSecurityPanel } from '@/components/AdminSecurityPanel';
 import { TokenManager } from '@/components/TokenManager';
+import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { useAppSettings } from '@/hooks/useAppSettings';
 import { useJobs } from '@/hooks/useJobs';
 import { useLogs } from '@/hooks/useLogs';
 import { useTranslation } from '@/hooks/useTranslation';
 import { apiClient } from '@/services/api';
+import { errorMessage } from '@/services/apiError';
 import type {
   AppSettings,
   ConfigExport,
@@ -15,9 +19,9 @@ import type {
   LogLevel,
 } from '@/types';
 
-type Section = 'general' | 'webhooks' | 'advanced' | 'logs' | 'operations';
+type Section = 'general' | 'webhooks' | 'advanced' | 'logs' | 'operations' | 'security';
 
-const SECTIONS: Section[] = ['general', 'webhooks', 'advanced', 'logs', 'operations'];
+const SECTIONS: Section[] = ['general', 'webhooks', 'advanced', 'logs', 'operations', 'security'];
 
 const LOG_LEVELS: LogLevel[] = ['debug', 'info', 'warning', 'error', 'critical'];
 
@@ -30,12 +34,34 @@ interface SectionProps {
  * Standalone runtime-configuration page (route `#/settings`). Reads and writes
  * `app_settings.json` through `/api/admin/app-settings`; nothing here is an
  * environment variable.
+ *
+ * Administration is the one part of the app behind a login: this page first
+ * shows the admin gate (set the password on first run, then log in) and only
+ * mounts the settings panels - and their admin API calls - once logged in.
  */
 export function SettingsView({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
-  const { draft, patch, reset, save, refresh, dirty, isLoading, isSaving, error } =
-    useAppSettings();
-  const [section, setSection] = useState<Section>('general');
+  const auth = useAdminAuth();
+  const status = auth.status;
+
+  let body: ReactNode;
+  if (auth.error) {
+    body = (
+      <div className="mt-8">
+        <FormError>{errorMessage(auth.error, t, t('settings.auth.errors.generic'))}</FormError>
+      </div>
+    );
+  } else if (!status) {
+    body = <p className="mt-8 text-xs text-faint">{t('common.loading')}</p>;
+  } else if (!status.adminEnabled) {
+    body = <p className="panel mt-8 text-sm text-muted">{t('settings.auth.admin_disabled')}</p>;
+  } else if (!status.configured) {
+    body = <AdminSetupForm onSubmit={auth.setup} />;
+  } else if (!status.authenticated) {
+    body = <AdminLoginForm onSubmit={auth.login} />;
+  } else {
+    body = <SettingsPanels onSignedOut={() => void auth.refresh()} />;
+  }
 
   return (
     <main className="mx-auto w-full max-w-4xl px-4 pb-24 pt-8 sm:px-6">
@@ -47,10 +73,33 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
         >
           <span aria-hidden>&lsaquo;</span> {t('settings.back_to_editor')}
         </button>
-        <h1 className="text-xl font-semibold tracking-tight text-ink">{t('settings.heading')}</h1>
-        <p className="text-sm text-muted">{t('settings.subheading')}</p>
+        <div className="flex items-start gap-3">
+          <div className="mr-auto flex flex-col gap-1">
+            <h1 className="text-xl font-semibold tracking-tight text-ink">{t('settings.heading')}</h1>
+            <p className="text-sm text-muted">{t('settings.subheading')}</p>
+          </div>
+          {status?.authenticated && (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => void auth.logout()}>
+              {t('settings.auth.logout')}
+            </button>
+          )}
+        </div>
       </div>
 
+      {body}
+    </main>
+  );
+}
+
+/** The settings themselves - only mounted for a logged-in admin. */
+function SettingsPanels({ onSignedOut }: { onSignedOut: () => void }) {
+  const { t } = useTranslation();
+  const { draft, patch, reset, save, refresh, dirty, isLoading, isSaving, error } =
+    useAppSettings();
+  const [section, setSection] = useState<Section>('general');
+
+  return (
+    <>
       {error && (
         <p className="mt-4 rounded-md border border-danger/30 bg-danger-wash px-3 py-2 text-xs text-danger">
           {error}
@@ -90,18 +139,16 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
 
           {section === 'logs' && <LogsSection />}
 
-          {draft && section !== 'logs' && section !== 'operations' && (
-            <>
-              {section === 'general' && <GeneralSection draft={draft} patch={patch} />}
-              {section === 'webhooks' && <WebhooksSection draft={draft} patch={patch} />}
-              {section === 'advanced' && (
-                <AdvancedSection draft={draft} patch={patch} onConfigImported={refresh} />
-              )}
-            </>
+          {draft && section === 'general' && <GeneralSection draft={draft} patch={patch} />}
+          {draft && section === 'webhooks' && <WebhooksSection draft={draft} patch={patch} />}
+          {draft && section === 'advanced' && (
+            <AdvancedSection draft={draft} patch={patch} onConfigImported={refresh} />
           )}
-
           {draft && section === 'operations' && (
             <OperationsSection draft={draft} patch={patch} />
+          )}
+          {draft && section === 'security' && (
+            <SecuritySection draft={draft} patch={patch} onSignedOut={onSignedOut} />
           )}
         </div>
       </div>
@@ -129,7 +176,7 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
           </div>
         </div>
       )}
-    </main>
+    </>
   );
 }
 
@@ -747,6 +794,30 @@ function OperationsSection({ draft, patch }: SectionProps) {
 }
 
 // --- row primitives --------------------------------------------------------
+
+function SecuritySection({
+  draft,
+  patch,
+  onSignedOut,
+}: SectionProps & { onSignedOut: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex flex-col">
+      <NumberRow
+        id="admin-session-idle"
+        label={t('settings.security.session_idle.label')}
+        hint={t('settings.security.session_idle.hint')}
+        value={draft.adminSessionIdleDays}
+        min={1}
+        max={30}
+        onChange={(adminSessionIdleDays) => patch({ adminSessionIdleDays })}
+      />
+      <div className="mt-4">
+        <AdminSecurityPanel onSignedOut={onSignedOut} />
+      </div>
+    </div>
+  );
+}
 
 function GroupLabel({ children }: { children: ReactNode }) {
   return (

@@ -413,6 +413,10 @@
       "operations": {
         "label": "Opérations",
         "blurb": "Tâches de traitement récentes et espace disque."
+      },
+      "security": {
+        "label": "Sécurité",
+        "blurb": "Mot de passe admin et navigateurs connectés."
       }
     },
     "groups": {
@@ -568,6 +572,52 @@
         "previous_page": "Précédent",
         "next_page": "Suivant",
         "page_info": "{from}-{to} sur {total}"
+      }
+    },
+    "auth": {
+      "admin_disabled": "L'API d'administration est désactivée sur cette instance (ADMIN_ENABLED=false).",
+      "logout": "Se déconnecter",
+      "password": "Mot de passe admin",
+      "current_password": "Mot de passe actuel",
+      "new_password": "Nouveau mot de passe",
+      "confirm_password": "Confirmer le mot de passe",
+      "setup": {
+        "title": "Créer le mot de passe admin",
+        "blurb": "Les paramètres sont réservés à l'administrateur. Choisissez un mot de passe d'au moins {min} caractères : il sera demandé pour ouvrir cette page. L'utilisation de l'application elle-même n'en a jamais besoin.",
+        "submit": "Créer et se connecter"
+      },
+      "login": {
+        "title": "Connexion administrateur",
+        "blurb": "Les paramètres sont réservés à l'administrateur. Saisissez le mot de passe admin pour continuer.",
+        "submit": "Se connecter"
+      },
+      "errors": {
+        "invalid_password": "Mot de passe incorrect.",
+        "locked_out": "Trop de tentatives échouées. Patientez un moment puis réessayez.",
+        "already_configured": "Un mot de passe admin existe déjà. Rechargez la page pour vous connecter.",
+        "generic": "Une erreur s'est produite. Réessayez.",
+        "too_short": "Le mot de passe doit contenir au moins {min} caractères.",
+        "mismatch": "Les deux mots de passe ne correspondent pas."
+      }
+    },
+    "security": {
+      "session_idle": {
+        "label": "Rester connecté (jours)",
+        "hint": "Une connexion admin inutilisée pendant cette durée prend fin. Jamais plus de 30 jours."
+      },
+      "change_password": {
+        "title": "Changer le mot de passe admin",
+        "blurb": "Tous les autres navigateurs connectés en admin sont déconnectés.",
+        "submit": "Changer le mot de passe",
+        "done": "Mot de passe changé."
+      },
+      "sessions": {
+        "title": "Navigateurs connectés",
+        "blurb": "Navigateurs actuellement connectés en admin.",
+        "this_browser": "ce navigateur",
+        "unknown_browser": "Navigateur inconnu",
+        "details": "{ip} - dernière activité {last_seen}",
+        "revoke": "Déconnecter"
       }
     }
   },

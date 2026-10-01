@@ -79,12 +79,11 @@ export function useImageProcessing(sessionId: string) {
   /**
    * Follow a processing job over the WebSocket until it finishes, bumping
    * `previewVersion` on completion so the preview refetches. Also handles a job
-   * that came back already terminal (PROCESSING_MODE=sync).
+   * that came back already terminal (a fast job can finish before the answer).
    *
    * Used for /process here and, via the returned handle, for jobs kicked off by
-   * other endpoints (preset apply, Auto Astro) - without this a queued job
-   * (PROCESSING_MODE=queue) would leave the preview on the previous result until
-   * the next user action.
+   * other endpoints (preset apply, Auto Astro) - without this a queued job would
+   * leave the preview on the previous result until the next user action.
    */
   const trackJob = useCallback((response: ProcessResponse) => {
     busyRef.current = true;
@@ -109,7 +108,7 @@ export function useImageProcessing(sessionId: string) {
     };
 
     if (response.status === 'completed' || response.status === 'failed') {
-      // Sync mode: the pipeline already ran (result on disk) - no socket needed.
+      // The job already finished (result on disk) - no socket needed.
       if (response.status === 'completed') {
         setStatus('completed');
         setPreviewVersion((version) => version + 1);

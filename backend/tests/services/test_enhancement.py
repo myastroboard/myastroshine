@@ -1,4 +1,4 @@
-"""EnhancementService orchestration (sync mode)."""
+"""EnhancementService orchestration: dispatch, the pipeline run, superseding, shutdown."""
 
 from __future__ import annotations
 
@@ -28,10 +28,11 @@ def enhancement(db_session) -> EnhancementService:
     )
 
 
-def test_dispatch_runs_inline_and_completes(
-    enhancement: EnhancementService, sample_image: np.ndarray
+def test_dispatch_runs_the_job_and_completes(
+    enhancement: EnhancementService, sample_image: np.ndarray, job_db
 ) -> None:
-    """dispatch() writes processed.jpg and returns a completed job."""
+    """dispatch() hands the job to the runner (inline in tests), which writes
+    processed.jpg; the answer carries the state the job reached."""
     record = enhancement.sessions.create_session(image_path="")
     enhancement.storage.save_original(record.session_id, sample_image)
 
@@ -524,3 +525,23 @@ def test_starnet2_is_fed_a_16_bit_image(
     cmd, pixels = seen[0]
     assert cmd[cmd.index("-i") + 1].endswith(".tif")
     assert pixels.dtype == np.uint16
+
+
+def test_run_stops_and_fails_the_job_when_the_server_shuts_down(
+    enhancement: EnhancementService, sample_image: np.ndarray
+) -> None:
+    """A shutdown mid-pipeline ends the job at its next step, marked failed."""
+    from app.services import job_runner
+    from app.services.job_runner import JobInterruptedError
+
+    record = enhancement.sessions.create_session(image_path="")
+    enhancement.storage.save_original(record.session_id, sample_image)
+    job = enhancement.jobs.create(record.session_id)
+    job_runner.get_job_runner().stopping.set()
+
+    with pytest.raises(JobInterruptedError):
+        enhancement.run(record.session_id, ProcessingParameters(contrast=1.5), job.job_id)
+
+    failed = enhancement.jobs.get(job.job_id)
+    assert failed.status == "failed"
+    assert failed.error == "interrupted by a server shutdown"

@@ -1,7 +1,7 @@
 """SQLAlchemy ORM models.
 
 Tables (see docs/ARCHITECTURE): sessions, jobs, presets, astrodex_links,
-webhook_tokens, stacks.
+webhook_tokens, stacks, admin_credentials, admin_sessions.
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ class SessionRecord(Base):
 
 
 class JobRecord(Base):
-    """An async processing job (direct or Celery-backed)."""
+    """A background processing job (``app.services.job_runner``)."""
 
     __tablename__ = "jobs"
     #: the admin job-history view filters by status and orders by created_at.
@@ -171,3 +171,38 @@ class WebhookToken(Base):
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoked: Mapped[bool] = mapped_column(default=False)
+
+
+class AdminCredential(Base):
+    """The single admin password (mono-poste: one row, ``id == 1``).
+
+    Only the scrypt hash is stored (see ``app.services.admin_auth``).
+    ``password_version`` is bumped on every change so every session minted with
+    an older password stops authenticating at once.
+    """
+
+    __tablename__ = "admin_credentials"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    password_hash: Mapped[str] = mapped_column(String(255))
+    password_version: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
+
+
+class AdminSession(Base):
+    """A logged-in admin browser. The cookie carries the raw token; only its
+    SHA-256 hash is stored."""
+
+    __tablename__ = "admin_sessions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    password_version: Mapped[int] = mapped_column(Integer)
+    client_ip: Mapped[str | None] = mapped_column(String(45))
+    user_agent: Mapped[str | None] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

@@ -2,7 +2,7 @@
 # Pins are kept at the latest release; scripts/check_deps_fresh.py enforces this.
 
 # Web framework
-fastapi==0.141.1
+fastapi==0.142.2
 uvicorn[standard]==0.54.0
 python-multipart==0.0.32
 websockets==17.1
@@ -33,6 +33,3 @@ packaging==26.3
 # Logging
 structlog==26.1.0
 
-# Job queue (optional, phase 2+)
-celery==5.6.3
-redis==8.1.0

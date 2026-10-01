@@ -11,8 +11,8 @@ from app.config import get_settings
 from app.utils.app_settings import get_app_settings
 
 
-def test_get_app_settings_returns_current_values(client) -> None:
-    response = client.get("/api/admin/app-settings")
+def test_get_app_settings_returns_current_values(admin_client) -> None:
+    response = admin_client.get("/api/admin/app-settings")
 
     assert response.status_code == 200
     body = response.json()
@@ -21,57 +21,59 @@ def test_get_app_settings_returns_current_values(client) -> None:
     assert body["astrodex_callback_urls"] == ["http://astrodex.test/api/webhooks/enhanced-images"]
 
 
-def test_post_app_settings_persists_and_is_readable(client) -> None:
-    current = client.get("/api/admin/app-settings").json()
+def test_post_app_settings_persists_and_is_readable(admin_client) -> None:
+    current = admin_client.get("/api/admin/app-settings").json()
     current["max_image_size_mb"] = 300
     current["stacking_enabled"] = False
 
-    response = client.post("/api/admin/app-settings", json=current)
+    response = admin_client.post("/api/admin/app-settings", json=current)
 
     assert response.status_code == 200
     assert response.json()["max_image_size_mb"] == 300
-    assert client.get("/api/admin/app-settings").json()["stacking_enabled"] is False
+    assert admin_client.get("/api/admin/app-settings").json()["stacking_enabled"] is False
     assert get_app_settings().max_image_size_mb == 300
 
 
-def test_post_app_settings_validates_bounds(client) -> None:
-    current = client.get("/api/admin/app-settings").json()
+def test_post_app_settings_validates_bounds(admin_client) -> None:
+    current = admin_client.get("/api/admin/app-settings").json()
     current["max_image_size_mb"] = 0  # below the ge=1 bound
 
-    response = client.post("/api/admin/app-settings", json=current)
+    response = admin_client.post("/api/admin/app-settings", json=current)
 
     assert response.status_code == 400
 
 
-def test_post_app_settings_403_when_admin_disabled(client, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_post_app_settings_403_when_admin_disabled(
+    admin_client, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setenv("ADMIN_ENABLED", "false")
     get_settings.cache_clear()
-    body = client.get("/api/admin/app-settings").json()
+    body = admin_client.get("/api/admin/app-settings").json()
 
-    response = client.post("/api/admin/app-settings", json=body)
+    response = admin_client.post("/api/admin/app-settings", json=body)
 
     assert response.status_code == 403
     get_settings.cache_clear()
 
 
-def test_post_app_settings_rejects_cors_wildcard(client) -> None:
-    current = client.get("/api/admin/app-settings").json()
+def test_post_app_settings_rejects_cors_wildcard(admin_client) -> None:
+    current = admin_client.get("/api/admin/app-settings").json()
     current["cors_origins"] = ["*"]
 
-    response = client.post("/api/admin/app-settings", json=current)
+    response = admin_client.post("/api/admin/app-settings", json=current)
 
     assert response.status_code == 400
 
 
-def test_post_app_settings_rejects_an_odd_starnet2_stride(client) -> None:
-    current = client.get("/api/admin/app-settings").json()
+def test_post_app_settings_rejects_an_odd_starnet2_stride(admin_client) -> None:
+    current = admin_client.get("/api/admin/app-settings").json()
     current["starnet2_stride"] = 7
 
-    assert client.post("/api/admin/app-settings", json=current).status_code == 400
+    assert admin_client.post("/api/admin/app-settings", json=current).status_code == 400
 
 
-def test_engine_status_reports_nothing_configured_by_default(client) -> None:
-    response = client.get("/api/admin/engine-status")
+def test_engine_status_reports_nothing_configured_by_default(admin_client) -> None:
+    response = admin_client.get("/api/admin/engine-status")
 
     assert response.status_code == 200
     body = response.json()
@@ -85,12 +87,12 @@ def test_engine_status_reports_nothing_configured_by_default(client) -> None:
     assert body["deepsnr"]["configured"] is False
 
 
-def test_engine_status_probes_a_configured_path(client) -> None:
-    current = client.get("/api/admin/app-settings").json()
+def test_engine_status_probes_a_configured_path(admin_client) -> None:
+    current = admin_client.get("/api/admin/app-settings").json()
     current["starnet2_path"] = "/nonexistent/starnet2"
-    client.post("/api/admin/app-settings", json=current)
+    admin_client.post("/api/admin/app-settings", json=current)
 
-    body = client.get("/api/admin/engine-status").json()
+    body = admin_client.get("/api/admin/engine-status").json()
 
     assert body["starnet2"]["configured"] is True
     assert body["starnet2"]["found"] is False
@@ -111,14 +113,14 @@ def test_engine_status_probes_a_configured_path(client) -> None:
     ],
 )
 def test_reads_403_when_admin_disabled(
-    client, monkeypatch: pytest.MonkeyPatch, method: str, path: str
+    admin_client, monkeypatch: pytest.MonkeyPatch, method: str, path: str
 ) -> None:
     """Reads used to be reachable regardless of ADMIN_ENABLED - they must be
     gated the same as the sibling write routes."""
     monkeypatch.setenv("ADMIN_ENABLED", "false")
     get_settings.cache_clear()
 
-    response = client.request(method, path)
+    response = admin_client.request(method, path)
 
     assert response.status_code == 403
     get_settings.cache_clear()
@@ -127,14 +129,14 @@ def test_reads_403_when_admin_disabled(
 # --- logs ---------------------------------------------------------------
 
 
-def test_tail_logs_empty_when_no_file(client) -> None:
-    response = client.get("/api/admin/logs")
+def test_tail_logs_empty_when_no_file(admin_client) -> None:
+    response = admin_client.get("/api/admin/logs")
 
     assert response.status_code == 200
     assert response.json() == {"lines": [], "returned": 0, "filtered_level": None}
 
 
-def test_tail_logs_newest_first_with_level_filter(client) -> None:
+def test_tail_logs_newest_first_with_level_filter(admin_client) -> None:
     get_settings().log_file.write_text(
         "2026-09-04 10:00:00,000 +0000 - app.a - INFO [f:1] - first\n"
         "2026-09-04 10:00:01,000 +0000 - app.b - ERROR [g:2] - boom\n"
@@ -143,40 +145,43 @@ def test_tail_logs_newest_first_with_level_filter(client) -> None:
         newline="",
     )
 
-    all_lines = client.get("/api/admin/logs").json()["lines"]
+    all_lines = admin_client.get("/api/admin/logs").json()["lines"]
     assert all_lines[0].endswith("third")  # newest first
 
-    errors = client.get("/api/admin/logs", params={"level": "error"}).json()
+    errors = admin_client.get("/api/admin/logs", params={"level": "error"}).json()
     assert errors["returned"] == 1
     assert "boom" in errors["lines"][0]
 
 
-def test_log_level_roundtrip_persists_and_applies(client) -> None:
-    assert client.get("/api/admin/logs/level").json() == {"file": "info", "console": "warning"}
+def test_log_level_roundtrip_persists_and_applies(admin_client) -> None:
+    assert admin_client.get("/api/admin/logs/level").json() == {
+        "file": "info",
+        "console": "warning",
+    }
 
-    response = client.post("/api/admin/logs/level", json={"file": "debug"})
+    response = admin_client.post("/api/admin/logs/level", json={"file": "debug"})
 
     assert response.status_code == 200
     assert response.json()["file"] == "debug"
     assert get_app_settings().log_level == "debug"
 
 
-def test_log_level_rejects_unknown_level(client) -> None:
-    assert client.post("/api/admin/logs/level", json={"console": "loud"}).status_code == 400
+def test_log_level_rejects_unknown_level(admin_client) -> None:
+    assert admin_client.post("/api/admin/logs/level", json={"console": "loud"}).status_code == 400
 
 
-def test_clear_logs_truncates_the_file(client) -> None:
+def test_clear_logs_truncates_the_file(admin_client) -> None:
     get_settings().log_file.write_text("noise\n", encoding="utf-8", newline="")
 
-    assert client.post("/api/admin/logs/clear").status_code == 204
+    assert admin_client.post("/api/admin/logs/clear").status_code == 204
     assert get_settings().log_file.read_text(encoding="utf-8") == ""
 
 
-def test_export_logs_returns_a_zip_of_the_present_files(client) -> None:
+def test_export_logs_returns_a_zip_of_the_present_files(admin_client) -> None:
     get_settings().log_file.write_bytes(b"main log\n")
     (get_settings().log_file.parent / "myastroshine.log.1").write_bytes(b"older\n")
 
-    response = client.get("/api/admin/logs/export")
+    response = admin_client.get("/api/admin/logs/export")
 
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/zip"
@@ -188,7 +193,7 @@ def test_export_logs_returns_a_zip_of_the_present_files(client) -> None:
 # --- operations -----------------------------------------------------------
 
 
-def test_list_jobs_hides_superseded_by_default(client, db_session) -> None:
+def test_list_jobs_hides_superseded_by_default(admin_client, db_session) -> None:
     from app.services.job import JobService
 
     jobs = JobService(db_session)
@@ -196,7 +201,7 @@ def test_list_jobs_hides_superseded_by_default(client, db_session) -> None:
     superseded = jobs.create("sess-1")
     jobs.update(superseded.job_id, status="superseded")
 
-    response = client.get("/api/admin/jobs")
+    response = admin_client.get("/api/admin/jobs")
 
     assert response.status_code == 200
     body = response.json()
@@ -206,7 +211,7 @@ def test_list_jobs_hides_superseded_by_default(client, db_session) -> None:
     assert body["offset"] == 0
 
 
-def test_list_jobs_filters_by_status(client, db_session) -> None:
+def test_list_jobs_filters_by_status(admin_client, db_session) -> None:
     from app.services.job import JobService
 
     jobs = JobService(db_session)
@@ -214,15 +219,15 @@ def test_list_jobs_filters_by_status(client, db_session) -> None:
     jobs.update(failed.job_id, status="failed", error="boom")
     jobs.create("sess-2")
 
-    response = client.get("/api/admin/jobs", params={"status": "failed"})
+    response = admin_client.get("/api/admin/jobs", params={"status": "failed"})
 
     body = response.json()
     assert body["total"] == 1
     assert body["jobs"][0]["error"] == "boom"
 
 
-def test_disk_usage_reports_bytes(client) -> None:
-    response = client.get("/api/admin/disk-usage")
+def test_disk_usage_reports_bytes(admin_client) -> None:
+    response = admin_client.get("/api/admin/disk-usage")
 
     assert response.status_code == 200
     body = response.json()
@@ -234,10 +239,12 @@ def test_disk_usage_reports_bytes(client) -> None:
 # --- backup / restore -------------------------------------------------------
 
 
-def test_config_export_includes_user_presets_but_not_builtins(client) -> None:
-    client.post("/api/presets", json={"name": "My Andromeda", "parameters": {"contrast": 1.4}})
+def test_config_export_includes_user_presets_but_not_builtins(admin_client) -> None:
+    admin_client.post(
+        "/api/presets", json={"name": "My Andromeda", "parameters": {"contrast": 1.4}}
+    )
 
-    response = client.get("/api/admin/config-export")
+    response = admin_client.get("/api/admin/config-export")
 
     assert response.status_code == 200
     body = response.json()
@@ -247,53 +254,55 @@ def test_config_export_includes_user_presets_but_not_builtins(client) -> None:
     assert body["settings"]["stacking_max_frames"] == 2000
 
 
-def test_config_import_applies_settings_and_creates_presets(client) -> None:
-    exported = client.get("/api/admin/config-export").json()
+def test_config_import_applies_settings_and_creates_presets(admin_client) -> None:
+    exported = admin_client.get("/api/admin/config-export").json()
     exported["settings"]["max_image_size_mb"] = 321
     exported["presets"] = [
         {"name": "Imported One", "category": "astronomy", "parameters": {"contrast": 1.2}}
     ]
 
-    response = client.post("/api/admin/config-import", json=exported)
+    response = admin_client.post("/api/admin/config-import", json=exported)
 
     assert response.status_code == 200
     body = response.json()
     assert body == {"presets_imported": 1, "presets_skipped": []}
-    assert client.get("/api/admin/app-settings").json()["max_image_size_mb"] == 321
-    names = {p["name"] for p in client.get("/api/presets").json()["presets"]}
+    assert admin_client.get("/api/admin/app-settings").json()["max_image_size_mb"] == 321
+    names = {p["name"] for p in admin_client.get("/api/presets").json()["presets"]}
     assert "Imported One" in names
 
 
-def test_config_import_skips_presets_with_a_colliding_name(client) -> None:
-    client.post("/api/presets", json={"name": "Mine", "parameters": {"contrast": 1.1}})
-    exported = client.get("/api/admin/config-export").json()
+def test_config_import_skips_presets_with_a_colliding_name(admin_client) -> None:
+    admin_client.post("/api/presets", json={"name": "Mine", "parameters": {"contrast": 1.1}})
+    exported = admin_client.get("/api/admin/config-export").json()
     exported["presets"] = [{"name": "Mine", "parameters": {"contrast": 1.9}}]
 
-    response = client.post("/api/admin/config-import", json=exported)
+    response = admin_client.post("/api/admin/config-import", json=exported)
 
     assert response.status_code == 200
     assert response.json() == {"presets_imported": 0, "presets_skipped": ["Mine"]}
     # the existing preset is untouched, not overwritten
-    listing = client.get("/api/presets").json()["presets"]
+    listing = admin_client.get("/api/presets").json()["presets"]
     mine = next(p for p in listing if p["name"] == "Mine")
     assert mine["parameters"]["contrast"] == 1.1
 
 
-def test_config_import_rejects_a_future_format_version(client) -> None:
-    exported = client.get("/api/admin/config-export").json()
+def test_config_import_rejects_a_future_format_version(admin_client) -> None:
+    exported = admin_client.get("/api/admin/config-export").json()
     exported["format_version"] = 99
 
-    response = client.post("/api/admin/config-import", json=exported)
+    response = admin_client.post("/api/admin/config-import", json=exported)
 
     assert response.status_code == 400
 
 
-def test_config_import_403_when_admin_disabled(client, monkeypatch: pytest.MonkeyPatch) -> None:
-    exported = client.get("/api/admin/config-export").json()
+def test_config_import_403_when_admin_disabled(
+    admin_client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    exported = admin_client.get("/api/admin/config-export").json()
     monkeypatch.setenv("ADMIN_ENABLED", "false")
     get_settings.cache_clear()
 
-    response = client.post("/api/admin/config-import", json=exported)
+    response = admin_client.post("/api/admin/config-import", json=exported)
 
     assert response.status_code == 403
     get_settings.cache_clear()

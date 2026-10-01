@@ -136,7 +136,7 @@ export default function App() {
             onClick={() => navigate('editor')}
           >
             <img
-              src="/logo.png"
+              src={`${import.meta.env.BASE_URL}logo.png`}
               alt=""
               width={28}
               height={28}

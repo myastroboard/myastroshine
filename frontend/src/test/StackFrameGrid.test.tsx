@@ -219,4 +219,22 @@ describe('StackFrameGrid', () => {
     const img = document.querySelector('img');
     expect(img?.className).toContain('opacity-40');
   });
+
+  it('tolerates frame clicks when no select / exclude handler is given', () => {
+    render(
+      <StackFrameGrid
+        pending={[]}
+        uploaded={[uploadedFrame(0)]}
+        selected={null}
+        interactive
+        onRemovePending={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /frame 1/i }));
+    fireEvent.click(screen.getByRole('checkbox'));
+
+    expect(screen.getByRole('checkbox')).toBeInTheDocument();
+  });
 });
+
