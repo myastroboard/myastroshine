@@ -4,14 +4,24 @@ All notable changes to MyAstroShine are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project aims to
 adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+From the release after 0.5.1, entries follow the MyAstroBoard organization format: `### Features`,
+`### Fixes`, `### Breaking changes`, one or two lines each. Older sections keep their
+original Keep a Changelog headings.
+
 ## [Unreleased]
 
-### Fixed
+### Features
 
-- **Uploads refused by a proxy explain themselves.** An upload that a proxy in
-  front of the app refuses as too large (Cloudflare caps a request at 100 MB)
-  now says so and suggests the local address, instead of showing the proxy's
-  raw HTML error page. Any other HTML error page is no longer shown as is.
+- None.
+
+### Fixes
+
+- An upload a proxy refuses as too large (Cloudflare caps requests at 100 MB) now says so and
+  suggests the local address, instead of showing the proxy's raw HTML error page.
+
+### Breaking changes
+
+- None.
 
 ## [0.5.1] - 2026-10-01
 

@@ -1,11 +1,12 @@
-# Shared Ruff baseline for the whole repository.
-# backend/pyproject.toml extends this with backend-specific settings.
+# Ruff configuration for the whole repository.
+# Extends the organization baseline (E, F, W, I, UP, B, line length 100), synced from
+# myastroboard/.github; backend/pyproject.toml extends this with backend-specific settings.
 
-line-length = 100
+extend = ".github/org/ruff.base.toml"
 target-version = "py314"
 
 [lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "PL", "S", "RUF"]
+extend-select = ["SIM", "PL", "S", "RUF"]
 # PLR0913/PLR0917: FastAPI routes and service constructors legitimately take
 # many (keyword) arguments via dependency injection.
 ignore = ["PLR0913", "PLR0917"]

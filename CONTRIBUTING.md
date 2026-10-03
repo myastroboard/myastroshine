@@ -1,7 +1,9 @@
 # Contributing to MyAstroShine
 
 Thanks for helping build MyAstroShine. This guide covers the practical workflow;
-`AGENTS.md` holds the hard rules that also apply to human contributors.
+`AGENTS.md` holds the hard rules that also apply to human contributors, on top of the
+[organization standards](https://github.com/myastroboard/.github/blob/main/standards/ORG_STANDARDS.md)
+shared by every MyAstroBoard repository.
 
 ## Development environment
 
@@ -63,8 +65,8 @@ Docker image gets it baked in via a build arg). To tag a release:
    `latest` on each), a Trivy scan, and a GitHub Release with notes generated
    from `CHANGELOG.md`'s `[Unreleased]` section plus the commit log.
 5. `.github/workflows/post-release-cleanup.yml` then opens a PR that files
-   that section under `## [0.2.0] - <date>` and resets `[Unreleased]` to
-   empty (`scripts/changelog_release.py`) - review and merge it.
+   that section under `## 0.2.0 (<date>)` and resets `[Unreleased]` to the
+   empty template (`scripts/changelog_release.py`) - review and merge it.
 
 **Docker Hub description**: `.github/workflows/dockerhub-description.yml`
 pushes `DOCKER_HUB.md` as the repo's long description and a short tagline to
@@ -119,10 +121,13 @@ of preference:
 
 ## Branching and commits
 
-- Branch from `main` as `feature/<short-description>` or `fix/<short-description>`.
-- Keep the branch rebased on the latest `main`; resolve conflicts yourself.
-- Conventional commit subjects: `feat:`, `fix:`, `docs:`, `style:`, `refactor:`,
-  `test:`, `chore:` in imperative mood, <= 72 chars.
+Branch names, commit format and AI disclosure follow the
+[organization's contributing guide](https://github.com/myastroboard/.github/blob/main/CONTRIBUTING.md).
+In short:
+
+- Branch from `main` as `<type>/<short-description>` (`feature/`, `fix/`, `chore/`,
+  `docs/`, `refactor/`, `test/`, `ci/`), and keep it rebased on the latest `main`.
+- Conventional commit subjects in imperative mood, <= 72 chars.
 - The maintainer performs every merge and every commit to `main`.
 
 ## Backend checks
@@ -219,8 +224,11 @@ own `e2e` CI job.
   and why; link the issue (`Fixes #123`).
 - Include tests for new behavior.
 - Update the relevant `docs/*.md` ([docs/README.md](docs/README.md) indexes them)
-  and `CHANGELOG.md`'s `[Unreleased]` section for any user-facing or behavioral
-  change.
+  for any user-facing or behavioral change.
+- A `feature/` or `fix/` branch adds a one- or two-line bullet to `CHANGELOG.md`
+  under `## [Unreleased]` (`### Features`, `### Fixes` or `### Breaking changes`,
+  replacing the `- None.` placeholder); the `Require Changelog Entry` check fails
+  the PR otherwise. Detail goes in `docs/`, linked from the bullet.
 - CI must be green before review.
 
 ## Project layout
