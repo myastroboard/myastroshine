@@ -114,3 +114,90 @@ def test_fit_reports_no_alignment_when_the_cv2_estimator_fails(
 
     assert not result.ok
     assert result.candidates == 6
+
+
+# -- refine_warp: a polynomial warp for wide-angle distortion ---------------
+
+_W, _H = 600, 800
+
+
+def _field(count: int = 900, seed: int = 5) -> np.ndarray:
+    rng = np.random.default_rng(seed)
+    return np.column_stack([rng.uniform(0, _W, count), rng.uniform(0, _H, count)])
+
+
+def _distort(points: np.ndarray, k: float) -> np.ndarray:
+    """Radial (barrel / pincushion) distortion about the frame centre."""
+    centre = np.array([_W / 2, _H / 2])
+    offset = points - centre
+    r2 = (offset**2).sum(axis=1, keepdims=True) / (np.hypot(_W, _H) / 2) ** 2
+    return centre + offset * (1 + k * r2)
+
+
+def _shifted_distorted_pair(k: float, seed: int = 5) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """A reference field and the same sky shifted by 40 px then seen through a
+    lens with distortion ``k`` in both frames - the sky moved, the lens did not,
+    so the frames differ by more than a rigid transform. Returns
+    ``(source, reference, global_matrix)``."""
+    sky = _field(seed=seed)
+    reference = _distort(sky, k)
+    source = _distort(sky + np.array([40.0, 0.0]), k)
+    keep = (source[:, 0] > 0) & (source[:, 0] < _W) & (reference[:, 0] > 0) & (reference[:, 0] < _W)
+    source, reference = source[keep], reference[keep]
+    matrix = np.array([[1.0, 0.0, -40.0], [0.0, 1.0, 0.0]])  # the best global guess
+    return source, reference, matrix
+
+
+def test_refine_warp_follows_lens_distortion_a_rigid_transform_cannot() -> None:
+    """With a distorted wide field, the warp maps every reference star back onto
+    its source star far better than the global shift."""
+    source, reference, matrix = _shifted_distorted_pair(k=0.04)
+    warp = star_match.refine_warp(source, reference, matrix, (_H, _W))
+    assert warp is not None
+    src_x, src_y = warp.source_coords(reference[:, 0], reference[:, 1])
+    error = np.hypot(src_x - source[:, 0], src_y - source[:, 1])
+    rigid = np.hypot(reference[:, 0] + 40.0 - source[:, 0], reference[:, 1] - source[:, 1])
+    assert float(np.sqrt(np.mean(error**2))) < 0.2 * float(np.sqrt(np.mean(rigid**2)))
+    assert warp.rms < 0.3
+
+
+def test_refine_warp_keeps_the_global_transform_when_it_is_already_right() -> None:
+    """No distortion: the warp cannot beat the global transform by 20%, so None."""
+    sky = _field()
+    rng = np.random.default_rng(1)
+    source = sky + rng.normal(0, 0.1, sky.shape)
+    matrix = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
+    assert star_match.refine_warp(source, sky, matrix, (_H, _W)) is None
+
+
+def test_refine_warp_needs_enough_well_spread_stars() -> None:
+    """Too few stars, or stars bunched in one part of the frame, give no warp."""
+    source, reference, matrix = _shifted_distorted_pair(k=0.04)
+    assert star_match.refine_warp(source[:40], reference[:40], matrix, (_H, _W)) is None
+    top = reference[:, 1] < _H / 3
+    assert star_match.refine_warp(source[top], reference[top], matrix, (_H, _W)) is None
+
+
+def test_refine_warp_rejects_a_warp_straying_far_from_the_global_transform() -> None:
+    """A fit implying a huge deviation from the global transform is not trusted."""
+    source, reference, matrix = _shifted_distorted_pair(k=0.04)
+    original = star_match._WARP_MAX_DEVIATION
+    try:
+        star_match._WARP_MAX_DEVIATION = 0.0001
+        assert star_match.refine_warp(source, reference, matrix, (_H, _W)) is None
+    finally:
+        star_match._WARP_MAX_DEVIATION = original
+
+
+def test_warp_remap_maps_scale_to_a_larger_output() -> None:
+    """The maps for a 2x output are the warp evaluated at half the coordinates,
+    times two - the align pass works at full resolution, registration at half."""
+    source, reference, matrix = _shifted_distorted_pair(k=0.04)
+    warp = star_match.refine_warp(source, reference, matrix, (_H, _W))
+    assert warp is not None
+    map_x, map_y = warp.remap_maps(2 * _W, 2 * _H)
+    assert map_x.shape == (2 * _H, 2 * _W)
+    for x, y in ((0, 0), (601, 333), (1199, 1599)):
+        sx, sy = warp.source_coords(np.array([x / 2]), np.array([y / 2]))
+        assert abs(float(map_x[y, x]) - 2 * float(sx[0])) < 0.05
+        assert abs(float(map_y[y, x]) - 2 * float(sy[0])) < 0.05
