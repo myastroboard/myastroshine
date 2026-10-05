@@ -945,12 +945,15 @@ with the composite:
 - `wide_field` - the EXIF 35 mm-equivalent focal length is at most 50 mm: a Milky
   Way / landscape lens. Two things change. **Vignetting is divided out first**
   (`devignette`): such a lens' linear data falls to about 1/3 in the corners (an
-  iPhone main camera: 0.29-0.37 on five frames from two nights, with and without
+  iPhone main camera: 0.26-0.38 on five frames from two nights, with and without
   a Milky Way in the frame) and nothing in the file corrects it - the phone
   hides it in its own render. With no flat to calibrate against, and a Milky Way
   that can cross the centre (a free radial fit absorbs it), the model is fixed to
   the natural `V(r) = (1 + a r^2)^-2` shape, one `a` per channel (phone lenses
-  shade colour too), fitted in log space on the 15th percentile of each ring
+  shade colour too), with `r` measured on each axis over its own half-length
+  (circular in sensor coordinates, elliptical in pixels: a radius over the
+  half-diagonal left the iPhone frames ~45% too bright at the long axis's ends,
+  a U-shaped residual, while this one fitted the same strength on both axes), fitted in log space on the 15th percentile of each ring
   around the centre from r = 0.3 outward (a band covers a small arc of each ring;
   the rings nearer the centre can lie wholly inside it), landscape pixels
   excluded. A fit implying corners above 0.9 or below 0.15 is not applied. Then

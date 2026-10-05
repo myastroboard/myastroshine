@@ -530,8 +530,9 @@ def devignette(linear: np.ndarray, sky_mask: np.ndarray | None = None) -> np.nda
     it absorbs the Milky Way. Two constraints separate them:
 
     - the shape is fixed to the natural ``cos^4``-like falloff,
-      ``V(r) = (1 + a r^2)^-2`` (``r`` = distance from the centre over the
-      half-diagonal), one ``a`` per channel (phone lenses also shade colour);
+      ``V(r) = (1 + a r^2)^-2`` (``r`` = distance from the centre with each axis
+      normalised by its half-length - see :func:`_normalised_radius`), one ``a``
+      per channel (phone lenses also shade colour);
     - it is fitted on a low percentile of each ring around the centre, from
       ``_VIG_FIT_MIN_RADIUS`` outward only: a band like the Milky Way covers a
       small arc of each ring, so the ring's darker pixels are background, while
@@ -539,7 +540,7 @@ def devignette(linear: np.ndarray, sky_mask: np.ndarray | None = None) -> np.nda
 
     Landscape pixels (``sky_mask``) are left out of the rings. Checked on five
     iPhone 16 Pro Max frames from two nights (with and without a Milky Way in the
-    centre): the corner gain came out at 0.29-0.37 every time. A fit implying a
+    centre): the corner gain came out at 0.26-0.38 every time. A fit implying a
     negligible (corner > 0.9) or implausible (< 0.15) falloff is not applied.
     """
     height, width = linear.shape[:2]
@@ -666,11 +667,18 @@ def _sky_colour_samples(
 
 
 def _normalised_radius(height: int, width: int) -> np.ndarray:
-    """Distance from the frame centre over the half-diagonal, per pixel."""
+    """Per-pixel distance from the frame centre, each axis normalised by its own
+    half-length (so 1 at the corners, ~0.71 at the edge midpoints).
+
+    Elliptical in pixels on a non-square frame, on purpose: a circular radius
+    left real iPhone frames ~45% too bright along the long axis's ends after
+    correction (a U-shaped residual top to bottom, flat side to side), while this
+    one fitted equal strengths on both axes and left the sky flat to +-6%.
+    """
     yy, xx = np.mgrid[0:height, 0:width].astype(np.float32)
-    radius: np.ndarray = np.hypot(yy - (height - 1) / 2, xx - (width - 1) / 2) / np.hypot(
-        height / 2, width / 2
-    )
+    x_norm = (xx - (width - 1) / 2) / (width / 2)
+    y_norm = (yy - (height - 1) / 2) / (height / 2)
+    radius: np.ndarray = np.hypot(x_norm, y_norm) / math.sqrt(2.0)
     return radius
 
 
