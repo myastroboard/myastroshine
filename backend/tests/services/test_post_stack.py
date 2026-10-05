@@ -486,12 +486,16 @@ def test_render_stack_base_treats_an_all_sky_mask_as_deep_sky() -> None:
 
 def _vignetted_milky_way(height: int = 300, width: int = 220, corner: float = 0.33) -> np.ndarray:
     """A flat sky with a bright diagonal band through the centre (a Milky Way),
-    under a cos^4-like vignetting falling to ``corner`` at the corners."""
+    under a cos^4-like vignetting falling to ``corner`` at the corners - circular
+    in sensor-normalised coordinates (each axis over its half-length), as
+    measured on an iPhone lens."""
     rng = np.random.default_rng(12)
     yy, xx = np.mgrid[0:height, 0:width].astype(np.float32)
     band = 0.012 * np.exp(-((((xx - width / 2) - 0.3 * (yy - height / 2)) / (width / 8)) ** 2))
     sky = 0.01 + band
-    radius = np.hypot(yy - (height - 1) / 2, xx - (width - 1) / 2) / np.hypot(height / 2, width / 2)
+    x_norm = (xx - (width - 1) / 2) / (width / 2)
+    y_norm = (yy - (height - 1) / 2) / (height / 2)
+    radius = np.hypot(x_norm, y_norm) / np.sqrt(2.0)
     strength = corner**-0.5 - 1.0
     vignetting = (1.0 + strength * radius**2) ** -2
     rgb = np.stack([sky * vignetting] * 3, axis=-1)
