@@ -114,3 +114,19 @@ def test_star_white_balance_measures_a_large_frame_on_a_downscaled_copy() -> Non
     gains = star_white_balance(frame)
     assert gains is not None
     assert _star_colour(frame * gains) == pytest.approx([1.0, 1.0, 1.0], abs=0.06)
+
+
+def test_neutralise_sky_measures_the_sky_inside_the_mask() -> None:
+    """With a sky mask, a dark landscape is not mistaken for the sky level."""
+    rng = np.random.default_rng(5)
+    linear = (np.array([0.02, 0.015, 0.01]) + rng.normal(0, 0.0005, (90, 120, 3))).astype(
+        np.float32
+    )
+    linear[60:] = 0.001  # landscape: the darker third of the frame
+    sky = np.zeros((90, 120), dtype=bool)
+    sky[:60] = True
+
+    _, level = neutralise_sky(linear, sky)
+    assert np.allclose(level, [0.02, 0.015, 0.01], atol=0.001)
+    _, unmasked_level = neutralise_sky(linear)
+    assert unmasked_level[0] < 0.005  # without it, the landscape is the "sky"

@@ -197,3 +197,38 @@ def test_faint_nebula_with_bright_stars_is_not_burnt_to_white() -> None:
     ridge = out[100:200, 150]  # BGR
     assert float(ridge.min(axis=1).max()) < 0.95  # never all three channels at white
     assert float(np.median(ridge[:, 2] - ridge[:, 0])) > 0.2  # still visibly red
+
+
+def test_a_sky_mask_puts_the_sky_at_the_target_despite_a_dark_landscape() -> None:
+    """Without a mask a large black landscape sets the sky statistics and the real
+    sky is over-brightened; with it the sky lands near the target background."""
+    rng = np.random.default_rng(9)
+    linear = (0.01 + rng.normal(0, 0.0008, (120, 160, 3))).astype(np.float32)
+    linear[60:] = -0.009  # a sky-neutralised landscape, well below the sky
+    sky = np.zeros((120, 160), dtype=bool)
+    sky[:60] = True
+
+    masked = float(np.median(adaptive_stretch(linear, 0.10, sky_mask=sky)[sky]))
+    unmasked = float(np.median(adaptive_stretch(linear, 0.10)[sky]))
+    assert abs(masked - 0.10) < 0.04
+    assert unmasked > masked + 0.05
+
+
+def test_protect_dark_sky_keeps_a_darker_region_above_black() -> None:
+    """A clean (low-noise) frame with a small region of darker sky (under the 10%
+    the sky level is read from): by default it is crushed to pure black;
+    protected, none of it is."""
+    rng = np.random.default_rng(3)
+    sky = np.full((160, 200), 0.01, dtype=np.float32)
+    sky[:, -16:] = 0.0075  # 8% of the frame, 25% darker
+    linear = np.stack([sky] * 3, axis=-1) + rng.normal(0, 0.00005, (160, 200, 3))
+    linear = linear.astype(np.float32)
+
+    plain = adaptive_stretch(linear, 0.10)
+    protected = adaptive_stretch(linear, 0.10, protect_dark_sky=True)
+
+    def crushed(img: np.ndarray) -> float:
+        return float((img[:, -12:].max(axis=2) == 0).mean())
+
+    assert crushed(plain) > 0.95
+    assert crushed(protected) == 0.0

@@ -20,6 +20,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import cv2
 import numpy as np
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -44,15 +45,23 @@ from app.services.frame_quality import FrameQuality
 from app.services.integration import IntegrationService, highpass_noise
 from app.services.job import JobService
 from app.services.job_runner import get_job_runner, raise_if_stopping
-from app.services.post_stack import PostStackReport, apply_post_stack, render_stack_base
+from app.services.post_stack import (
+    PostStackReport,
+    RenderHints,
+    apply_post_stack,
+    render_hints_for,
+    render_stack_base,
+)
 from app.services.session import SessionService
 from app.services.storage import StorageService
 from app.utils.app_settings import get_app_settings
 from app.utils.linear_ingest import LinearFrame, ingest_frame, summarize_capture
+from app.utils.sky_mask import fit_sky_mask
 
 logger = get_logger(__name__)
 
 _MIN_FRAMES = 2
+_NOISE_WEIGHTING = "noise"
 _COLOR_NDIM = 3
 _MAX_CALIBRATION_FRAMES = 256  # per kind - well above any real dark/flat/bias run
 
@@ -284,9 +293,11 @@ class StackingService:
         # (background extraction + colour calibration + stretch); every later
         # /process rebuilds from composite.npy, so this only has to match the
         # StackParameters() defaults.
-        display = np.clip(render_stack_base(composite, StackParameters()) * 255.0, 0, 255).astype(
-            np.uint8
-        )
+        sky_mask = self.storage.load_stack_sky_mask(stack_id)
+        hints = RenderHints.from_dict(self.storage.load_stack_render_hints(stack_id))
+        display = np.clip(
+            render_stack_base(composite, StackParameters(), sky_mask, hints) * 255.0, 0, 255
+        ).astype(np.uint8)
         self.storage.save_original(session.session_id, display)
         session.image_path = str(self.storage.original_path(session.session_id))
 
@@ -338,13 +349,29 @@ class StackingService:
         def on_progress(step: str, percent: int, detail: str | None = None) -> None:
             self._emit(job_id, stack_id, step, 15 + int(percent * 0.8), detail=detail)
 
+        hints = render_hints_for(
+            [
+                self.storage.load_frame_acquisition(stack_id, i).get("acquisition", {})
+                for i in indices
+            ]
+        )
+        self.storage.save_stack_render_hints(stack_id, hints.to_dict())
+        weighting = record.weighting
+        if hints.camera_processed and weighting == _NOISE_WEIGHTING:
+            # A phone denoises each frame by its own ISO-dependent amount, so the
+            # measured noise says how hard it smoothed, not how good the frame
+            # is: on a real iPhone series the ISO 10000 frames read 3x "cleaner"
+            # and got 10x the weight. Equal weights instead.
+            weighting = "none"
+            logger.info("noise weighting replaced by equal weights", stack_id=stack_id)
+
         result = self._integration.integrate(
             stack_id,
             indices,
             transform=record.registration_transform,
             combination=record.combination_method,
             rejection=record.rejection_algo,
-            weighting=record.weighting,
+            weighting=weighting,
             quality_filter=record.quality_filter,
             protected=set(record.included_frames or []),
             calibration=masters,
@@ -361,6 +388,12 @@ class StackingService:
             # extraction / colour calibration / stretch are non-destructive
             # editor steps (see post_stack.render_stack_base).
             composite, post_stack = apply_post_stack(result.composite, result.coverage)
+        self._store_sky_mask(
+            stack_id,
+            result.reference_index,
+            result.composite.shape,
+            post_stack.cropped if post_stack else None,
+        )
 
         measured = None
         if result.reference_noise > 0:
@@ -377,6 +410,7 @@ class StackingService:
             "aligned": result.aligned,
             "calibrated": calibrated,
             "quality_filter": record.quality_filter,
+            "weighting": weighting,
             "post_process": _post_stack_dict(post_stack),
             "frames": [_quality_dict(q) for q in result.frame_quality],
         }
@@ -395,6 +429,33 @@ class StackingService:
             drizzle_factor=record.drizzle_factor,
         )
         return composite, stats
+
+    def _store_sky_mask(
+        self,
+        stack_id: str,
+        reference_index: int,
+        full_shape: tuple[int, ...],
+        crop: tuple[int, int, int, int] | None,
+    ) -> None:
+        """Give the composite the reference frame's sky matte, if it has one.
+
+        Every frame is warped into the reference frame's geometry, so the
+        reference's own matte (a ProRAW's) marks the composite's sky; it is
+        brought to the composite's size (drizzle included) and given the same
+        wedge crop. A stale mask from an earlier run is removed when the new
+        reference has none, or none with a landscape in it.
+        """
+        matte = self.storage.load_frame_sky_matte(stack_id, reference_index)
+        if matte is None or fit_sky_mask(matte, full_shape) is None:
+            self.storage.delete_stack_sky_mask(stack_id)
+            return
+        height, width = full_shape[:2]
+        mask = cv2.resize(matte, (width, height), interpolation=cv2.INTER_LINEAR)
+        if crop is not None:
+            top, left, crop_height, crop_width = crop
+            mask = mask[top : top + crop_height, left : left + crop_width]
+        self.storage.save_stack_sky_mask(stack_id, mask)
+        logger.info("stack sky mask stored", stack_id=stack_id, reference=reference_index)
 
     def _emit(
         self,

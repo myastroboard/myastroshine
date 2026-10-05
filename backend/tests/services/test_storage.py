@@ -74,3 +74,28 @@ def test_linear_frame_is_stored_compact_and_round_trips(tmp_path: Path) -> None:
 
     storage.save_linear_frame("s", 1, LinearFrame(data=data, source_bit_depth=32))
     assert np.load(storage.linear_frame_path("s", 1)).dtype == np.float32
+
+
+def test_stack_sky_mask_round_trips_and_is_optional(tmp_path: Path) -> None:
+    """A nightscape composite's sky mask is stored next to it; a stack without one
+    loads ``None``."""
+    storage = StorageService(root=tmp_path)
+    assert storage.load_stack_sky_mask("stack-1") is None
+
+    mask = np.zeros((6, 8), dtype=np.uint8)
+    mask[:4] = 255
+    storage.save_stack_sky_mask("stack-1", mask)
+    loaded = storage.load_stack_sky_mask("stack-1")
+    assert loaded is not None
+    assert np.array_equal(loaded, mask)
+
+
+def test_stack_render_hints_round_trip_and_are_optional(tmp_path: Path) -> None:
+    """The render hints sidecar is stored next to the composite; absent -> None."""
+    storage = StorageService(root=tmp_path)
+    assert storage.load_stack_render_hints("stack-1") is None
+    storage.save_stack_render_hints("stack-1", {"camera_processed": True, "wide_field": False})
+    assert storage.load_stack_render_hints("stack-1") == {
+        "camera_processed": True,
+        "wide_field": False,
+    }

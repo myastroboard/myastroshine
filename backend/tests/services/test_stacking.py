@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import cv2
@@ -684,3 +685,89 @@ def test_process_stops_at_its_next_step_when_the_server_shuts_down(
         stacking.process(record.stack_id, "job-interrupted")
 
     assert stacking.get_result(record.stack_id).status == "failed"
+
+
+def _matte(height: int, width: int, landscape_rows: int) -> np.ndarray:
+    """A quarter-size sky matte (255 = sky) with landscape along the bottom."""
+    matte = np.full((height // 4, width // 4), 255, dtype=np.uint8)
+    matte[matte.shape[0] - landscape_rows // 4 :] = 0
+    return matte
+
+
+def test_a_stack_inherits_the_reference_frames_sky_matte(
+    stacking: StackingService, star_field: np.ndarray
+) -> None:
+    """Frames are aligned onto the reference, so its matte marks the composite's
+    sky: it is stored at the composite's size and the default render uses it."""
+    record = stacking.initiate(InitiateStackRequest(frame_count=3))
+    matte = _matte(120, 160, landscape_rows=32)
+    for i, frame in enumerate(_shifted_frames(star_field, 3)):
+        stacking.add_frame(record.stack_id, i, replace(frame, sky_matte=matte))
+
+    done = stacking.process(record.stack_id)
+
+    mask = stacking.storage.load_stack_sky_mask(record.stack_id)
+    assert mask is not None
+    composite = stacking.storage.load_stack_composite(record.stack_id)
+    assert mask.shape == composite.shape[:2]
+    assert mask[:40].min() == 255
+    assert mask[-10:].max() == 0
+    assert done.quality_report is not None
+
+
+def test_a_stack_without_mattes_has_no_sky_mask(
+    stacking: StackingService, star_field: np.ndarray
+) -> None:
+    """Deep-sky frames (no matte) leave the composite maskless."""
+    record = stacking.initiate(InitiateStackRequest(frame_count=2))
+    for i, frame in enumerate(_shifted_frames(star_field, 2)):
+        stacking.add_frame(record.stack_id, i, frame)
+    stacking.process(record.stack_id)
+    assert stacking.storage.load_stack_sky_mask(record.stack_id) is None
+
+
+def test_re_uploading_a_frame_without_a_matte_drops_the_old_one(
+    stacking: StackingService, star_field: np.ndarray
+) -> None:
+    """A replaced frame never keeps the previous file's matte."""
+    record = stacking.initiate(InitiateStackRequest(frame_count=2))
+    with_matte = replace(_frame(star_field), sky_matte=_matte(120, 160, landscape_rows=32))
+    stacking.add_frame(record.stack_id, 0, with_matte)
+    assert stacking.storage.load_frame_sky_matte(record.stack_id, 0) is not None
+
+    stacking.add_frame(record.stack_id, 0, _frame(star_field))
+    assert stacking.storage.load_frame_sky_matte(record.stack_id, 0) is None
+
+
+_PHONE_METADATA = {"camera_processed": "1", "focal_35mm": "24"}
+
+
+def test_a_phone_stack_uses_equal_weights_and_records_its_render_hints(
+    stacking: StackingService, star_field: np.ndarray
+) -> None:
+    """The phone denoises each frame by its own amount, so noise weighting is
+    replaced by equal weights; the composite's render hints are stored."""
+    record = stacking.initiate(InitiateStackRequest(frame_count=3))
+    for i, frame in enumerate(_shifted_frames(star_field, 3)):
+        stacking.add_frame(record.stack_id, i, replace(frame, metadata=_PHONE_METADATA))
+
+    done = stacking.process(record.stack_id)
+
+    assert done.quality_report is not None
+    assert done.quality_report["weighting"] == "none"
+    assert stacking.storage.load_stack_render_hints(record.stack_id) == {
+        "camera_processed": True,
+        "wide_field": True,
+    }
+
+
+def test_a_camera_stack_keeps_noise_weighting(
+    stacking: StackingService, star_field: np.ndarray
+) -> None:
+    """Frames that are not camera-processed keep the requested weighting."""
+    record = stacking.initiate(InitiateStackRequest(frame_count=2))
+    for i, frame in enumerate(_shifted_frames(star_field, 2)):
+        stacking.add_frame(record.stack_id, i, frame)
+    done = stacking.process(record.stack_id)
+    assert done.quality_report is not None
+    assert done.quality_report["weighting"] == "noise"

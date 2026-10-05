@@ -154,8 +154,12 @@ Every route is implemented and tested end to end.
   the editor's linear "Stack" step (background extraction, colour calibration,
   tunable deep stretch - see `docs/ALGORITHMS.md`) drives every render. 2D data
   is read as monochrome; a 3-plane array as RGB; a CFA mosaic is debayered.
+- **Linear DNG** (an Apple ProRAW: already demosaiced RGB) - also a composite
+  session, `is_stack: true`. A ProRAW's sky matte, when it shows a landscape, is
+  kept with the composite and makes the "Stack" step measure the sky only (and
+  skips the border trim).
 - **Camera RAW** (`.cr2` `.cr3` `.nef` `.arw` `.dng` `.orf` `.rw2` `.pef`
-  `.raf`, via `rawpy`/libraw) - demosaiced with the camera's as-shot white
+  `.raf`, via `rawpy`/libraw; a Bayer `.dng`) - demosaiced with the camera's as-shot white
   balance, standard sRGB-ish tone response (a normal starting point to edit
   further, not a scientific stretch like FITS).
 
@@ -227,7 +231,7 @@ straighten -> crop; crop coordinates are fractions of the rotated/flipped image)
 turn changes the result's dimensions.
 
 `stack` is a nested object, used **only** for a composite session - one produced
-by the stacker, or a linear upload (FITS / 16-bit, `is_stack: true`). It runs as
+by the stacker, or a linear upload (FITS / 16-bit / linear DNG, `is_stack: true`). It runs as
 a non-destructive pre-stage on the 32-bit linear composite, ahead of every other
 stage; it is ignored for an ordinary 8-bit image upload.
 

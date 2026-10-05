@@ -46,6 +46,7 @@ class PreparedFrame:
     data: np.ndarray
     meta: dict[str, Any] = field(default_factory=dict)
     thumbnail: np.ndarray = field(default_factory=lambda: np.zeros((1, 1, 3), np.uint8))
+    sky_matte: np.ndarray | None = None
 
 
 def _pack_frame(data: np.ndarray, source_bit_depth: int) -> np.ndarray:
@@ -173,6 +174,17 @@ class StorageService:
     def _frame_meta_path(self, stack_id: str, index: int) -> Path:
         return self.stack_frames_dir(stack_id) / f"{index:0{_FRAME_INDEX_WIDTH}d}.json"
 
+    def _frame_sky_matte_path(self, stack_id: str, index: int) -> Path:
+        return self.stack_frames_dir(stack_id) / f"{index:0{_FRAME_INDEX_WIDTH}d}_sky.npy"
+
+    def load_frame_sky_matte(self, stack_id: str, index: int) -> np.ndarray | None:
+        """A stored frame's sky matte, or ``None`` when its file had none."""
+        path = self._frame_sky_matte_path(stack_id, index)
+        if not path.exists():
+            return None
+        matte: np.ndarray = np.load(path)
+        return matte
+
     def stack_thumb_path(self, stack_id: str, index: int) -> Path:
         return self.stack_frames_dir(stack_id) / f"{index:0{_FRAME_INDEX_WIDTH}d}_thumb.jpg"
 
@@ -280,11 +292,19 @@ class StorageService:
                 "acquisition": frame.metadata,
             },
             thumbnail=to_display_bgr(frame, _STACK_THUMB_MAX_SIZE),
+            sky_matte=frame.sky_matte,
         )
 
     def write_linear_frame(self, stack_id: str, index: int, prepared: PreparedFrame) -> None:
-        """Write a :meth:`prepare_linear_frame` result to disk (fast: three files)."""
+        """Write a :meth:`prepare_linear_frame` result to disk (fast: three files,
+        plus the frame's sky matte when it has one - a replaced frame never keeps
+        the previous one's)."""
         self.stack_frames_dir(stack_id, create=True)
+        matte_path = self._frame_sky_matte_path(stack_id, index)
+        if prepared.sky_matte is not None:
+            np.save(matte_path, prepared.sky_matte.astype(np.uint8))
+        else:
+            matte_path.unlink(missing_ok=True)
         np.save(self.linear_frame_path(stack_id, index), prepared.data)
         self._frame_meta_path(stack_id, index).write_text(
             json.dumps(prepared.meta), encoding="utf-8"
@@ -330,6 +350,38 @@ class StorageService:
     def load_stack_composite(self, stack_id: str) -> np.ndarray:
         composite: np.ndarray = np.load(self.stack_composite_path(stack_id))
         return composite
+
+    def stack_sky_mask_path(self, stack_id: str) -> Path:
+        """A nightscape's sky mask (``uint8``, 255 = sky), when the composite has one."""
+        return self.stack_dir(stack_id) / "sky_mask.npy"
+
+    def save_stack_sky_mask(self, stack_id: str, mask: np.ndarray) -> None:
+        self.stack_dir(stack_id, create=True)
+        np.save(self.stack_sky_mask_path(stack_id), mask.astype(np.uint8))
+
+    def stack_render_hints_path(self, stack_id: str) -> Path:
+        """What the source frames say about rendering the composite (JSON)."""
+        return self.stack_dir(stack_id) / "render_hints.json"
+
+    def save_stack_render_hints(self, stack_id: str, hints: dict[str, Any]) -> None:
+        self.stack_dir(stack_id, create=True)
+        self.stack_render_hints_path(stack_id).write_text(json.dumps(hints), encoding="utf-8")
+
+    def load_stack_render_hints(self, stack_id: str) -> dict[str, Any] | None:
+        path = self.stack_render_hints_path(stack_id)
+        if not path.exists():
+            return None
+        return dict(json.loads(path.read_text(encoding="utf-8")))
+
+    def delete_stack_sky_mask(self, stack_id: str) -> None:
+        self.stack_sky_mask_path(stack_id).unlink(missing_ok=True)
+
+    def load_stack_sky_mask(self, stack_id: str) -> np.ndarray | None:
+        path = self.stack_sky_mask_path(stack_id)
+        if not path.exists():
+            return None
+        mask: np.ndarray = np.load(path)
+        return mask
 
     def delete_stack(self, stack_id: str) -> None:
         path = self.stack_dir(stack_id)

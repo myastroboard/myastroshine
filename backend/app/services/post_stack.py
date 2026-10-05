@@ -23,8 +23,10 @@ calibration are still the rest of the editor's job.
 
 from __future__ import annotations
 
+import itertools
+import math
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import cv2
 import numpy as np
@@ -33,6 +35,7 @@ from app.logging_config import get_logger
 from app.services.color_calibration import neutralise_sky, star_white_balance
 from app.services.stretch import adaptive_stretch
 from app.utils.image_utils import stretch_composite_linear
+from app.utils.sky_mask import fit_sky_mask
 
 if TYPE_CHECKING:
     from app.models import StackParameters
@@ -67,6 +70,37 @@ _BG_TILE_PERCENTILE = 8.0
 _BG_OBJECT_SIGMA = 1.8
 _BG_REJECT_ITERATIONS = 3
 _BG_POLY_DEGREE = 2
+# A nightscape (sky mask present): the light-pollution dome climbs steeply toward
+# the horizon, which a paraboloid flattens out - a cubic follows it while still
+# being far too smooth to model the Milky Way's structure.
+_BG_POLY_DEGREE_NIGHTSCAPE = 3
+_BG_POLY_DEGREE_WIDE_FIELD = 1  # a tilted plane: see RenderHints.wide_field
+_BG_MIN_TILE_SKY = 0.5  # a lattice tile is sampled only when at least half of it is sky
+_HORIZON_FEATHER = 0.004  # sky-only corrections fade over this fraction of the frame size
+# Wide-field vignetting (see devignette).
+_VIG_ESTIMATE_MAX_SIZE = 512
+_VIG_FIT_MIN_RADIUS = 0.3  # inside this the rings can lie wholly within the Milky Way
+_VIG_RINGS = 18
+_VIG_RING_PERCENTILE = 15.0  # the darker pixels of a ring: background, not the Milky Way band
+_VIG_MIN_RING_PIXELS = 50
+_VIG_MIN_RINGS = 8
+_VIG_STRENGTHS = np.linspace(0.0, 3.0, 301)  # corner gain (1 + a)^-2 from 1 down to 1/16
+_VIG_MIN_CORNER = 0.15
+_VIG_MAX_CORNER = 0.9
+_VIG_GAIN_STEP = 4  # the gain map is smooth: build it at 1/4 resolution
+# Wide-field sky colour flattening (see flatten_sky_colour).
+_CF_ESTIMATE_MAX_SIZE = 512
+_CF_GRID = (16, 12)  # rows x columns of lattice tiles
+_CF_MIN_TILE_SKY = 0.8
+_CF_DARK_PERCENTILE = 30.0  # a tile's sky colour: its darker pixels, between the stars
+_CF_BACKGROUND_PERCENTILE = 70.0  # the brightest 30% of tiles are the Milky Way
+_CF_MIN_TILES = 20
+_CF_POLY_DEGREE = 2
+_CF_REJECT_ITERATIONS = 3
+_CF_REJECT_SIGMA = 2.0
+_CF_GAIN_CLIP = (0.5, 2.0)
+_CF_SURFACE_SIZE = 64
+_MAD_SIGMA = 1.4826
 _BG_MIN_SAMPLES = 10  # below this many object-free tiles, fall back to a flat background
 # The degree-2 surface is a smooth global bowl; a Seestar / alt-az stack often
 # keeps a *sharper* edge/corner falloff in one or more channels that a paraboloid
@@ -105,6 +139,56 @@ class PostStackReport:
     cropped: tuple[int, int, int, int] | None  # (top, left, height, width) kept, or None
 
 
+@dataclass(frozen=True)
+class RenderHints:
+    """What the source frames say about how to render a composite.
+
+    ``camera_processed``: every frame is a linear DNG a camera has already merged,
+    denoised and white-balanced (a phone's ProRAW). Its white balance is kept -
+    the star white balance cast real iPhone frames yellow-green (lens fringing
+    and skyglow bias the star colours) - and its noise level is not a quality
+    signal (see :mod:`app.services.stacking`).
+
+    ``wide_field``: a 35 mm-equivalent focal length of at most
+    ``WIDE_FIELD_MAX_FOCAL_35MM`` - a Milky Way / landscape lens, whose frame the
+    Milky Way can cross from edge to edge. Such a lens vignettes strongly (an
+    iPhone main camera's linear data falls to ~1/3 in the corners) and a free
+    background surface bends to the Milky Way's broad glow and the vignetting
+    together, carving dark holes into it. So the vignetting is first divided out
+    with a fixed-shape radial model (:func:`devignette`), the sky's remaining
+    colour shading is flattened (:func:`flatten_sky_colour`), background
+    extraction fits only a tilted plane (a light-pollution gradient), and the
+    stretch keeps the darkest real sky above its black point.
+    """
+
+    camera_processed: bool = False
+    wide_field: bool = False
+
+    def to_dict(self) -> dict[str, bool]:
+        return {"camera_processed": self.camera_processed, "wide_field": self.wide_field}
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any] | None) -> RenderHints:
+        data = data or {}
+        return cls(
+            camera_processed=bool(data.get("camera_processed")),
+            wide_field=bool(data.get("wide_field")),
+        )
+
+
+WIDE_FIELD_MAX_FOCAL_35MM = 50.0
+
+
+def render_hints_for(acquisitions: list[dict[str, Any]]) -> RenderHints:
+    """The :class:`RenderHints` for a composite built from these frames' metadata."""
+    focals = [float(a["focal_35mm"]) for a in acquisitions if a.get("focal_35mm")]
+    return RenderHints(
+        camera_processed=bool(acquisitions)
+        and all(a.get("camera_processed") == "1" for a in acquisitions),
+        wide_field=bool(focals) and max(focals) <= WIDE_FIELD_MAX_FOCAL_35MM,
+    )
+
+
 def apply_post_stack(
     composite: np.ndarray, coverage: np.ndarray
 ) -> tuple[np.ndarray, PostStackReport]:
@@ -116,37 +200,66 @@ def apply_post_stack(
     return cropped, PostStackReport(box)
 
 
-def render_stack_base(composite: np.ndarray, params: StackParameters) -> np.ndarray:
+def render_stack_base(
+    composite: np.ndarray,
+    params: StackParameters,
+    sky_mask: np.ndarray | None = None,
+    hints: RenderHints | None = None,
+) -> np.ndarray:
     """Linear composite (already wedge-cropped) -> BGR ``float32`` ``[0, 1]``.
 
     Background extraction and colour calibration run first, in linear space and
     only when enabled; the stretch always runs, with a target background the
     "Stretch" control tunes. The output feeds straight into the enhancement
     pipeline's background/creative stages.
+
+    ``sky_mask`` (any resolution, high = sky - see :mod:`app.utils.sky_mask`)
+    marks a nightscape's landscape so every sky measurement skips it. ``None``,
+    or a mask with no real foreground, is the plain deep-sky path, unchanged.
+    ``hints`` (:class:`RenderHints`) adapt it to the source: a camera-processed
+    frame keeps its white balance, a wide-field one gets a gentler background
+    extraction. ``None`` is the deep-sky path.
     """
+    hints = hints or RenderHints()
     linear = np.nan_to_num(composite.astype(np.float32, copy=False))
     if linear.ndim == 2:  # noqa: PLR2004 - a mono stack: give the shared code 3 planes
         linear = np.repeat(linear[:, :, np.newaxis], _COLOR_NDIM, axis=2)
     target = _STRETCH_TARGET_LOW * (_STRETCH_TARGET_HIGH / _STRETCH_TARGET_LOW) ** params.stretch
+    sky = fit_sky_mask(sky_mask, linear.shape)
 
     if params.stretch_mode == "classic":
+        if hints.wide_field:
+            linear = flatten_sky_colour(devignette(linear, sky), sky)
         if params.background_extraction > 0:
-            linear, _ = extract_background(linear, params.background_extraction / 100.0)
+            linear, _ = extract_background(
+                linear, params.background_extraction / 100.0, sky, wide_field=hints.wide_field
+            )
         if params.color_calibration:
             linear, _ = calibrate_colour(linear)
         return stretch_composite_linear(linear, target_background=target)
 
     source_peak = linear.max(axis=2)
+    if hints.wide_field:
+        linear = flatten_sky_colour(devignette(linear, sky), sky)
     if params.background_extraction > 0:
-        linear, _ = extract_background(linear, params.background_extraction / 100.0)
-    linear, _ = neutralise_sky(linear)
-    if params.color_calibration:
+        linear, _ = extract_background(
+            linear, params.background_extraction / 100.0, sky, wide_field=hints.wide_field
+        )
+    linear, _ = neutralise_sky(linear, sky)
+    # A nightscape or a camera-processed frame keeps the camera's white balance:
+    # its star colours are not a usable reference - a phone lens' blue fringing
+    # and the skyglow round each star skewed the gains (blue cut by a third on
+    # real iPhone ProRAW frames, a yellow-green cast), while the camera's own
+    # balance looked natural.
+    if params.color_calibration and sky is None and not hints.camera_processed:
         gains = star_white_balance(linear)
         if gains is not None:
             linear = linear * gains
         else:  # too few clean stars: fall back to balancing the signal means
-            linear, _ = neutralise_sky(calibrate_colour(np.clip(linear, 0.0, None))[0])
-    return adaptive_stretch(linear, target, source_peak=source_peak)
+            linear, _ = neutralise_sky(calibrate_colour(np.clip(linear, 0.0, None))[0], sky)
+    return adaptive_stretch(
+        linear, target, source_peak=source_peak, sky_mask=sky, protect_dark_sky=hints.wide_field
+    )
 
 
 # -- 1. crop the rotation wedge ---------------------------------------------
@@ -263,7 +376,13 @@ def crop_low_signal_border(
 # -- 2. background extraction ----------------------------------------------
 
 
-def extract_background(composite: np.ndarray, strength: float = 1.0) -> tuple[np.ndarray, float]:
+def extract_background(
+    composite: np.ndarray,
+    strength: float = 1.0,
+    sky_mask: np.ndarray | None = None,
+    *,
+    wide_field: bool = False,
+) -> tuple[np.ndarray, float]:
     """Fit a low-order polynomial to the object-free sky and subtract ``strength`` of it.
 
     Object tiles (a nebula, a galaxy, a bright cluster) are rejected iteratively
@@ -276,6 +395,21 @@ def extract_background(composite: np.ndarray, strength: float = 1.0) -> tuple[np
     footprint), but is masked to zero across the interior so a galaxy halo or a
     frame-filling nebula is untouched. The tile lattice is sampled on a
     downscaled copy and the fitted surface cubic-resized back to full resolution.
+
+    ``sky_mask`` (boolean, full resolution, from :func:`fit_sky_mask`) marks a
+    nightscape's sky. The rejection above only drops tiles *brighter* than the
+    fit, so a dark landscape would otherwise be fitted as sky and drag the
+    surface down around it (a halo round every tree). With a mask: only tiles
+    that are mostly sky are sampled, from their sky pixels; the fit is degree 3
+    (a light-pollution dome rises steeply toward the horizon); the border
+    correction is skipped (the frame edge there is the landscape, not a stack
+    footprint); and the surface is subtracted from the sky only, fading out
+    across the horizon so the landscape keeps its own tones.
+
+    ``wide_field`` without a sky mask (a Milky Way frame with no landscape): the
+    fit is a plane and the border correction is skipped - see
+    :class:`RenderHints`. The Milky Way's broad glow and the lens vignetting both
+    peak near the centre; any curved surface absorbs part of the Milky Way.
     """
     height, width = composite.shape[:2]
     scale = _BG_ESTIMATE_MAX_SIZE / max(height, width)
@@ -289,46 +423,47 @@ def extract_background(composite: np.ndarray, strength: float = 1.0) -> tuple[np
         else composite
     )
     small_h, small_w = small.shape[:2]
+    small_sky = (
+        None
+        if sky_mask is None
+        else cv2.resize(
+            sky_mask.astype(np.uint8), (small_w, small_h), interpolation=cv2.INTER_NEAREST
+        )
+        > 0
+    )
+    plane_only = wide_field and small_sky is None
+    if small_sky is not None:
+        degree = _BG_POLY_DEGREE_NIGHTSCAPE
+    elif plane_only:
+        degree = _BG_POLY_DEGREE_WIDE_FIELD
+    else:
+        degree = _BG_POLY_DEGREE
 
     grid = np.linspace(0.0, 1.0, _BG_GRID, dtype=np.float32)
     grid_x, grid_y = np.meshgrid(grid, grid)
     row_edges = np.linspace(0, small_h, _BG_GRID + 1, dtype=int)
     col_edges = np.linspace(0, small_w, _BG_GRID + 1, dtype=int)
+    tiles = [
+        (slice(row_edges[i], row_edges[i + 1]), slice(col_edges[j], col_edges[j + 1]))
+        for i in range(_BG_GRID)
+        for j in range(_BG_GRID)
+    ]
+    sky_tiles = np.ones((_BG_GRID, _BG_GRID), dtype=bool)
+    if small_sky is not None:
+        sky_tiles = np.array(
+            [float(small_sky[rows, cols].mean()) >= _BG_MIN_TILE_SKY for rows, cols in tiles]
+        ).reshape(_BG_GRID, _BG_GRID)
+        if sky_tiles.sum() < _BG_MIN_SAMPLES:  # too little sky to fit: leave the frame alone
+            return composite.copy(), 0.0
 
     background = np.zeros((height, width, _COLOR_NDIM), dtype=np.float32)
     peak = 0.0
     for channel in range(_COLOR_NDIM):
-        plane = small[..., channel]
-        samples = np.array(
-            [
-                [
-                    float(
-                        np.percentile(
-                            plane[row_edges[i] : row_edges[i + 1], col_edges[j] : col_edges[j + 1]],
-                            _BG_TILE_PERCENTILE,
-                        )
-                    )
-                    for j in range(_BG_GRID)
-                ]
-                for i in range(_BG_GRID)
-            ]
-        )
-        keep = np.ones_like(samples, dtype=bool)
-        coeffs = _fit_poly2d(grid_x, grid_y, samples, _BG_POLY_DEGREE)
-        for _ in range(_BG_REJECT_ITERATIONS):
-            fitted = _eval_poly2d(grid_x, grid_y, coeffs, _BG_POLY_DEGREE).reshape(samples.shape)
-            residual = samples - fitted
-            sigma = np.median(np.abs(residual[keep] - np.median(residual[keep]))) * 1.4826 + _TINY
-            keep = residual <= _BG_OBJECT_SIGMA * sigma
-            if keep.sum() < _BG_MIN_SAMPLES:
-                break
-            keep = ~_dilate(~keep)  # also drop tiles touching an object (a soft skirt)
-            coeffs = _fit_poly2d(grid_x[keep], grid_y[keep], samples[keep], _BG_POLY_DEGREE)
-
-        surface_coarse = _eval_poly2d(grid_x, grid_y, coeffs, _BG_POLY_DEGREE).reshape(
-            samples.shape
-        )
-        surface_coarse = surface_coarse + _border_residual(samples, surface_coarse, keep)
+        samples = _tile_samples(small[..., channel], tiles, small_sky)
+        coeffs, keep = _fit_sky_surface(samples, sky_tiles, grid_x, grid_y, degree)
+        surface_coarse = _eval_poly2d(grid_x, grid_y, coeffs, degree).reshape(samples.shape)
+        if small_sky is None and not plane_only:
+            surface_coarse = surface_coarse + _border_residual(samples, surface_coarse, keep)
         surface = cv2.resize(
             surface_coarse.astype(np.float32), (width, height), interpolation=cv2.INTER_CUBIC
         )
@@ -337,9 +472,238 @@ def extract_background(composite: np.ndarray, strength: float = 1.0) -> tuple[np
 
     # Flatten toward the *darkest* real sky (a low percentile of the fitted
     # surface), not its median - keeps the sky dark so faint signal stays above it.
-    floor = float(np.percentile(background, _BG_FLOOR_PERCENTILE))
-    flattened = composite - strength * (background - floor)
+    if sky_mask is None:
+        floor = float(np.percentile(background, _BG_FLOOR_PERCENTILE))
+        flattened = composite - strength * (background - floor)
+        return np.clip(flattened, 0.0, None), peak * strength
+
+    floor = float(np.percentile(background[sky_mask], _BG_FLOOR_PERCENTILE))
+    weight = sky_weight(sky_mask)[..., np.newaxis]
+    flattened = composite - strength * weight * (background - floor)
     return np.clip(flattened, 0.0, None), peak * strength
+
+
+def _tile_samples(
+    plane: np.ndarray, tiles: list[tuple[slice, slice]], sky: np.ndarray | None
+) -> np.ndarray:
+    """Each lattice tile's sky level: a low percentile of its (sky) pixels."""
+    values = []
+    for rows, cols in tiles:
+        pixels = plane[rows, cols] if sky is None else plane[rows, cols][sky[rows, cols]]
+        values.append(float(np.percentile(pixels, _BG_TILE_PERCENTILE)) if pixels.size else 0.0)
+    return np.array(values).reshape(_BG_GRID, _BG_GRID)
+
+
+def _fit_sky_surface(
+    samples: np.ndarray,
+    sky_tiles: np.ndarray,
+    grid_x: np.ndarray,
+    grid_y: np.ndarray,
+    degree: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Fit the polynomial to the sky tiles, iteratively rejecting object tiles.
+
+    Returns the coefficients and the tiles the final fit kept.
+    """
+    keep = sky_tiles.copy()
+    coeffs = _fit_poly2d(grid_x[keep], grid_y[keep], samples[keep], degree)
+    for _ in range(_BG_REJECT_ITERATIONS):
+        fitted = _eval_poly2d(grid_x, grid_y, coeffs, degree).reshape(samples.shape)
+        residual = samples - fitted
+        sigma = np.median(np.abs(residual[keep] - np.median(residual[keep]))) * 1.4826 + _TINY
+        objects = sky_tiles & (residual > _BG_OBJECT_SIGMA * sigma)
+        keep = sky_tiles & ~objects
+        if keep.sum() < _BG_MIN_SAMPLES:
+            break
+        # Also drop tiles touching an object (a soft skirt) - but not tiles
+        # touching the landscape: those are the sky right above the horizon.
+        keep = sky_tiles & ~_dilate(objects)
+        coeffs = _fit_poly2d(grid_x[keep], grid_y[keep], samples[keep], degree)
+    return coeffs, keep
+
+
+def devignette(linear: np.ndarray, sky_mask: np.ndarray | None = None) -> np.ndarray:
+    """Divide out a wide-angle lens' vignetting, measured on the frame itself.
+
+    A wide-field Milky Way frame has no flat to calibrate against, and a free
+    radial fit cannot tell the vignetting from a Milky Way crossing the centre -
+    it absorbs the Milky Way. Two constraints separate them:
+
+    - the shape is fixed to the natural ``cos^4``-like falloff,
+      ``V(r) = (1 + a r^2)^-2`` (``r`` = distance from the centre over the
+      half-diagonal), one ``a`` per channel (phone lenses also shade colour);
+    - it is fitted on a low percentile of each ring around the centre, from
+      ``_VIG_FIT_MIN_RADIUS`` outward only: a band like the Milky Way covers a
+      small arc of each ring, so the ring's darker pixels are background, while
+      the rings near the centre lie entirely inside it and are skipped.
+
+    Landscape pixels (``sky_mask``) are left out of the rings. Checked on five
+    iPhone 16 Pro Max frames from two nights (with and without a Milky Way in the
+    centre): the corner gain came out at 0.29-0.37 every time. A fit implying a
+    negligible (corner > 0.9) or implausible (< 0.15) falloff is not applied.
+    """
+    height, width = linear.shape[:2]
+    scale = min(1.0, _VIG_ESTIMATE_MAX_SIZE / max(height, width))
+    size = (max(round(width * scale), 16), max(round(height * scale), 16))
+    small = cv2.resize(linear.astype(np.float32), size, interpolation=cv2.INTER_AREA)
+    radius = _normalised_radius(size[1], size[0])
+    usable = (
+        np.ones(radius.shape, dtype=bool)
+        if sky_mask is None
+        else cv2.resize(sky_mask.astype(np.uint8), size, interpolation=cv2.INTER_NEAREST) > 0
+    )
+    edges = np.linspace(_VIG_FIT_MIN_RADIUS, 1.0, _VIG_RINGS + 1)
+    rings = [usable & (radius >= lo) & (radius < hi) for lo, hi in itertools.pairwise(edges)]
+    centres = np.array([(lo + hi) / 2 for lo, hi in itertools.pairwise(edges)])
+    filled = np.array([ring.sum() >= _VIG_MIN_RING_PIXELS for ring in rings])
+    if filled.sum() < _VIG_MIN_RINGS:
+        return linear
+
+    strengths = []
+    for channel in range(_COLOR_NDIM):
+        plane = small[..., channel]
+        levels = np.array(
+            [
+                np.percentile(plane[ring], _VIG_RING_PERCENTILE)
+                for ring, ok in zip(rings, filled, strict=True)
+                if ok
+            ]
+        )
+        if (levels <= 0).any():
+            return linear
+        strengths.append(_fit_cos4_strength(centres[filled], levels))
+    corners = [(1.0 + a) ** -2 for a in strengths]
+    if not all(_VIG_MIN_CORNER <= c <= _VIG_MAX_CORNER for c in corners):
+        logger.info("vignetting not corrected", corners=[round(c, 3) for c in corners])
+        return linear
+
+    coarse = _normalised_radius(*(max(8, n // _VIG_GAIN_STEP) for n in (height, width))) ** 2
+    coarse_gain = np.stack([(1.0 + a * coarse) ** 2 for a in strengths], axis=-1)
+    gain = cv2.resize(
+        coarse_gain.astype(np.float32), (width, height), interpolation=cv2.INTER_LINEAR
+    )
+    logger.info("vignetting corrected", corners=[round(c, 3) for c in corners])
+    corrected: np.ndarray = linear * gain
+    return corrected
+
+
+def flatten_sky_colour(linear: np.ndarray, sky_mask: np.ndarray | None = None) -> np.ndarray:
+    """Flatten a wide-field frame's large-scale colour shading of the sky.
+
+    After :func:`devignette`, real iPhone frames still showed the sky's colour
+    drifting across the field - about +15% blue in one corner, 12% less red along
+    the bottom (a green glow once stretched) - the same pattern on every frame and
+    on their stack, so a lens/sensor trait or a skyglow tint, not sky. Fixing it
+    through *colour ratios* only cannot touch the brightness, so unlike a curved
+    background surface it cannot carve into the Milky Way.
+
+    The sky is sampled on a lattice (the darker pixels of each tile; tiles mostly
+    outside ``sky_mask`` skipped); the brightest tiles are dropped (the Milky Way
+    has its own colour); a smooth degree-2 surface is fitted to R/G and to B/G
+    with outlier rejection, normalised to its median (the overall balance is
+    kept), and R and B are divided by it.
+    """
+    samples = _sky_colour_samples(linear, sky_mask)
+    if samples is None:
+        return linear
+    x, y, ratio, level = samples
+    background = level <= np.percentile(level, _CF_BACKGROUND_PERCENTILE)
+
+    height, width = linear.shape[:2]
+    out = linear.astype(np.float32, copy=True)
+    grid = np.linspace(0.0, 1.0, _CF_SURFACE_SIZE, dtype=np.float32)
+    xx, yy = np.meshgrid(grid, grid)
+    for channel, column in ((0, 0), (2, 1)):
+        values = ratio[:, column]
+        keep = background.copy()
+        coeffs = _fit_poly2d(x[keep], y[keep], values[keep], _CF_POLY_DEGREE)
+        for _ in range(_CF_REJECT_ITERATIONS):
+            residual = values - _eval_poly2d(x, y, coeffs, _CF_POLY_DEGREE)
+            spread = float(np.median(np.abs(residual[keep] - np.median(residual[keep]))))
+            keep = background & (np.abs(residual) <= _CF_REJECT_SIGMA * _MAD_SIGMA * spread + _TINY)
+            coeffs = _fit_poly2d(x[keep], y[keep], values[keep], _CF_POLY_DEGREE)
+        reference = float(np.median(_eval_poly2d(x[keep], y[keep], coeffs, _CF_POLY_DEGREE)))
+        surface = _eval_poly2d(xx, yy, coeffs, _CF_POLY_DEGREE).reshape(xx.shape) / reference
+        surface = np.clip(surface, *_CF_GAIN_CLIP).astype(np.float32)
+        out[..., channel] /= cv2.resize(surface, (width, height), interpolation=cv2.INTER_CUBIC)
+    return out
+
+
+def _sky_colour_samples(
+    linear: np.ndarray, sky_mask: np.ndarray | None
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None:
+    """Lattice samples of the sky colour: ``(x, y, (R/G, B/G), G level)`` per tile,
+    from each tile's darker sky pixels; ``None`` when too few tiles are usable."""
+    height, width = linear.shape[:2]
+    scale = min(1.0, _CF_ESTIMATE_MAX_SIZE / max(height, width))
+    size = (max(round(width * scale), _CF_GRID[1]), max(round(height * scale), _CF_GRID[0]))
+    small = cv2.resize(linear.astype(np.float32), size, interpolation=cv2.INTER_AREA)
+    usable = (
+        np.ones(small.shape[:2], dtype=bool)
+        if sky_mask is None
+        else cv2.resize(sky_mask.astype(np.uint8), size, interpolation=cv2.INTER_NEAREST) > 0
+    )
+    rows = np.linspace(0, size[1], _CF_GRID[0] + 1, dtype=int)
+    cols = np.linspace(0, size[0], _CF_GRID[1] + 1, dtype=int)
+    xs, ys, ratios, levels = [], [], [], []
+    for i, j in itertools.product(range(_CF_GRID[0]), range(_CF_GRID[1])):
+        tile = small[rows[i] : rows[i + 1], cols[j] : cols[j + 1]]
+        sky = usable[rows[i] : rows[i + 1], cols[j] : cols[j + 1]]
+        if sky.mean() < _CF_MIN_TILE_SKY:
+            continue
+        pixels = tile[sky]
+        luma = pixels.mean(axis=1)
+        level = np.median(pixels[luma <= np.percentile(luma, _CF_DARK_PERCENTILE)], axis=0)
+        if (level <= 0).any():
+            continue
+        xs.append((cols[j] + cols[j + 1]) / 2 / size[0])
+        ys.append((rows[i] + rows[i + 1]) / 2 / size[1])
+        ratios.append((level[0] / level[1], level[2] / level[1]))
+        levels.append(level[1])
+    if len(levels) < _CF_MIN_TILES:
+        return None
+    return np.array(xs), np.array(ys), np.array(ratios), np.array(levels)
+
+
+def _normalised_radius(height: int, width: int) -> np.ndarray:
+    """Distance from the frame centre over the half-diagonal, per pixel."""
+    yy, xx = np.mgrid[0:height, 0:width].astype(np.float32)
+    radius: np.ndarray = np.hypot(yy - (height - 1) / 2, xx - (width - 1) / 2) / np.hypot(
+        height / 2, width / 2
+    )
+    return radius
+
+
+def _fit_cos4_strength(radii: np.ndarray, levels: np.ndarray) -> float:
+    """The ``a`` of ``c (1 + a r^2)^-2`` that best fits ``levels`` (in log space,
+    so every ring weighs the same whatever its brightness); ``c`` is solved in
+    closed form for each candidate."""
+    best_a, best_err = 0.0, math.inf
+    log_levels = np.log(levels)
+    for a in _VIG_STRENGTHS:
+        log_model = -2.0 * np.log1p(a * radii**2)
+        offset = float(np.mean(log_levels - log_model))
+        err = float(np.sum((log_levels - log_model - offset) ** 2))
+        if err < best_err:
+            best_a, best_err = float(a), err
+    return best_a
+
+
+def sky_weight(sky_mask: np.ndarray) -> np.ndarray:
+    """``sky_mask`` as a ``float32`` weight feathered across the horizon.
+
+    A hard mask edge would leave a visible seam where a sky-only correction
+    stops; a short Gaussian ramp (relative to the frame size) hides it. The mask
+    is grown by twice that ramp first, so the full correction reaches the very
+    edge of the sky and the ramp falls on the (dark) landscape side - a ramp on
+    the sky side leaves a bright rim around every tree.
+    """
+    sigma = max(1.0, _HORIZON_FEATHER * max(sky_mask.shape))
+    radius = round(2 * sigma)
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * radius + 1, 2 * radius + 1))
+    grown = cv2.dilate(sky_mask.astype(np.uint8), kernel).astype(np.float32)
+    weight: np.ndarray = cv2.GaussianBlur(grown, (0, 0), sigma)
+    return weight
 
 
 def _border_weight(size: int) -> np.ndarray:
