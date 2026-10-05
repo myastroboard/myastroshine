@@ -323,3 +323,52 @@ def test_identical_samples_are_not_clipped_to_one_value() -> None:
     tile, rejected, _ = _reduce_tile(block, weights, "average", "sigma", 2)
     assert rejected == 0
     assert np.allclose(tile, block.mean(axis=0))
+
+
+def _distorted_star_frame(shift: float, rng_seed: int = 21) -> np.ndarray:
+    """An RGB sky of ~600 small stars, shifted by ``shift`` px, seen through a
+    barrel-distorted wide-angle lens (the lens stays put while the sky moves)."""
+    height, width = 360, 480
+    rng = np.random.default_rng(rng_seed)
+    stars = np.column_stack([rng.uniform(-40, width + 40, 600), rng.uniform(0, height, 600)])
+    stars[:, 0] += shift
+    centre = np.array([width / 2, height / 2])
+    offset = stars - centre
+    r2 = (offset**2).sum(axis=1, keepdims=True) / (np.hypot(width, height) / 2) ** 2
+    seen = centre + offset * (1 + 0.08 * r2)
+    yy, xx = np.mgrid[0:height, 0:width].astype(np.float32)
+    frame = np.full((height, width), 0.05, dtype=np.float32)
+    for (x, y), flux in zip(seen, rng.uniform(0.2, 0.6, len(seen)), strict=True):
+        if 2 <= x < width - 2 and 2 <= y < height - 2:
+            y0, y1, x0, x1 = int(y) - 4, int(y) + 5, int(x) - 4, int(x) + 5
+            patch = (slice(max(y0, 0), y1), slice(max(x0, 0), x1))
+            frame[patch] += flux * np.exp(-((xx[patch] - x) ** 2 + (yy[patch] - y) ** 2) / 2.0)
+    noise = np.random.default_rng(int(shift * 10) + 1).normal(0, 0.002, frame.shape)
+    return np.repeat((frame + noise)[..., np.newaxis], 3, axis=2).astype(np.float32)
+
+
+def test_a_distorted_wide_field_registers_with_a_polynomial_warp(
+    storage: StorageService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Frames whose stars drift differently across the field (distortion) align
+    far better with the refined warp than with the global transform alone."""
+    from app.services import integration
+
+    def stack(stack_id: str) -> float:
+        for i, shift in enumerate((0.0, 8.0, 16.0)):
+            storage.save_linear_frame(stack_id, i, LinearFrame(data=_distorted_star_frame(shift)))
+        result = IntegrationService(storage).integrate(
+            stack_id,
+            [0, 1, 2],
+            transform="similarity",
+            combination="average",
+            rejection="sigma",
+            weighting="none",
+        )
+        assert result.aligned
+        return result.registration_rms
+
+    refined = stack("warp-on")
+    monkeypatch.setattr(integration, "refine_warp", lambda *_args: None)
+    rigid = stack("warp-off")
+    assert refined < 0.6 * rigid

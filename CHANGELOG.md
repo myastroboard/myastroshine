@@ -18,6 +18,8 @@ original Keep a Changelog headings.
 - Wide-angle shots (35 mm-equivalent focal up to 50 mm) have their lens vignetting and sky colour
   shading corrected automatically, and a clean stack no longer crushes darker sky to black.
   Phone ProRAW keeps the phone's white balance and stacks with equal weights.
+- Stacking follows wide-angle lens distortion: stars stay sharp across the whole stack instead of
+  turning into short streaks toward the corners.
 
 ### Fixes
 

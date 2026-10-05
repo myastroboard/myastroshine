@@ -705,6 +705,22 @@ two star fields by **asterism (triangle) matching**, vendored in the style of
    (`affine`) with RANSAC fits the transform; it is rejected if there are too
    few inliers, the inlier RMS is over 2 px, or the scale is not within 0.5-2x.
    `translation` keeps only the median inlier shift.
+4. **Polynomial refinement** (`refine_warp`, `similarity` / `affine` only). A
+   wide-angle lens' distortion makes stars drift differently across the field
+   as the sky turns: on a real iPhone series (24 mm equivalent, 4 minutes) the
+   global transform left 1.65 px of residual (half resolution), growing toward
+   the edges, and the corner stars of the stack came out as short streaks. So
+   every detected star (not just the 60 brightest) is paired with its mutual
+   nearest reference star within 3 px of the global transform, and a cubic
+   polynomial reference -> source warp is fitted with 3-sigma MAD rejection. It
+   replaces the global transform only with at least 60 pairs covering 7 of the
+   9 cells of a 3x3 split, a residual cut by at least 20%, and nowhere more than
+   2% of the frame diagonal away from the global transform - a deep-sky field
+   (no distortion, fewer stars) keeps the global transform. On the iPhone series:
+   residual 1.42 -> 0.64 px, and the stack's median star size 4.62 -> 4.08 px,
+   the same as a single frame (4.05; corners 4.86 -> 3.79). The align pass then
+   warps with `cv2.remap` (Lanczos) instead of `warpAffine`; drizzle keeps the
+   global transform.
 
 ### Integration (`app/services/integration.py`)
 

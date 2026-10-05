@@ -45,7 +45,7 @@ from app.services.calibration import CalibrationMasters, CalibrationService
 from app.services.drizzle import drizzle_accumulate, drizzle_finalise
 from app.services.frame_quality import FrameMeasure, FrameQuality, score_frames
 from app.services.star_detection import StarDetectionService
-from app.services.star_match import StarMatchService
+from app.services.star_match import PolyWarp, StarMatchService, refine_warp
 from app.services.storage import StorageService
 from app.utils.image_utils import _auto_stretch_to_uint8
 from app.utils.linear_ingest import LinearFrame, debayer_rgb, superpixel_rgb
@@ -92,6 +92,9 @@ class _FramePlan:
     fwhm: float = 0.0  # px, median star FWHM proxy
     roundness: float = 1.0  # 0..1, 1 = round
     matrix: np.ndarray | None = None  # frame -> reference; set in pass 1
+    #: optional refinement of ``matrix`` for lens distortion (see star_match.refine_warp);
+    #: the align pass uses it when set, drizzle keeps ``matrix``.
+    warp: PolyWarp | None = None
     rms: float = 0.0
     registered: bool = False
     #: dropped by the frame-quality filter (kept separate from a registration failure).
@@ -433,6 +436,12 @@ class IntegrationService:
             result = self._matcher.align(plan.centroids, reference.centroids, transform)
             if result.ok and result.matrix is not None:
                 plan.matrix, plan.rms, plan.registered = result.matrix, result.rms, True
+                if transform != "translation":
+                    plan.warp = refine_warp(
+                        plan.centroids, reference.centroids, result.matrix, shape[:2]
+                    )
+                    if plan.warp is not None:
+                        plan.rms = plan.warp.rms
 
         self._map_frames(plans, match, on_progress, "registration", 30, 50)
         return plans, reference, shape, qualities
@@ -495,7 +504,17 @@ class IntegrationService:
                 frame = ref_frame
             else:
                 frame = self._prepared_full(stack_id, plan.index, calibration, cosmetic)
-                if aligned and plan.matrix is not None:
+                if aligned and plan.warp is not None:
+                    map_x, map_y = plan.warp.remap_maps(width, height)
+                    frame = cv2.remap(
+                        frame,
+                        map_x,
+                        map_y,
+                        cv2.INTER_LANCZOS4,
+                        borderMode=cv2.BORDER_CONSTANT,
+                        borderValue=(math.nan, math.nan, math.nan),
+                    )
+                elif aligned and plan.matrix is not None:
                     matrix = plan.matrix.astype(np.float64).copy()
                     matrix[0, 2] *= scale_x
                     matrix[1, 2] *= scale_y
