@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import io
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import cv2
 import numpy as np
@@ -45,10 +45,14 @@ from app.utils.image_utils import (
     make_preview,
     stretch_composite_linear,
 )
+from app.utils.sky_mask import read_apple_sky_matte
 
 logger = get_logger(__name__)
 
 _RGB_PLANE_COUNT = 3
+_DNG = ".dng"
+_EXIF_IFD = 0x8769
+_EXIF_FOCAL_35MM = 41989  # FocalLengthIn35mmFilm
 _MONO_NDIM = 2
 _CUBE_NDIM = 3
 
@@ -116,6 +120,10 @@ class LinearFrame:
     ``(H, W, 3)`` in **R, G, B** channel order for colour data. Values are
     nominally ``[0, 1]`` but not hard-clipped - a bright star can sit slightly
     above 1.0 and calibration can push pixels slightly below 0.0.
+
+    ``sky_matte`` is the frame's own sky / landscape matte when the file carries
+    one (an Apple ProRAW - see :mod:`app.utils.sky_mask`), ``uint8``, 255 = sky,
+    at its own (lower) resolution and in the frame's orientation.
     """
 
     data: np.ndarray
@@ -124,6 +132,7 @@ class LinearFrame:
     source_bit_depth: int = 16
     already_stretched: bool = False
     metadata: dict[str, str] = field(default_factory=dict)
+    sky_matte: np.ndarray | None = None
 
     @property
     def is_color(self) -> bool:
@@ -192,14 +201,17 @@ def ingest_frame(data: bytes, filename: str | None = None) -> LinearFrame:
     """Decode ``data`` into a :class:`LinearFrame`.
 
     ``filename``'s extension picks the reader (FITS, RAW, or OpenCV for the
-    rest). Raises :class:`UnsupportedImageError` for unreadable bytes or a frame
-    that exceeds ``MAX_IMAGE_PIXELS``.
+    rest); a DNG's sky matte, if it has one, is attached as ``sky_matte``.
+    Raises :class:`UnsupportedImageError` for unreadable bytes or a frame that
+    exceeds ``MAX_IMAGE_PIXELS``.
     """
     ext = extension_of(filename)
     if ext in FITS_FORMATS:
         frame = _ingest_fits(data)
     elif ext in RAW_FORMATS:
         frame = _ingest_raw(data)
+        if ext == _DNG:
+            frame = replace(frame, sky_matte=read_apple_sky_matte(data))
     else:
         frame = _ingest_standard(data)
 
@@ -284,6 +296,7 @@ def _ingest_raw(data: bytes) -> LinearFrame:
 
     try:
         with rawpy.imread(io.BytesIO(data)) as raw:
+            camera_processed = raw.raw_type == rawpy.RawType.Stack  # type: ignore[attr-defined]
             rgb16 = raw.postprocess(
                 gamma=(1, 1),
                 no_auto_bright=True,
@@ -293,11 +306,51 @@ def _ingest_raw(data: bytes) -> LinearFrame:
     except rawpy.LibRawError as exc:  # type: ignore[attr-defined]
         raise UnsupportedImageError(f"Could not decode RAW file: {exc}") from exc
 
+    metadata = {"image_type": "Light"}
+    if camera_processed:
+        # A linear DNG (a phone's ProRAW): the camera already merged, denoised and
+        # white-balanced it - see post_stack.RenderHints for what that changes.
+        metadata["camera_processed"] = "1"
+    if (focal := _focal_35mm(data)) is not None:
+        metadata["focal_35mm"] = f"{focal:g}"
     return LinearFrame(
         data=np.ascontiguousarray(rgb16.astype(np.float32) / 65535.0),
         source_bit_depth=16,
-        metadata={"image_type": "Light"},
+        metadata=metadata,
     )
+
+
+def _focal_35mm(data: bytes) -> float | None:
+    """The EXIF 35 mm-equivalent focal length of a TIFF-based RAW, if it has one.
+
+    Best effort: Pillow reads the EXIF of the TIFF-structured formats (DNG, CR2,
+    NEF, ARW...); anything else, or a file without the tag, gives ``None``.
+    """
+    from PIL import Image, UnidentifiedImageError  # noqa: PLC0415 - only for a RAW upload
+
+    try:
+        with Image.open(io.BytesIO(data)) as image:
+            focal = image.getexif().get_ifd(_EXIF_IFD).get(_EXIF_FOCAL_35MM)
+    except UnidentifiedImageError, OSError, ValueError, SyntaxError:
+        return None
+    return float(focal) if isinstance(focal, int | float) and focal > 0 else None
+
+
+def is_linear_dng(data: bytes) -> bool:
+    """True for a DNG whose image is already demosaiced linear RGB (``LinearRaw``).
+
+    That is what an Apple ProRAW is (the phone has already merged and demosaiced
+    its burst), and what DNG converters / denoisers write. Unlike a Bayer RAW it
+    is ready-made linear composite data, so a single one opens in the linear
+    editor like a stacked FITS does. Only parses the header - no decode.
+    """
+    import rawpy  # noqa: PLC0415 - heavy, only for an actual RAW upload
+
+    try:
+        with rawpy.imread(io.BytesIO(data)) as raw:
+            return bool(raw.raw_type == rawpy.RawType.Stack)  # type: ignore[attr-defined]
+    except rawpy.LibRawError:  # type: ignore[attr-defined]
+        return False
 
 
 # -- standard formats (OpenCV) ----------------------------------------------

@@ -11,12 +11,14 @@ from astropy.io import fits
 
 from app.db.models import StackRecord
 from app.models import ProcessingParameters, StackParameters
+from app.services import linear_upload as linear_upload_module
 from app.services.enhancement import EnhancementService
 from app.services.image_processing import ImageProcessingService
 from app.services.job import JobService
 from app.services.linear_upload import LinearUploadService, is_linear_stack_upload
 from app.services.session import SessionService
 from app.services.storage import StorageService
+from app.utils.linear_ingest import LinearFrame
 
 
 @pytest.fixture
@@ -155,3 +157,82 @@ def test_composite_session_runs_the_linear_stack_step(
     assert result is not None
     # a low stretch target keeps the sky dark, not lifted to a milky grey
     assert int(np.median(result)) < 60
+
+
+def test_only_a_linear_dng_takes_the_composite_route(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A ProRAW (demosaiced linear DNG) opens as a composite; a Bayer RAW does not."""
+    monkeypatch.setattr(linear_upload_module, "is_linear_dng", lambda _data: True)
+    assert is_linear_stack_upload(b"x", "IMG_1516.DNG") is True
+    assert is_linear_stack_upload(b"x", "IMG_0001.CR2") is False
+    monkeypatch.setattr(linear_upload_module, "is_linear_dng", lambda _data: False)
+    assert is_linear_stack_upload(b"x", "bayer.dng") is False
+
+
+def _proraw_like(height: int = 240, width: int = 180) -> tuple[LinearFrame, np.ndarray]:
+    """A linear sky over a black landscape strip, with its quarter-size sky matte."""
+    rng = np.random.default_rng(4)
+    data = (0.02 + rng.normal(0, 0.001, (height, width, 3))).astype(np.float32)
+    data[height * 3 // 4 :] = 0.0005
+    matte = np.full((height // 4, width // 4), 255, dtype=np.uint8)
+    matte[matte.shape[0] * 3 // 4 :] = 0
+    metadata = {"camera_processed": "1", "focal_35mm": "24"}
+    return LinearFrame(data=data, sky_matte=matte, metadata=metadata), matte
+
+
+def test_a_proraw_with_a_landscape_keeps_its_sky_mask_and_is_not_cropped(
+    linear_upload: LinearUploadService, db_session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The sky matte is stored with the composite, and the dark landscape is not
+    mistaken for a dead stack border and trimmed off."""
+    frame, matte = _proraw_like()
+    monkeypatch.setattr(linear_upload_module, "ingest_frame", lambda _d, _f: frame)
+
+    session, composite = linear_upload.ingest(b"proraw", "IMG_1516.DNG")
+
+    assert composite.shape[:2] == (240, 180)
+    assert _crop_box(linear_upload, db_session, session.session_id) is None
+    record = db_session.query(StackRecord).filter_by(session_id=session.session_id).one()
+    stored = linear_upload.storage.load_stack_sky_mask(record.stack_id)
+    assert stored is not None
+    assert np.array_equal(stored, matte)
+    assert linear_upload.storage.load_stack_render_hints(record.stack_id) == {
+        "camera_processed": True,
+        "wide_field": True,
+    }
+
+
+def test_an_all_sky_matte_is_not_stored(
+    linear_upload: LinearUploadService, db_session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A ProRAW pointed straight up (no landscape) takes the plain deep-sky path."""
+    frame, matte = _proraw_like()
+    matte[:] = 255  # the frame shares this array
+    monkeypatch.setattr(linear_upload_module, "ingest_frame", lambda _d, _f: frame)
+
+    session, _ = linear_upload.ingest(b"proraw", "IMG_1527.DNG")
+
+    record = db_session.query(StackRecord).filter_by(session_id=session.session_id).one()
+    assert linear_upload.storage.load_stack_sky_mask(record.stack_id) is None
+
+
+def test_a_nightscape_session_renders_with_its_sky_mask(
+    linear_upload: LinearUploadService, db_session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """End to end: the editor render hands the stored mask to the Stack step, so
+    the sky (not the landscape) sits at a dark night-sky level."""
+    frame, _matte = _proraw_like()
+    monkeypatch.setattr(linear_upload_module, "ingest_frame", lambda _d, _f: frame)
+    session, _ = linear_upload.ingest(b"proraw", "IMG_1516.DNG")
+
+    jobs = JobService(db_session)
+    enhancement = EnhancementService(
+        linear_upload.sessions, linear_upload.storage, ImageProcessingService(), jobs
+    )
+    job = jobs.create(session.session_id)
+    enhancement.run(session.session_id, ProcessingParameters(), job.job_id)
+
+    assert jobs.get(job.job_id).status == "completed"
+    result = cv2.imread(str(linear_upload.storage.processed_path(session.session_id)))
+    assert result is not None
+    sky_level = int(np.median(result[:150]))
+    assert 10 < sky_level < 60  # dark, not the milky grey of an 8-bit decode

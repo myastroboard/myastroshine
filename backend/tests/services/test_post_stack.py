@@ -8,11 +8,15 @@ import pytest
 
 from app.models import StackParameters
 from app.services.post_stack import (
+    RenderHints,
     _border_residual,
     apply_post_stack,
     calibrate_colour,
     crop_low_signal_border,
+    devignette,
     extract_background,
+    flatten_sky_colour,
+    render_hints_for,
     render_stack_base,
 )
 
@@ -396,3 +400,217 @@ def test_render_stack_base_uses_star_gains_when_the_field_has_stars(
     )
     out = render_stack_base(_linear_sky(120, 160), StackParameters())
     assert out.shape == (120, 160, 3)
+
+
+# -- nightscape: a sky mask keeps the landscape out of the sky statistics ----
+
+
+def _nightscape(height: int = 240, width: int = 180) -> tuple[np.ndarray, np.ndarray]:
+    """A linear sky with a light-pollution gradient above a near-black, jagged
+    landscape (trees) along the bottom; returns ``(composite, sky_mask)``."""
+    composite = _linear_sky(height, width)
+    xx = np.arange(width)
+    horizon = (height * 0.75 + 12 * np.sin(xx / 9.0)).astype(int)
+    sky = np.arange(height)[:, np.newaxis] < horizon[np.newaxis, :]
+    composite[~sky] = 0.0005
+    return composite, sky
+
+
+def test_a_sky_mask_keeps_the_landscape_out_of_the_background_fit() -> None:
+    """With the mask, the sky right above the horizon is flattened like the rest;
+    without it, the dark landscape drags the fitted surface down and leaves the
+    sky there brighter than the rest of the sky (a halo round the trees)."""
+    composite, sky = _nightscape()
+
+    def horizon_excess(flat: np.ndarray) -> float:
+        luma = flat.mean(axis=2)
+        near = sky & ~np.roll(sky, -20, axis=0)  # the 20 sky rows above the horizon
+        upper = sky & (np.arange(sky.shape[0])[:, np.newaxis] < 100)
+        return float(np.median(luma[near]) - np.median(luma[upper]))
+
+    masked, _ = extract_background(composite, 1.0, sky)
+    unmasked, _ = extract_background(composite, 1.0)
+    assert abs(horizon_excess(masked)) < 0.0006  # flat to the noise level
+    assert horizon_excess(unmasked) > 2 * abs(horizon_excess(masked))
+
+
+def test_a_sky_mask_leaves_the_landscape_tones_alone() -> None:
+    """The sky surface is subtracted from the sky only, fading out across the
+    horizon: the landscape away from the horizon is unchanged."""
+    composite, sky = _nightscape()
+    masked, _ = extract_background(composite, 1.0, sky)
+    deep_landscape = ~sky & ~np.roll(~sky, -30, axis=0)
+    deep_landscape[-1] = False
+    assert np.allclose(masked[deep_landscape], composite[deep_landscape])
+
+
+def test_too_little_sky_leaves_the_frame_unextracted() -> None:
+    """A mask with almost no sky tiles cannot support a fit: nothing is subtracted."""
+    composite, _ = _nightscape()
+    sky = np.zeros(composite.shape[:2], dtype=bool)
+    sky[:3] = True  # under half of the top row of lattice tiles
+    flat, peak = extract_background(composite, 1.0, sky)
+    assert peak == 0.0
+    assert np.array_equal(flat, composite)
+
+
+def test_render_stack_base_keeps_the_camera_white_balance_on_a_nightscape(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A nightscape skips the star white balance (the camera's own is kept) and
+    the stretch puts the sky - not the landscape - at the target background."""
+    from app.services import post_stack
+
+    monkeypatch.setattr(
+        post_stack, "star_white_balance", lambda _l: pytest.fail("star WB must not run")
+    )
+    composite, sky = _nightscape()
+    out = render_stack_base(composite, StackParameters(), sky.astype(np.uint8) * 255)
+    sky_level = float(np.median(out[sky]))
+    assert 0.05 < sky_level < 0.2  # a dark night sky, near the 0.10 target
+    assert float(np.median(out[~sky])) < sky_level  # the landscape stays darker than the sky
+
+
+def test_render_stack_base_treats_an_all_sky_mask_as_deep_sky() -> None:
+    """A mask without landscape renders exactly like no mask at all."""
+    composite = _linear_sky(120, 160)
+    all_sky = np.full((30, 40), 255, dtype=np.uint8)
+    assert np.array_equal(
+        render_stack_base(composite, StackParameters(), all_sky),
+        render_stack_base(composite, StackParameters()),
+    )
+
+
+# -- wide field: fixed-shape devignetting, plane-only background ------------
+
+
+def _vignetted_milky_way(height: int = 300, width: int = 220, corner: float = 0.33) -> np.ndarray:
+    """A flat sky with a bright diagonal band through the centre (a Milky Way),
+    under a cos^4-like vignetting falling to ``corner`` at the corners."""
+    rng = np.random.default_rng(12)
+    yy, xx = np.mgrid[0:height, 0:width].astype(np.float32)
+    band = 0.012 * np.exp(-((((xx - width / 2) - 0.3 * (yy - height / 2)) / (width / 8)) ** 2))
+    sky = 0.01 + band
+    radius = np.hypot(yy - (height - 1) / 2, xx - (width - 1) / 2) / np.hypot(height / 2, width / 2)
+    strength = corner**-0.5 - 1.0
+    vignetting = (1.0 + strength * radius**2) ** -2
+    rgb = np.stack([sky * vignetting] * 3, axis=-1)
+    return (rgb + rng.normal(0, 0.0002, rgb.shape)).astype(np.float32)
+
+
+def test_devignette_divides_out_a_wide_angle_falloff_without_eating_the_band() -> None:
+    """The fixed cos^4 shape, fitted on the rings' darker pixels away from the
+    centre, restores a flat sky in the corners and keeps the central band."""
+    frame = _vignetted_milky_way()
+    flat = devignette(frame)
+    luma = flat.mean(axis=2)
+    corner_sky = float(np.median(luma[:20, :20]))
+    edge_sky = float(np.median(luma[140:160, :15]))
+    assert abs(corner_sky / edge_sky - 1.0) < 0.08
+    band_peak = float(np.median(luma[140:160, 100:120]))
+    assert band_peak > 1.8 * edge_sky  # the band (2.2x the sky) is not absorbed
+
+
+def test_devignette_leaves_an_unvignetted_frame_alone() -> None:
+    """A frame with no measurable falloff (corner gain > 0.9) is returned as is."""
+    frame = _vignetted_milky_way(corner=1.0)
+    assert devignette(frame) is frame
+
+
+def test_devignette_skips_an_implausible_falloff() -> None:
+    """A fit implying corners under 15% (no real lens) is not applied."""
+    frame = _vignetted_milky_way(corner=0.08)
+    assert devignette(frame) is frame
+
+
+def test_wide_field_background_extraction_fits_only_a_plane() -> None:
+    """A wide-field frame keeps its central band: only the tilted gradient goes."""
+    rng = np.random.default_rng(2)
+    yy, xx = np.mgrid[0:240, 0:180].astype(np.float32)
+    band = 0.01 * np.exp(-(((xx - 90) / 30) ** 2))
+    gradient = 0.004 * (yy / 240)
+    plane = (0.01 + gradient + band)[..., np.newaxis].repeat(3, axis=2)
+    plane = (plane + rng.normal(0, 0.0002, plane.shape)).astype(np.float32)
+
+    flat, _ = extract_background(plane, 1.0, wide_field=True)
+    luma = flat.mean(axis=2)
+    assert abs(float(luma[:30, :20].mean() - luma[-30:, :20].mean())) < 0.0006  # gradient gone
+    band_height = float(luma[100:140, 85:95].mean() - luma[100:140, :20].mean())
+    assert band_height > 0.008  # the band (0.01) survives
+
+
+def test_render_hints_follow_the_source_frames() -> None:
+    """Every frame camera-processed -> camera_processed; a focal of at most 50 mm
+    (35 mm equivalent) -> wide_field; and they round-trip through a dict."""
+    phone = {"camera_processed": "1", "focal_35mm": "24"}
+    assert render_hints_for([phone, phone]) == RenderHints(camera_processed=True, wide_field=True)
+    assert render_hints_for([phone, {"focal_35mm": "24"}]).camera_processed is False
+    assert render_hints_for([{"focal_35mm": "600"}]).wide_field is False
+    assert render_hints_for([{}]) == RenderHints()
+    hints = RenderHints(camera_processed=True)
+    assert RenderHints.from_dict(hints.to_dict()) == hints
+    assert RenderHints.from_dict(None) == RenderHints()
+
+
+def test_render_stack_base_keeps_a_camera_processed_white_balance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A camera-processed source skips the star white balance even with no mask."""
+    from app.services import post_stack
+
+    monkeypatch.setattr(
+        post_stack, "star_white_balance", lambda _l: pytest.fail("star WB must not run")
+    )
+    out = render_stack_base(
+        _linear_sky(120, 160), StackParameters(), hints=RenderHints(camera_processed=True)
+    )
+    assert out.shape == (120, 160, 3)
+
+
+@pytest.mark.parametrize("mode", ["adaptive", "classic"])
+def test_render_stack_base_devignettes_a_wide_field_frame(mode: str) -> None:
+    """Both stretch modes divide out a wide-field frame's vignetting first."""
+    frame = _vignetted_milky_way()
+    params = StackParameters(stretch_mode=mode, background_extraction=0, color_calibration=False)
+    plain = render_stack_base(frame, params)
+    wide = render_stack_base(frame, params, hints=RenderHints(wide_field=True))
+
+    def corner_to_edge(img: np.ndarray) -> float:
+        return float(img[:20, :20].mean() / max(img[140:160, :15].mean(), 1e-6))
+
+    assert corner_to_edge(wide) > corner_to_edge(plain)
+
+
+def test_flatten_sky_colour_removes_a_colour_drift_but_keeps_brightness() -> None:
+    """A smooth blue excess toward one corner and a red deficit along the bottom
+    are flattened; luminance structure (a bright band) is untouched."""
+    rng = np.random.default_rng(4)
+    yy, xx = np.mgrid[0:240, 0:180].astype(np.float32)
+    band = 0.01 * np.exp(-(((xx - 90) / 25) ** 2))
+    sky = 0.01 + band
+    red = sky * (1.0 - 0.12 * (yy / 240) ** 2)
+    blue = sky * (1.0 + 0.15 * (1 - xx / 180) * (1 - yy / 240))
+    frame = np.stack([red, sky, blue], axis=-1) + rng.normal(0, 0.0001, (240, 180, 3))
+    flat = flatten_sky_colour(frame.astype(np.float32))
+
+    def ratio(img: np.ndarray, rows: slice, cols: slice, channel: int) -> float:
+        return float(np.median(img[rows, cols, channel] / img[rows, cols, 1]))
+
+    corner, opposite = (slice(0, 30), slice(0, 20)), (slice(200, 240), slice(160, 180))
+    assert abs(ratio(flat, *corner, 2) - ratio(flat, *opposite, 2)) < 0.03
+    assert (
+        abs(
+            ratio(flat, slice(0, 30), slice(0, 20), 0)
+            - ratio(flat, slice(210, 240), slice(0, 20), 0)
+        )
+        < 0.03
+    )
+    assert np.allclose(flat[..., 1], frame[..., 1])  # green - and so the band - is unchanged
+
+
+def test_flatten_sky_colour_needs_enough_sky() -> None:
+    """With too few sky tiles there is nothing to fit: the frame is returned as is."""
+    frame = _linear_sky(120, 160)
+    sky = np.zeros((120, 160), dtype=bool)
+    sky[:4] = True
+    assert flatten_sky_colour(frame, sky) is frame

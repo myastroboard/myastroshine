@@ -42,6 +42,8 @@ _NOISE_SAMPLE_PERCENTILE = 30.0  # the noise is measured where the sky is darkes
 # A 3x3-median residual underestimates the noise sigma; this puts it back on scale.
 _MEDIAN_RESIDUAL_TO_SIGMA = 1.4826 * 1.5
 _SHADOW_CLIP_SIGMA = 2.8  # black point = sky - this many noise sigma
+_DARK_SKY_PERCENTILE = 0.5  # protect_dark_sky: the darkest real sky stays above black
+_DARK_SKY_MARGIN = 0.15  # ... by this fraction of its distance to the sky level
 _OBJECT_PERCENTILE = 99.0
 _OBJECT_TARGET = 0.72
 _WHITE_PERCENTILE = 99.99  # of the brightest channel - stars included
@@ -59,6 +61,9 @@ def adaptive_stretch(
     linear: np.ndarray,
     target_background: float,
     source_peak: np.ndarray | None = None,
+    sky_mask: np.ndarray | None = None,
+    *,
+    protect_dark_sky: bool = False,
 ) -> np.ndarray:
     """Sky-neutral linear RGB ``(H, W, 3)`` -> stretched BGR ``float32`` ``[0, 1]``.
 
@@ -67,16 +72,26 @@ def adaptive_stretch(
     the *unprocessed* composite: where it approaches saturation the recorded colour
     is an artefact of one channel clipping first, so the stretched pixel is faded
     to neutral instead of showing a coloured ring in a bright star's core.
+    ``sky_mask`` (boolean, same size) takes the sky level, noise and object level
+    from a nightscape's sky only, so a dark landscape does not set the black point.
+    ``protect_dark_sky`` keeps the black point under the darkest real sky (its
+    ``_DARK_SKY_PERCENTILE``) even when the noise is low: a deep stack of a wide
+    field, whose sky is never perfectly flat, otherwise crushed its darker
+    regions to black blotches - the black point (sky - 2.8 sigma) rises toward
+    the sky level as the noise falls.
     """
     rgb = linear.astype(np.float32, copy=False)
     luma = rgb @ LUMA_RGB
-    sky, noise, smooth = _sky_noise(luma)
+    sky, noise, smooth, in_sky = _sky_noise(luma, sky_mask)
     black = sky - _SHADOW_CLIP_SIGMA * noise
+    if protect_dark_sky:
+        darkest = float(np.percentile(smooth[in_sky], _DARK_SKY_PERCENTILE))
+        black = min(black, darkest - (sky - darkest) * _DARK_SKY_MARGIN)
 
     white = float(np.percentile(rgb[::2, ::2].max(axis=2) - black, _WHITE_PERCENTILE))
     white = max(white, _TINY)
     x_sky = max(sky - black, _TINY) / white
-    x_obj = float(np.percentile(smooth - black, _OBJECT_PERCENTILE)) / white
+    x_obj = float(np.percentile(smooth[in_sky] - black, _OBJECT_PERCENTILE)) / white
     x_obj = min(max(x_obj, x_sky * 1.5), 1.0)
     white_floor = min(max(x_obj * 1.2, x_sky * 4.0), 1.0)
 
@@ -113,25 +128,35 @@ def _fit_gamut(rgb: np.ndarray, luma: np.ndarray) -> np.ndarray:
     return result
 
 
-def _sky_noise(luma: np.ndarray) -> tuple[float, float, np.ndarray]:
-    """Sky level, noise sigma, and the star-suppressed downscaled luminance."""
+def _sky_noise(
+    luma: np.ndarray, sky_mask: np.ndarray | None = None
+) -> tuple[float, float, np.ndarray, np.ndarray]:
+    """Sky level, noise sigma, the star-suppressed downscaled luminance, and the
+    sky pixels of that downscaled copy (all of them without a ``sky_mask``)."""
     height, width = luma.shape
     scale = min(1.0, _ESTIMATE_MAX_SIZE / max(height, width))
-    small = cv2.resize(
-        luma.astype(np.float32),
-        (max(round(width * scale), 8), max(round(height * scale), 8)),
-        interpolation=cv2.INTER_AREA,
-    )
+    size = (max(round(width * scale), 8), max(round(height * scale), 8))
+    small = cv2.resize(luma.astype(np.float32), size, interpolation=cv2.INTER_AREA)
     smooth = cv2.medianBlur(small, _STAR_SUPPRESS_KERNEL)
-    sky = float(np.percentile(smooth, _SKY_PERCENTILE))
+    in_sky = (
+        np.ones(smooth.shape, dtype=bool)
+        if sky_mask is None
+        else cv2.resize(sky_mask.astype(np.uint8), size, interpolation=cv2.INTER_NEAREST) > 0
+    )
+    sky = float(np.percentile(smooth[in_sky], _SKY_PERCENTILE))
 
     sample = np.ascontiguousarray(luma[::2, ::2], dtype=np.float32)
     residual = sample - cv2.medianBlur(sample, 3)
-    darkest = cv2.resize(smooth, (sample.shape[1], sample.shape[0])) <= np.percentile(
-        smooth, _NOISE_SAMPLE_PERCENTILE
+    sample_size = (sample.shape[1], sample.shape[0])
+    darkest = cv2.resize(smooth, sample_size) <= np.percentile(
+        smooth[in_sky], _NOISE_SAMPLE_PERCENTILE
     )
+    if sky_mask is not None:
+        darkest &= (
+            cv2.resize(in_sky.astype(np.uint8), sample_size, interpolation=cv2.INTER_NEAREST) > 0
+        )
     noise = float(np.median(np.abs(residual[darkest]))) * _MEDIAN_RESIDUAL_TO_SIGMA
-    return sky, noise, smooth
+    return sky, noise, smooth, in_sky
 
 
 def _mtf(x: np.ndarray, balance: float) -> np.ndarray:

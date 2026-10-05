@@ -19,8 +19,18 @@ accepts `uint8`); the Stack step works on the linear composite.
 
 ## Upload ingest: FITS / RAW / 16-bit
 
-**Linear stack data - FITS (any bit depth) and 16-bit PNG/TIFF - opens as a
-composite session**, not through `decode_image`. `POST /api/upload` routes it to
+**Linear stack data - FITS (any bit depth), 16-bit PNG/TIFF, and a linear DNG -
+opens as a composite session**, not through `decode_image`. A linear DNG is one
+whose image is already demosaiced RGB (`LinearRaw`, libraw's `RawType.Stack`):
+an **Apple ProRAW**, which the phone has already merged from a burst and
+demosaiced, or a DNG converter's output. Decoding one through the 8-bit RAW path
+below threw away the night: libraw's auto-brightening lifted a 10 s night-mode
+sky to ~68% grey (the phone's own render keeps it ~36%). When a ProRAW carries
+Apple's `semanticskymatte` (a quarter-resolution sky/landscape matte, read with a
+minimal TIFF directory walk in `app/utils/sky_mask.py` and rotated to the image's
+orientation), it is stored as `sky_mask.npy` and the "Stack" step uses it (see
+"Nightscapes" under Post-stack); the border crop is skipped then, since the dark
+edge is the landscape, not a dead stack border. `POST /api/upload` routes it to
 `app/services/linear_upload.py`: the frame is ingested to linear `float32`
 (`app/utils/linear_ingest.py` - CFA mosaics debayered, a `(3,H,W)`/`(H,W,3)`
 cube read as R/G/B planes, mono left 2D), its field-rotation / vignette border
@@ -51,7 +61,7 @@ pipeline works on. The file extension picks the decoder:
   transform (`stretch_composite_linear`) at a deep sky target - not three
   independent per-channel stretches.
 - **Camera RAW** (`.cr2`/`.cr3`/`.nef`/`.arw`/`.dng`/`.orf`/`.rw2`/`.pef`/`.raf`,
-  `rawpy`/libraw) - demosaiced with the camera's as-shot white balance and
+  `rawpy`/libraw; a Bayer `.dng` - a linear one takes the composite route above) - demosaiced with the camera's as-shot white balance and
   libraw's default sRGB-ish tone response (`use_camera_wb=True`,
   `output_bps=8`). Unlike FITS, this isn't scientific linear data by
   convention - the goal is the same as opening a RAW in any other photo tool:
@@ -717,10 +727,20 @@ ever resident):
    backgrounds), and stream it to a `float16` memmap on disk. The combine tile
    size adapts to the frame count to keep the working set bounded.
 3. **Combine** - tile over the memmap rows. Per pixel across the stack:
-   **iterative sigma-clip around the mean** (2 iterations, k=3 - fast, sum-based;
-   `np.nanmedian` on the stack axis is ~100x slower), then `winsorized_sigma`
-   clamps the outliers (count preserved) or `sigma` drops them, then a
-   **weighted mean** (`none` = equal / `noise` = `1/noise^2` clamped 0.25-4x /
+   **iterative sigma-clip** (2 iterations, k=3). The first iteration is centred
+   on the **median with a MAD spread** (sort-based, NaN-aware - as fast as a sum
+   and far faster than `np.nanmedian`; the plain std stands in where the MAD is
+   0), the second on the mean / std of the samples - those the first kept
+   (`sigma`), or all of them clamped into the first pass's bounds
+   (`winsorized_sigma`, the Siril / PixInsight estimate). Either way the
+   samples outside the final bounds are **dropped**. The robust first pass is
+   what removes a one-frame aircraft or satellite trail from a short stack: a
+   mean / std that includes the outlier can place it at most `(N-1)/sqrt(N)`
+   sigma away (2.85 for 10 frames, under k=3), so a plain sigma-clip would keep
+   it and average it in at 1/N. Winsorization only *estimates* the spread: the
+   former `winsorized_sigma` kept the clamped samples in the mean, which adds
+   k sigma / N wherever an outlier is one-sided - a faint line left along every
+   trail. Then a **weighted mean** (`none` = equal / `noise` = `1/noise^2` clamped 0.25-4x /
    `quality` = the frame-quality score's combined weight). Rejection is skipped
    where fewer than 30% of frames cover a pixel (the field-rotation
    wedge - the per-pixel sigma there is unreliable). `median` combination uses a
@@ -864,6 +884,82 @@ the enhancement pipeline works on:
    99.9th-percentile clip, applied to all three channels - brighter, but it clips
    galaxy cores and pushes stars to white. It also keeps the former means-based
    colour calibration.
+
+**Nightscapes (a sky mask).** A Milky Way shot usually has a landscape in the
+frame, and every step above measures "the sky" from statistics a dark landscape
+corrupts: the background fit only rejects tiles *brighter* than the surface, so
+trees are fitted as sky and drag it down (a halo round every tree); the sky level
+is the darker half of the frame (the trees); the stretch's black point and sky
+come from the darkest pixels (the trees again). When the composite has a **sky
+mask** (`sky_mask.npy` next to `composite.npy`, high = sky - see
+`app/utils/sky_mask.py`; today Apple ProRAW's own `semanticskymatte`), every
+step measures the sky alone:
+
+- background extraction samples only lattice tiles that are at least half sky,
+  from their sky pixels; never drops a tile for *touching* the landscape (that is
+  the sky right above the horizon, where the light-pollution dome is); fits a
+  **cubic** (the dome climbs steeply toward the horizon; still far too smooth to
+  model the Milky Way); skips the frame-edge correction (that edge is the
+  landscape, not a stack footprint); and subtracts the surface **from the sky
+  only**, feathered across the horizon (mask grown by twice the ramp first, so the
+  ramp falls on the dark landscape side - a ramp on the sky side left a bright rim
+  round every tree). The landscape keeps its own tones.
+- sky neutralisation takes the darker half *of the sky*.
+- **the camera's white balance is kept**: the star white balance is skipped. On
+  real iPhone ProRAW frames its gains cut blue by about a third (the phone lens'
+  blue fringing and the skyglow round each star bias the star colours) and cast
+  the Milky Way yellow-green, while the camera's own balance looked natural.
+- the stretch reads the sky level, noise and object level inside the mask.
+
+A mask with less than 1% landscape counts as no mask, so an all-sky frame takes
+the deep-sky path unchanged.
+
+**Render hints (`RenderHints`, `render_hints.json` next to the composite).** What
+the source frames say, recorded at ingest (`linear_ingest._ingest_raw`) and kept
+with the composite:
+
+- `camera_processed` - every frame is a linear DNG (a phone's ProRAW: merged,
+  denoised and white-balanced by the phone). Its **white balance is kept** (the
+  star white balance is skipped, as for a nightscape: it cast real iPhone frames
+  yellow-green), and a stack of them uses **equal weights** instead of the
+  default noise weighting - the phone denoises each frame by its own
+  ISO-dependent amount, so on a real 12-frame iPhone series the ISO 10000 frames
+  read 3x "cleaner" than the ISO 2500 ones and got 10x the weight. The weighting
+  actually used is recorded in `quality_report["weighting"]`.
+- `wide_field` - the EXIF 35 mm-equivalent focal length is at most 50 mm: a Milky
+  Way / landscape lens. Two things change. **Vignetting is divided out first**
+  (`devignette`): such a lens' linear data falls to about 1/3 in the corners (an
+  iPhone main camera: 0.29-0.37 on five frames from two nights, with and without
+  a Milky Way in the frame) and nothing in the file corrects it - the phone
+  hides it in its own render. With no flat to calibrate against, and a Milky Way
+  that can cross the centre (a free radial fit absorbs it), the model is fixed to
+  the natural `V(r) = (1 + a r^2)^-2` shape, one `a` per channel (phone lenses
+  shade colour too), fitted in log space on the 15th percentile of each ring
+  around the centre from r = 0.3 outward (a band covers a small arc of each ring;
+  the rings nearer the centre can lie wholly inside it), landscape pixels
+  excluded. A fit implying corners above 0.9 or below 0.15 is not applied. Then
+  the sky's remaining **colour shading is flattened** (`flatten_sky_colour`):
+  the same iPhone frames still drifted about +15% blue toward one corner and 12%
+  less red along the bottom (a green glow once stretched), identically on every
+  frame and on their stack. Degree-2 surfaces are fitted to the sky's R/G and
+  B/G ratios (16x12 lattice, each tile's darker pixels, the brightest 30% of
+  tiles - the Milky Way's own colour - left out, 2-sigma rejection), normalised
+  to their median, and R and B divided by them: colour only, so it cannot carve
+  the Milky Way's brightness. Then **background extraction fits only a tilted
+  plane** and skips the border correction (with no sky mask): a curved surface
+  bends to the Milky Way's broad glow, carving dark holes into it. Finally the
+  stretch **keeps the darkest real sky above the black point**
+  (`protect_dark_sky`: black <= the sky's 0.5th percentile minus 15% of its
+  distance to the sky level). A stack's low noise otherwise lifts the black point
+  (sky - 2.8 sigma) up to the sky level, and the slightly darker parts of a
+  never-quite-flat wide-field sky were crushed to black blotches.
+
+A **stack** of ProRAW frames gets its mask from the **reference frame**: each
+frame's matte is stored with it at upload (`frames/NNNN_sky.npy`), every frame is
+warped into the reference's geometry, so the reference's matte is resized to the
+composite (drizzle included), given the same wedge crop, and stored as the
+stack's `sky_mask.npy`. The landscape itself is still aligned on the stars, so it
+blurs over a long series; stacking sky and landscape separately is not done yet.
 
 Nothing here touches `composite.npy`; every value recomputes the working image
 from the linear data, so the stretch/background/colour choices stay reversible

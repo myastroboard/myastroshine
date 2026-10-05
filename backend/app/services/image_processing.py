@@ -24,7 +24,7 @@ import numpy as np
 from app.logging_config import get_logger
 from app.models import CurvePoint, GeometryParameters, ProcessingParameters
 from app.services.external_starless import StarlessSplitFn
-from app.services.post_stack import render_stack_base
+from app.services.post_stack import RenderHints, render_stack_base
 from app.services.star_detection import StarDetectionService
 from app.services.starless import StarlessService
 from app.utils.math_utils import (
@@ -643,6 +643,8 @@ class ImageProcessingService:
         linear_composite: bool = False,
         starless_split: StarlessSplitFn | None = None,
         denoise_stage: DenoiseStageFn | None = None,
+        sky_mask: np.ndarray | None = None,
+        render_hints: RenderHints | None = None,
     ) -> np.ndarray:
         """Run the full pipeline in the recommended order.
 
@@ -672,13 +674,18 @@ class ImageProcessingService:
         planes, ``float32``), not a uint8 upload - prepend the ``stack_base``
         pre-stage (background extraction, colour calibration and the tunable
         stretch, all from ``params.stack``) which turns it into the BGR
-        ``float32`` the rest of the pipeline expects.
+        ``float32`` the rest of the pipeline expects. ``sky_mask`` (a
+        nightscape composite's sky mask) and ``render_hints`` (what its source
+        frames say - see :class:`RenderHints`) are handed to that pre-stage.
         """
         background = self._background_stages(params)
         creative = self._creative_stages(params)
         if linear_composite:
             background = [
-                ("stack_base", lambda r: render_stack_base(r, params.stack)),
+                (
+                    "stack_base",
+                    lambda r: render_stack_base(r, params.stack, sky_mask, render_hints),
+                ),
                 *background,
             ]
         if denoise_stage is not None:

@@ -816,11 +816,21 @@ def _reduce_tile(
 ) -> tuple[np.ndarray, int, np.ndarray]:
     """Reject outliers then combine one row-tile across the stack axis.
 
-    Iterative sigma-clip around the mean (fast, sum-based - ``np.nanmedian``
-    along the stack axis is ~100x slower and not worth it here). ``block`` is
-    NaN where a rotated frame did not cover the pixel; rejection is skipped
-    where fewer than ``min_cover`` frames overlap (the field-rotation wedge),
-    since the per-pixel sigma there is too noisy to trust.
+    Iterative sigma-clip: the first pass is centred on the per-pixel median with
+    a MAD spread, the later ones on the mean / standard deviation of the samples -
+    those the previous pass kept (``sigma``), or all of them clamped into the
+    previous pass's bounds (``winsorized_sigma``, the Siril / PixInsight
+    estimate). Either way the samples outside the final bounds are **dropped**
+    from the combine. The robust first pass is what lets a short stack drop a
+    one-frame outlier (an aircraft or satellite trail): a mean / std computed
+    *with* the outlier puts it at most ``(N-1)/sqrt(N)`` sigma away - 2.85 for 10
+    frames, under ``_KAPPA`` - so a plain sigma-clip never rejects it and
+    averages it in at 1/N instead. Winsorization is only used to *estimate* the
+    spread: keeping the clamped samples in the mean, as this once did, adds
+    ``_KAPPA`` sigma / N wherever an outlier is one-sided - a faint line along
+    every trail. ``block`` is NaN where a rotated frame did not cover the pixel;
+    rejection is skipped where fewer than ``min_cover`` frames overlap (the
+    field-rotation wedge), since the per-pixel sigma there is too noisy to trust.
     """
     finite = np.isfinite(block)
     coverage = finite.sum(axis=0)
@@ -828,19 +838,25 @@ def _reduce_tile(
     rejected = 0
 
     if rejection in ("sigma", "winsorized_sigma"):
-        lo = hi = None
-        for _ in range(_REJECT_ITERATIONS):
-            count = np.maximum(keep.sum(axis=0), 1)
-            mean = np.where(keep, block, 0.0).sum(axis=0) / count
-            var = np.where(keep, (block - mean) ** 2, 0.0).sum(axis=0) / count
-            spread = _KAPPA * np.sqrt(var)
-            lo, hi = mean - spread, mean + spread
+        lo: np.ndarray = np.zeros(block.shape[1:])
+        hi: np.ndarray = lo
+        for iteration in range(_REJECT_ITERATIONS):
+            if iteration == 0:
+                centre, sigma = _robust_centre_spread(block, finite, coverage)
+            else:
+                if rejection == "winsorized_sigma":
+                    sample, count = np.clip(block, lo, hi), np.maximum(coverage, 1)
+                    used = finite
+                else:
+                    sample, count = block, np.maximum(keep.sum(axis=0), 1)
+                    used = keep
+                centre = np.where(used, sample, 0.0).sum(axis=0) / count
+                sigma = np.sqrt(np.where(used, (sample - centre) ** 2, 0.0).sum(axis=0) / count)
+            spread = _KAPPA * sigma
+            lo, hi = centre - spread, centre + spread
             keep = finite & (block >= lo) & (block <= hi) & (coverage >= min_cover)
         keep |= finite & (coverage < min_cover)  # unclipped where too few frames overlap
         rejected = int(np.count_nonzero(finite & ~keep))
-        if rejection == "winsorized_sigma" and lo is not None:
-            block = np.where(coverage >= min_cover, np.clip(block, lo, hi), block)
-            keep = finite
 
     frame_coverage = coverage[..., 0].astype(np.int32)  # how many frames hit each pixel
     if combination == "median":
@@ -850,3 +866,30 @@ def _reduce_tile(
     weight_sum = (keep * weights).sum(axis=0)
     tile = (np.where(keep, block, 0.0) * weights).sum(axis=0) / np.maximum(weight_sum, _TINY)
     return np.where(weight_sum > 0, tile, 0.0).astype(np.float32), rejected, frame_coverage
+
+
+def _robust_centre_spread(
+    block: np.ndarray, finite: np.ndarray, coverage: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """Per-pixel median and MAD-sigma across the stack axis, NaN-aware.
+
+    Sort-based (missing samples sorted to the end as ``+inf``, the median read at
+    each pixel's own coverage), which is as fast as the sum-based clip and far
+    faster than ``np.nanmedian``. Where the MAD is zero - more than half the
+    samples identical, e.g. a quantised or clipped source - the plain standard
+    deviation stands in, so those pixels aren't clipped to a single value.
+    """
+    lo = np.maximum((coverage - 1) // 2, 0)[np.newaxis]
+    hi = (coverage // 2)[np.newaxis]
+
+    def nan_median(values: np.ndarray) -> np.ndarray:
+        ordered = np.sort(np.where(finite, values, np.inf), axis=0)
+        mid = np.take_along_axis(ordered, lo, 0) + np.take_along_axis(ordered, hi, 0)
+        return np.where(coverage > 0, 0.5 * mid[0], 0.0)
+
+    median = nan_median(block)
+    mad_sigma = _MAD_TO_SIGMA * nan_median(np.abs(block - median))
+    count = np.maximum(coverage, 1)
+    mean = np.where(finite, block, 0.0).sum(axis=0) / count
+    std = np.sqrt(np.where(finite, (block - mean) ** 2, 0.0).sum(axis=0) / count)
+    return median, np.where(mad_sigma > 0, mad_sigma, std)

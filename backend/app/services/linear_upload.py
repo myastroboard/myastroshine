@@ -9,7 +9,13 @@ colour calibration and a tunable deep stretch, all recomputed from the 32-bit
 composite on every render - and keeps the faint signal in float through the
 whole tone chain rather than quantising it to 256 levels on the way in.
 
-``decode_image`` still handles ordinary 8-bit photos and camera RAW.
+A **linear DNG** (an Apple ProRAW: already merged and demosaiced by the phone)
+takes the same route. When it carries Apple's sky matte, the matte is stored
+next to the composite (``sky_mask.npy``) so the "Stack" step measures the sky
+without the landscape (see :mod:`app.utils.sky_mask`), and the border crop -
+which would take a dark landscape for a dead stack edge - is skipped.
+
+``decode_image`` still handles ordinary 8-bit photos and Bayer camera RAW.
 """
 
 from __future__ import annotations
@@ -23,12 +29,19 @@ import numpy as np
 from app.db.models import SessionRecord, StackRecord
 from app.logging_config import get_logger
 from app.models import StackParameters
-from app.services.post_stack import crop_low_signal_border, render_stack_base
+from app.services.post_stack import crop_low_signal_border, render_hints_for, render_stack_base
 from app.services.session import SessionService
 from app.services.storage import StorageService
 from app.utils.app_settings import get_app_settings
 from app.utils.image_utils import FITS_FORMATS, extension_of
-from app.utils.linear_ingest import LinearFrame, debayer_rgb, ingest_frame, summarize_capture
+from app.utils.linear_ingest import (
+    LinearFrame,
+    debayer_rgb,
+    ingest_frame,
+    is_linear_dng,
+    summarize_capture,
+)
+from app.utils.sky_mask import fit_sky_mask
 
 logger = get_logger(__name__)
 
@@ -36,6 +49,7 @@ logger = get_logger(__name__)
 #: >8-bit one is treated as linear stack data (see :func:`is_linear_stack_upload`).
 _LINEAR_STANDARD_FORMATS = {".tif", ".tiff", ".png"}
 _COLOR_NDIM = 3
+_DNG = ".dng"
 
 
 def is_linear_stack_upload(data: bytes, filename: str | None) -> bool:
@@ -43,12 +57,15 @@ def is_linear_stack_upload(data: bytes, filename: str | None) -> bool:
 
     FITS always is (scientific linear data by convention); a TIFF / PNG only
     when it is stored deeper than 8-bit (a linear stack export, not a JPEG-grade
-    preview). Everything else - JPEG, an 8-bit PNG, camera RAW - is left to
+    preview); a DNG only when it is already-demosaiced linear RGB (a ProRAW).
+    Everything else - JPEG, an 8-bit PNG, a Bayer camera RAW - is left to
     :func:`app.utils.image_utils.decode_image`.
     """
     ext = extension_of(filename)
     if ext in FITS_FORMATS:
         return True
+    if ext == _DNG:
+        return is_linear_dng(data)
     if ext in _LINEAR_STANDARD_FORMATS:
         decoded = cv2.imdecode(np.frombuffer(data, dtype=np.uint8), cv2.IMREAD_UNCHANGED)
         return decoded is not None and decoded.dtype != np.uint8
@@ -83,15 +100,24 @@ class LinearUploadService:
         """
         frame = ingest_frame(data, filename)
         composite = _to_linear_composite(frame)
-        composite, border_crop = crop_low_signal_border(composite)
+        sky_mask = frame.sky_matte
+        if fit_sky_mask(sky_mask, composite.shape) is None:
+            sky_mask = None  # no matte, or one with no landscape in it: deep-sky path
+            composite, border_crop = crop_low_signal_border(composite)
+        else:
+            border_crop = None  # the dark edge here is the landscape, not a dead border
 
         stack_id = str(uuid.uuid4())
         self.storage.save_stack_composite(stack_id, composite)
+        if sky_mask is not None:
+            self.storage.save_stack_sky_mask(stack_id, sky_mask)
+        hints = render_hints_for([frame.metadata])
+        self.storage.save_stack_render_hints(stack_id, hints.to_dict())
 
         session = self.sessions.create_session(image_path="", original_filename=filename)
-        display = np.clip(render_stack_base(composite, StackParameters()) * 255.0, 0, 255).astype(
-            np.uint8
-        )
+        display = np.clip(
+            render_stack_base(composite, StackParameters(), sky_mask, hints) * 255.0, 0, 255
+        ).astype(np.uint8)
         self.storage.save_original(session.session_id, display)
         session.image_path = str(self.storage.original_path(session.session_id))
 
@@ -125,5 +151,7 @@ class LinearUploadService:
             stack_id=stack_id,
             shape=[int(n) for n in composite.shape],
             border_crop=list(border_crop) if border_crop else None,
+            sky_mask=sky_mask is not None,
+            hints=hints.to_dict(),
         )
         return session, composite

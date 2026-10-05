@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 
 from app.services.calibration import CalibrationService
-from app.services.integration import IntegrationService
+from app.services.integration import IntegrationService, _reduce_tile
 from app.services.storage import StorageService
 from app.utils.linear_ingest import LinearFrame
 
@@ -270,3 +270,56 @@ def test_calibration_through_integrate_flattens_a_gradient(storage: StorageServi
     left = float(np.median(sky[:, : width // 4]))
     right = float(np.median(sky[:, -width // 4 :]))
     assert abs(left - right) / max(left, right, 1e-6) < 0.15
+
+
+def _trail_stack(frames: int) -> np.ndarray:
+    """A flat, noisy sky stack ``(K, H, W, 1)`` with a bright trail in frame 0 only."""
+    rng = np.random.default_rng(3)
+    block = (0.05 + rng.normal(0, 0.002, (frames, 32, 1024, 1))).astype(np.float32)
+    block[0, 16, :, 0] += 0.5
+    return block
+
+
+@pytest.mark.parametrize("frames", [3, 5, 10])
+@pytest.mark.parametrize("rejection", ["sigma", "winsorized_sigma"])
+def test_a_one_frame_trail_is_rejected_in_a_short_stack(frames: int, rejection: str) -> None:
+    """An aircraft trail in one frame of a short stack leaves no ghost in the mean.
+
+    A mean / std that includes the outlier can never place it ``_KAPPA`` sigma
+    away when there are 10 frames or fewer; the median / MAD first pass can.
+    """
+    weights = np.full((frames, 1, 1, 1), 1.0 / frames, dtype=np.float32)
+    tile, rejected, _ = _reduce_tile(_trail_stack(frames), weights, "average", rejection, 2)
+    trail_excess = float(tile[16].mean() - tile[4].mean())
+    # An unrejected trail would add 0.5 / frames; a trail clamped to the upper
+    # bound instead of dropped would still add 3 sigma / frames (0.0006 for 10
+    # frames, a visible line once stretched). Dropped, only noise is left: the
+    # difference of two 1024-pixel row means is within about 0.00006.
+    assert abs(trail_excess) < 0.0002
+    assert rejected >= 1024
+
+
+def test_rejection_handles_partial_coverage() -> None:
+    """Pixels a rotated frame did not cover (NaN) are ignored, not treated as outliers."""
+    block = _trail_stack(6)
+    block[1:3, :, :8] = np.nan  # two frames miss the left strip
+    weights = np.full((6, 1, 1, 1), 1.0 / 6, dtype=np.float32)
+    tile, _, coverage = _reduce_tile(block, weights, "average", "sigma", 2)
+    assert np.isfinite(tile).all()
+    assert coverage[0, 0] == 4  # 6 frames minus the 2 missing
+    assert abs(float(tile[4, :8].mean()) - 0.05) < 0.003
+
+
+def test_identical_samples_are_not_clipped_to_one_value() -> None:
+    """Where most samples are identical (MAD = 0), the std stands in for the spread.
+
+    Otherwise every sample off the median by a single quantisation step would be
+    rejected.
+    """
+    block = np.full((7, 4, 4, 1), 0.2, dtype=np.float32)
+    block[5] = 0.2 + 1 / 255
+    block[6] = 0.2 + 2 / 255
+    weights = np.full((7, 1, 1, 1), 1.0 / 7, dtype=np.float32)
+    tile, rejected, _ = _reduce_tile(block, weights, "average", "sigma", 2)
+    assert rejected == 0
+    assert np.allclose(tile, block.mean(axis=0))

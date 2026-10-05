@@ -26,6 +26,7 @@ from app.services.external_starless import (
 from app.services.image_processing import DenoiseStageFn, ImageProcessingService, StepCallback
 from app.services.job import JobService
 from app.services.job_runner import JobInterruptedError, get_job_runner, raise_if_stopping
+from app.services.post_stack import RenderHints
 from app.services.session import SessionService
 from app.services.storage import StorageService
 from app.utils.app_settings import get_app_settings
@@ -267,6 +268,10 @@ class EnhancementService:
                     linear_composite=True,
                     starless_split=starless_split,
                     denoise_stage=denoise_stage,
+                    sky_mask=self.storage.load_stack_sky_mask(stack_id),
+                    render_hints=RenderHints.from_dict(
+                        self.storage.load_stack_render_hints(stack_id)
+                    ),
                 )
             else:
                 original = self.storage.load_original(session_id)

@@ -12,10 +12,17 @@ original Keep a Changelog headings.
 
 ### Features
 
-- None.
+- An iPhone ProRAW (`.dng`) opens in the linear editor, and a Milky Way shot with a landscape uses
+  the phone's sky mask, single or stacked: no halos round trees, a dark night sky. See
+  docs/ALGORITHMS.md "Nightscapes".
+- Wide-angle shots (35 mm-equivalent focal up to 50 mm) have their lens vignetting and sky colour
+  shading corrected automatically, and a clean stack no longer crushes darker sky to black.
+  Phone ProRAW keeps the phone's white balance and stacks with equal weights.
 
 ### Fixes
 
+- Stacking now removes an aircraft or satellite trail from a short stack (3 to 10 frames), and the
+  default winsorized rejection no longer leaves a faint line where a trail was rejected.
 - An upload a proxy refuses as too large (Cloudflare caps requests at 100 MB) now says so and
   suggests the local address, instead of showing the proxy's raw HTML error page.
 

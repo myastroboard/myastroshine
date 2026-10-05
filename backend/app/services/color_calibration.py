@@ -42,16 +42,24 @@ _SKY_LUMA_PERCENTILE = 50.0  # the sky is sampled on the darker half of the fram
 _TINY = 1e-8
 
 
-def neutralise_sky(linear: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def neutralise_sky(
+    linear: np.ndarray, sky_mask: np.ndarray | None = None
+) -> tuple[np.ndarray, np.ndarray]:
     """Subtract each channel's sky level, keeping the (signed) noise around zero.
 
     The sky level is the per-channel median of the darker half of the frame (by
     luminance) - the sky between the objects on a typical deep-sky field, and still
-    a sky-dominated sample on a frame-filling nebula. Returns ``(neutral, sky)``.
+    a sky-dominated sample on a frame-filling nebula. ``sky_mask`` (boolean, same
+    size) restricts that sample to the sky of a nightscape - otherwise the darker
+    half is the landscape. Returns ``(neutral, sky)``.
     """
     sample = linear[::3, ::3]
     luma = sample @ LUMA_RGB
-    dark = luma <= np.percentile(luma, _SKY_LUMA_PERCENTILE)
+    if sky_mask is None:
+        dark = luma <= np.percentile(luma, _SKY_LUMA_PERCENTILE)
+    else:
+        in_sky = sky_mask[::3, ::3]
+        dark = in_sky & (luma <= np.percentile(luma[in_sky], _SKY_LUMA_PERCENTILE))
     sky = np.median(sample[dark], axis=0).astype(np.float32)
     return (linear - sky).astype(np.float32), sky
 

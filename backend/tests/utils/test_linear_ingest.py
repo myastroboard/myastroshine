@@ -15,6 +15,7 @@ from app.utils.linear_ingest import (
     LinearFrame,
     debayer_rgb,
     ingest_frame,
+    is_linear_dng,
     stretch_composite_bgr,
     summarize_capture,
     to_display_bgr,
@@ -406,6 +407,8 @@ def test_a_standard_format_frame_over_the_pixel_cap_is_rejected(
 
 def test_raw_dispatches_through_rawpy_to_linear_rgb(monkeypatch: pytest.MonkeyPatch) -> None:
     class _FakeRaw:
+        raw_type = rawpy.RawType.Flat
+
         def __enter__(self) -> _FakeRaw:
             return self
 
@@ -528,3 +531,99 @@ def test_stretch_composite_bgr_handles_a_nan_rotation_wedge() -> None:
     out = stretch_composite_bgr(data)
     assert out.shape == (60, 60, 3)
     assert np.isfinite(out).all()
+
+
+@pytest.mark.parametrize(("raw_type", "expected"), [("Stack", True), ("Flat", False)])
+def test_is_linear_dng_reads_the_raw_type(
+    monkeypatch: pytest.MonkeyPatch, raw_type: str, expected: bool
+) -> None:
+    """A demosaiced (``LinearRaw``) DNG - an Apple ProRAW - is linear composite data;
+    a Bayer DNG is not."""
+
+    kind = getattr(rawpy.RawType, raw_type)
+
+    class _FakeRaw:
+        raw_type = kind
+
+        def __enter__(self) -> _FakeRaw:
+            return self
+
+        def __exit__(self, *exc_info: object) -> None:
+            return None
+
+    monkeypatch.setattr(rawpy, "imread", lambda _file: _FakeRaw())
+    assert is_linear_dng(b"fake dng") is expected
+
+
+def test_is_linear_dng_is_false_for_garbage() -> None:
+    """A file libraw cannot open is simply not a linear DNG."""
+    assert is_linear_dng(b"not a raw file") is False
+
+
+@pytest.mark.parametrize(
+    ("filename", "has_matte"), [("IMG_1516.DNG", True), ("IMG_0001.CR2", False)]
+)
+def test_a_dng_frame_carries_its_sky_matte(
+    monkeypatch: pytest.MonkeyPatch, filename: str, has_matte: bool
+) -> None:
+    """A DNG's sky matte (a ProRAW's) rides on the frame; other RAWs have none."""
+
+    class _FakeRaw:
+        raw_type = rawpy.RawType.Flat
+
+        def __enter__(self) -> _FakeRaw:
+            return self
+
+        def __exit__(self, *exc_info: object) -> None:
+            return None
+
+        def postprocess(self, **_kwargs: object) -> np.ndarray:
+            return np.full((8, 6, 3), 1000, dtype=np.uint16)
+
+    matte = np.full((2, 2), 255, dtype=np.uint8)
+    monkeypatch.setattr(rawpy, "imread", lambda _file: _FakeRaw())
+    monkeypatch.setattr(linear_ingest, "read_apple_sky_matte", lambda _data: matte)
+
+    frame = ingest_frame(b"fake raw", filename)
+    assert (frame.sky_matte is matte) is has_matte
+
+
+def test_a_linear_dng_frame_is_flagged_camera_processed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A demosaiced DNG (a ProRAW) is flagged; its 35 mm focal is recorded."""
+
+    class _FakeRaw:
+        raw_type = rawpy.RawType.Stack
+
+        def __enter__(self) -> _FakeRaw:
+            return self
+
+        def __exit__(self, *exc_info: object) -> None:
+            return None
+
+        def postprocess(self, **_kwargs: object) -> np.ndarray:
+            return np.full((8, 6, 3), 1000, dtype=np.uint16)
+
+    monkeypatch.setattr(rawpy, "imread", lambda _file: _FakeRaw())
+    monkeypatch.setattr(linear_ingest, "read_apple_sky_matte", lambda _data: None)
+    monkeypatch.setattr(linear_ingest, "_focal_35mm", lambda _data: 24.0)
+
+    frame = ingest_frame(b"fake dng", "IMG_1537.DNG")
+    assert frame.metadata["camera_processed"] == "1"
+    assert frame.metadata["focal_35mm"] == "24"
+
+
+def test_focal_35mm_reads_exif_and_tolerates_anything_else() -> None:
+    """The EXIF FocalLengthIn35mmFilm tag is read; a file without it gives None."""
+    from PIL import Image
+
+    image = Image.new("RGB", (8, 8))
+    exif = image.getexif()
+    exif.get_ifd(0x8769)[41989] = 24
+    buffer = io.BytesIO()
+    image.save(buffer, format="JPEG", exif=exif)
+    assert linear_ingest._focal_35mm(buffer.getvalue()) == 24.0
+
+    plain = io.BytesIO()
+    Image.new("RGB", (8, 8)).save(plain, format="JPEG")
+    assert linear_ingest._focal_35mm(plain.getvalue()) is None
+    assert linear_ingest._focal_35mm(b"not an image") is None
