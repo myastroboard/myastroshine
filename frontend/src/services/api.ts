@@ -27,6 +27,7 @@ import type {
   LogLevel,
   LogLevels,
   LogTail,
+  LookCatalog,
   LookId,
   Preset,
   ProcessResponse,
@@ -624,6 +625,11 @@ export const apiClient = {
    * exposure) read off its source FITS header(s), or `null` if it has none. */
   getCaptureInfo(sessionId: string): Promise<CaptureInfo | null> {
     return request<CaptureInfo | null>(`/session/${sessionId}/capture-info`);
+  },
+
+  /** The "Style" gallery's looks for this session, night-landscape ones first. */
+  getLookCatalog(sessionId: string): Promise<LookCatalog> {
+    return request<LookCatalog>(`/looks/${sessionId}`);
   },
 };
 

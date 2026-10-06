@@ -445,12 +445,39 @@ Building blocks (each an identity at strength 0, BGR float32 in and out):
   white.
 - **Colour pop** - luminance-preserving saturation weighted by an object mask
   (blurred luminance from the sky median to the 99th percentile), so the
-  target's colours deepen and the background's colour noise does not.
+  target's colours deepen and the background's colour noise does not. Only the
+  smoothed colour (1 px+ blur of the chroma) is boosted: pixel-scale colour
+  grain is never amplified.
 - **Split toning** - a cool tint on the background and a warm one on the
   subject (same object mask). The tints carry zero luminance and scale with each
   pixel's luminance, so brightness is unchanged and black stays black.
 - **Vignette** - a smooth corner darkening (up to 35 %), flat in the centre.
+- **Warm / cool tone** - a luminance-free amber or teal tint proportional to
+  each pixel's luminance (black stays black).
+- **Shadow lift** - colours scaled by `1 + 0.6 * s * (1 - L)^2`: darks open up
+  by at most 1.6x, white not at all; a gain, never a grey offset.
 
+**Night landscapes.** When the session's composite has a sky mask (an iPhone
+ProRAW, single or stacked - see "Nightscapes"), the gallery also offers
+`galactic_core` and `blue_hour` (`GET /api/looks/{id}` lists them first). These
+looks have sky steps and foreground steps: each runs with its statistics
+measured on its own region, and the two results are blended through the mask,
+feathered over 0.2 % of the diagonal. The mask is taken through the edit's
+geometry first (`EnhancementService.look_sky_mask`, on a copy at most twice the
+target size, so a thumbnail never warps a full-resolution mask). On the sky:
+
+- every blur is normalised over the sky only, so the sky next to a tree line is
+  averaged with sky, never with the dark foreground;
+- the sky's local level ignores "sky" pixels darker than 0.75x that level: the
+  phone's matte is coarser than a tree, and dark leaves it counts as sky would
+  otherwise pull the level down and make the sky beside them glow (a halo);
+- the "subject" (for toning and colour pop) is what stands out from the local
+  sky level (6 % of the diagonal), not the sky's broad brightest gradient - the
+  light-pollution dome over the horizon is not warmed as if it were the Milky
+  Way - and it fades out over a 1 % strip of sky along the foreground.
+
+Without a sky mask (an API call on an ordinary image), these looks apply their
+sky steps to the whole frame.
 Looks (weights at amount 100; `amount` scales them linearly):
 
 | Look | Operations |
@@ -458,6 +485,8 @@ Looks (weights at amount 100; `amount` scales them linearly):
 | `vivid` | deep sky black 0.5, local contrast 1.0, colour pop 1.0 |
 | `soft_glow` | deep sky black 0.4, Orton glow 1.0 |
 | `cinematic` | local contrast 0.3, split toning 1.0, vignette 0.6 |
+| `galactic_core` | sky: local contrast 1.0, split toning 1.0, colour pop 0.8; foreground: shadow lift 0.7, local contrast 0.3 |
+| `blue_hour` | sky: cool tone 1.6, Orton glow 1.0, local contrast 0.4; foreground: shadow lift 0.6, warm tone 1.0 |
 
 ## Auto Astro (one-click adaptive enhancement)
 

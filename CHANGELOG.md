@@ -23,9 +23,13 @@ original Keep a Changelog headings.
 - New optional "Style" step before Export: Vivid, Soft glow or Cinematic finishing looks from a
   gallery of your own image, one strength slider, nothing invented. See docs/ALGORITHMS.md "Looks".
   The Astrodex copy carries the style, and its parameters gain a `look` key (myastroboard).
+- Night landscapes get two more styles that treat the sky and the ground apart: Galactic core and
+  Blue hour, with no halo round the trees. See docs/ALGORITHMS.md "Looks".
 
 ### Fixes
 
+- The editor no longer crashes on a phone ProRAW whose capture info has no gain or sensor
+  temperature (the info panel now skips fields the API sends as null).
 - Stacking now removes an aircraft or satellite trail from a short stack (3 to 10 frames), and the
   default winsorized rejection no longer leaves a faint line where a trail was rejected.
 - An upload a proxy refuses as too large (Cloudflare caps requests at 100 MB) now says so and

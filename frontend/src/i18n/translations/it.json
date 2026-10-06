@@ -216,6 +216,7 @@
   },
   "style_panel": {
     "gallery_aria": "Stili di finitura",
+    "nightscape_note": "La tua foto contiene un paesaggio: i primi stili trattano cielo e terreno separatamente.",
     "none": {
       "name": "Nessuno stile",
       "hint": "La tua immagine esattamente come l'hai modificata, senza stile finale."
@@ -232,6 +233,14 @@
       "cinematic": {
         "name": "Cinema",
         "hint": "Uno sfondo freddo, un soggetto caldo e una leggera vignettatura - atmosfera da locandina."
+      },
+      "galactic_core": {
+        "name": "Nucleo galattico",
+        "hint": "Un nucleo della Via Lattea caldo e dorato, con profonde bande di polvere su un cielo freddo; il paesaggio leggermente schiarito."
+      },
+      "blue_hour": {
+        "name": "Ora blu",
+        "hint": "Un cielo notturno freddo e luminoso, con un bagliore morbido sulla Via Lattea, sopra un paesaggio caldo."
       }
     },
     "amount": {

@@ -117,9 +117,23 @@ export function stackParametersEqual(a: StackParameters, b: StackParameters): bo
  * colour, contrast, a glow from the image's own bright areas - never adds stars
  * or detail. `lookId: null` (the default) is no look at all.
  */
-export type LookId = 'vivid' | 'soft_glow' | 'cinematic';
+export type LookId = 'vivid' | 'soft_glow' | 'cinematic' | 'galactic_core' | 'blue_hour';
 
-export const LOOK_IDS: LookId[] = ['vivid', 'soft_glow', 'cinematic'];
+/** What the gallery is for: `'nightscape'` when the photo has a sky mask (a
+ * night landscape - its looks treat the sky and the ground apart). */
+export type LookScene = 'general' | 'nightscape';
+
+/** `GET /api/looks/{id}`: the looks the gallery offers, in display order. */
+export interface LookCatalog {
+  scene: LookScene;
+  looks: LookId[];
+}
+
+/** The looks for every image - also the gallery's fallback before the catalogue loads. */
+export const GENERAL_LOOK_CATALOG: LookCatalog = {
+  scene: 'general',
+  looks: ['vivid', 'soft_glow', 'cinematic'],
+};
 
 export interface LookParameters {
   lookId: LookId | null;
@@ -519,18 +533,19 @@ export interface UploadResponse {
 }
 
 /** Acquisition info read off the source FITS header(s) - every field is
- * best-effort and may be absent. `null` when the session has none (an
+ * best-effort and may be absent or `null` (the API sends `null` for what the
+ * header did not have). `null` as a whole when the session has none (an
  * ordinary photo, or a FITS with no usable header). */
 export interface CaptureInfo {
-  objectName?: string;
-  telescope?: string;
-  filter?: string;
-  frameCount?: number;
-  exposureS?: number;
-  totalExposureS?: number;
-  dateObs?: string;
-  gain?: number;
-  sensorTempC?: number;
+  objectName?: string | null;
+  telescope?: string | null;
+  filter?: string | null;
+  frameCount?: number | null;
+  exposureS?: number | null;
+  totalExposureS?: number | null;
+  dateObs?: string | null;
+  gain?: number | null;
+  sensorTempC?: number | null;
 }
 
 export interface ProcessResponse {

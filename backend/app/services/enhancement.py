@@ -10,13 +10,14 @@ from __future__ import annotations
 import hashlib
 import json
 
+import cv2
 import numpy as np
 from sqlalchemy import select
 
 from app.db.models import JobRecord, StackRecord
 from app.exceptions import AppError, ImageProcessingError
 from app.logging_config import get_logger
-from app.models import ProcessingParameters, ProcessResponse
+from app.models import GeometryParameters, LookId, ProcessingParameters, ProcessResponse
 from app.services import progress
 from app.services.engine_probe import get_engine_statuses
 from app.services.external_denoise import ExternalDenoiseService, blend_denoise
@@ -29,10 +30,12 @@ from app.services.external_starless import (
 from app.services.image_processing import DenoiseStageFn, ImageProcessingService, StepCallback
 from app.services.job import JobService
 from app.services.job_runner import JobInterruptedError, get_job_runner, raise_if_stopping
+from app.services.looks import LOOKS
 from app.services.post_stack import RenderHints
 from app.services.session import SessionService
 from app.services.storage import StorageService
 from app.utils.app_settings import get_app_settings
+from app.utils.sky_mask import fit_sky_mask
 
 logger = get_logger(__name__)
 
@@ -271,6 +274,49 @@ class EnhancementService:
             denoise_stage=denoise_stage,
         )
 
+    def has_sky_mask(self, session_id: str) -> bool:
+        """True when the session is a night landscape: its composite has a sky mask."""
+        stack_id = self._backing_stack_id(session_id)
+        return stack_id is not None and self.storage.stack_sky_mask_path(stack_id).exists()
+
+    def look_sky_mask(
+        self,
+        session_id: str,
+        look_id: LookId | None,
+        geometry: GeometryParameters,
+        shape: tuple[int, ...],
+    ) -> np.ndarray | None:
+        """The session's sky mask (0..1) framed like the result, for a look that uses one.
+
+        ``None`` unless ``look_id`` is a night-landscape look and the session's
+        composite has a sky mask. The mask lives in the composite's frame; the
+        edit's rotate / flip / straighten / crop put the result in another, so
+        the mask goes through the same geometry. That geometry is
+        scale-invariant, so it runs on a copy at most twice the target size (a
+        gallery thumbnail never pays for a full-resolution warp).
+        """
+        if look_id is None or LOOKS[look_id].ground_steps is None:
+            return None
+        stack_id = self._backing_stack_id(session_id)
+        if stack_id is None:
+            return None
+        stored = self.storage.load_stack_sky_mask(stack_id)
+        composite_shape = self.storage.stack_composite_shape(stack_id)
+        sky = fit_sky_mask(stored, composite_shape)
+        if sky is None:
+            return None
+        height, width = sky.shape
+        scale = min(1.0, 2.0 * max(shape[:2]) / max(height, width))
+        weight: np.ndarray = sky.astype(np.float32)
+        if scale < 1.0:
+            size = (max(1, round(width * scale)), max(1, round(height * scale)))
+            weight = cv2.resize(weight, size, interpolation=cv2.INTER_AREA)
+        framed = self.processing.apply_geometry(weight, geometry)
+        resized: np.ndarray = cv2.resize(
+            framed, (shape[1], shape[0]), interpolation=cv2.INTER_LINEAR
+        )
+        return resized
+
     def _prelook(
         self, session_id: str, params: ProcessingParameters, on_step: StepCallback
     ) -> np.ndarray:
@@ -327,7 +373,10 @@ class EnhancementService:
 
             prelook = self._prelook(session_id, params, on_step)
             on_step("look", 90)
-            result = self.processing.apply_look(prelook, params.look)
+            sky = self.look_sky_mask(
+                session_id, params.look.look_id, params.geometry, prelook.shape[:2]
+            )
+            result = self.processing.apply_look(prelook, params.look, sky)
 
             self.jobs.update(job_id, progress_percent=95, current_step="rendering")
             self._emit(job_id)

@@ -216,6 +216,7 @@
   },
   "style_panel": {
     "gallery_aria": "Abschließende Stile",
+    "nightscape_note": "Dein Foto enthält eine Landschaft: Die ersten Stile behandeln Himmel und Boden getrennt.",
     "none": {
       "name": "Kein Stil",
       "hint": "Dein Bild genau so, wie du es bearbeitet hast, ohne abschließenden Stil."
@@ -232,6 +233,14 @@
       "cinematic": {
         "name": "Kino",
         "hint": "Ein kühler Hintergrund, ein warmes Motiv und eine sanfte Vignette - Filmplakat-Stimmung."
+      },
+      "galactic_core": {
+        "name": "Galaktisches Zentrum",
+        "hint": "Ein warmes, goldenes Milchstraßenzentrum mit tiefen Staubbändern vor kühlem Himmel; die Landschaft sanft aufgehellt."
+      },
+      "blue_hour": {
+        "name": "Blaue Stunde",
+        "hint": "Ein kühler, leuchtender Nachthimmel mit sanftem Schimmer auf der Milchstraße über einer warmen Landschaft."
       }
     },
     "amount": {

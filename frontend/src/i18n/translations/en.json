@@ -216,6 +216,7 @@
   },
   "style_panel": {
     "gallery_aria": "Finishing styles",
+    "nightscape_note": "Your photo has a landscape: the first styles treat the sky and the ground separately.",
     "none": {
       "name": "No style",
       "hint": "Your image exactly as you edited it, with no finishing style."
@@ -232,6 +233,14 @@
       "cinematic": {
         "name": "Cinematic",
         "hint": "A cool background, a warm subject and a gentle vignette - a movie-poster mood."
+      },
+      "galactic_core": {
+        "name": "Galactic core",
+        "hint": "A warm, golden Milky Way core with deep dust lanes over a cool sky; the landscape gently opened up."
+      },
+      "blue_hour": {
+        "name": "Blue hour",
+        "hint": "A cool, luminous night sky with a soft glow on the Milky Way above a warm landscape."
       }
     },
     "amount": {

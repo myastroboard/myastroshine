@@ -580,9 +580,15 @@ class ImageProcessingService:
         return np.clip(out, 0.0, 1.0)
 
     @_dtype_flexible
-    def apply_look(self, image: np.ndarray, look: LookParameters) -> np.ndarray:
-        """The optional "Style" finishing look (``app.services.looks``); identity when none."""
-        return self._looks.apply(image, look)
+    def apply_look(
+        self, image: np.ndarray, look: LookParameters, sky_mask: np.ndarray | None = None
+    ) -> np.ndarray:
+        """The optional "Style" finishing look (``app.services.looks``); identity when none.
+
+        ``sky_mask`` (0..1, already through this edit's geometry) lets a
+        night-landscape look treat the sky and the foreground apart.
+        """
+        return self._looks.apply(image, look, sky_mask)
 
     def _background_stages(
         self, params: ProcessingParameters

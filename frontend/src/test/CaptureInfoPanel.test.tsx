@@ -35,6 +35,23 @@ describe('CaptureInfoPanel', () => {
     expect(screen.queryByText(/Telescope|Télescope/)).not.toBeInTheDocument();
   });
 
+  it('skips fields the API sent as null instead of crashing', () => {
+    // A phone ProRAW's capture info has no gain or sensor temperature: the
+    // API sends them as null, which used to crash the editor.
+    const info: CaptureInfo = {
+      frameCount: 1,
+      exposureS: 10,
+      gain: null,
+      sensorTempC: null,
+      objectName: null,
+    };
+
+    render(<CaptureInfoPanel info={info} />);
+
+    expect(screen.getByText('1 × 10s')).toBeInTheDocument();
+    expect(screen.queryByText(/°C/)).not.toBeInTheDocument();
+  });
+
   it('renders nothing when every field is absent', () => {
     const { container } = render(<CaptureInfoPanel info={{}} />);
 

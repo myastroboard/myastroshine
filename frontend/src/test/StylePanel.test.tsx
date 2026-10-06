@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { StylePanel } from '@/components/StylePanel';
-import { DEFAULT_LOOK_PARAMETERS, type LookId } from '@/types';
+import { DEFAULT_LOOK_PARAMETERS, GENERAL_LOOK_CATALOG, type LookId } from '@/types';
 
 const thumbnailUrl = (look: LookId | null) => `/thumb/${look ?? 'none'}`;
 
@@ -11,6 +11,8 @@ describe('StylePanel', () => {
     const { container } = render(
       <StylePanel
         look={DEFAULT_LOOK_PARAMETERS}
+        looks={GENERAL_LOOK_CATALOG.looks}
+        scene="general"
         thumbnailUrl={thumbnailUrl}
         onLookChange={vi.fn()}
         isProcessing={false}
@@ -37,6 +39,8 @@ describe('StylePanel', () => {
     render(
       <StylePanel
         look={{ lookId: 'vivid', amount: 60 }}
+        looks={GENERAL_LOOK_CATALOG.looks}
+        scene="general"
         thumbnailUrl={thumbnailUrl}
         onLookChange={onLookChange}
         isProcessing={false}
@@ -55,6 +59,8 @@ describe('StylePanel', () => {
     render(
       <StylePanel
         look={{ lookId: 'soft_glow', amount: 60 }}
+        looks={GENERAL_LOOK_CATALOG.looks}
+        scene="general"
         thumbnailUrl={thumbnailUrl}
         onLookChange={onLookChange}
         isProcessing={false}
@@ -76,6 +82,8 @@ describe('StylePanel', () => {
     render(
       <StylePanel
         look={{ lookId: 'vivid', amount: 60 }}
+        looks={GENERAL_LOOK_CATALOG.looks}
+        scene="general"
         thumbnailUrl={thumbnailUrl}
         onLookChange={vi.fn()}
         isProcessing
@@ -86,5 +94,43 @@ describe('StylePanel', () => {
       expect(radio).toBeDisabled();
     }
     expect(screen.getByRole('slider')).toBeDisabled();
+  });
+
+  it('offers the night-landscape looks first and says why on a night landscape', () => {
+    render(
+      <StylePanel
+        look={DEFAULT_LOOK_PARAMETERS}
+        looks={['galactic_core', 'blue_hour', 'vivid', 'soft_glow', 'cinematic']}
+        scene="nightscape"
+        thumbnailUrl={thumbnailUrl}
+        onLookChange={vi.fn()}
+        isProcessing={false}
+      />,
+    );
+
+    expect(screen.getAllByRole('radio').map((radio) => radio.textContent)).toEqual([
+      'No style',
+      'Galactic core',
+      'Blue hour',
+      'Vivid',
+      'Soft glow',
+      'Cinematic',
+    ]);
+    expect(screen.getByText(/treat the sky and the ground separately/)).toBeInTheDocument();
+  });
+
+  it('says nothing about the landscape on an ordinary image', () => {
+    render(
+      <StylePanel
+        look={DEFAULT_LOOK_PARAMETERS}
+        looks={GENERAL_LOOK_CATALOG.looks}
+        scene="general"
+        thumbnailUrl={thumbnailUrl}
+        onLookChange={vi.fn()}
+        isProcessing={false}
+      />,
+    );
+
+    expect(screen.queryByText(/treat the sky and the ground/)).not.toBeInTheDocument();
   });
 });

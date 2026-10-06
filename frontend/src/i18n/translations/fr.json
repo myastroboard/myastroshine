@@ -216,6 +216,7 @@
   },
   "style_panel": {
     "gallery_aria": "Styles de finition",
+    "nightscape_note": "Votre photo contient un paysage : les premiers styles traitent le ciel et le sol séparément.",
     "none": {
       "name": "Sans style",
       "hint": "Votre image exactement telle que vous l'avez retouchée, sans style final."
@@ -232,6 +233,14 @@
       "cinematic": {
         "name": "Cinéma",
         "hint": "Un fond froid, un sujet chaud et un léger vignettage - une ambiance d'affiche de film."
+      },
+      "galactic_core": {
+        "name": "Cœur galactique",
+        "hint": "Un cœur de la Voie lactée chaud et doré, aux bandes de poussière profondes, sur un ciel froid ; le paysage légèrement éclairci."
+      },
+      "blue_hour": {
+        "name": "Heure bleue",
+        "hint": "Un ciel nocturne froid et lumineux, avec un halo doux sur la Voie lactée, au-dessus d'un paysage chaud."
       }
     },
     "amount": {
