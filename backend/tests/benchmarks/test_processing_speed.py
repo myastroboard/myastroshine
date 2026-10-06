@@ -32,10 +32,12 @@ pytestmark = pytest.mark.skipif(
     reason="opt-in: set RUN_BENCHMARKS=1 (see this file's module docstring)",
 )
 
-FULL_RES_BUDGET_SECONDS = 8.0  # was 5.0 at v0.1.0; raised for v0.2's 5 new stages (below) - see
-# ALGORITHMS.md "Missing core astro ops". Full-res enhance is not the interactive path (that's
-# the preview budget below, unaffected): it runs on-demand or via the job queue with progress
-# reported over the WebSocket, not on every slider drag.
+FULL_RES_BUDGET_SECONDS = 12.0  # was 5.0 at v0.1.0; 8.0 for v0.2's 5 new stages - see
+# ALGORITHMS.md "Missing core astro ops"; 12.0 since the float multiscale (starlet) denoise,
+# chroma denoise and sharpen replaced the 8-bit bilateral filter and Laplacian kernel (~9.6s
+# on a desktop CPU, and GitHub runners vary by up to ~1.5x between runs). Full-res enhance is
+# not the interactive path (that's the preview budget below, unaffected): it runs on-demand or
+# via the job queue with progress reported over the WebSocket, not on every slider drag.
 PREVIEW_BUDGET_SECONDS = 0.5
 
 

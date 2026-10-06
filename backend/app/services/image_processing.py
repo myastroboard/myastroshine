@@ -392,8 +392,11 @@ class ImageProcessingService:
         """Boost saturation weighted towards less-saturated pixels (0.0..2.0)."""
         if _unchanged(vibrance, 1.0):
             return image
-        peak = image.max(axis=2)
-        sat = (peak - image.min(axis=2)) / np.maximum(peak, 1e-6)
+        # Per-channel max/min: numpy's reduction over the interleaved last axis
+        # costs several times more on a full-res frame.
+        blue, green, red = cv2.split(image)
+        peak = np.maximum(np.maximum(blue, green), red)
+        sat = (peak - np.minimum(np.minimum(blue, green), red)) / np.maximum(peak, 1e-6)
         factor = (1.0 + (1.0 - sat) * (vibrance - 1.0))[:, :, np.newaxis]
         luma = (image @ _LUMA_BGR)[:, :, np.newaxis]
         boosted: np.ndarray = np.clip(luma + (image - luma) * factor, 0.0, 1.0)

@@ -27,6 +27,8 @@ original Keep a Changelog headings.
   default winsorized rejection no longer leaves a faint line where a trail was rejected.
 - An upload a proxy refuses as too large (Cloudflare caps requests at 100 MB) now says so and
   suggests the local address, instead of showing the proxy's raw HTML error page.
+- Full-resolution renders are about 10% faster (vibrance, denoise and sharpen), with identical
+  output. The weekly performance benchmark's full-res budget is now 12 s; see CONTRIBUTING.md.
 - Lib update
 
 ### Breaking changes

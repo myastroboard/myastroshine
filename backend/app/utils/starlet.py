@@ -28,6 +28,20 @@ _LOCAL_NOISE_RANGE = (0.5, 4.0)  # relative to the frame-wide noise
 _TINY = 1e-12
 
 
+def _garrote_weight(detail: np.ndarray, cut_sq: np.ndarray | float, out: np.ndarray) -> np.ndarray:
+    """``clip(1 - cut^2 / detail^2, 0, 1)`` - the non-negative garrote weight - into ``out``.
+
+    Computed in place: on a full-res frame, the expression's temporaries (one
+    24 MP array per operator) cost more than the arithmetic itself.
+    """
+    np.multiply(detail, detail, out=out)
+    np.maximum(out, _TINY, out=out)
+    np.divide(cut_sq, out, out=out)
+    np.subtract(1.0, out, out=out)
+    np.clip(out, 0.0, 1.0, out=out)
+    return out
+
+
 def starlet_transform(plane: np.ndarray, layers: int) -> tuple[list[np.ndarray], np.ndarray]:
     """Decompose ``plane`` into ``layers`` detail layers and the smooth residual."""
     current: np.ndarray = plane.astype(np.float32, copy=False)
@@ -77,10 +91,12 @@ def denoise_plane(
         scale = np.clip(energy / (reference + _TINY), *_LOCAL_NOISE_RANGE)
 
     result = result.copy()
+    scratch = np.empty_like(result)
     for level, detail in enumerate(details):
         cut = threshold * sigma * _NOISE_PER_LAYER[level] * scale
-        keep = np.clip(1.0 - (cut * cut) / np.maximum(detail * detail, _TINY), 0.0, 1.0)
-        result += detail * keep
+        keep = _garrote_weight(detail, cut * cut, scratch)
+        keep *= detail
+        result += keep
     return result
 
 
@@ -98,8 +114,9 @@ def enhance_detail(plane: np.ndarray, amount: float, layers: int) -> np.ndarray:
     details, _ = starlet_transform(plane, layers)
     sigma = float(np.median(np.abs(details[0]))) * _MAD_TO_SIGMA / _NOISE_PER_LAYER[0]
     result = plane.astype(np.float32, copy=True)
+    scratch = np.empty_like(result)
     for level, detail in enumerate(details):
         cut = 3.0 * sigma * _NOISE_PER_LAYER[level]
-        significant = np.clip(1.0 - (cut * cut) / np.maximum(detail * detail, _TINY), 0.0, 1.0)
+        significant = _garrote_weight(detail, cut * cut, scratch)
         result += amount * detail * significant
     return result
