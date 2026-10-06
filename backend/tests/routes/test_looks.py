@@ -11,6 +11,8 @@ _DEEP_SKY_GROUPS = [
     {"scene": "nebula", "looks": ["luminous", "structure"]},
     {"scene": "galaxy", "looks": ["deep_field", "warm_core"]},
     {"scene": "cluster", "looks": ["sparkle", "night_velvet"]},
+    {"scene": "moon", "looks": ["moon_crisp", "moonlight"]},
+    {"scene": "planet", "looks": ["planet_crisp", "rich_colour"]},
 ]
 
 

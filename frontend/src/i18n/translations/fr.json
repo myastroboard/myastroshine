@@ -222,7 +222,9 @@
       "nightscape": "Paysage de nuit",
       "nebula": "Nébuleuse",
       "galaxy": "Galaxie",
-      "cluster": "Amas d'étoiles"
+      "cluster": "Amas d'étoiles",
+      "moon": "Lune",
+      "planet": "Planète"
     },
     "nightscape_note": "Votre photo contient un paysage : les premiers styles traitent le ciel et le sol séparément.",
     "none": {
@@ -273,6 +275,22 @@
       "night_velvet": {
         "name": "Velours nocturne",
         "hint": "Un fond noir velours qui fait ressortir chaque étoile."
+      },
+      "moon_crisp": {
+        "name": "Net",
+        "hint": "Cratères, rayons et terminateur plus nets, dans le gris propre de la Lune - le limbe reste propre."
+      },
+      "moonlight": {
+        "name": "Clair de lune",
+        "hint": "Un halo doux et froid autour de la Lune, sa surface légèrement affinée."
+      },
+      "planet_crisp": {
+        "name": "Net",
+        "hint": "Les bandes, zones et tempêtes de la planète plus nettes - le limbe reste propre."
+      },
+      "rich_colour": {
+        "name": "Couleurs riches",
+        "hint": "Les vraies couleurs de la planète ressorties sur ses bandes, le ciel reste noir."
       }
     },
     "amount": {

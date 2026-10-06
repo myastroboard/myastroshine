@@ -470,6 +470,15 @@ Building blocks (each an identity at strength 0, BGR float32 in and out):
 - **Core and arms** - a luminance-free warm tint growing with the subject mask
   squared (the core) and a cool one with `m * (1 - m)` (the fainter outskirts):
   a spiral galaxy's old yellow core and young blue arms.
+- **Disc detail / band detail** - for the Moon and planets, whose disc may be a
+  few dozen pixels in a big black field: the disc is found by Otsu's threshold
+  on the luminance, and the scales are fractions of *its* equivalent diameter
+  (craters: 0.4 % to 4 %; a planet's belts: up to 10 %), not of the frame. The
+  band-pass is a blur normalised over the disc only, so the sky never enters it,
+  and it fades in from the limb over 2 % of the diameter: no ring on the limb.
+  The noise is read at pixel scale (a detailed disc is all structure, so the
+  band's own spread is not noise) and scaled to the fine blur; lifts fade
+  towards white. No disc wider than 8 px: nothing to sharpen.
 
 **Stars.** A star is a compact bright peak: the luminance above its own blur at
 0.3 % of the diagonal (at least 1.5 px) by more than 5 noise sigmas. Bright
@@ -514,16 +523,24 @@ Looks (weights at amount 100; `amount` scales them linearly):
 | `warm_core` | deep sky black 0.3, core and arms 1.0, colour pop 0.6 |
 | `sparkle` | deep sky black 0.3, star colour 1.0, star glow 1.0 |
 | `night_velvet` | deep sky black 1.6, star colour 0.6, vignette 0.5 |
+| `moon_crisp` | deep sky black 0.3, disc detail 1.0 |
+| `moonlight` | disc detail 0.4, Orton glow 0.7, cool tone 1.0 |
+| `planet_crisp` | deep sky black 0.3, band detail 1.0 |
+| `rich_colour` | band detail 0.5, colour pop 1.2 |
 
 The gallery groups the looks by kind of picture (`GET /api/looks/{id}`): any
 image (`vivid`, `soft_glow`, `cinematic`), night landscape (with a sky mask
 only), nebula (`luminous`, `structure`), galaxy (`deep_field`, `warm_core`) and
-star cluster (`sparkle`, `night_velvet`). It opens on the night-landscape group
-when there is a sky mask, on "any image" otherwise: the kind of a deep-sky
-target is not guessed from the picture, one tap on a chip switches group.
+star cluster (`sparkle`, `night_velvet`), Moon (`moon_crisp`, `moonlight`) and
+planet (`planet_crisp`, `rich_colour`). It opens on the night-landscape group
+when there is a sky mask; otherwise on the group of the built-in preset the user
+applied (Nebula, Galaxy, Cluster, Lunar), else on "any image". The kind of
+target is never guessed from the picture; one tap on a chip switches group.
 
 Tuned on real stacks - smart-telescope FITS and DSLR / astro-camera linear
-TIFFs of nebulae, galaxies and clusters - each opened the way the app opens it.
+TIFFs of nebulae, galaxies and clusters - each opened the way the app opens it,
+and on telephoto Moon shots. The planet looks are so far checked on synthetic
+banded discs only.
 
 ## Auto Astro (one-click adaptive enhancement)
 

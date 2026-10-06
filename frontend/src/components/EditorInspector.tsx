@@ -23,6 +23,7 @@ import {
   type LookCatalog,
   type LookId,
   type LookParameters,
+  type LookScene,
   type Preset,
   type DenoiseEngine,
   type ProcessingParameters,
@@ -96,6 +97,8 @@ export interface DepthBundle {
 export interface StyleBundle {
   /** The looks this session's gallery offers (night-landscape ones first). */
   catalog: LookCatalog;
+  /** The gallery group of the built-in preset last applied, if any. */
+  suggestedScene: LookScene | null;
   /** Gallery thumbnail URL for a look (`null`: the edit without a look). */
   thumbnailUrl: (look: LookId | null) => string;
   onLookChange: <K extends keyof LookParameters>(key: K, value: LookParameters[K]) => void;
@@ -301,6 +304,7 @@ export function EditorInspector(props: EditorInspectorProps) {
         <StylePanel
           look={parameters.look}
           catalog={props.style.catalog}
+          suggestedScene={props.style.suggestedScene}
           thumbnailUrl={props.style.thumbnailUrl}
           onLookChange={props.style.onLookChange}
           isProcessing={props.isProcessing}

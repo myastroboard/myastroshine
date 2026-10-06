@@ -23,6 +23,7 @@ import {
   DEFAULT_GEOMETRY,
   DEFAULT_LOOK_AMOUNT,
   DEFAULT_PARAMETERS,
+  PRESET_LOOK_SCENE,
   geometryEquals,
   hasEdits,
   isDefaultGeometry,
@@ -34,6 +35,7 @@ import {
   type EditorStepId,
   type FocusPoint,
   type GeometryParameters,
+  type LookScene,
   type ProcessingParameters,
   type SliderParameterKey,
 } from '@/types';
@@ -114,6 +116,9 @@ export function EditorView({ session, onExit }: EditorViewProps) {
   const autoAstro = useAutoAstro(session.sessionId);
   const captureInfo = useCaptureInfo(session.sessionId, Boolean(session.isStack));
   const lookCatalog = useLookCatalog(session.sessionId);
+  // The kind of picture the user told us about by applying a built-in preset -
+  // the Style step opens on that group.
+  const [presetScene, setPresetScene] = useState<LookScene | null>(null);
   const astrodex = useAstroDexIntegration();
   const { detect: detectStars } = starMask;
 
@@ -247,6 +252,7 @@ export function EditorView({ session, onExit }: EditorViewProps) {
   }
 
   async function handlePresetApply(presetId: string): Promise<void> {
+    setPresetScene(PRESET_LOOK_SCENE[presetId] ?? null);
     const job = await applyPreset(presetId);
     const preset = presets.find((entry) => entry.presetId === presetId);
     if (preset) {
@@ -478,6 +484,7 @@ export function EditorView({ session, onExit }: EditorViewProps) {
         }}
         style={{
           catalog: lookCatalog,
+          suggestedScene: presetScene,
           thumbnailUrl: (look) =>
             apiClient.lookThumbnailUrl(session.sessionId, look, {
               amount: DEFAULT_LOOK_AMOUNT,

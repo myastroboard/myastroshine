@@ -2,7 +2,7 @@
 
 GET /api/looks/{session_id} - the looks offered for this session, grouped by
 kind of picture: the night-landscape group first when its image has a sky
-mask, then the general, nebula, galaxy and star-cluster groups.
+mask, then the general, nebula, galaxy, star-cluster, Moon and planet groups.
 
 GET /api/looks/{session_id}/thumbnail - the current edit, before its look, with
 ``look`` (optional) applied at ``amount``, as a small JPEG.
@@ -30,8 +30,10 @@ from app.services.looks import (
     CLUSTER_LOOKS,
     GALAXY_LOOKS,
     GENERAL_LOOKS,
+    MOON_LOOKS,
     NEBULA_LOOKS,
     NIGHTSCAPE_LOOKS,
+    PLANET_LOOKS,
 )
 from app.utils import image_utils
 from app.utils.validators import is_valid_session_id
@@ -56,6 +58,8 @@ async def look_catalog(
         LookGroup(scene="nebula", looks=list(NEBULA_LOOKS)),
         LookGroup(scene="galaxy", looks=list(GALAXY_LOOKS)),
         LookGroup(scene="cluster", looks=list(CLUSTER_LOOKS)),
+        LookGroup(scene="moon", looks=list(MOON_LOOKS)),
+        LookGroup(scene="planet", looks=list(PLANET_LOOKS)),
     ]
     if enhancement.has_sky_mask(session_id):
         night = LookGroup(scene="nightscape", looks=list(NIGHTSCAPE_LOOKS))

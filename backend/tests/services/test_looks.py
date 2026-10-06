@@ -33,6 +33,8 @@ _OPERATIONS = (
     looks.star_glow,
     looks.star_colour,
     looks.core_and_arms,
+    looks.disc_detail,
+    looks.band_detail,
 )
 _SKY = 0.08
 
@@ -472,3 +474,101 @@ def test_local_contrast_does_not_burn_a_bright_core() -> None:
     image = np.repeat(grey[:, :, np.newaxis], 3, axis=2)
     out = looks.local_contrast(image, 1.0)
     assert int(np.count_nonzero(out >= 0.999)) <= int(np.count_nonzero(image >= 0.999)) + 20
+
+
+def _planet(
+    size: int = 400, diameter: float = 120.0, seed: int = 8
+) -> tuple[np.ndarray, np.ndarray]:
+    """A banded, slightly coloured disc on black (a Jupiter-like planet) and its mask."""
+    rng = np.random.default_rng(seed)
+    ys, xs = np.mgrid[0:size, 0:size].astype(np.float32)
+    centre = size / 2
+    radius = diameter / 2
+    inside = (xs - centre) ** 2 + (ys - centre) ** 2 <= radius**2
+    bands = 0.55 + 0.08 * np.sin((ys - centre) / radius * 9.0)
+    image = np.zeros((size, size, 3), dtype=np.float32)
+    image[inside] = (bands[inside])[:, np.newaxis] * np.array([0.8, 0.9, 1.0], np.float32)
+    image += rng.normal(0.0, 0.004, image.shape).astype(np.float32)
+    return np.clip(image, 0.0, 1.0).astype(np.float32), inside
+
+
+def test_band_detail_sharpens_the_bands_and_leaves_the_sky_black() -> None:
+    """Bands gain contrast inside the disc; the black sky and the limb get no ring."""
+    image, inside = _planet()
+    out = looks.band_detail(image, 1.0)
+    core = (slice(170, 230), slice(170, 230))
+    assert float(_luma(out[core]).std()) > 1.15 * float(_luma(image[core]).std())
+    ring = np.zeros_like(inside)
+    ys, xs = np.mgrid[0:400, 0:400]
+    distance = np.sqrt((xs - 200) ** 2 + (ys - 200) ** 2)
+    ring[(distance > 62) & (distance < 75)] = True  # just outside the limb
+    assert float(np.abs(out[ring] - image[ring]).max()) < 0.01
+
+
+def test_disc_detail_scales_with_the_disc_not_the_frame() -> None:
+    """A small planet in a big black field gets the same treatment as a tight crop of it."""
+    image, _ = _planet(size=800, diameter=120.0)
+    crop = image[300:500, 300:500].copy()
+    wide = looks.band_detail(image, 1.0)[300:500, 300:500]
+    tight = looks.band_detail(crop, 1.0)
+    assert float(np.abs(wide - tight).mean()) < 0.003
+
+
+def test_disc_detail_ignores_a_frame_without_a_disc() -> None:
+    """No disc bigger than a few pixels (a star field): nothing to sharpen."""
+    image = np.zeros((100, 100, 3), dtype=np.float32)
+    image[50, 50] = 1.0
+    assert looks.disc_detail(image, 1.0) is image
+
+
+def test_disc_detail_does_not_amplify_noise_on_a_flat_disc() -> None:
+    """A featureless disc keeps its grain."""
+    size = 300
+    ys, xs = np.mgrid[0:size, 0:size].astype(np.float32)
+    inside = (xs - 150) ** 2 + (ys - 150) ** 2 <= 90**2
+    rng = np.random.default_rng(1)
+    image = np.zeros((size, size, 3), dtype=np.float32)
+    image[inside] = 0.5
+    image += rng.normal(0.0, 0.01, image.shape).astype(np.float32) * inside[:, :, np.newaxis]
+    image = np.clip(image, 0.0, 1.0)
+    out = looks.disc_detail(image, 1.0)
+    centre = (slice(110, 190), slice(110, 190))
+    assert _fine_energy(out[centre]) < 1.1 * _fine_energy(image[centre])
+
+
+def test_rich_colour_brings_out_a_planet_colour() -> None:
+    """Rich colour deepens the disc's own colour and leaves the sky black."""
+    image, inside = _planet()
+    out = LooksService().apply(image, LookParameters(look_id="rich_colour", amount=100))
+    assert float(_chroma(out)[inside].mean()) > 1.2 * float(_chroma(image)[inside].mean())
+    assert float(out[:20, :20].max()) < 0.03
+
+
+def _moon(size: int = 600, diameter: float = 400.0) -> np.ndarray:
+    """A grey disc with small craters (bright rims, dark floors) on black."""
+    rng = np.random.default_rng(12)
+    ys, xs = np.mgrid[0:size, 0:size].astype(np.float32)
+    centre, radius = size / 2, diameter / 2
+    inside = (xs - centre) ** 2 + (ys - centre) ** 2 <= radius**2
+    grey = np.where(inside, 0.5, 0.0).astype(np.float32)
+    for _ in range(40):
+        angle, r = rng.uniform(0, 2 * np.pi), rng.uniform(0, radius * 0.85)
+        cy, cx = centre + r * np.sin(angle), centre + r * np.cos(angle)
+        d2 = (xs - cx) ** 2 + (ys - cy) ** 2
+        grey += np.where(inside, 0.08 * np.exp(-d2 / 30.0) - 0.08 * np.exp(-d2 / 8.0), 0.0)
+    grey += rng.normal(0.0, 0.004, grey.shape).astype(np.float32) * inside
+    return np.repeat(np.clip(grey, 0.0, 1.0)[:, :, np.newaxis], 3, axis=2).astype(np.float32)
+
+
+def test_disc_detail_sharpens_lunar_craters() -> None:
+    """Crater-scale detail gains contrast; the sky round the Moon stays black."""
+    image = _moon()
+    out = looks.disc_detail(image, 1.0)
+
+    def crater_contrast(img: np.ndarray) -> float:
+        luma = _luma(img[200:400, 200:400])
+        band = cv2.GaussianBlur(luma, (0, 0), 1.0) - cv2.GaussianBlur(luma, (0, 0), 6.0)
+        return float(np.std(band))
+
+    assert crater_contrast(out) > 1.1 * crater_contrast(image)
+    assert float(out[:40, :40].max()) < 0.02

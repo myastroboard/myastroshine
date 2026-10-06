@@ -222,7 +222,9 @@
       "nightscape": "Nachtlandschaft",
       "nebula": "Nebel",
       "galaxy": "Galaxie",
-      "cluster": "Sternhaufen"
+      "cluster": "Sternhaufen",
+      "moon": "Mond",
+      "planet": "Planet"
     },
     "nightscape_note": "Dein Foto enthält eine Landschaft: Die ersten Stile behandeln Himmel und Boden getrennt.",
     "none": {
@@ -273,6 +275,22 @@
       "night_velvet": {
         "name": "Nachtsamt",
         "hint": "Ein samtschwarzer Hintergrund, vor dem jeder Stern hervortritt."
+      },
+      "moon_crisp": {
+        "name": "Scharf",
+        "hint": "Schärfere Krater, Strahlen und Terminator im eigenen Grau des Mondes - der Rand bleibt sauber."
+      },
+      "moonlight": {
+        "name": "Mondlicht",
+        "hint": "Ein sanftes, kühles Leuchten um den Mond, seine Oberfläche leicht geschärft."
+      },
+      "planet_crisp": {
+        "name": "Scharf",
+        "hint": "Bänder, Zonen und Stürme des Planeten schärfer - der Rand bleibt sauber."
+      },
+      "rich_colour": {
+        "name": "Satte Farben",
+        "hint": "Die echten Farben des Planeten auf seinen Bändern hervorgehoben, der Himmel bleibt schwarz."
       }
     },
     "amount": {

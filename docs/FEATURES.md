@@ -170,7 +170,12 @@ soft inner glow on the gas; **Structure**, filaments and dark lanes carved out),
 a **Galaxy** (**Deep field**, a deep black field round a crisp galaxy; **Warm
 core**, a golden core and bluer outskirts) or a **Star cluster** (**Sparkle**, the
 stars' own colours and a soft round glow; **Night velvet**, a velvet-black
-background). Stars keep their size and bright cores keep their detail.
+background), the **Moon** (**Crisp**, sharper craters and terminator in the
+Moon's own grey; **Moonlight**, a soft cool glow round the disc) or a **Planet**
+(**Crisp**, sharper belts and zones; **Rich colour**, the bands' real colours).
+Stars keep their size, bright cores keep their detail, and a Moon or planet
+limb gets no ring. After a built-in preset (Nebula, Galaxy, Cluster, Lunar),
+the gallery opens on the matching chip.
 Styles only rework the light the camera recorded: no added stars, no fake
 detail. Changing only the style re-renders in a moment (the rest
 of the edit is kept), and applying a preset or Auto Astro keeps the chosen style.
