@@ -51,3 +51,17 @@ def test_apply_unknown_session_is_404(client) -> None:
 def test_apply_malformed_session_id_is_404(client) -> None:
     response = client.post("/api/auto-astro/not-a-valid-id")
     assert response.status_code == 404
+
+
+def test_apply_preserves_the_session_look(client, sample_jpeg: bytes) -> None:
+    """The "Style" look is a final choice - Auto Astro must not drop it."""
+    session_id = _upload(client, sample_jpeg)
+    client.post(
+        f"/api/process/{session_id}",
+        json={"parameters": {"look": {"look_id": "soft_glow", "amount": 40}}},
+    )
+
+    response = client.post(f"/api/auto-astro/{session_id}")
+
+    assert response.status_code == 200
+    assert response.json()["parameters"]["look"] == {"look_id": "soft_glow", "amount": 40}

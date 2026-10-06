@@ -96,6 +96,7 @@
       "detail": "Détail",
       "stars": "Étoiles",
       "depth": "Effet 3D",
+      "style": "Style",
       "export": "Export",
       "phase": {
         "prepare": "Préparer",
@@ -113,6 +114,7 @@
         "detail": "Netteté, grain",
         "stars": "Les réduire ou les retirer",
         "depth": "Parallaxe animée",
+        "style": "Touche finale facultative",
         "export": "Télécharger ou partager"
       }
     },
@@ -156,6 +158,10 @@
         "help": "Transformez votre image en un léger effet 3D animé.",
         "more": "Choisissez le point focal, puis ouvrez la visionneuse Depth Shift pour un aperçu de parallaxe interactif."
       },
+      "style": {
+        "help": "Facultatif : donnez un style final à votre image pour la partager. Touchez un style, puis réglez son intensité.",
+        "more": "Chaque style ne fait que retravailler la lumière enregistrée par votre appareil - contraste, couleurs, un halo doux autour des zones lumineuses. Rien n'est inventé : aucune étoile ajoutée, aucun faux détail. Vous pouvez toujours télécharger l'image sans son style à l'étape Export."
+      },
       "export": {
         "help": "Enregistrez votre image, ou gardez ces réglages pour vos prochaines photos."
       }
@@ -195,11 +201,44 @@
     "returned": "Ajoutée à l'objet Astrodex comme nouvelle photo.",
     "return_hint": "Ajoute une copie à l'objet Astrodex avec votre image améliorée - l'originale est conservée.",
     "return_hint_named": "Ajoute une copie à '{object}' dans l'Astrodex avec votre image améliorée - l'originale est conservée.",
+    "return_style_hint": "Elle est envoyée avec le style '{style}'.",
     "return_failed": "Échec du renvoi dans l'Astrodex : {error}",
     "ready_title": "Votre image est prête",
     "recap": "Retouché : {steps}",
     "recap_none": "Aucun réglage pour l'instant - c'est l'originale.",
-    "result_alt": "Votre image retouchée"
+    "result_alt": "Votre image retouchée",
+    "style": {
+      "aria": "Style de l'image téléchargée",
+      "with": "Avec le style ({style})",
+      "without": "Sans style",
+      "hint": "Une image stylée indique son style dans les informations du fichier."
+    }
+  },
+  "style_panel": {
+    "gallery_aria": "Styles de finition",
+    "none": {
+      "name": "Sans style",
+      "hint": "Votre image exactement telle que vous l'avez retouchée, sans style final."
+    },
+    "looks": {
+      "vivid": {
+        "name": "Éclatant",
+        "hint": "Un ciel plus noir, des structures plus marquées et des couleurs plus riches sur votre cible."
+      },
+      "soft_glow": {
+        "name": "Halo doux",
+        "hint": "Un halo onirique autour des zones lumineuses, sur un ciel plus sombre."
+      },
+      "cinematic": {
+        "name": "Cinéma",
+        "hint": "Un fond froid, un sujet chaud et un léger vignettage - une ambiance d'affiche de film."
+      }
+    },
+    "amount": {
+      "label": "Intensité",
+      "hint": "La force avec laquelle le style s'applique."
+    },
+    "honest_note": "Les styles ne font que retravailler la lumière captée - rien n'est ajouté."
   },
   "image_preview": {
     "processed_alt": "Traitée",

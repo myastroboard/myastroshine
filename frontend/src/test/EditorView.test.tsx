@@ -72,6 +72,8 @@ vi.mock('@/services/api', () => ({
     previewUrl: (sessionId: string, opts: Record<string, unknown> = {}) =>
       `/preview/${sessionId}?${new URLSearchParams(opts as Record<string, string>).toString()}`,
     downloadImage: vi.fn(),
+    lookThumbnailUrl: (sessionId: string, look: string | null, opts: Record<string, unknown>) =>
+      `/looks/${sessionId}/${look ?? 'none'}?${new URLSearchParams(opts as Record<string, string>).toString()}`,
   },
 }));
 
@@ -91,6 +93,7 @@ function makeState(parameters: ProcessingParameters) {
       updateStarRemovalEngine: vi.fn(),
       updateDenoiseEngine: vi.fn(),
       updateStackParameter: vi.fn(),
+      updateLook: vi.fn(),
       updateChannelCurve: vi.fn(),
       applyGeometry: vi.fn(),
       trackJob: vi.fn(),
@@ -386,15 +389,16 @@ describe('EditorView', () => {
   });
 
   describe('looks: presets, Auto Astro, manual edits', () => {
-    it('applies a preset as a look, keeping the framing, and follows its job', async () => {
+    it('applies a preset, keeping the framing and the style, and follows its job', async () => {
       const geometry = { ...DEFAULT_GEOMETRY, cropW: 0.7 };
-      resetState({ ...DEFAULT_PARAMETERS, geometry });
+      const look = { lookId: 'vivid' as const, amount: 45 };
+      resetState({ ...DEFAULT_PARAMETERS, geometry, look });
       renderEditor();
 
       await act(async () => inspector().start.onPresetApply('p1'));
 
       expect(h.state.processing.syncParameters).toHaveBeenCalledWith(
-        expect.objectContaining({ contrast: 1.4, geometry }),
+        expect.objectContaining({ contrast: 1.4, geometry, look }),
       );
       expect(h.state.processing.trackJob).toHaveBeenCalledWith(JOB);
     });
@@ -417,6 +421,8 @@ describe('EditorView', () => {
     });
 
     it('applies Auto Astro when it proposes something, and ignores a failed run', async () => {
+      const look = { lookId: 'soft_glow' as const, amount: 60 };
+      resetState({ ...DEFAULT_PARAMETERS, look });
       h.state.autoAstro.apply = vi
         .fn()
         .mockResolvedValueOnce({ ...JOB, parameters: { exposure: 0.3 } })
@@ -425,7 +431,7 @@ describe('EditorView', () => {
 
       await act(async () => inspector().start.onAutoAstro());
       expect(h.state.processing.syncParameters).toHaveBeenCalledWith(
-        expect.objectContaining({ exposure: 0.3 }),
+        expect.objectContaining({ exposure: 0.3, look }),
       );
       expect(h.state.processing.trackJob).toHaveBeenCalledTimes(1);
 
@@ -457,6 +463,29 @@ describe('EditorView', () => {
       expect(p.updateStackParameter).toHaveBeenCalledWith('stretch', 0.4);
       expect(p.resetStack).toHaveBeenCalled();
       expect(h.state.presets.clearActivePreset).toHaveBeenCalledTimes(8);
+    });
+  });
+
+  describe('style', () => {
+    it('routes the look choice and its reset to the processing hook', () => {
+      renderEditor();
+      const i = inspector();
+
+      act(() => i.style.onLookChange('lookId', 'cinematic'));
+      act(() => i.style.onLookChange('amount', 30));
+      act(() => i.style.onReset());
+
+      const update = h.state.processing.updateLook;
+      expect(update).toHaveBeenNthCalledWith(1, 'lookId', 'cinematic');
+      expect(update).toHaveBeenNthCalledWith(2, 'amount', 30);
+      expect(update).toHaveBeenNthCalledWith(3, 'lookId', null);
+    });
+
+    it('builds gallery thumbnails at the default amount, cache-busted per render', () => {
+      renderEditor();
+
+      expect(inspector().style.thumbnailUrl('vivid')).toBe('/looks/abcdef1234567890/vivid?amount=60&v=0');
+      expect(inspector().style.thumbnailUrl(null)).toBe('/looks/abcdef1234567890/none?amount=60&v=0');
     });
   });
 
@@ -565,10 +594,12 @@ describe('EditorView', () => {
         });
       renderEditor();
 
-      await act(async () => inspector().exportActions.onDownload('  final.png '));
-      await act(async () => inspector().exportActions.onDownload('   '));
+      await act(async () => inspector().exportActions.onDownload('  final.png ', true));
+      await act(async () => inspector().exportActions.onDownload('   ', false));
 
       expect(names).toEqual(['final.jpg', 'm42_myastroshine.jpg']);
+      expect(apiClient.downloadImage).toHaveBeenNthCalledWith(1, 'abcdef1234567890', 'jpeg', 95, true);
+      expect(apiClient.downloadImage).toHaveBeenNthCalledWith(2, 'abcdef1234567890', 'jpeg', 95, false);
       click.mockRestore();
     });
 

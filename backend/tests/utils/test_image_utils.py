@@ -370,3 +370,47 @@ def test_encode_image_formats(sample_image: np.ndarray) -> None:
     png = image_utils.encode_image(sample_image, "png")
     assert jpeg[:2] == b"\xff\xd8"  # JPEG SOI marker
     assert png[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_encode_described_without_text_is_plain_encode(sample_image: np.ndarray) -> None:
+    """No description: byte-identical to ``encode_image``."""
+    for fmt in ("jpeg", "png", "tiff"):
+        assert image_utils.encode_image_described(sample_image, fmt) == image_utils.encode_image(
+            sample_image, fmt
+        )
+
+
+def test_encode_described_jpeg_carries_a_comment(sample_image: np.ndarray) -> None:
+    """The JPEG gets a COM segment with the text and still decodes to the same pixels."""
+    data = image_utils.encode_image_described(sample_image, "jpeg", 90, "MyAstroShine style: x")
+    assert data[:4] == b"\xff\xd8\xff\xfe"
+    assert b"MyAstroShine style: x" in data
+    plain = cv2.imdecode(
+        np.frombuffer(image_utils.encode_image(sample_image, "jpeg", 90), np.uint8),
+        cv2.IMREAD_COLOR,
+    )
+    decoded = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
+    assert np.array_equal(decoded, plain)
+
+
+def test_encode_described_png_carries_a_text_chunk(sample_image: np.ndarray) -> None:
+    """The PNG gets a valid ``Description`` tEXt chunk (Pillow reads it back)."""
+    from PIL import Image
+
+    data = image_utils.encode_image_described(sample_image, "png", description="hello")
+    with Image.open(io.BytesIO(data)) as img:
+        img.load()
+        assert img.info["Description"] == "hello"
+    decoded = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
+    assert np.array_equal(decoded, sample_image)
+
+
+def test_encode_described_tiff_carries_an_image_description(sample_image: np.ndarray) -> None:
+    """The TIFF stores the text in its ImageDescription tag, pixels unchanged."""
+    from PIL import Image
+
+    data = image_utils.encode_image_described(sample_image, "tiff", description="hello")
+    with Image.open(io.BytesIO(data)) as img:
+        assert img.tag_v2[270] == "hello"
+    decoded = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
+    assert np.array_equal(decoded, sample_image)

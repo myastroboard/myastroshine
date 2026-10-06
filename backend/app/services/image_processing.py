@@ -22,8 +22,9 @@ import cv2
 import numpy as np
 
 from app.logging_config import get_logger
-from app.models import CurvePoint, GeometryParameters, ProcessingParameters
+from app.models import CurvePoint, GeometryParameters, LookParameters, ProcessingParameters
 from app.services.external_starless import StarlessSplitFn
+from app.services.looks import LooksService
 from app.services.post_stack import RenderHints, render_stack_base
 from app.services.star_detection import StarDetectionService
 from app.services.starless import StarlessService
@@ -101,6 +102,7 @@ class ImageProcessingService:
     def __init__(self) -> None:
         self._star_detector = StarDetectionService()
         self._starless = StarlessService(self._star_detector)
+        self._looks = LooksService()
 
     @_dtype_flexible
     def apply_geometry(self, image: np.ndarray, geom: GeometryParameters) -> np.ndarray:
@@ -577,6 +579,11 @@ class ImageProcessingService:
         out = cv2.cvtColor(cv2.merge([y, cr, cb]), cv2.COLOR_YCrCb2BGR)
         return np.clip(out, 0.0, 1.0)
 
+    @_dtype_flexible
+    def apply_look(self, image: np.ndarray, look: LookParameters) -> np.ndarray:
+        """The optional "Style" finishing look (``app.services.looks``); identity when none."""
+        return self._looks.apply(image, look)
+
     def _background_stages(
         self, params: ProcessingParameters
     ) -> list[tuple[str, Callable[[np.ndarray], np.ndarray]]]:
@@ -680,6 +687,11 @@ class ImageProcessingService:
         ``float32`` the rest of the pipeline expects. ``sky_mask`` (a
         nightscape composite's sky mask) and ``render_hints`` (what its source
         frames say - see :class:`RenderHints`) are handed to that pre-stage.
+
+        ``params.look`` is **not** applied here: the "Style" look is a final
+        layer on this method's 8-bit result, applied by :meth:`apply_look`, so
+        the caller can keep the pre-look result (to re-render only the look, to
+        build the gallery thumbnails, or to export without it).
         """
         background = self._background_stages(params)
         creative = self._creative_stages(params)

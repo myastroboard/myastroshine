@@ -99,3 +99,30 @@ def test_stack_render_hints_round_trip_and_are_optional(tmp_path: Path) -> None:
         "camera_processed": True,
         "wide_field": False,
     }
+
+
+def test_prelook_round_trips_and_checks_its_key(tmp_path: Path) -> None:
+    """The pre-look render is stored losslessly with a thumbnail, and a stale key misses."""
+    storage = StorageService(tmp_path)
+    image = np.random.default_rng(1).integers(0, 255, (900, 1200, 3), dtype=np.uint8)
+    assert storage.load_prelook("s1") is None
+    assert storage.load_prelook_thumb("s1") is None
+
+    storage.save_prelook("s1", image, "key-a")
+
+    assert np.array_equal(storage.load_prelook("s1"), image)
+    assert np.array_equal(storage.load_prelook("s1", "key-a"), image)
+    assert storage.load_prelook("s1", "key-b") is None
+    thumb = storage.load_prelook_thumb("s1")
+    assert thumb is not None
+    assert max(thumb.shape[:2]) == 400
+
+
+def test_prelook_without_its_key_file_is_a_cache_miss(tmp_path: Path) -> None:
+    """A pre-look image whose key file is missing is never trusted as a cache hit."""
+    storage = StorageService(tmp_path)
+    image = np.zeros((10, 10, 3), dtype=np.uint8)
+    storage.save_prelook("s1", image, "key-a")
+    (storage.session_dir("s1") / "prelook.json").unlink()
+    assert storage.load_prelook("s1", "key-a") is None
+    assert storage.load_prelook("s1") is not None

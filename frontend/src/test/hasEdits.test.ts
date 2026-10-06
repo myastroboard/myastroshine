@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_GEOMETRY, DEFAULT_PARAMETERS, hasEdits } from '@/types';
+import { DEFAULT_GEOMETRY, DEFAULT_LOOK_PARAMETERS, DEFAULT_PARAMETERS, hasEdits } from '@/types';
 
 describe('hasEdits', () => {
   it('is false for the untouched default parameters', () => {
@@ -30,6 +30,12 @@ describe('hasEdits', () => {
           { x: 255, y: 255 },
         ],
       }),
+    ).toBe(true);
+  });
+
+  it('is true when a finishing style is chosen', () => {
+    expect(
+      hasEdits({ ...DEFAULT_PARAMETERS, look: { ...DEFAULT_LOOK_PARAMETERS, lookId: 'cinematic' } }),
     ).toBe(true);
   });
 });

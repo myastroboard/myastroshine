@@ -20,7 +20,7 @@ describe('ExportPanel', () => {
 
     fireEvent.change(field, { target: { value: 'orion final' } });
     fireEvent.click(screen.getByRole('button', { name: 'Download' }));
-    expect(onDownload).toHaveBeenCalledWith('orion final');
+    expect(onDownload).toHaveBeenCalledWith('orion final', true);
   });
 
   it('disables Download when the filename field is blank', () => {
@@ -100,5 +100,31 @@ describe('ExportPanel', () => {
 
     expect(screen.getByAltText('Your edited image')).toHaveAttribute('src', '/result.jpg');
     expect(screen.getByText('Touched up: Light, Stars')).toBeInTheDocument();
+  });
+
+  it('hides the style choice when no style is active', () => {
+    render(<ExportPanel {...base} />);
+
+    expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();
+  });
+
+  it('downloads with the style by default, or without it on request', () => {
+    const onDownload = vi.fn();
+    render(<ExportPanel {...base} styleName="Vivid" onDownload={onDownload} />);
+
+    const withStyle = screen.getByRole('radio', { name: 'With style (Vivid)' });
+    expect(withStyle).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Download' }));
+    expect(onDownload).toHaveBeenLastCalledWith('orion_myastroshine', true);
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Without style' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Download' }));
+    expect(onDownload).toHaveBeenLastCalledWith('orion_myastroshine', false);
+  });
+
+  it('says the Astrodex copy carries the active style', () => {
+    render(<ExportPanel {...base} canReturnToAstroDex styleName="Soft glow" />);
+
+    expect(screen.getByText(/sent with the style 'Soft glow'/)).toBeInTheDocument();
   });
 });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  DEFAULT_LOOK_PARAMETERS,
   DEFAULT_PARAMETERS,
   DEFAULT_STACK_PARAMETERS,
   EDITOR_STEPS,
@@ -66,5 +67,15 @@ describe('stepIsModified', () => {
     expect(stepIsModified(step('colour'), base, null)).toBe(false);
     expect(stepIsModified(step('colour'), { ...base, vibrance: 1.4 }, null)).toBe(true);
     expect(stepIsModified(step('depth'), base, { x: 0.3, y: 0.3 })).toBe(true);
+  });
+
+  it('flags the style step for a chosen look and its amount, not for an unused amount', () => {
+    const vivid = { ...base, look: { lookId: 'vivid' as const, amount: 60 } };
+    expect(stepChanged(step('style'), base, vivid, null, null)).toBe(true);
+    const stronger = { ...base, look: { lookId: 'vivid' as const, amount: 90 } };
+    expect(stepChanged(step('style'), vivid, stronger, null, null)).toBe(true);
+    const unusedAmount = { ...base, look: { ...DEFAULT_LOOK_PARAMETERS, amount: 10 } };
+    expect(stepChanged(step('style'), base, unusedAmount, null, null)).toBe(false);
+    expect(stepIsModified(step('style'), vivid, null)).toBe(true);
   });
 });

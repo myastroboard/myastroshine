@@ -111,9 +111,37 @@ export function stackParametersEqual(a: StackParameters, b: StackParameters): bo
   );
 }
 
+/**
+ * The optional "Style" finishing look, applied last (backend
+ * `app/services/looks.py`). Every look only reworks the recorded light - tone,
+ * colour, contrast, a glow from the image's own bright areas - never adds stars
+ * or detail. `lookId: null` (the default) is no look at all.
+ */
+export type LookId = 'vivid' | 'soft_glow' | 'cinematic';
+
+export const LOOK_IDS: LookId[] = ['vivid', 'soft_glow', 'cinematic'];
+
+export interface LookParameters {
+  lookId: LookId | null;
+  /** How strongly the look applies, 0-100 (0 = no effect). */
+  amount: number;
+}
+
+export const DEFAULT_LOOK_AMOUNT = 60;
+
+export const DEFAULT_LOOK_PARAMETERS: LookParameters = {
+  lookId: null,
+  amount: DEFAULT_LOOK_AMOUNT,
+};
+
+export function lookParametersEqual(a: LookParameters, b: LookParameters): boolean {
+  return a.lookId === b.lookId && a.amount === b.amount;
+}
+
 export interface ProcessingParameters {
   geometry: GeometryParameters;
   stack: StackParameters;
+  look: LookParameters;
   contrast: number;
   exposure: number;
   saturation: number;
@@ -155,6 +183,7 @@ export interface ProcessingParameters {
 export const DEFAULT_PARAMETERS: ProcessingParameters = {
   geometry: DEFAULT_GEOMETRY,
   stack: DEFAULT_STACK_PARAMETERS,
+  look: DEFAULT_LOOK_PARAMETERS,
   contrast: 1.0,
   exposure: 0.0,
   saturation: 1.0,
@@ -195,8 +224,11 @@ export function hasEdits(p: ProcessingParameters): boolean {
   if (!stackParametersEqual(p.stack, DEFAULT_STACK_PARAMETERS)) {
     return true;
   }
+  if (!lookParametersEqual(p.look, DEFAULT_LOOK_PARAMETERS)) {
+    return true;
+  }
   for (const key of Object.keys(DEFAULT_PARAMETERS) as (keyof ProcessingParameters)[]) {
-    if (key === 'geometry' || key === 'stack') {
+    if (key === 'geometry' || key === 'stack' || key === 'look') {
       continue;
     }
     const value = p[key];
@@ -226,8 +258,11 @@ export function parametersEqual(a: ProcessingParameters, b: ProcessingParameters
   if (!stackParametersEqual(a.stack, b.stack)) {
     return false;
   }
+  if (!lookParametersEqual(a.look, b.look)) {
+    return false;
+  }
   for (const key of Object.keys(DEFAULT_PARAMETERS) as (keyof ProcessingParameters)[]) {
-    if (key === 'geometry' || key === 'stack') {
+    if (key === 'geometry' || key === 'stack' || key === 'look') {
       continue;
     }
     const av = a[key];
@@ -255,11 +290,12 @@ export const CURVE_CHANNEL_FIELD: Record<CurveChannel, keyof ProcessingParameter
 };
 
 /** Numeric parameters driven by the slider panel (everything but geometry / stack /
- * curve fields, and the discrete engine choices, which are pickers, not sliders). */
+ * look / curve fields, and the discrete engine choices, which are pickers, not sliders). */
 export type SliderParameterKey = Exclude<
   keyof ProcessingParameters,
   | 'geometry'
   | 'stack'
+  | 'look'
   | 'curvePoints'
   | 'redCurvePoints'
   | 'greenCurvePoints'
@@ -343,7 +379,8 @@ export function temperatureIndex(kelvin: number): number {
  * switch, and the "modified" dots all derive from this one list.
  *
  * `start` and `export` are workflow brackets (no step number): a one-click
- * starting point, and getting the result out.
+ * starting point, and getting the result out. `style` is the optional finishing
+ * look just before export - the backend runs it last, after every other stage.
  */
 export type EditorStepId =
   | 'start'
@@ -356,6 +393,7 @@ export type EditorStepId =
   | 'detail'
   | 'stars'
   | 'depth'
+  | 'style'
   | 'export';
 
 /**
@@ -412,6 +450,7 @@ export const EDITOR_STEPS: EditorStep[] = [
     params: ['starReduction', 'starRemoval', 'starRecombine', 'starSensitivity', 'starMaxSize'],
   },
   { id: 'depth', phase: 'finish', params: [] },
+  { id: 'style', phase: 'deliver', params: [] },
   { id: 'export', phase: 'deliver', params: [] },
 ];
 
@@ -433,6 +472,9 @@ export function stepChanged(
       return !stackParametersEqual(a.stack, b.stack);
     case 'frame':
       return !geometryEquals(a.geometry, b.geometry);
+    case 'style':
+      // Only a chosen look counts: the amount alone, with no look, changes nothing.
+      return a.look.lookId !== b.look.lookId || (b.look.lookId !== null && a.look.amount !== b.look.amount);
     case 'curves':
       return (
         !curvePointsEqual(a.curvePoints, b.curvePoints) ||

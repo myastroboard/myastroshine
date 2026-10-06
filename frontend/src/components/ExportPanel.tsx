@@ -17,7 +17,10 @@ export interface ExportPanelProps {
   resultUrl?: string;
   /** Labels of the workflow steps that changed the image, for the recap line. */
   touchedSteps?: string[];
-  onDownload: (filename: string) => void;
+  /** Display name of the active "Style" look, or `null` when there is none. */
+  styleName?: string | null;
+  /** `withStyle`: with a look active, `false` downloads the edit without it. */
+  onDownload: (filename: string, withStyle: boolean) => void;
   onReturnToAstroDex: () => void;
   onSaveAsPreset: () => void;
 }
@@ -35,12 +38,14 @@ export function ExportPanel({
   defaultFilename = '',
   resultUrl,
   touchedSteps = [],
+  styleName = null,
   onDownload,
   onReturnToAstroDex,
   onSaveAsPreset,
 }: ExportPanelProps) {
   const { t } = useTranslation();
   const [filename, setFilename] = useState(defaultFilename);
+  const [withStyle, setWithStyle] = useState(true);
 
   const trimmed = filename.trim();
 
@@ -85,12 +90,34 @@ export function ExportPanel({
           </span>
         </span>
       </div>
+      {styleName !== null && (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex gap-1" role="radiogroup" aria-label={t('export_panel.style.aria')}>
+            {[true, false].map((option) => (
+              <button
+                key={String(option)}
+                type="button"
+                role="radio"
+                aria-checked={withStyle === option}
+                disabled={isProcessing}
+                className={`chip ${withStyle === option ? 'chip-active' : ''}`}
+                onClick={() => setWithStyle(option)}
+              >
+                {option
+                  ? t('export_panel.style.with', { style: styleName })
+                  : t('export_panel.style.without')}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-faint">{t('export_panel.style.hint')}</p>
+        </div>
+      )}
       <div className="flex flex-col gap-2">
         <button
           type="button"
           className="btn btn-primary w-full py-2.5 text-[15px]"
           disabled={isProcessing || trimmed === ''}
-          onClick={() => onDownload(trimmed || defaultFilename)}
+          onClick={() => onDownload(trimmed || defaultFilename, styleName === null || withStyle)}
         >
           <DownloadIcon className="h-5 w-5" />
           {t('export_panel.download')}
@@ -113,6 +140,7 @@ export function ExportPanel({
           {astrodexObjectName
             ? t('export_panel.return_hint_named', { object: astrodexObjectName })
             : t('export_panel.return_hint')}
+          {styleName !== null && ` ${t('export_panel.return_style_hint', { style: styleName })}`}
         </p>
       )}
       {canReturnToAstroDex && astrodexReturned && !astrodexError && (

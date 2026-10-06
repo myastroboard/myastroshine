@@ -20,6 +20,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { apiClient } from '@/services/api';
 import {
   DEFAULT_GEOMETRY,
+  DEFAULT_LOOK_AMOUNT,
   DEFAULT_PARAMETERS,
   geometryEquals,
   hasEdits,
@@ -93,6 +94,7 @@ export function EditorView({ session, onExit }: EditorViewProps) {
     updateStarRemovalEngine,
     updateDenoiseEngine,
     updateStackParameter,
+    updateLook,
     updateChannelCurve,
     applyGeometry,
     trackJob,
@@ -246,12 +248,14 @@ export function EditorView({ session, onExit }: EditorViewProps) {
     const job = await applyPreset(presetId);
     const preset = presets.find((entry) => entry.presetId === presetId);
     if (preset) {
-      // A preset is a look, not a composition - keep the current framing
-      // (the backend's preset-apply route preserves geometry the same way).
+      // A preset is a starting point, not a composition nor a finishing style -
+      // keep the current framing and look (the backend's preset-apply route
+      // preserves both the same way).
       syncParameters({
         ...DEFAULT_PARAMETERS,
         ...preset.parameters,
         geometry: parameters.geometry,
+        look: parameters.look,
       });
     }
     // Follow the job to completion so the preview refetches when the result is
@@ -264,11 +268,12 @@ export function EditorView({ session, onExit }: EditorViewProps) {
     const result = await autoAstro.apply();
     if (result) {
       // Auto Astro proposes tone/star/gradient/white-balance/denoise settings
-      // only - carry the framing over.
+      // only - carry the framing and the "Style" look over.
       const next = {
         ...DEFAULT_PARAMETERS,
         ...result.parameters,
         geometry: parameters.geometry,
+        look: parameters.look,
       };
       syncParameters(next);
       setAutoAstroParams(next);
@@ -342,8 +347,8 @@ export function EditorView({ session, onExit }: EditorViewProps) {
     setShowDepthViewer(true);
   }
 
-  async function handleDownload(filename: string): Promise<void> {
-    const blob = await apiClient.downloadImage(session.sessionId);
+  async function handleDownload(filename: string, withStyle: boolean): Promise<void> {
+    const blob = await apiClient.downloadImage(session.sessionId, 'jpeg', 95, withStyle);
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
@@ -469,6 +474,15 @@ export function EditorView({ session, onExit }: EditorViewProps) {
           onOpenViewer: handleOpenDepthViewer,
           error: depthShift.error,
         }}
+        style={{
+          thumbnailUrl: (look) =>
+            apiClient.lookThumbnailUrl(session.sessionId, look, {
+              amount: DEFAULT_LOOK_AMOUNT,
+              v: previewVersion,
+            }),
+          onLookChange: updateLook,
+          onReset: () => updateLook('lookId', null),
+        }}
         exportActions={{
           canReturnToAstroDex: Boolean(session.astrodex),
           astrodexObjectName: session.astrodex?.objectName ?? null,
@@ -477,7 +491,7 @@ export function EditorView({ session, onExit }: EditorViewProps) {
           astrodexError: astrodex.error,
           defaultFilename: defaultExportName(session),
           resultUrl: processedUrl,
-          onDownload: (filename) => void handleDownload(filename),
+          onDownload: (filename, withStyle) => void handleDownload(filename, withStyle),
           onReturnToAstroDex: () => void handleReturnToAstrodex(),
           onSaveAsPreset: () => setShowSavePreset(true),
         }}

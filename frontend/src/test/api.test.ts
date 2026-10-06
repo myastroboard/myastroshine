@@ -195,7 +195,7 @@ describe('downloadImage', () => {
     const [url, init] = lastCall();
     expect(url).toBe('/api/download/s1');
     expect(init?.method).toBe('POST');
-    expect(JSON.parse(init?.body as string)).toEqual({ format: 'jpeg', quality: 95 });
+    expect(JSON.parse(init?.body as string)).toEqual({ format: 'jpeg', quality: 95, style: true });
     expect(blob).toBeInstanceOf(Blob);
   });
 
@@ -203,7 +203,36 @@ describe('downloadImage', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { ok: true }));
     await apiClient.downloadImage('s1', 'png', 80);
     const [, init] = lastCall();
-    expect(JSON.parse(init?.body as string)).toEqual({ format: 'png', quality: 80 });
+    expect(JSON.parse(init?.body as string)).toEqual({ format: 'png', quality: 80, style: true });
+  });
+
+  it('can ask for the edit without its "Style" look', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { ok: true }));
+    await apiClient.downloadImage('s1', 'jpeg', 95, false);
+    const [, init] = lastCall();
+    expect(JSON.parse(init?.body as string)).toEqual({
+      format: 'jpeg',
+      quality: 95,
+      style: false,
+    });
+  });
+});
+
+describe('lookThumbnailUrl', () => {
+  it('builds the plain thumbnail URL without a look', () => {
+    expect(apiClient.lookThumbnailUrl('s1', null)).toBe('/api/looks/s1/thumbnail');
+    expect(apiClient.lookThumbnailUrl('s1', null, { amount: 40, v: 3 })).toBe(
+      '/api/looks/s1/thumbnail?v=3',
+    );
+  });
+
+  it('adds the look, its amount and the cache-buster', () => {
+    expect(apiClient.lookThumbnailUrl('s1', 'vivid', { amount: 40, v: 3 })).toBe(
+      '/api/looks/s1/thumbnail?look=vivid&amount=40&v=3',
+    );
+    expect(apiClient.lookThumbnailUrl('s1', 'cinematic')).toBe(
+      '/api/looks/s1/thumbnail?look=cinematic',
+    );
   });
 
   it('throws an ApiError on failure', async () => {

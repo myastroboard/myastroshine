@@ -12,6 +12,7 @@ accepts `uint8`); the Stack step works on the linear composite.
 - [Upload ingest: FITS / RAW / 16-bit](#upload-ingest-fits--raw--16-bit)
 - [Single-image pipeline](#single-image-pipeline)
 - [Star removal (starless)](#star-removal-starless)
+- [Looks (the "Style" step)](#looks-the-style-step)
 - [Auto Astro (one-click adaptive enhancement)](#auto-astro-one-click-adaptive-enhancement)
 - [Depth map (v1, gradient-based)](#depth-map-v1-gradient-based)
 - [Stacking](#stacking)
@@ -406,6 +407,57 @@ timeout, bad output - logs and falls back to the classical code.
   is made monotonic so later stages can't pull the bar back.
 - No new Python dependency: each CLI is self-contained (its own ONNX Runtime).
   Verified against StarNet2 2.6.1 / DeepSNR 1.3.1 (linux-x64) on the Debian-13 image.
+
+## Looks (the "Style" step)
+
+`LooksService` (`app/services/looks.py`) - an optional finishing look, chosen in
+the "Style" step just before Export, that turns a clean result into a shareable
+one. It runs **last**, as a separate layer on the pipeline's finished 8-bit
+result (`ImageProcessingService.apply_look`, after `star_recombine` when star
+removal is active). The job keeps that pre-look result losslessly
+(`prelook.npy`, keyed by a hash of every parameter but the look plus the
+source's mtime), so changing only the look or its amount re-applies it in
+milliseconds instead of re-running the pipeline, the gallery thumbnails are
+rendered from a ~400 px copy, and an export "without style" is exact. No look
+is an identity. Design and roadmap: `initial_plan/15_LOOKS_STEP.md`.
+
+**Guardrail - no invented detail.** Every operation only redistributes the
+recorded signal: tone, colour, contrast at a given scale, a glow built from the
+image's own bright areas. No synthetic stars or diffraction spikes, no sky
+replacement, no generative model. Tests check that no look creates fine
+structure on a flat frame or raises the pixel-scale grain of a pure-noise sky.
+
+**Size-relative.** Every radius is a fraction of the image diagonal, so a
+~320 px gallery thumbnail previews the full-resolution export faithfully (a test
+compares "style then shrink" with "shrink then style").
+
+Building blocks (each an identity at strength 0, BGR float32 in and out):
+
+- **Local contrast** - a difference of Gaussians of the luminance (0.2 % and
+  2 % of the diagonal, the fine one at least 1 px) added back to every channel.
+  Band values within 3 noise sigmas (MAD of the band, which is mostly sky) fade
+  out through a non-negative garrote, so grain is never boosted.
+- **Orton glow** - a blurred copy (1.2 % of the diagonal), minus its own median
+  so the sky contributes nothing, screen-blended on top.
+- **Deep sky black** - a soft toe on the luminance,
+  `L' = L * L / (L + k) * (1 + k)` with `k = strength * median(L)` (capped at
+  0.5); colours are scaled by `L' / L <= 1`, so nothing brightens and white stays
+  white.
+- **Colour pop** - luminance-preserving saturation weighted by an object mask
+  (blurred luminance from the sky median to the 99th percentile), so the
+  target's colours deepen and the background's colour noise does not.
+- **Split toning** - a cool tint on the background and a warm one on the
+  subject (same object mask). The tints carry zero luminance and scale with each
+  pixel's luminance, so brightness is unchanged and black stays black.
+- **Vignette** - a smooth corner darkening (up to 35 %), flat in the centre.
+
+Looks (weights at amount 100; `amount` scales them linearly):
+
+| Look | Operations |
+|------|------------|
+| `vivid` | deep sky black 0.5, local contrast 1.0, colour pop 1.0 |
+| `soft_glow` | deep sky black 0.4, Orton glow 1.0 |
+| `cinematic` | local contrast 0.3, split toning 1.0, vignette 0.6 |
 
 ## Auto Astro (one-click adaptive enhancement)
 

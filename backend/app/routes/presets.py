@@ -82,12 +82,15 @@ async def apply_preset(
     preset = presets.get_preset(preset_id)
     parameters = ProcessingParameters(**preset.parameters)
 
-    # A preset is a look, not a composition - keep the session's current
-    # framing rather than resetting the user's crop to the preset's default.
+    # A preset is a starting point for the tones, not a composition and not a
+    # finishing style - keep the session's current framing and "Style" look
+    # rather than resetting the user's crop or chosen look.
     session = sessions.get_session(session_id)
     if session.parameters:
         current = ProcessingParameters.model_validate(session.parameters)
-        parameters = parameters.model_copy(update={"geometry": current.geometry})
+        parameters = parameters.model_copy(
+            update={"geometry": current.geometry, "look": current.look}
+        )
 
     client_ip = get_client_ip(http_request)
     return enhancement.dispatch(session_id, parameters, client_ip)

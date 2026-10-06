@@ -7,6 +7,9 @@ publishes progress for the WebSocket (``app.services.progress``).
 
 from __future__ import annotations
 
+import hashlib
+import json
+
 import numpy as np
 from sqlalchemy import select
 
@@ -43,6 +46,19 @@ def _to_u16(image: np.ndarray) -> np.ndarray:
 
 def _from_u16(image: np.ndarray) -> np.ndarray:
     return image.astype(np.float32) / _U16_FULL
+
+
+def prelook_key(params: ProcessingParameters, source_mtime_ns: int) -> str:
+    """Identify the pre-look render: every parameter but the look, plus the source.
+
+    The source's mtime makes a re-stacked composite (same session, new pixels)
+    a cache miss.
+    """
+    payload = json.dumps(
+        {"params": params.model_dump(exclude={"look"}), "source": source_mtime_ns},
+        sort_keys=True,
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 class _JobSuperseded(Exception):
@@ -220,6 +236,63 @@ class EnhancementService:
 
         return denoise
 
+    def _render(
+        self,
+        session_id: str,
+        params: ProcessingParameters,
+        stack_id: str | None,
+        on_step: StepCallback,
+    ) -> np.ndarray:
+        """Run the full pipeline - everything but the "Style" look - to ``uint8`` BGR."""
+        starless_split = self._starless_split(session_id, params, on_step)
+        denoise_stage = self._denoise_stage(session_id, params, on_step)
+        if stack_id is not None:
+            # A stacked-composite session: run the pipeline on the 32-bit
+            # linear composite (STF / background extraction / colour
+            # calibration are the "Stack" step, params.stack) instead of the
+            # pre-stretched uint8 upload.
+            composite = self.storage.load_stack_composite(stack_id)
+            return self.processing.apply_parameters(
+                composite,
+                params,
+                on_step,
+                linear_composite=True,
+                starless_split=starless_split,
+                denoise_stage=denoise_stage,
+                sky_mask=self.storage.load_stack_sky_mask(stack_id),
+                render_hints=RenderHints.from_dict(self.storage.load_stack_render_hints(stack_id)),
+            )
+        original = self.storage.load_original(session_id)
+        return self.processing.apply_parameters(
+            original,
+            params,
+            on_step,
+            starless_split=starless_split,
+            denoise_stage=denoise_stage,
+        )
+
+    def _prelook(
+        self, session_id: str, params: ProcessingParameters, on_step: StepCallback
+    ) -> np.ndarray:
+        """The result before its "Style" look - reused when only the look changed."""
+        stack_id = self._backing_stack_id(session_id)
+        source = (
+            self.storage.stack_composite_path(stack_id)
+            if stack_id is not None
+            else self.storage.original_path(session_id)
+        )
+        if not source.exists():
+            # Let the render raise its usual "missing image" error.
+            return self._render(session_id, params, stack_id, on_step)
+        key = prelook_key(params, source.stat().st_mtime_ns)
+        prelook = self.storage.load_prelook(session_id, key)
+        if prelook is not None:
+            logger.info("reusing the pre-look render", session_id=session_id)
+            return prelook
+        prelook = self._render(session_id, params, stack_id, on_step)
+        self.storage.save_prelook(session_id, prelook, key)
+        return prelook
+
     def run(self, session_id: str, params: ProcessingParameters, job_id: str) -> None:
         """Enhance ``session_id`` with ``params``, tracking ``job_id``."""
         if self.jobs.get(job_id).status == "superseded":
@@ -252,36 +325,9 @@ class EnhancementService:
                 self.jobs.update(job_id, current_step=name, progress_percent=progress_floor)
                 self._emit(job_id)
 
-            starless_split = self._starless_split(session_id, params, on_step)
-            denoise_stage = self._denoise_stage(session_id, params, on_step)
-            stack_id = self._backing_stack_id(session_id)
-            if stack_id is not None:
-                # A stacked-composite session: run the pipeline on the 32-bit
-                # linear composite (STF / background extraction / colour
-                # calibration are the "Stack" step, params.stack) instead of the
-                # pre-stretched uint8 upload.
-                composite = self.storage.load_stack_composite(stack_id)
-                result = self.processing.apply_parameters(
-                    composite,
-                    params,
-                    on_step,
-                    linear_composite=True,
-                    starless_split=starless_split,
-                    denoise_stage=denoise_stage,
-                    sky_mask=self.storage.load_stack_sky_mask(stack_id),
-                    render_hints=RenderHints.from_dict(
-                        self.storage.load_stack_render_hints(stack_id)
-                    ),
-                )
-            else:
-                original = self.storage.load_original(session_id)
-                result = self.processing.apply_parameters(
-                    original,
-                    params,
-                    on_step,
-                    starless_split=starless_split,
-                    denoise_stage=denoise_stage,
-                )
+            prelook = self._prelook(session_id, params, on_step)
+            on_step("look", 90)
+            result = self.processing.apply_look(prelook, params.look)
 
             self.jobs.update(job_id, progress_percent=95, current_step="rendering")
             self._emit(job_id)

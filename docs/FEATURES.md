@@ -18,6 +18,7 @@ the tour.
   - [6. Detail](#6-detail)
   - [7. Stars](#7-stars)
   - [8. Depth](#8-depth)
+  - [Style](#style)
   - [Export](#export)
 - [Go-back points](#go-back-points)
 - [Stacking](#stacking)
@@ -153,12 +154,25 @@ on the preview (click), then open the viewer for an interactive parallax preview
 Depth is estimated from image detail (stars and structure read as near, smooth
 sky as far); the focal point pulls the chosen spot forward too.
 
+### Style
+
+An optional finishing touch for sharing. A gallery shows **your own image** in
+each style - **Vivid** (deeper black sky, stronger structure, richer colours),
+**Soft glow** (a dreamy glow around the bright parts) and **Cinematic** (cool
+background, warm subject, gentle vignette) - next to **No style**. Tap one, then
+set its **Strength**. Styles only rework the light the camera recorded: no added
+stars, no fake detail. Changing only the style re-renders in a moment (the rest
+of the edit is kept), and applying a preset or Auto Astro keeps the chosen style.
+
 ### Export
 
 The end of the workflow: **Your image is ready**, a thumbnail of the result and a
 recap of the steps that changed it. Download the result (JPEG), **Send back to
 Astrodex** (when the session was opened from Astrodex), or **Keep these settings
-for other photos** to save them as a preset.
+for other photos** to save them as a preset. With a style active, choose
+**With style** (the default; the file names its style in its details) or
+**Without style**; the Astrodex copy is the styled version you see. A saved
+preset never stores a style.
 
 ## Go-back points
 

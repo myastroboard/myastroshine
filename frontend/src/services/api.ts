@@ -27,6 +27,7 @@ import type {
   LogLevel,
   LogLevels,
   LogTail,
+  LookId,
   Preset,
   ProcessResponse,
   ProcessingParameters,
@@ -262,11 +263,41 @@ export const apiClient = {
     return `${API_URL}/preview/${sessionId}${query ? `?${query}` : ''}`;
   },
 
-  async downloadImage(sessionId: string, format = 'jpeg', quality = 95): Promise<Blob> {
+  /**
+   * The "Style" gallery thumbnail: the edit before its look, with `look` applied
+   * at `amount` (`null`: the plain edit). Rendered from a small stored copy, so
+   * it never re-runs the pipeline. `v` is the cache-buster, as for previews.
+   */
+  lookThumbnailUrl(
+    sessionId: string,
+    look: LookId | null,
+    opts: { amount?: number; v?: number | string } = {},
+  ): string {
+    const params = new URLSearchParams();
+    if (look !== null) {
+      params.set('look', look);
+      if (opts.amount !== undefined) {
+        params.set('amount', String(opts.amount));
+      }
+    }
+    if (opts.v !== undefined) {
+      params.set('v', String(opts.v));
+    }
+    const query = params.toString();
+    return `${API_URL}/looks/${sessionId}/thumbnail${query ? `?${query}` : ''}`;
+  },
+
+  /** `style`: with a "Style" look active, `false` downloads the edit without it. */
+  async downloadImage(
+    sessionId: string,
+    format = 'jpeg',
+    quality = 95,
+    style = true,
+  ): Promise<Blob> {
     const response = await fetch(`${API_URL}/download/${sessionId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ format, quality }),
+      body: JSON.stringify({ format, quality, style }),
     });
     if (!response.ok) {
       throw await readError(response);

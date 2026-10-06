@@ -97,3 +97,18 @@ def test_delete_builtin_is_403(client) -> None:
     response = client.delete("/api/presets/system_galaxy")
 
     assert response.status_code == 403
+
+
+def test_apply_preset_keeps_the_session_look(client, sample_jpeg: bytes) -> None:
+    """A preset never carries a look - applying one keeps the user's chosen look."""
+    session_id = _upload(client, sample_jpeg)
+    client.post(
+        f"/api/process/{session_id}",
+        json={"parameters": {"look": {"look_id": "cinematic", "amount": 75}}},
+    )
+
+    response = client.post(f"/api/presets/system_nebula/apply/{session_id}")
+    assert response.status_code == 200
+
+    jpeg = client.post(f"/api/download/{session_id}", json={"format": "jpeg"})
+    assert b"MyAstroShine style: cinematic (75%)" in jpeg.content

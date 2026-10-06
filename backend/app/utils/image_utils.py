@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import io
 import math
+import struct
+import zlib
 from pathlib import Path
 
 import cv2
@@ -359,6 +361,41 @@ def encode_image(image: np.ndarray, fmt: str = "jpeg", quality: int = 95) -> byt
     if not ok:
         raise OSError(f"Failed to encode image as {fmt}")
     return buffer.tobytes()
+
+
+_JPEG_SOI = b"\xff\xd8"
+_JPEG_COM = b"\xff\xfe"
+_PNG_SIGNATURE_AND_IHDR = 8 + 4 + 4 + 13 + 4  # signature, IHDR length/type/data/crc
+_TIFF_IMAGE_DESCRIPTION = 270
+
+
+def encode_image_described(
+    image: np.ndarray, fmt: str = "jpeg", quality: int = 95, description: str | None = None
+) -> bytes:
+    """:func:`encode_image`, plus ``description`` stored in the file's own metadata.
+
+    JPEG: a COM segment right after SOI. PNG: a ``Description`` tEXt chunk right
+    after IHDR. TIFF: the ImageDescription tag (via Pillow). ``description`` is
+    ASCII; without one, the output is exactly :func:`encode_image`'s.
+    """
+    data = encode_image(image, fmt, quality)
+    if not description:
+        return data
+    text = description.encode("ascii", "replace")
+    ext = _ENCODE_EXT.get(fmt.lower())
+    if ext == ".jpg":
+        segment = _JPEG_COM + struct.pack(">H", len(text) + 2) + text
+        return data[: len(_JPEG_SOI)] + segment + data[len(_JPEG_SOI) :]
+    if ext == ".png":
+        body = b"tEXt" + b"Description\x00" + text
+        chunk = struct.pack(">I", len(body) - 4) + body + struct.pack(">I", zlib.crc32(body))
+        return data[:_PNG_SIGNATURE_AND_IHDR] + chunk + data[_PNG_SIGNATURE_AND_IHDR:]
+    from PIL import Image  # noqa: PLC0415 - only for a described TIFF export
+
+    rgb = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+    buffer = io.BytesIO()
+    rgb.save(buffer, format="TIFF", tiffinfo={_TIFF_IMAGE_DESCRIPTION: description})
+    return buffer.getvalue()
 
 
 def make_preview(image: np.ndarray, max_size: int = 512) -> np.ndarray:

@@ -11,6 +11,7 @@ import {
   type CurvePoint,
   type GeometryParameters,
   type JobStatus,
+  type LookParameters,
   type DenoiseEngine,
   type ProcessingParameters,
   type ProcessResponse,
@@ -291,6 +292,20 @@ export function useImageProcessing(sessionId: string) {
     [flushHeld],
   );
 
+  /** Update the "Style" step's finishing look - which one, or its amount. */
+  const updateLook = useCallback(
+    <K extends keyof LookParameters>(key: K, value: LookParameters[K]) => {
+      setParameters((prev) => {
+        const next = { ...prev, look: { ...prev.look, [key]: value } };
+        heldRef.current = next; // rendered on release, or by the fallback timer
+        clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(flushHeld, SETTLE_FALLBACK_MS);
+        return next;
+      });
+    },
+    [flushHeld],
+  );
+
   /** `channel` picks which curve field (see CURVE_CHANNEL_FIELD) gets the new points. */
   const updateChannelCurve = useCallback(
     (channel: CurveChannel, points: CurvePoint[]) => {
@@ -418,6 +433,7 @@ export function useImageProcessing(sessionId: string) {
     updateStarRemovalEngine,
     updateDenoiseEngine,
     updateStackParameter,
+    updateLook,
     updateChannelCurve,
     applyGeometry,
     applyParameters,
