@@ -216,6 +216,14 @@
   },
   "style_panel": {
     "gallery_aria": "Stili di finitura",
+    "scenes_aria": "Tipo di foto",
+    "scenes": {
+      "general": "Qualsiasi immagine",
+      "nightscape": "Paesaggio notturno",
+      "nebula": "Nebulosa",
+      "galaxy": "Galassia",
+      "cluster": "Ammasso stellare"
+    },
     "nightscape_note": "La tua foto contiene un paesaggio: i primi stili trattano cielo e terreno separatamente.",
     "none": {
       "name": "Nessuno stile",
@@ -241,6 +249,30 @@
       "blue_hour": {
         "name": "Ora blu",
         "hint": "Un cielo notturno freddo e luminoso, con un bagliore morbido sulla Via Lattea, sopra un paesaggio caldo."
+      },
+      "luminous": {
+        "name": "Luminoso",
+        "hint": "Un morbido bagliore interno nel gas della nebulosa, su un cielo più nero, con colori più ricchi."
+      },
+      "structure": {
+        "name": "Struttura",
+        "hint": "I filamenti e le bande scure della nebulosa scolpiti; le stelle mantengono la loro dimensione."
+      },
+      "deep_field": {
+        "name": "Campo profondo",
+        "hint": "Uno sfondo nero profondo attorno a una galassia nitida, con un leggero bagliore sulle stelle."
+      },
+      "warm_core": {
+        "name": "Nucleo caldo",
+        "hint": "Un nucleo caldo e dorato e bordi più freddi e bluastri - i veri colori di una galassia a spirale."
+      },
+      "sparkle": {
+        "name": "Scintillio",
+        "hint": "I colori propri delle stelle messi in risalto, con un bagliore rotondo e morbido - niente punte finte."
+      },
+      "night_velvet": {
+        "name": "Velluto notturno",
+        "hint": "Uno sfondo nero vellutato che fa risaltare ogni stella."
       }
     },
     "amount": {

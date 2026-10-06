@@ -17,6 +17,7 @@ from app.models import LookParameters, ProcessingParameters
 from app.services import looks
 from app.services.image_processing import ImageProcessingService
 from app.services.looks import LOOKS, LooksService
+from app.services.storage import PRELOOK_THUMB_MAX_SIZE
 
 _OPERATIONS = (
     looks.local_contrast,
@@ -28,11 +29,15 @@ _OPERATIONS = (
     looks.warm_tone,
     looks.cool_tone,
     looks.lift_shadows,
+    looks.inner_glow,
+    looks.star_glow,
+    looks.star_colour,
+    looks.core_and_arms,
 )
 _SKY = 0.08
 
 
-def _astro_scene(height: int = 240, width: int = 360, seed: int = 7) -> np.ndarray:
+def _astro_scene(height: int = 240, width: int = 360, seed: int = 7, stars: int = 25) -> np.ndarray:
     """A dark noisy sky, a reddish nebula with a filament, and a few stars (BGR float32)."""
     rng = np.random.default_rng(seed)
     ys, xs = np.mgrid[0:height, 0:width].astype(np.float32)
@@ -42,7 +47,7 @@ def _astro_scene(height: int = 240, width: int = 360, seed: int = 7) -> np.ndarr
     filament = 0.15 * np.exp(-(((ys - height / 2 - 0.3 * (xs - width / 2)) / 3.0) ** 2)) * nebula
     image = np.full((height, width, 3), _SKY, dtype=np.float32)
     image += (0.45 * nebula + filament)[:, :, np.newaxis] * np.array([0.5, 0.6, 1.0], np.float32)
-    for _ in range(25):
+    for _ in range(stars):
         y, x = rng.integers(5, height - 5), rng.integers(5, width - 5)
         image += (0.8 * np.exp(-((xs - x) ** 2 + (ys - y) ** 2) / 2.0))[:, :, np.newaxis]
     image += rng.normal(0.0, 0.01, image.shape).astype(np.float32)
@@ -124,8 +129,13 @@ def test_local_contrast_does_not_sharpen_pixel_noise() -> None:
     assert _fine_energy(out) < 1.1 * _fine_energy(noise)
 
 
-def test_local_contrast_lifts_medium_scale_structure(scene: np.ndarray) -> None:
-    """Medium-scale structure (the filament) stands out more."""
+def test_local_contrast_lifts_medium_scale_structure() -> None:
+    """Medium-scale structure (the filament) stands out more.
+
+    Measured on a starless scene: stars are shielded on purpose (see the star
+    bloat test below), so they must not be counted as "structure" here.
+    """
+    scene = _astro_scene(stars=0)
 
     def band(image: np.ndarray) -> float:
         luma = _luma(image)
@@ -134,6 +144,27 @@ def test_local_contrast_lifts_medium_scale_structure(scene: np.ndarray) -> None:
         )
 
     assert band(looks.local_contrast(scene, 1.0)) > 1.2 * band(scene)
+
+
+def test_local_contrast_does_not_bloat_stars() -> None:
+    """Stars sit in the same band as structure; the boost leaves them their size."""
+    height, width = 240, 360
+    ys, xs = np.mgrid[0:height, 0:width].astype(np.float32)
+    image = np.full((height, width, 3), _SKY, dtype=np.float32)
+    # A faint star and a bright one with a wide halo (it reaches white in its core).
+    for y, x, peak, sigma in ((60, 90, 0.5, 1.2), (150, 250, 3.0, 4.0)):
+        star = peak * np.exp(-((xs - x) ** 2 + (ys - y) ** 2) / (2 * sigma * sigma))
+        image += star[:, :, np.newaxis]
+    image = np.clip(image + np.random.default_rng(2).normal(0, 0.005, image.shape), 0, 1)
+    image = image.astype(np.float32)
+
+    out = looks.local_contrast(image, 1.0)
+
+    def area_above(img: np.ndarray, level: float) -> int:
+        return int(np.count_nonzero(_luma(img) > level))
+
+    for level in (0.3, 0.6):
+        assert area_above(out, level) <= area_above(image, level) * 1.1 + 2
 
 
 def test_colour_pop_saturates_the_object_not_the_sky(scene: np.ndarray) -> None:
@@ -189,12 +220,17 @@ def test_looks_do_not_amplify_pixel_noise(look_id: str) -> None:
 
 @pytest.mark.parametrize("look_id", sorted(LOOKS))
 def test_look_on_a_thumbnail_matches_the_full_size_look(look_id: str) -> None:
-    """Sizes are relative to the image, so a gallery thumbnail previews the export faithfully."""
-    full = _astro_scene(480, 720)
-    small = cv2.resize(full, (180, 120), interpolation=cv2.INTER_AREA)
+    """Sizes are relative to the image, so a gallery thumbnail previews the export faithfully.
+
+    The thumbnail is the gallery's real size (``PRELOOK_THUMB_MAX_SIZE``): far
+    smaller, stars shrink below a pixel and no star-aware look could match.
+    """
+    full = _astro_scene(800, 1200)
+    size = (PRELOOK_THUMB_MAX_SIZE, round(PRELOOK_THUMB_MAX_SIZE * 800 / 1200))
+    small = cv2.resize(full, size, interpolation=cv2.INTER_AREA)
     params = LookParameters(look_id=look_id, amount=100)
     styled_then_shrunk = cv2.resize(
-        LooksService().apply(full, params), (180, 120), interpolation=cv2.INTER_AREA
+        LooksService().apply(full, params), size, interpolation=cv2.INTER_AREA
     )
     shrunk_then_styled = LooksService().apply(small, params)
     assert float(np.abs(styled_then_shrunk - shrunk_then_styled).mean()) < 0.01
@@ -341,3 +377,98 @@ def test_tone_and_lift_keep_black_black(operation: looks.Operation) -> None:
     black = np.zeros((8, 8, 3), dtype=np.float32)
     assert np.array_equal(operation(black, 1.0), black)
     assert operation(black, 0.0) is black
+
+
+def _star_field(height: int = 240, width: int = 360) -> tuple[np.ndarray, list[tuple[int, int]]]:
+    """A dark sky with coloured stars (blue and orange) and their positions."""
+    rng = np.random.default_rng(4)
+    ys, xs = np.mgrid[0:height, 0:width].astype(np.float32)
+    image = np.full((height, width, 3), _SKY, dtype=np.float32)
+    spots = []
+    for index in range(30):
+        y, x = int(rng.integers(10, height - 10)), int(rng.integers(10, width - 10))
+        # BGR: odd stars blue, even stars orange.
+        colour = np.array([1.0, 0.8, 0.5] if index % 2 else [0.5, 0.75, 1.0], np.float32)
+        star = 0.7 * np.exp(-((xs - x) ** 2 + (ys - y) ** 2) / 3.0)
+        image += star[:, :, np.newaxis] * colour
+        spots.append((y, x))
+    image += rng.normal(0.0, 0.004, image.shape).astype(np.float32)
+    return np.clip(image, 0.0, 1.0).astype(np.float32), spots
+
+
+def test_star_glow_blooms_round_the_stars_only() -> None:
+    """The glow brightens the stars' surroundings, not the empty sky far from any star."""
+    image, spots = _star_field()
+    out = looks.star_glow(image, 1.0)
+    y, x = spots[0]
+    ring = (slice(y - 4, y + 5), slice(x - 4, x + 5))
+    assert float(out[ring].mean()) > float(image[ring].mean()) + 0.01
+    far = np.ones(image.shape[:2], dtype=bool)
+    for sy, sx in spots:
+        far[max(0, sy - 20) : sy + 20, max(0, sx - 20) : sx + 20] = False
+    assert np.allclose(out[far], image[far], atol=0.005)
+
+
+def test_star_colour_deepens_star_colours_and_spares_the_sky() -> None:
+    """Blue stars get bluer, orange ones more orange; the sky keeps its colour."""
+    image, spots = _star_field()
+    out = looks.star_colour(image, 1.0)
+    for index, (y, x) in enumerate(spots[:6]):
+        before, after = image[y, x], out[y, x]
+        if index % 2:  # blue star: blue over red grows
+            assert after[0] - after[2] > before[0] - before[2]
+        else:  # orange star: red over blue grows
+            assert after[2] - after[0] > before[2] - before[0]
+    assert np.allclose(out[:5, :5], image[:5, :5], atol=0.002)
+
+
+def test_core_and_arms_warms_the_core_and_cools_the_outskirts() -> None:
+    """On a galaxy-like disc, the bright core warms and the fainter outskirts cool."""
+    height, width = 240, 360
+    ys, xs = np.mgrid[0:height, 0:width].astype(np.float32)
+    disc = np.exp(-(((xs - 180) / 70) ** 2 + ((ys - 120) / 35) ** 2))
+    grey = (_SKY + 0.6 * disc).astype(np.float32)
+    image = np.repeat(grey[:, :, np.newaxis], 3, axis=2)
+    out = looks.core_and_arms(image, 1.0)
+    core, arm = out[120, 180], out[120, 245]
+    assert core[2] > core[0]  # warm: red over blue
+    assert arm[0] > arm[2]  # cool: blue over red
+    assert np.allclose(out[:10, :10], image[:10, :10])  # sky untouched
+    assert np.allclose(_luma(out), _luma(image), atol=0.01)
+
+
+def test_inner_glow_lifts_a_frame_filling_nebula_where_orton_glow_barely_does() -> None:
+    """When the nebula is the median level, only the low-percentile floor finds a glow."""
+    height, width = 240, 360
+    rng = np.random.default_rng(6)
+    ys, xs = np.mgrid[0:height, 0:width].astype(np.float32)
+    clouds = 0.3 + 0.15 * np.sin(xs / 25.0) * np.cos(ys / 30.0)
+    image = np.repeat(clouds[:, :, np.newaxis], 3, axis=2).astype(np.float32)
+    image *= np.array([0.6, 0.6, 1.0], np.float32)
+    image += rng.normal(0.0, 0.003, image.shape).astype(np.float32)
+    inner = float(np.abs(looks.inner_glow(image, 1.0) - image).mean())
+    plain = float(np.abs(looks.orton_glow(image, 1.0) - image).mean())
+    assert inner > 1.5 * plain
+
+
+def test_inner_glow_does_not_swell_a_bright_star() -> None:
+    """The nebula glow is made without the stars: a bright star keeps its size."""
+    height, width = 240, 360
+    ys, xs = np.mgrid[0:height, 0:width].astype(np.float32)
+    star = 2.0 * np.exp(-((xs - 180) ** 2 + (ys - 120) ** 2) / (2 * 3.0**2))
+    image = np.clip(_SKY + star, 0.0, 1.0)[:, :, np.newaxis].repeat(3, axis=2).astype(np.float32)
+    out = looks.inner_glow(image, 1.0)
+    halo = (slice(105, 135), slice(165, 195))
+    assert float(np.abs(out[halo] - image[halo]).max()) < 0.05
+
+
+def test_local_contrast_does_not_burn_a_bright_core() -> None:
+    """A bright core keeps its detail: lifts fade out towards white."""
+    height, width = 240, 360
+    ys, xs = np.mgrid[0:height, 0:width].astype(np.float32)
+    core = 0.85 * np.exp(-(((xs - 180) / 60) ** 2 + ((ys - 120) / 60) ** 2))
+    ripples = 0.06 * np.sin(xs / 6.0) * np.exp(-(((xs - 180) / 60) ** 2))
+    grey = np.clip(_SKY + core + ripples, 0.0, 1.0).astype(np.float32)
+    image = np.repeat(grey[:, :, np.newaxis], 3, axis=2)
+    out = looks.local_contrast(image, 1.0)
+    assert int(np.count_nonzero(out >= 0.999)) <= int(np.count_nonzero(image >= 0.999)) + 20

@@ -436,7 +436,10 @@ Building blocks (each an identity at strength 0, BGR float32 in and out):
 - **Local contrast** - a difference of Gaussians of the luminance (0.2 % and
   2 % of the diagonal, the fine one at least 1 px) added back to every channel.
   Band values within 3 noise sigmas (MAD of the band, which is mostly sky) fade
-  out through a non-negative garrote, so grain is never boosted.
+  out through a non-negative garrote, so grain is never boosted. Stars sit in
+  the same band and would bloat, so they are shielded (see "Stars" below), and
+  lifts fade out over the top half of the range (`2 * (1 - L)`), so a bright core
+  (the Lagoon's, Orion's) keeps its detail instead of burning to white.
 - **Orton glow** - a blurred copy (1.2 % of the diagonal), minus its own median
   so the sky contributes nothing, screen-blended on top.
 - **Deep sky black** - a soft toe on the luminance,
@@ -456,6 +459,24 @@ Building blocks (each an identity at strength 0, BGR float32 in and out):
   each pixel's luminance (black stays black).
 - **Shadow lift** - colours scaled by `1 + 0.6 * s * (1 - L)^2`: darks open up
   by at most 1.6x, white not at all; a gain, never a grey offset.
+- **Inner glow** - the Orton glow for a subject that fills the frame: its floor
+  is the 20th percentile instead of the median (a frame-filling nebula *is* the
+  median), and its source leaves the stars out, so a bright star does not swell.
+- **Star glow** - the detected stars' own pixels, blurred (0.4 % of the
+  diagonal) and screen-blended back: a round bloom, never a spike.
+- **Star colour** - the smoothed colour boosted on the star pixels only
+  (typical-size star mask, scaled so a 75th-percentile star gets the full boost),
+  so the nebulosity round a bright star is never tinted with a disc of colour.
+- **Core and arms** - a luminance-free warm tint growing with the subject mask
+  squared (the core) and a cool one with `m * (1 - m)` (the fainter outskirts):
+  a spiral galaxy's old yellow core and young blue arms.
+
+**Stars.** A star is a compact bright peak: the luminance above its own blur at
+0.3 % of the diagonal (at least 1.5 px) by more than 5 noise sigmas. Bright
+stars, whose halo is wider, are found again at three times that radius - but
+only round the image's brightest 0.3 % of pixels, because at that scale a thin
+nebula filament is a "peak" too and must keep its boost. The shield used by
+local contrast is these masks grown by twice their radius and softened.
 
 **Night landscapes.** When the session's composite has a sky mask (an iPhone
 ProRAW, single or stacked - see "Nightscapes"), the gallery also offers
@@ -487,6 +508,22 @@ Looks (weights at amount 100; `amount` scales them linearly):
 | `cinematic` | local contrast 0.3, split toning 1.0, vignette 0.6 |
 | `galactic_core` | sky: local contrast 1.0, split toning 1.0, colour pop 0.8; foreground: shadow lift 0.7, local contrast 0.3 |
 | `blue_hour` | sky: cool tone 1.6, Orton glow 1.0, local contrast 0.4; foreground: shadow lift 0.6, warm tone 1.0 |
+| `luminous` | deep sky black 0.4, inner glow 0.8, colour pop 1.0 |
+| `structure` | deep sky black 0.3, local contrast 1.6, colour pop 0.5 |
+| `deep_field` | deep sky black 0.7, local contrast 0.8, star glow 0.4 |
+| `warm_core` | deep sky black 0.3, core and arms 1.0, colour pop 0.6 |
+| `sparkle` | deep sky black 0.3, star colour 1.0, star glow 1.0 |
+| `night_velvet` | deep sky black 1.6, star colour 0.6, vignette 0.5 |
+
+The gallery groups the looks by kind of picture (`GET /api/looks/{id}`): any
+image (`vivid`, `soft_glow`, `cinematic`), night landscape (with a sky mask
+only), nebula (`luminous`, `structure`), galaxy (`deep_field`, `warm_core`) and
+star cluster (`sparkle`, `night_velvet`). It opens on the night-landscape group
+when there is a sky mask, on "any image" otherwise: the kind of a deep-sky
+target is not guessed from the picture, one tap on a chip switches group.
+
+Tuned on real stacks - smart-telescope FITS and DSLR / astro-camera linear
+TIFFs of nebulae, galaxies and clusters - each opened the way the app opens it.
 
 ## Auto Astro (one-click adaptive enhancement)
 

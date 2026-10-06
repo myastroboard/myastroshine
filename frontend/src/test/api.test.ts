@@ -221,12 +221,18 @@ describe('downloadImage', () => {
 describe('getLookCatalog', () => {
   it('GETs the session look catalogue', async () => {
     fetchMock.mockResolvedValueOnce(
-      jsonResponse(200, { scene: 'nightscape', looks: ['galactic_core', 'vivid'] }),
+      jsonResponse(200, {
+        scene: 'nightscape',
+        groups: [{ scene: 'nightscape', looks: ['galactic_core'] }],
+      }),
     );
     const catalog = await apiClient.getLookCatalog('s1');
     const [url] = lastCall();
     expect(url).toBe('/api/looks/s1');
-    expect(catalog).toEqual({ scene: 'nightscape', looks: ['galactic_core', 'vivid'] });
+    expect(catalog).toEqual({
+      scene: 'nightscape',
+      groups: [{ scene: 'nightscape', looks: ['galactic_core'] }],
+    });
   });
 });
 

@@ -64,7 +64,10 @@ vi.mock('@/hooks/useStarMask', () => ({ useStarMask: () => h.state.starMask }));
 vi.mock('@/hooks/useAutoAstro', () => ({ useAutoAstro: () => h.state.autoAstro }));
 vi.mock('@/hooks/useCaptureInfo', () => ({ useCaptureInfo: () => h.state.captureInfo }));
 vi.mock('@/hooks/useLookCatalog', () => ({
-  useLookCatalog: () => ({ scene: 'nightscape', looks: ['galactic_core', 'vivid'] }),
+  useLookCatalog: () => ({
+    scene: 'nightscape',
+    groups: [{ scene: 'nightscape', looks: ['galactic_core'] }],
+  }),
 }));
 vi.mock('@/hooks/useAstroDexIntegration', () => ({
   useAstroDexIntegration: () => h.state.astrodex,
@@ -489,7 +492,7 @@ describe('EditorView', () => {
 
       expect(inspector().style.catalog).toEqual({
         scene: 'nightscape',
-        looks: ['galactic_core', 'vivid'],
+        groups: [{ scene: 'nightscape', looks: ['galactic_core'] }],
       });
     });
 

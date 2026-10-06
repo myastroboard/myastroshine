@@ -25,6 +25,8 @@ original Keep a Changelog headings.
   The Astrodex copy carries the style, and its parameters gain a `look` key (myastroboard).
 - Night landscapes get two more styles that treat the sky and the ground apart: Galactic core and
   Blue hour, with no halo round the trees. See docs/ALGORITHMS.md "Looks".
+- Deep-sky styles, picked with chips above the gallery: Luminous and Structure for nebulae, Deep
+  field and Warm core for galaxies, Sparkle and Night velvet for star clusters - stars keep their size.
 
 ### Fixes
 

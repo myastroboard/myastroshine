@@ -216,6 +216,14 @@
   },
   "style_panel": {
     "gallery_aria": "Estilos de acabado",
+    "scenes_aria": "Tipo de foto",
+    "scenes": {
+      "general": "Cualquier imagen",
+      "nightscape": "Paisaje nocturno",
+      "nebula": "Nebulosa",
+      "galaxy": "Galaxia",
+      "cluster": "Cúmulo estelar"
+    },
     "nightscape_note": "Tu foto tiene un paisaje: los primeros estilos tratan el cielo y el suelo por separado.",
     "none": {
       "name": "Sin estilo",
@@ -241,6 +249,30 @@
       "blue_hour": {
         "name": "Hora azul",
         "hint": "Un cielo nocturno frío y luminoso, con un brillo suave sobre la Vía Láctea, encima de un paisaje cálido."
+      },
+      "luminous": {
+        "name": "Luminoso",
+        "hint": "Un brillo interior suave en el gas de la nebulosa, sobre un cielo más negro, con colores más ricos."
+      },
+      "structure": {
+        "name": "Estructura",
+        "hint": "Los filamentos y bandas oscuras de la nebulosa esculpidos; las estrellas conservan su tamaño."
+      },
+      "deep_field": {
+        "name": "Campo profundo",
+        "hint": "Un fondo negro profundo alrededor de una galaxia nítida, con un ligero brillo en las estrellas."
+      },
+      "warm_core": {
+        "name": "Núcleo cálido",
+        "hint": "Un núcleo cálido y dorado y unos bordes más fríos y azulados - los colores reales de una galaxia espiral."
+      },
+      "sparkle": {
+        "name": "Destello",
+        "hint": "Los colores propios de las estrellas realzados, con un brillo redondo y suave - sin picos falsos."
+      },
+      "night_velvet": {
+        "name": "Terciopelo nocturno",
+        "hint": "Un fondo negro aterciopelado que hace destacar cada estrella."
       }
     },
     "amount": {

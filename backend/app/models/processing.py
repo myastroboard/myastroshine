@@ -32,7 +32,19 @@ StretchMode = Literal["adaptive", "classic"]
 
 #: The "Style" step's looks (``app.services.looks``). Removing one later needs
 #: a migration path for stored sessions, like ``_RETIRED_KEYS``.
-LookId = Literal["vivid", "soft_glow", "cinematic", "galactic_core", "blue_hour"]
+LookId = Literal[
+    "vivid",
+    "soft_glow",
+    "cinematic",
+    "galactic_core",
+    "blue_hour",
+    "luminous",
+    "structure",
+    "deep_field",
+    "warm_core",
+    "sparkle",
+    "night_velvet",
+]
 
 
 class GeometryParameters(BaseModel):
@@ -105,16 +117,28 @@ class LookParameters(BaseModel):
     amount: int = Field(default=60, ge=0, le=100)
 
 
-#: What kind of picture the "Style" gallery is for: ``"nightscape"`` when the
-#: session has a sky mask (a night landscape), ``"general"`` otherwise.
-LookScene = Literal["general", "nightscape"]
+#: Kinds of picture the "Style" gallery groups its looks by. ``"nightscape"``
+#: is offered only when the session has a sky mask (a night landscape).
+LookScene = Literal["general", "nightscape", "nebula", "galaxy", "cluster"]
 
 
-class LookCatalog(BaseModel):
-    """``GET /api/looks/{session_id}``: the looks offered, in display order."""
+class LookGroup(BaseModel):
+    """One gallery group: the looks made for one kind of picture."""
 
     scene: LookScene
     looks: list[LookId]
+
+
+class LookCatalog(BaseModel):
+    """``GET /api/looks/{session_id}``: the gallery's groups, in display order.
+
+    ``scene`` is the group the gallery opens on: ``"nightscape"`` when the
+    session has a sky mask, ``"general"`` otherwise - the kind of a deep-sky
+    target is not guessed from the picture (the user switches group in one tap).
+    """
+
+    scene: LookScene
+    groups: list[LookGroup]
 
 
 #: Fields removed from ``ProcessingParameters`` over time. Dropped on the way in

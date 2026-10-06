@@ -1,7 +1,8 @@
 """Looks routes - the "Style" step's catalogue and gallery thumbnails.
 
-GET /api/looks/{session_id} - the looks offered for this session: the
-night-landscape ones first when its image has a sky mask, then the general ones.
+GET /api/looks/{session_id} - the looks offered for this session, grouped by
+kind of picture: the night-landscape group first when its image has a sky
+mask, then the general, nebula, galaxy and star-cluster groups.
 
 GET /api/looks/{session_id}/thumbnail - the current edit, before its look, with
 ``look`` (optional) applied at ``amount``, as a small JPEG.
@@ -24,8 +25,14 @@ from app.dependencies import (
     StorageDep,
 )
 from app.exceptions import SessionNotFoundError
-from app.models import LookCatalog, LookId, LookParameters, ProcessingParameters
-from app.services.looks import GENERAL_LOOKS, NIGHTSCAPE_LOOKS
+from app.models import LookCatalog, LookGroup, LookId, LookParameters, ProcessingParameters
+from app.services.looks import (
+    CLUSTER_LOOKS,
+    GALAXY_LOOKS,
+    GENERAL_LOOKS,
+    NEBULA_LOOKS,
+    NIGHTSCAPE_LOOKS,
+)
 from app.utils import image_utils
 from app.utils.validators import is_valid_session_id
 
@@ -40,13 +47,20 @@ async def look_catalog(
     sessions: SessionServiceDep,
     enhancement: EnhancementServiceDep,
 ) -> LookCatalog:
-    """Which looks the gallery offers for this session, in display order."""
+    """Which looks the gallery offers for this session, grouped, in display order."""
     if not is_valid_session_id(session_id):
         raise SessionNotFoundError(f"Session {session_id} not found")
     sessions.get_session(session_id)
+    groups = [
+        LookGroup(scene="general", looks=list(GENERAL_LOOKS)),
+        LookGroup(scene="nebula", looks=list(NEBULA_LOOKS)),
+        LookGroup(scene="galaxy", looks=list(GALAXY_LOOKS)),
+        LookGroup(scene="cluster", looks=list(CLUSTER_LOOKS)),
+    ]
     if enhancement.has_sky_mask(session_id):
-        return LookCatalog(scene="nightscape", looks=[*NIGHTSCAPE_LOOKS, *GENERAL_LOOKS])
-    return LookCatalog(scene="general", looks=list(GENERAL_LOOKS))
+        night = LookGroup(scene="nightscape", looks=list(NIGHTSCAPE_LOOKS))
+        return LookCatalog(scene="nightscape", groups=[night, *groups])
+    return LookCatalog(scene="general", groups=groups)
 
 
 @router.get("/looks/{session_id}/thumbnail")
