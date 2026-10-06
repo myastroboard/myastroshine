@@ -27,6 +27,7 @@ original Keep a Changelog headings.
   default winsorized rejection no longer leaves a faint line where a trail was rejected.
 - An upload a proxy refuses as too large (Cloudflare caps requests at 100 MB) now says so and
   suggests the local address, instead of showing the proxy's raw HTML error page.
+- Lib update
 
 ### Breaking changes
 
