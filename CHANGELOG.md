@@ -32,6 +32,8 @@ original Keep a Changelog headings.
 
 ### Fixes
 
+- Uploading stack frames now shows real progress and a frame counter instead of sitting at 0 % until
+  the end; requests stay under the per-file size limit from Settings (so a reverse proxy accepts them).
 - The editor no longer crashes on a phone ProRAW whose capture info has no gain or sensor
   temperature (the info panel now skips fields the API sends as null).
 - Stacking now removes an aircraft or satellite trail from a short stack (3 to 10 frames), and the

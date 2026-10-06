@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useStackProcessing } from '@/hooks/useStackProcessing';
+import { chunkBySize, useStackProcessing } from '@/hooks/useStackProcessing';
 import { apiClient } from '@/services/api';
 import type {
   CalibrationSummary,
@@ -178,19 +178,101 @@ describe('useStackProcessing', () => {
 
       expect(mockedApi.initiateStack).toHaveBeenCalledTimes(1);
       expect(mockedApi.initiateStack).toHaveBeenCalledWith(25, SETTINGS);
-      expect(mockedApi.uploadStackFrames).toHaveBeenCalledTimes(2); // batched: 20 + 5
-      expect(mockedApi.uploadStackFrames).toHaveBeenNthCalledWith(1, 'stack-1', 0, expect.any(Array));
-      expect(mockedApi.uploadStackFrames).toHaveBeenNthCalledWith(
-        2,
-        'stack-1',
-        20,
-        expect.any(Array),
-      );
+      // Every frame sent once, in order, with contiguous indices, never more
+      // than 20 files per request.
+      const calls = mockedApi.uploadStackFrames.mock.calls;
+      let next = 0;
+      for (const [stackId, start, batch] of calls) {
+        expect(stackId).toBe('stack-1');
+        expect(start).toBe(next);
+        expect(batch.length).toBeLessThanOrEqual(20);
+        next += batch.length;
+      }
+      expect(next).toBe(25);
       expect(result.current.uploaded).toHaveLength(3);
       expect(result.current.calibration.frames.dark).toBe(1);
       expect(result.current.pending).toHaveLength(0);
       expect(result.current.selected).toBe(0);
       expect(result.current.phase).toBe('reviewing');
+    });
+
+    it('moves the progress bar with the bytes sent, and counts the frames received', async () => {
+      mockedApi.initiateStack.mockResolvedValue(session({ stackId: 'stack-1' }));
+      mockedApi.getStack.mockResolvedValue(stackResult({ stackId: 'stack-1', frames: [] }));
+      let sendProgress: ((sent: number, total: number) => void) | undefined;
+      let finish: () => void = () => undefined;
+      mockedApi.uploadStackFrames.mockImplementationOnce((_id, _start, _files, onProgress) => {
+        sendProgress = onProgress;
+        return new Promise((resolve) => {
+          finish = () => resolve(session({ stackId: 'stack-1' }));
+        });
+      });
+      const { result } = renderHook(() => useStackProcessing(SETTINGS, 50));
+      const files = [new File(['x'.repeat(100)], 'a.fits'), new File(['y'.repeat(100)], 'b.fits')];
+      act(() => result.current.addFiles(files));
+      mockedApi.uploadStackFrames.mockResolvedValue(session({ stackId: 'stack-1' }));
+
+      let upload: Promise<void> = Promise.resolve();
+      await act(async () => {
+        upload = result.current.uploadFrames();
+      });
+      await waitFor(() => expect(sendProgress).toBeDefined());
+
+      // First request: half sent is part-way, not 0 %; fully sent stops short
+      // of that request's share until the server has read its frames.
+      act(() => sendProgress?.(50, 100));
+      const half = result.current.progress;
+      act(() => sendProgress?.(100, 100));
+      const sent = result.current.progress;
+      expect(half.percent).toBeGreaterThan(0);
+      expect(half.percent).toBeLessThan(sent.percent);
+      expect(sent.percent).toBeLessThan(50);
+      expect(sent.detail).toBe('0/2');
+
+      await act(async () => {
+        finish();
+        await upload;
+      });
+      expect(result.current.phase).toBe('reviewing');
+    });
+
+    it('splits a small upload into several requests so the bar keeps moving', async () => {
+      mockedApi.initiateStack.mockResolvedValue(session({ stackId: 'stack-1' }));
+      mockedApi.uploadStackFrames.mockResolvedValue(session({ stackId: 'stack-1' }));
+      mockedApi.getStack.mockResolvedValue(stackResult({ stackId: 'stack-1', frames: [] }));
+      const { result } = renderHook(() => useStackProcessing(SETTINGS, 50));
+      const frames = Array.from({ length: 12 }, (_, i) => new File([new Uint8Array(1000)], `f${i}`));
+      act(() => result.current.addFiles(frames));
+
+      await act(async () => {
+        await result.current.uploadFrames();
+      });
+
+      // 12 equal frames, aiming for at least 8 requests: one frame each.
+      expect(mockedApi.uploadStackFrames).toHaveBeenCalledTimes(12);
+    });
+
+    it('caps each request at the per-file size limit from the settings', async () => {
+      mockedApi.initiateStack.mockResolvedValue(session({ stackId: 'stack-1' }));
+      mockedApi.uploadStackFrames.mockResolvedValue(session({ stackId: 'stack-1' }));
+      mockedApi.getStack.mockResolvedValue(stackResult({ stackId: 'stack-1', frames: [] }));
+      // A 1 MB limit and three 0.6 MB frames: no two fit in one request.
+      const { result } = renderHook(() => useStackProcessing(SETTINGS, 50, 1));
+      const big = (name: string) => new File([new Uint8Array(600 * 1024)], name);
+      act(() => result.current.addFiles([big('a.fits'), big('b.fits'), big('c.fits')]));
+
+      await act(async () => {
+        await result.current.uploadFrames();
+      });
+
+      expect(mockedApi.uploadStackFrames).toHaveBeenCalledTimes(3);
+      expect(mockedApi.uploadStackFrames).toHaveBeenNthCalledWith(
+        3,
+        'stack-1',
+        2,
+        [expect.any(File)],
+        expect.any(Function),
+      );
     });
 
     it('selects nothing when the uploaded stack comes back with no frames', async () => {
@@ -931,3 +1013,29 @@ describe('useStackProcessing', () => {
     });
   });
 });
+
+describe('chunkBySize', () => {
+  const sized = (bytes: number, name: string) => new File([new Uint8Array(bytes)], name);
+
+  it('splits on the file count and on the byte budget, whichever comes first', () => {
+    const files = [sized(40, 'a'), sized(40, 'b'), sized(40, 'c'), sized(10, 'd'), sized(10, 'e')];
+    const names = (batches: File[][]) => batches.map((batch) => batch.map((file) => file.name));
+
+    expect(names(chunkBySize(files, 20, 100))).toEqual([['a', 'b'], ['c', 'd', 'e']]);
+    expect(names(chunkBySize(files, 2, 1000))).toEqual([['a', 'b'], ['c', 'd'], ['e']]);
+  });
+
+  it('sends a file bigger than the budget on its own', () => {
+    const batches = chunkBySize([sized(10, 'a'), sized(500, 'big'), sized(10, 'b')], 20, 100);
+    expect(batches.map((batch) => batch.map((file) => file.name))).toEqual([
+      ['a'],
+      ['big'],
+      ['b'],
+    ]);
+  });
+
+  it('returns no batch for no file', () => {
+    expect(chunkBySize([], 20, 100)).toEqual([]);
+  });
+});
+

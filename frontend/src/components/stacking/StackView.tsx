@@ -57,7 +57,7 @@ export function StackView({ initialFiles, onEnhanceComposite, onWorkingChange }:
     stack,
     attachToStack,
     reset,
-  } = useStackProcessing(settings, stackingMaxFrames);
+  } = useStackProcessing(settings, stackingMaxFrames, maxImageSizeMb);
 
   const [step, setStep] = useState<StackStep>('frames');
 
@@ -176,7 +176,11 @@ export function StackView({ initialFiles, onEnhanceComposite, onWorkingChange }:
   if (phase === 'uploading') {
     return (
       <div className="mx-auto w-full max-w-xl">
-        <StackProgress percent={progress.percent} currentStep="upload" />
+        <StackProgress
+          percent={progress.percent}
+          currentStep="upload"
+          detail={progress.detail}
+        />
       </div>
     );
   }

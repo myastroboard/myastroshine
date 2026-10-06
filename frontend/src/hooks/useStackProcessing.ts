@@ -13,6 +13,14 @@ import type {
 
 const TERMINAL = new Set(['completed', 'failed']);
 const MIN_FRAMES = 2;
+const MIB = 1024 * 1024;
+/** Share of a batch's progress given to sending it; the rest is the server
+ * reading the frames, which only the response reports. */
+const SEND_SHARE = 0.85;
+/** Aim for at least this many requests: the server reads a request's frames
+ * before answering, so the bar can only move between requests - a few big ones
+ * would leave it frozen for seconds at a time. */
+const MIN_UPLOAD_REQUESTS = 8;
 const UPLOAD_BATCH_SIZE = 20; // files per request - keeps a 1000-frame night to ~50 requests; backend UPLOAD_BATCH_MAX_FILES
 
 const EMPTY_CALIBRATION: CalibrationSummary = {
@@ -45,6 +53,34 @@ function chunk<T>(items: T[], size: number): T[][] {
   return batches;
 }
 
+/**
+ * Split files into upload requests of at most `maxCount` files and `maxBytes`
+ * bytes (a file larger than `maxBytes` goes alone). Small requests keep the
+ * progress bar moving and stay under a reverse proxy's body limit - Cloudflare
+ * refuses anything over 100 MB, which 20 phone RAWs easily exceed. The cap is
+ * the operator's per-file limit (Settings, `max_image_size_mb`): a request is
+ * never heavier than one largest allowed file, so wherever a single image can
+ * be uploaded, the batches can too.
+ */
+export function chunkBySize(files: File[], maxCount: number, maxBytes: number): File[][] {
+  const batches: File[][] = [];
+  let current: File[] = [];
+  let bytes = 0;
+  for (const file of files) {
+    if (current.length > 0 && (current.length >= maxCount || bytes + file.size > maxBytes)) {
+      batches.push(current);
+      current = [];
+      bytes = 0;
+    }
+    current.push(file);
+    bytes += file.size;
+  }
+  if (current.length > 0) {
+    batches.push(current);
+  }
+  return batches;
+}
+
 let pendingSeq = 0;
 
 /**
@@ -54,7 +90,11 @@ let pendingSeq = 0;
  * `stacking_max_frames` (from `/api/config`), checked client-side so the user
  * gets a translated message instead of a raw backend 400.
  */
-export function useStackProcessing(settings: StackSettings, maxFrames: number) {
+export function useStackProcessing(
+  settings: StackSettings,
+  maxFrames: number,
+  maxImageSizeMb = 100,
+) {
   const { t } = useTranslation();
   const [phase, setPhase] = useState<StackPhase>('collecting');
   const [pending, setPending] = useState<PendingFrame[]>([]);
@@ -149,14 +189,39 @@ export function useStackProcessing(settings: StackSettings, maxFrames: number) {
 
   const uploadBatches = useCallback(
     async (stackId: string, files: File[], startIndex: number) => {
+      // Progress follows the bytes, so it moves while a big batch is sent
+      // instead of jumping from 0 to 100 when the only request answers.
+      const totalBytes = Math.max(
+        1,
+        files.reduce((sum, file) => sum + file.size, 0),
+      );
       let done = 0;
-      for (const batch of chunk(files, UPLOAD_BATCH_SIZE)) {
-        await apiClient.uploadStackFrames(stackId, startIndex + done, batch);
+      let doneBytes = 0;
+      const report = (bytes: number) =>
+        setProgress({
+          percent: Math.min(100, Math.round((bytes / totalBytes) * 100)),
+          step: 'upload',
+          detail: `${done}/${files.length}`,
+        });
+      report(0);
+      // Never above the operator's per-file limit (Settings); smaller when that
+      // still leaves fewer than MIN_UPLOAD_REQUESTS steps.
+      const largest = files.reduce((max, file) => Math.max(max, file.size), 0);
+      const budget = Math.min(
+        maxImageSizeMb * MIB,
+        Math.max(largest, Math.ceil(totalBytes / MIN_UPLOAD_REQUESTS)),
+      );
+      for (const batch of chunkBySize(files, UPLOAD_BATCH_SIZE, budget)) {
+        const batchBytes = batch.reduce((sum, file) => sum + file.size, 0);
+        await apiClient.uploadStackFrames(stackId, startIndex + done, batch, (sent, total) =>
+          report(doneBytes + (SEND_SHARE * batchBytes * sent) / Math.max(total, 1)),
+        );
         done += batch.length;
-        setProgress({ percent: Math.round((done / files.length) * 100), step: 'upload' });
+        doneBytes += batchBytes;
+        report(doneBytes);
       }
     },
-    [],
+    [maxImageSizeMb],
   );
 
   const uploadFrames = useCallback(async () => {
