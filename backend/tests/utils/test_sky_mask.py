@@ -110,3 +110,22 @@ def test_fit_sky_mask_ignores_an_all_sky_or_mismatched_mask() -> None:
     assert fit_sky_mask(np.full((60, 80), 255, np.uint8), (240, 320)) is None
     assert fit_sky_mask(_matte(), (320, 240)) is None
     assert fit_sky_mask(None, (240, 320)) is None
+
+
+def test_fit_sky_mask_ignores_a_mask_with_almost_no_sky() -> None:
+    """A matte that marks (almost) nothing as sky - an indoor shot, a matte that
+    missed the sky - gives no mask, instead of empty sky statistics downstream."""
+    assert fit_sky_mask(np.zeros((60, 80), np.uint8), (240, 320)) is None
+    nearly_none = np.zeros((60, 80), np.uint8)
+    nearly_none[:2] = 255  # ~3% sky
+    assert fit_sky_mask(nearly_none, (240, 320)) is None
+
+
+def test_a_matte_without_strip_tags_is_ignored() -> None:
+    """A matte sub-IFD without StripOffsets / StripByteCounts (a tiled layout)
+    gives no mask rather than an error."""
+    data = bytearray(_tiff_with_matte(_matte()))
+    sub_ifd_entries = 8 + (2 + 2 * 12 + 4) + 2  # header + IFD0, then the sub-IFD's entry count
+    assert struct.unpack_from("<H", data, sub_ifd_entries)[0] == 273  # its first entry
+    struct.pack_into("<H", data, sub_ifd_entries, 322)  # StripOffsets -> TileWidth
+    assert read_apple_sky_matte(bytes(data)) is None

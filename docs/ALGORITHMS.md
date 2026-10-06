@@ -719,8 +719,12 @@ two star fields by **asterism (triangle) matching**, vendored in the style of
    (no distortion, fewer stars) keeps the global transform. On the iPhone series:
    residual 1.42 -> 0.64 px, and the stack's median star size 4.62 -> 4.08 px,
    the same as a single frame (4.05; corners 4.86 -> 3.79). The align pass then
-   warps with `cv2.remap` (Lanczos) instead of `warpAffine`; drizzle keeps the
-   global transform.
+   warps with `cv2.remap` (Lanczos) instead of `warpAffine`. A forward
+   polynomial (source -> reference) is fitted on the same pairs for drizzle,
+   which places each input pixel and checks it against the 1x median with that
+   same warp - placing with the global transform against a warp-aligned median
+   rejected clearly more star pixels toward the edges. The warp is saved in the
+   stack checkpoint, so a resumed re-combine or drizzle uses it too.
 
 ### Integration (`app/services/integration.py`)
 

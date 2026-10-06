@@ -42,7 +42,11 @@ from numpy.lib.format import open_memmap
 from app.exceptions import InvalidParameterError
 from app.logging_config import get_logger
 from app.services.calibration import CalibrationMasters, CalibrationService
-from app.services.drizzle import drizzle_accumulate, drizzle_finalise
+from app.services.drizzle import (
+    affine_reference_coords,
+    drizzle_accumulate,
+    drizzle_finalise,
+)
 from app.services.frame_quality import FrameMeasure, FrameQuality, score_frames
 from app.services.star_detection import StarDetectionService
 from app.services.star_match import PolyWarp, StarMatchService, refine_warp
@@ -93,7 +97,7 @@ class _FramePlan:
     roundness: float = 1.0  # 0..1, 1 = round
     matrix: np.ndarray | None = None  # frame -> reference; set in pass 1
     #: optional refinement of ``matrix`` for lens distortion (see star_match.refine_warp);
-    #: the align pass uses it when set, drizzle keeps ``matrix``.
+    #: the align pass (and drizzle, through its forward map) uses it when set.
     warp: PolyWarp | None = None
     rms: float = 0.0
     registered: bool = False
@@ -350,6 +354,7 @@ class IntegrationService:
                     "roundness": p.roundness,
                     "rms": p.rms,
                     "matrix": p.matrix.tolist() if p.matrix is not None else None,
+                    "warp": p.warp.to_dict() if p.warp is not None else None,
                 }
                 for p in kept
             ],
@@ -634,8 +639,24 @@ class IntegrationService:
                 matrix = plan.matrix.astype(np.float64).copy()
                 matrix[0, 2] *= scale_x
                 matrix[1, 2] *= scale_y
-                keep = _drizzle_keep(frame, matrix, median, sigma, height, width)
-                drizzle_accumulate(frame, matrix, scale, float(norm[slot]), flux, weight, keep)
+                # The same placement the align pass used (the warp when there is
+                # one), or the rejection would compare against a misaligned median.
+                coords = (
+                    plan.warp.reference_maps(width, height)
+                    if plan.warp is not None
+                    else affine_reference_coords(matrix, height, width)
+                )
+                keep = _drizzle_keep(frame, coords, median, sigma, height, width)
+                drizzle_accumulate(
+                    frame,
+                    matrix,
+                    scale,
+                    float(norm[slot]),
+                    flux,
+                    weight,
+                    keep,
+                    reference_coords=coords,
+                )
             pct = 75 + 25 * slot // max(1, len(kept))
             _report(on_progress, "integration", pct, slot, len(kept))
 
@@ -705,7 +726,7 @@ def _pick_reference(pool: list[_FramePlan], plans: list[_FramePlan]) -> _FramePl
 
 def _drizzle_keep(
     frame: np.ndarray,
-    matrix: np.ndarray,
+    reference_coords: tuple[np.ndarray, np.ndarray],
     median: np.ndarray,
     sigma: np.ndarray,
     ref_height: int,
@@ -714,10 +735,7 @@ def _drizzle_keep(
     """``(h, w)`` bool: input pixels that land in the reference and agree with
     the 1x median to within ``_KAPPA`` sigma (rejects cosmics / hot pixels /
     a satellite streak before it is drizzled)."""
-    height, width = frame.shape[:2]
-    ys, xs = np.mgrid[0:height, 0:width]
-    x_ref = matrix[0, 0] * xs + matrix[0, 1] * ys + matrix[0, 2]
-    y_ref = matrix[1, 0] * xs + matrix[1, 1] * ys + matrix[1, 2]
+    x_ref, y_ref = reference_coords
     row = np.clip(np.rint(y_ref).astype(np.int64), 0, ref_height - 1)
     col = np.clip(np.rint(x_ref).astype(np.int64), 0, ref_width - 1)
     deviation = np.abs(frame - median[row, col])
@@ -797,6 +815,7 @@ def _plan_from_json(d: dict[str, Any]) -> _FramePlan:
     """A lightweight ``_FramePlan`` for the combine / drizzle steps (centroids
     are no longer needed once the aligned memmap exists)."""
     matrix = d.get("matrix")
+    warp = d.get("warp")
     return _FramePlan(
         index=int(d["index"]),
         centroids=np.empty((0, 2), dtype=np.float64),
@@ -808,6 +827,7 @@ def _plan_from_json(d: dict[str, Any]) -> _FramePlan:
         roundness=float(d["roundness"]),
         rms=float(d["rms"]),
         matrix=np.array(matrix, dtype=np.float64) if matrix is not None else None,
+        warp=PolyWarp.from_dict(warp) if warp is not None else None,
         registered=True,
     )
 
