@@ -487,6 +487,17 @@ describe('EditorView', () => {
       expect(update).toHaveBeenNthCalledWith(3, 'lookId', null);
     });
 
+    it('suggests the gallery group of the built-in preset last applied', async () => {
+      renderEditor();
+      expect(inspector().style.suggestedScene).toBeNull();
+
+      await act(async () => inspector().start.onPresetApply('system_lunar'));
+      expect(inspector().style.suggestedScene).toBe('moon');
+
+      await act(async () => inspector().start.onPresetApply('p1'));
+      expect(inspector().style.suggestedScene).toBeNull();
+    });
+
     it('hands the session look catalogue to the gallery', () => {
       renderEditor();
 

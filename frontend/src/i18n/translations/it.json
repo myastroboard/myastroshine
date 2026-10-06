@@ -222,7 +222,9 @@
       "nightscape": "Paesaggio notturno",
       "nebula": "Nebulosa",
       "galaxy": "Galassia",
-      "cluster": "Ammasso stellare"
+      "cluster": "Ammasso stellare",
+      "moon": "Luna",
+      "planet": "Pianeta"
     },
     "nightscape_note": "La tua foto contiene un paesaggio: i primi stili trattano cielo e terreno separatamente.",
     "none": {
@@ -273,6 +275,22 @@
       "night_velvet": {
         "name": "Velluto notturno",
         "hint": "Uno sfondo nero vellutato che fa risaltare ogni stella."
+      },
+      "moon_crisp": {
+        "name": "Nitido",
+        "hint": "Crateri, raggi e terminatore più nitidi, nel grigio proprio della Luna - il lembo resta pulito."
+      },
+      "moonlight": {
+        "name": "Chiaro di luna",
+        "hint": "Un bagliore morbido e freddo attorno alla Luna, la superficie leggermente affinata."
+      },
+      "planet_crisp": {
+        "name": "Nitido",
+        "hint": "Bande, zone e tempeste del pianeta più nitide - il lembo resta pulito."
+      },
+      "rich_colour": {
+        "name": "Colori ricchi",
+        "hint": "I veri colori del pianeta messi in risalto sulle sue bande, il cielo resta nero."
       }
     },
     "amount": {

@@ -128,12 +128,23 @@ export type LookId =
   | 'deep_field'
   | 'warm_core'
   | 'sparkle'
-  | 'night_velvet';
+  | 'night_velvet'
+  | 'moon_crisp'
+  | 'moonlight'
+  | 'planet_crisp'
+  | 'rich_colour';
 
 /** Kinds of picture the gallery groups its looks by. `'nightscape'` only when
  * the photo has a sky mask (a night landscape - its looks treat the sky and the
  * ground apart). */
-export type LookScene = 'general' | 'nightscape' | 'nebula' | 'galaxy' | 'cluster';
+export type LookScene =
+  | 'general'
+  | 'nightscape'
+  | 'nebula'
+  | 'galaxy'
+  | 'cluster'
+  | 'moon'
+  | 'planet';
 
 export interface LookGroup {
   scene: LookScene;
@@ -156,7 +167,19 @@ export const DEFAULT_LOOK_CATALOG: LookCatalog = {
     { scene: 'nebula', looks: ['luminous', 'structure'] },
     { scene: 'galaxy', looks: ['deep_field', 'warm_core'] },
     { scene: 'cluster', looks: ['sparkle', 'night_velvet'] },
+    { scene: 'moon', looks: ['moon_crisp', 'moonlight'] },
+    { scene: 'planet', looks: ['planet_crisp', 'rich_colour'] },
   ],
+};
+
+/** The gallery group a built-in preset points at: the user said what they shot
+ * by picking it, so the Style step opens there (the kind of target is never
+ * guessed from the picture). */
+export const PRESET_LOOK_SCENE: Readonly<Record<string, LookScene>> = {
+  system_nebula: 'nebula',
+  system_galaxy: 'galaxy',
+  system_cluster: 'cluster',
+  system_lunar: 'moon',
 };
 
 export interface LookParameters {

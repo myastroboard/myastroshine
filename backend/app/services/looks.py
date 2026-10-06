@@ -95,6 +95,20 @@ _STAR_COLOUR_GAIN = 2.5
 #: core), cool with ``m * (1 - m)`` (the fainter arms); the sky (m = 0) is untouched.
 _CORE_WARM_GAIN = 0.18
 _ARMS_COOL_GAIN = 0.8
+#: Moon / planet detail: scales are fractions of the *disc's* diameter, not of
+#: the frame - a planet is a few dozen pixels in a big black field.
+_DISC_FINE = 0.004
+_DISC_COARSE = 0.04
+_BAND_COARSE = 0.1
+_DISC_GAIN = 1.4
+_DISC_MIN_FINE_PX = 0.7
+#: The limb: the detail boost fades in over this fraction of the diameter inside
+#: the disc edge, so the limb gets no bright or dark ring.
+_DISC_LIMB_FADE = 0.02
+#: A disc smaller than this many pixels across is not a disc to work on.
+_DISC_MIN_DIAMETER_PX = 8.0
+#: White noise minus its 1 px Gaussian blur keeps this fraction of its sigma.
+_PIXEL_RESIDUAL_GAIN = 0.85
 #: The glow floor for a frame-filling subject (see :func:`inner_glow`).
 _INNER_GLOW_FLOOR_PERCENTILE = 20.0
 
@@ -455,6 +469,76 @@ def core_and_arms(image: np.ndarray, strength: float, region: Region = None) -> 
     return _clip01(image + strength * luma[:, :, np.newaxis] * tint)
 
 
+def _disc(luma: np.ndarray) -> tuple[np.ndarray, float]:
+    """The bright Moon / planet disc (boolean) and its equivalent diameter in px.
+
+    Otsu's threshold on the slightly blurred luminance splits the lit disc from
+    the black sky; the diameter is that of a circle of the same area, so a
+    partial disc (a crescent, a tight crop) still gets sensible scales.
+    """
+    smooth = cv2.GaussianBlur(luma, (0, 0), sigmaX=1.0)
+    as_u8 = np.clip(smooth * 255.0, 0, 255).astype(np.uint8)
+    level, _ = cv2.threshold(as_u8, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    disc: np.ndarray = smooth * 255.0 > level
+    diameter = 2.0 * float(np.sqrt(np.count_nonzero(disc) / np.pi))
+    return disc, diameter
+
+
+def disc_detail(image: np.ndarray, strength: float, region: Region = None) -> np.ndarray:
+    """Sharpen the Moon's surface: craters, rays, the terminator.
+
+    A band-pass at scales relative to the disc's own diameter (0.4 % to 4 %),
+    measured inside the disc only (a normalised blur), so the black sky never
+    enters it and the limb gets no ring. As elsewhere, noise-level detail fades
+    out and lifts fade towards white.
+    """
+    return _disc_detail(image, strength, _DISC_COARSE)
+
+
+def band_detail(image: np.ndarray, strength: float, region: Region = None) -> np.ndarray:
+    """Sharpen a planet's belts, zones and storms.
+
+    :func:`disc_detail` at a wider scale (up to 10 % of the diameter): a
+    planet's bands are far wider, relative to its disc, than lunar craters.
+    """
+    return _disc_detail(image, strength, _BAND_COARSE)
+
+
+def _disc_detail(image: np.ndarray, strength: float, coarse_fraction: float) -> np.ndarray:
+    if strength <= 0.0:
+        return image
+    luma = _luma(image)
+    disc, diameter = _disc(luma)
+    if diameter < _DISC_MIN_DIAMETER_PX:
+        return image
+    fine_sigma = max(_DISC_MIN_FINE_PX, _DISC_FINE * diameter)
+    weight = disc.astype(np.float32)
+    norm_fine = np.maximum(cv2.GaussianBlur(weight, (0, 0), sigmaX=fine_sigma), _TINY)
+    norm_coarse = np.maximum(
+        cv2.GaussianBlur(weight, (0, 0), sigmaX=coarse_fraction * diameter), _TINY
+    )
+    fine = cv2.GaussianBlur(luma * weight, (0, 0), sigmaX=fine_sigma) / norm_fine
+    coarse = (
+        cv2.GaussianBlur(luma * weight, (0, 0), sigmaX=coarse_fraction * diameter) / norm_coarse
+    )
+    band = fine - coarse
+    # The noise is read at pixel scale (the band itself is all structure on a
+    # detailed disc), then scaled to the fine blur: white noise of sigma s
+    # blurred by a Gaussian of sigma g keeps about s / (2 * sqrt(pi) * g).
+    residual = luma - cv2.GaussianBlur(luma, (0, 0), sigmaX=1.0)
+    pixel_noise = float(np.median(np.abs(residual[disc]))) * _MAD_TO_SIGMA / _PIXEL_RESIDUAL_GAIN
+    sigma = pixel_noise / (2.0 * np.sqrt(np.pi) * max(fine_sigma, 0.5))
+    cut_sq = (_LOCAL_CONTRAST_NOISE_SIGMAS * sigma) ** 2
+    band *= np.clip(1.0 - cut_sq / np.maximum(band * band, _TINY), 0.0, 1.0)
+    headroom = np.clip(_HIGHLIGHT_ROLLOFF * (1.0 - fine), 0.0, 1.0)
+    band = np.where(band > 0.0, band * headroom, band)
+    # Fade in from the limb: distance inside the disc, over a small fraction of it.
+    inside = cv2.distanceTransform(disc.astype(np.uint8), cv2.DIST_L2, 5)
+    limb = np.clip(inside / max(_DISC_LIMB_FADE * diameter, 1.0), 0.0, 1.0)
+    out = image + (strength * _DISC_GAIN * band * limb)[:, :, np.newaxis]
+    return _clip01(out)
+
+
 def _tone(image: np.ndarray, strength: float, tint: np.ndarray) -> np.ndarray:
     luma = _luma(image)[:, :, np.newaxis]
     return _clip01(image + (strength * _TONE_GAIN) * luma * tint)
@@ -567,6 +651,24 @@ LOOKS: dict[LookId, Look] = {
         "night_velvet",
         ((deep_black, 1.6), (star_colour, 0.6), (vignette, 0.5)),
     ),
+    # The Moon: crisp craters and terminator in neutral grey, or a soft cool glow.
+    "moon_crisp": Look(
+        "moon_crisp",
+        ((deep_black, 0.3), (disc_detail, 1.0)),
+    ),
+    "moonlight": Look(
+        "moonlight",
+        ((disc_detail, 0.4), (orton_glow, 0.7), (cool_tone, 1.0)),
+    ),
+    # Planets: crisp bands, or their real colours brought out.
+    "planet_crisp": Look(
+        "planet_crisp",
+        ((deep_black, 0.3), (band_detail, 1.0)),
+    ),
+    "rich_colour": Look(
+        "rich_colour",
+        ((band_detail, 0.5), (colour_pop, 1.2)),
+    ),
 }
 
 #: The gallery's groups, by kind of picture (the looks route lists them). The
@@ -576,6 +678,8 @@ NIGHTSCAPE_LOOKS: tuple[LookId, ...] = ("galactic_core", "blue_hour")
 NEBULA_LOOKS: tuple[LookId, ...] = ("luminous", "structure")
 GALAXY_LOOKS: tuple[LookId, ...] = ("deep_field", "warm_core")
 CLUSTER_LOOKS: tuple[LookId, ...] = ("sparkle", "night_velvet")
+MOON_LOOKS: tuple[LookId, ...] = ("moon_crisp", "moonlight")
+PLANET_LOOKS: tuple[LookId, ...] = ("planet_crisp", "rich_colour")
 
 
 def look_description(look: LookParameters) -> str | None:

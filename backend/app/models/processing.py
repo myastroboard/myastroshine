@@ -44,6 +44,10 @@ LookId = Literal[
     "warm_core",
     "sparkle",
     "night_velvet",
+    "moon_crisp",
+    "moonlight",
+    "planet_crisp",
+    "rich_colour",
 ]
 
 
@@ -119,7 +123,7 @@ class LookParameters(BaseModel):
 
 #: Kinds of picture the "Style" gallery groups its looks by. ``"nightscape"``
 #: is offered only when the session has a sky mask (a night landscape).
-LookScene = Literal["general", "nightscape", "nebula", "galaxy", "cluster"]
+LookScene = Literal["general", "nightscape", "nebula", "galaxy", "cluster", "moon", "planet"]
 
 
 class LookGroup(BaseModel):

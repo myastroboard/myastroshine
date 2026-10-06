@@ -7,6 +7,8 @@ export interface StylePanelProps {
   look: LookParameters;
   /** The session's looks, grouped by kind of picture (`GET /api/looks/{id}`). */
   catalog: LookCatalog;
+  /** The group a built-in preset the user applied points at, if any. */
+  suggestedScene?: LookScene | null;
   /** URL of a gallery thumbnail: the edit before its look, with `look` applied. */
   thumbnailUrl: (look: LookId | null) => string;
   onLookChange: <K extends keyof LookParameters>(key: K, value: LookParameters[K]) => void;
@@ -14,15 +16,19 @@ export interface StylePanelProps {
 }
 
 /** The group the gallery shows: the user's pick, else the chosen look's group,
- * else the catalogue's suggestion - always one the catalogue has. */
+ * else a night landscape (the photo's own sky mask says so), else the group of
+ * the preset they applied, else the catalogue's default - always one the
+ * catalogue has. */
 function shownScene(
   catalog: LookCatalog,
   picked: LookScene | null,
   lookId: LookId | null,
+  suggested: LookScene | null,
 ): LookScene {
   const scenes = catalog.groups.map((group) => group.scene);
   const ofLook = catalog.groups.find((group) => lookId !== null && group.looks.includes(lookId));
-  const wanted = picked ?? ofLook?.scene ?? catalog.scene;
+  const night = catalog.scene === 'nightscape' ? catalog.scene : null;
+  const wanted = picked ?? ofLook?.scene ?? night ?? suggested ?? catalog.scene;
   return scenes.includes(wanted) ? wanted : (scenes[0] ?? catalog.scene);
 }
 
@@ -36,6 +42,7 @@ function shownScene(
 export function StylePanel({
   look,
   catalog,
+  suggestedScene = null,
   thumbnailUrl,
   onLookChange,
   isProcessing,
@@ -43,7 +50,7 @@ export function StylePanel({
   const { t } = useTranslation();
   const [picked, setPicked] = useState<LookScene | null>(null);
   const selected = look.lookId;
-  const scene = shownScene(catalog, picked, selected);
+  const scene = shownScene(catalog, picked, selected, suggestedScene);
   const group = catalog.groups.find((entry) => entry.scene === scene);
   // "No style" is always the first choice.
   const choices: (LookId | null)[] = [null, ...(group?.looks ?? [])];

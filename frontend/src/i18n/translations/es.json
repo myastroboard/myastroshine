@@ -222,7 +222,9 @@
       "nightscape": "Paisaje nocturno",
       "nebula": "Nebulosa",
       "galaxy": "Galaxia",
-      "cluster": "Cúmulo estelar"
+      "cluster": "Cúmulo estelar",
+      "moon": "Luna",
+      "planet": "Planeta"
     },
     "nightscape_note": "Tu foto tiene un paisaje: los primeros estilos tratan el cielo y el suelo por separado.",
     "none": {
@@ -273,6 +275,22 @@
       "night_velvet": {
         "name": "Terciopelo nocturno",
         "hint": "Un fondo negro aterciopelado que hace destacar cada estrella."
+      },
+      "moon_crisp": {
+        "name": "Nítido",
+        "hint": "Cráteres, rayos y terminador más nítidos, en el gris propio de la Luna - el limbo queda limpio."
+      },
+      "moonlight": {
+        "name": "Luz de luna",
+        "hint": "Un brillo suave y frío alrededor de la Luna, su superficie ligeramente afinada."
+      },
+      "planet_crisp": {
+        "name": "Nítido",
+        "hint": "Las bandas, zonas y tormentas del planeta más nítidas - el limbo queda limpio."
+      },
+      "rich_colour": {
+        "name": "Color intenso",
+        "hint": "Los colores reales del planeta realzados en sus bandas, el cielo queda negro."
       }
     },
     "amount": {

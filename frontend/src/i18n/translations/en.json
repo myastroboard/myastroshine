@@ -222,7 +222,9 @@
       "nightscape": "Night landscape",
       "nebula": "Nebula",
       "galaxy": "Galaxy",
-      "cluster": "Star cluster"
+      "cluster": "Star cluster",
+      "moon": "Moon",
+      "planet": "Planet"
     },
     "nightscape_note": "Your photo has a landscape: the first styles treat the sky and the ground separately.",
     "none": {
@@ -273,6 +275,22 @@
       "night_velvet": {
         "name": "Night velvet",
         "hint": "A velvet-black background that makes every star stand out."
+      },
+      "moon_crisp": {
+        "name": "Crisp",
+        "hint": "Sharper craters, rays and terminator, in the Moon's own grey - the limb stays clean."
+      },
+      "moonlight": {
+        "name": "Moonlight",
+        "hint": "A soft, cool glow round the Moon, its surface gently sharpened."
+      },
+      "planet_crisp": {
+        "name": "Crisp",
+        "hint": "The planet's belts, zones and storms made crisper - the limb stays clean."
+      },
+      "rich_colour": {
+        "name": "Rich colour",
+        "hint": "The planet's real colours brought out on its bands, the sky left black."
       }
     },
     "amount": {

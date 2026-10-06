@@ -69,6 +69,7 @@ function makeProps(overrides: Partial<EditorInspectorProps> = {}): EditorInspect
     },
     style: {
       catalog: DEFAULT_LOOK_CATALOG,
+      suggestedScene: null,
       thumbnailUrl: (look) => `/thumb/${look ?? 'none'}`,
       onLookChange: vi.fn(),
       onReset: vi.fn(),

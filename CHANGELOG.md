@@ -27,6 +27,8 @@ original Keep a Changelog headings.
   Blue hour, with no halo round the trees. See docs/ALGORITHMS.md "Looks".
 - Deep-sky styles, picked with chips above the gallery: Luminous and Structure for nebulae, Deep
   field and Warm core for galaxies, Sparkle and Night velvet for star clusters - stars keep their size.
+- Moon and planet styles (Crisp and Moonlight, Crisp and Rich colour), sized to the disc, with no ring
+  on the limb; after a built-in preset the Style gallery opens on the matching kind of picture.
 
 ### Fixes
 

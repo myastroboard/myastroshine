@@ -233,4 +233,39 @@ describe('StylePanel', () => {
 
     expect(gallery().map((radio) => radio.textContent)).toEqual(['No style']);
   });
+
+  it('opens on the group of the preset the user applied', () => {
+    render(
+      <StylePanel
+        look={DEFAULT_LOOK_PARAMETERS}
+        catalog={DEFAULT_LOOK_CATALOG}
+        suggestedScene="moon"
+        thumbnailUrl={thumbnailUrl}
+        onLookChange={vi.fn()}
+        isProcessing={false}
+      />,
+    );
+
+    expect(screen.getByRole('radio', { name: 'Moon' })).toHaveAttribute('aria-checked', 'true');
+    expect(gallery().map((radio) => radio.textContent)).toEqual(['No style', 'Crisp', 'Moonlight']);
+  });
+
+  it('lets a night landscape win over a preset suggestion', () => {
+    render(
+      <StylePanel
+        look={DEFAULT_LOOK_PARAMETERS}
+        catalog={NIGHT_CATALOG}
+        suggestedScene="nebula"
+        thumbnailUrl={thumbnailUrl}
+        onLookChange={vi.fn()}
+        isProcessing={false}
+      />,
+    );
+
+    expect(screen.getByRole('radio', { name: 'Night landscape' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+  });
 });
+
