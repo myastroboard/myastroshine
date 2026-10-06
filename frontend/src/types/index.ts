@@ -117,22 +117,46 @@ export function stackParametersEqual(a: StackParameters, b: StackParameters): bo
  * colour, contrast, a glow from the image's own bright areas - never adds stars
  * or detail. `lookId: null` (the default) is no look at all.
  */
-export type LookId = 'vivid' | 'soft_glow' | 'cinematic' | 'galactic_core' | 'blue_hour';
+export type LookId =
+  | 'vivid'
+  | 'soft_glow'
+  | 'cinematic'
+  | 'galactic_core'
+  | 'blue_hour'
+  | 'luminous'
+  | 'structure'
+  | 'deep_field'
+  | 'warm_core'
+  | 'sparkle'
+  | 'night_velvet';
 
-/** What the gallery is for: `'nightscape'` when the photo has a sky mask (a
- * night landscape - its looks treat the sky and the ground apart). */
-export type LookScene = 'general' | 'nightscape';
+/** Kinds of picture the gallery groups its looks by. `'nightscape'` only when
+ * the photo has a sky mask (a night landscape - its looks treat the sky and the
+ * ground apart). */
+export type LookScene = 'general' | 'nightscape' | 'nebula' | 'galaxy' | 'cluster';
 
-/** `GET /api/looks/{id}`: the looks the gallery offers, in display order. */
-export interface LookCatalog {
+export interface LookGroup {
   scene: LookScene;
   looks: LookId[];
 }
 
-/** The looks for every image - also the gallery's fallback before the catalogue loads. */
-export const GENERAL_LOOK_CATALOG: LookCatalog = {
+/** `GET /api/looks/{id}`: the gallery's groups in display order, and the group
+ * it opens on. */
+export interface LookCatalog {
+  scene: LookScene;
+  groups: LookGroup[];
+}
+
+/** Every session's groups (no night landscape) - also the gallery's fallback
+ * before the catalogue loads. */
+export const DEFAULT_LOOK_CATALOG: LookCatalog = {
   scene: 'general',
-  looks: ['vivid', 'soft_glow', 'cinematic'],
+  groups: [
+    { scene: 'general', looks: ['vivid', 'soft_glow', 'cinematic'] },
+    { scene: 'nebula', looks: ['luminous', 'structure'] },
+    { scene: 'galaxy', looks: ['deep_field', 'warm_core'] },
+    { scene: 'cluster', looks: ['sparkle', 'night_velvet'] },
+  ],
 };
 
 export interface LookParameters {

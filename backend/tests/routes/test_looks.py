@@ -5,6 +5,14 @@ from __future__ import annotations
 import cv2
 import numpy as np
 
+#: The groups every session gets, in order (a night landscape adds its own first).
+_DEEP_SKY_GROUPS = [
+    {"scene": "general", "looks": ["vivid", "soft_glow", "cinematic"]},
+    {"scene": "nebula", "looks": ["luminous", "structure"]},
+    {"scene": "galaxy", "looks": ["deep_field", "warm_core"]},
+    {"scene": "cluster", "looks": ["sparkle", "night_velvet"]},
+]
+
 
 def _upload(client, sample_jpeg: bytes) -> str:
     resp = client.post("/api/upload", files={"file": ("m31.jpg", sample_jpeg, "image/jpeg")})
@@ -111,7 +119,7 @@ def test_catalogue_offers_the_general_looks_for_an_ordinary_image(
     response = client.get(f"/api/looks/{session_id}")
 
     assert response.status_code == 200
-    assert response.json() == {"scene": "general", "looks": ["vivid", "soft_glow", "cinematic"]}
+    assert response.json() == {"scene": "general", "groups": _DEEP_SKY_GROUPS}
 
 
 def test_catalogue_puts_the_night_looks_first_for_a_night_landscape(
@@ -123,7 +131,10 @@ def test_catalogue_puts_the_night_looks_first_for_a_night_landscape(
 
     assert response.json() == {
         "scene": "nightscape",
-        "looks": ["galactic_core", "blue_hour", "vivid", "soft_glow", "cinematic"],
+        "groups": [
+            {"scene": "nightscape", "looks": ["galactic_core", "blue_hour"]},
+            *_DEEP_SKY_GROUPS,
+        ],
     }
 
 

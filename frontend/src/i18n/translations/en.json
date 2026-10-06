@@ -216,6 +216,14 @@
   },
   "style_panel": {
     "gallery_aria": "Finishing styles",
+    "scenes_aria": "Kind of photo",
+    "scenes": {
+      "general": "Any image",
+      "nightscape": "Night landscape",
+      "nebula": "Nebula",
+      "galaxy": "Galaxy",
+      "cluster": "Star cluster"
+    },
     "nightscape_note": "Your photo has a landscape: the first styles treat the sky and the ground separately.",
     "none": {
       "name": "No style",
@@ -241,6 +249,30 @@
       "blue_hour": {
         "name": "Blue hour",
         "hint": "A cool, luminous night sky with a soft glow on the Milky Way above a warm landscape."
+      },
+      "luminous": {
+        "name": "Luminous",
+        "hint": "A soft inner glow on the nebula's gas, on a deeper black sky, with richer colours."
+      },
+      "structure": {
+        "name": "Structure",
+        "hint": "The nebula's filaments and dark lanes carved out; the stars keep their size."
+      },
+      "deep_field": {
+        "name": "Deep field",
+        "hint": "A deep black field round a crisp galaxy, with a light bloom on the stars."
+      },
+      "warm_core": {
+        "name": "Warm core",
+        "hint": "A warm, golden core and cooler, bluer outskirts - the real colours of a spiral galaxy."
+      },
+      "sparkle": {
+        "name": "Sparkle",
+        "hint": "The stars' own colours brought out, with a soft round glow - no fake spikes."
+      },
+      "night_velvet": {
+        "name": "Night velvet",
+        "hint": "A velvet-black background that makes every star stand out."
       }
     },
     "amount": {

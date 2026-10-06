@@ -216,6 +216,14 @@
   },
   "style_panel": {
     "gallery_aria": "Estilos de acabamento",
+    "scenes_aria": "Tipo de foto",
+    "scenes": {
+      "general": "Qualquer imagem",
+      "nightscape": "Paisagem noturna",
+      "nebula": "Nebulosa",
+      "galaxy": "Galáxia",
+      "cluster": "Enxame estelar"
+    },
     "nightscape_note": "A sua foto tem uma paisagem: os primeiros estilos tratam o céu e o chão em separado.",
     "none": {
       "name": "Sem estilo",
@@ -241,6 +249,30 @@
       "blue_hour": {
         "name": "Hora azul",
         "hint": "Um céu noturno frio e luminoso, com um brilho suave na Via Láctea, sobre uma paisagem quente."
+      },
+      "luminous": {
+        "name": "Luminoso",
+        "hint": "Um brilho interior suave no gás da nebulosa, num céu mais negro, com cores mais ricas."
+      },
+      "structure": {
+        "name": "Estrutura",
+        "hint": "Os filamentos e faixas escuras da nebulosa esculpidos; as estrelas mantêm o seu tamanho."
+      },
+      "deep_field": {
+        "name": "Campo profundo",
+        "hint": "Um fundo negro profundo à volta de uma galáxia nítida, com um leve brilho nas estrelas."
+      },
+      "warm_core": {
+        "name": "Núcleo quente",
+        "hint": "Um núcleo quente e dourado e periferia mais fria e azulada - as cores reais de uma galáxia espiral."
+      },
+      "sparkle": {
+        "name": "Cintilação",
+        "hint": "As cores próprias das estrelas realçadas, com um brilho redondo e suave - sem picos falsos."
+      },
+      "night_velvet": {
+        "name": "Veludo noturno",
+        "hint": "Um fundo negro aveludado que faz sobressair cada estrela."
       }
     },
     "amount": {

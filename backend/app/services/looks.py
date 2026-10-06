@@ -37,6 +37,8 @@ _TINY = 1e-6
 _LOCAL_CONTRAST_FINE = 0.002  # of the diagonal
 _LOCAL_CONTRAST_COARSE = 0.02
 _LOCAL_CONTRAST_GAIN = 2.5
+#: Lifts fade out over the top ``1 / _HIGHLIGHT_ROLLOFF`` of the range (the top half).
+_HIGHLIGHT_ROLLOFF = 2.0
 _LOCAL_CONTRAST_MIN_FINE_PX = 1.0  # a thumbnail's fine blur must still average out pixel noise
 #: Band coefficients within this many noise sigmas fade out (non-negative
 #: garrote, as in ``app.utils.starlet``), so leftover grain is never boosted.
@@ -73,6 +75,28 @@ _SKY_BACKGROUND_RADIUS = 0.06
 _SKY_DARK_INTRUSION = 0.75
 #: Width of the strip of sky along the foreground that is never the "subject".
 _SKY_EDGE_FADE = 0.01
+#: Stars: compact bright peaks - luminance above its own blur at this radius
+#: (at least 1.5 px, so a thumbnail's 1-2 px stars still count) ...
+_STAR_RADIUS = 0.003
+_STAR_MIN_RADIUS_PX = 1.5
+#: Bright stars' halos are wider: they are found again at this multiple of the radius.
+_BRIGHT_STAR_SCALE = 3.0
+#: A bright star's core is among the image's brightest pixels (top 0.3 %).
+_BRIGHT_STAR_CORE_PERCENTILE = 99.7
+#: Star colour is scaled so a star at this percentile of the star mask gets the full boost.
+_STAR_TYPICAL_PERCENTILE = 75.0
+#: ... by more than this many noise sigmas (ramping to full over as many again).
+_STAR_NOISE_SIGMAS = 5.0
+#: Star glow: a round bloom made of each star's own light, spread this wide.
+_STAR_GLOW_RADIUS = 0.004
+_STAR_GLOW_GAIN = 3.0
+_STAR_COLOUR_GAIN = 2.5
+#: Galaxy core / arms toning: warm grows with the subject mask squared (the
+#: core), cool with ``m * (1 - m)`` (the fainter arms); the sky (m = 0) is untouched.
+_CORE_WARM_GAIN = 0.18
+_ARMS_COOL_GAIN = 0.8
+#: The glow floor for a frame-filling subject (see :func:`inner_glow`).
+_INNER_GLOW_FLOOR_PERCENTILE = 20.0
 
 #: Split-toning tints in BGR, scaled to zero luma (``tint @ _LUMA_BGR == 0``) so
 #: they shift the hue without brightening or darkening anything.
@@ -184,7 +208,9 @@ def local_contrast(image: np.ndarray, strength: float, region: Region = None) ->
     A band-pass of the luminance (fine blur minus coarse blur) is added back to
     every channel, so colour is kept and neither pixel noise nor the overall sky
     level is touched. Band values at the noise level (measured robustly on the
-    band itself, which is mostly sky) are faded out rather than boosted.
+    band itself, which is mostly sky) are faded out rather than boosted, and the
+    stars are shielded: they sit in the same band, and boosting them bloats them.
+    Lifts fade out near white, so bright cores are not burnt.
     """
     if strength <= 0.0:
         return image
@@ -194,7 +220,32 @@ def local_contrast(image: np.ndarray, strength: float, region: Region = None) ->
     sigma = float(np.median(np.abs(_sample(band, region)))) * _MAD_TO_SIGMA
     cut_sq = (_LOCAL_CONTRAST_NOISE_SIGMAS * sigma) ** 2
     band *= np.clip(1.0 - cut_sq / np.maximum(band * band, _TINY), 0.0, 1.0)
+    band *= 1.0 - _star_shield(luma)
+    # Highlight roll-off: a lift fades out towards white, so a bright core
+    # (the Lagoon's, Orion's) keeps its detail instead of burning to white.
+    headroom = np.clip(_HIGHLIGHT_ROLLOFF * (1.0 - fine), 0.0, 1.0)
+    band = np.where(band > 0.0, band * headroom, band)
     out = image + (strength * _LOCAL_CONTRAST_GAIN * band)[:, :, np.newaxis]
+    return _clip01(out)
+
+
+def _orton(
+    image: np.ndarray,
+    strength: float,
+    region: Region,
+    floor_percentile: float,
+    *,
+    starless: bool = False,
+) -> np.ndarray:
+    if strength <= 0.0:
+        return image
+    source = image
+    if starless:
+        source = image * (1.0 - _star_shield(_luma(image)))[:, :, np.newaxis]
+    glow = _blur(source, _ORTON_RADIUS, region=region)
+    floor = np.percentile(_sample(glow, region), floor_percentile, axis=0)
+    glow = np.clip(glow - floor, 0.0, 1.0) * (strength * _ORTON_GAIN)
+    out = 1.0 - (1.0 - image) * (1.0 - glow)
     return _clip01(out)
 
 
@@ -205,13 +256,19 @@ def orton_glow(image: np.ndarray, strength: float, region: Region = None) -> np.
     copy's own median is used, so the glow comes from the object and the sky
     background stays dark.
     """
-    if strength <= 0.0:
-        return image
-    glow = _blur(image, _ORTON_RADIUS, region=region)
-    floor = np.median(_sample(glow, region), axis=0)
-    glow = np.clip(glow - floor, 0.0, 1.0) * (strength * _ORTON_GAIN)
-    out = 1.0 - (1.0 - image) * (1.0 - glow)
-    return _clip01(out)
+    return _orton(image, strength, region, _DEEP_BLACK_SKY_PERCENTILE)
+
+
+def inner_glow(image: np.ndarray, strength: float, region: Region = None) -> np.ndarray:
+    """The Orton glow for a subject that fills the frame (a large nebula).
+
+    Same blend, but measured from a low percentile instead of the median: when
+    the nebula covers most of the picture its own level *is* the median, and
+    :func:`orton_glow` would find almost nothing above it. The glow is made of
+    the nebula alone - the stars are left out of its source, so a bright star
+    does not swell into a disc.
+    """
+    return _orton(image, strength, region, _INNER_GLOW_FLOOR_PERCENTILE, starless=True)
 
 
 def deep_black(image: np.ndarray, strength: float, region: Region = None) -> np.ndarray:
@@ -287,6 +344,115 @@ def vignette(image: np.ndarray, strength: float, region: Region = None) -> np.nd
     falloff = radius_sq * radius_sq * (3.0 - 2.0 * radius_sq)  # smooth, flat centre
     gain = 1.0 - strength * _VIGNETTE_GAIN * falloff
     return _clip01(image * gain[:, :, np.newaxis])
+
+
+def _star_radius(luma: np.ndarray) -> float:
+    return max(_STAR_MIN_RADIUS_PX, _STAR_RADIUS * _diagonal(luma))
+
+
+def _peaks(luma: np.ndarray, sigma: float) -> np.ndarray:
+    """0..1 where the luminance rises above its own blur at ``sigma`` by > 5 noise sigmas."""
+    peak = luma - cv2.GaussianBlur(luma, (0, 0), sigmaX=sigma)
+    noise = float(np.median(np.abs(peak))) * _MAD_TO_SIGMA
+    cut = _STAR_NOISE_SIGMAS * max(noise, _TINY)
+    mask: np.ndarray = np.clip((peak - cut) / cut, 0.0, 1.0)
+    return mask
+
+
+def _star_mask(luma: np.ndarray) -> np.ndarray:
+    """0..1 on compact bright peaks (stars), 0 on the background and on extended
+    structure (a nebula or a galaxy's disc are wider than the star radius).
+
+    Two scales: the typical star, and three times wider for the few bright
+    stars whose halo is larger than the typical radius (see :func:`_bright_peaks`).
+    """
+    mask: np.ndarray = np.maximum(_peaks(luma, _star_radius(luma)), _bright_peaks(luma))
+    return mask
+
+
+def _grow(mask: np.ndarray, radius: float) -> np.ndarray:
+    size = 2 * int(np.ceil(2.0 * radius)) + 1
+    grown = cv2.dilate(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (size, size)))
+    blurred: np.ndarray = cv2.GaussianBlur(grown, (0, 0), sigmaX=radius)
+    return blurred
+
+
+def _bright_peaks(luma: np.ndarray) -> np.ndarray:
+    """Peaks at three times the star radius - the halo of a bright star.
+
+    Only round the image's very brightest pixels (a bright star's core): at
+    that scale a thin nebula filament is a "peak" too, and must keep its boost.
+    """
+    radius = _BRIGHT_STAR_SCALE * _star_radius(luma)
+    cores = (luma >= np.percentile(luma, _BRIGHT_STAR_CORE_PERCENTILE)).astype(np.float32)
+    near_core = np.clip(_grow(cores, radius), 0.0, 1.0)
+    bright: np.ndarray = _peaks(luma, radius) * near_core
+    return bright
+
+
+def _star_shield(luma: np.ndarray) -> np.ndarray:
+    """0..1 over each star and its halo - where structure boosts must not act."""
+    radius = _star_radius(luma)
+    shield = np.maximum(
+        _grow(_peaks(luma, radius), radius),
+        _grow(_bright_peaks(luma), _BRIGHT_STAR_SCALE * radius),
+    )
+    clipped: np.ndarray = np.clip(shield, 0.0, 1.0)
+    return clipped
+
+
+def star_glow(image: np.ndarray, strength: float, region: Region = None) -> np.ndarray:
+    """A soft round bloom round the stars, made of their own light.
+
+    The detected stars' pixels are blurred and screen-blended back: brighter
+    stars bloom more. Round only - no diffraction spikes, nothing that was not
+    in the star's own recorded light.
+    """
+    if strength <= 0.0:
+        return image
+    stars = image * _star_mask(_luma(image))[:, :, np.newaxis]
+    glow = _blur(stars, _STAR_GLOW_RADIUS, _STAR_MIN_RADIUS_PX) * (strength * _STAR_GLOW_GAIN)
+    return _clip01(1.0 - (1.0 - image) * (1.0 - np.clip(glow, 0.0, 1.0)))
+
+
+def star_colour(image: np.ndarray, strength: float, region: Region = None) -> np.ndarray:
+    """Bring out the stars' real colours (blue-white, yellow, orange) - on the stars only.
+
+    The smoothed colour of each star (its rim carries it better than its often
+    white-clipped core) is boosted on the star's own pixels - the typical-size
+    star mask only, so the nebulosity round a bright star is never tinted with
+    a disc of colour. Luminance unchanged.
+    """
+    if strength <= 0.0:
+        return image
+    luma = _luma(image)
+    weight = _peaks(luma, _star_radius(luma))
+    # Scaled on a typical star, not the brightest one (which would leave the
+    # rest of the field with almost no colour boost).
+    on_stars = weight[weight > _TINY]
+    typical = float(np.percentile(on_stars, _STAR_TYPICAL_PERCENTILE)) if on_stars.size else 1.0
+    weight = np.clip(weight / max(typical, _TINY), 0.0, 1.0)
+    chroma = image - luma[:, :, np.newaxis]
+    smooth = _blur(chroma, _LOCAL_CONTRAST_FINE, _LOCAL_CONTRAST_MIN_FINE_PX)
+    gain = (strength * _STAR_COLOUR_GAIN * weight)[:, :, np.newaxis]
+    return _clip01(image + gain * smooth)
+
+
+def core_and_arms(image: np.ndarray, strength: float, region: Region = None) -> np.ndarray:
+    """Warm the brightest part of the subject, cool its fainter outskirts.
+
+    On a spiral galaxy this follows its real colours - an old, yellow core and
+    young, blue arms. Luminance-free tints, proportional to luminance; the
+    background sky is untouched.
+    """
+    if strength <= 0.0:
+        return image
+    luma = _luma(image)
+    subject = _object_mask(luma, region)[:, :, np.newaxis]
+    tint = _HIGHLIGHT_TINT * (_CORE_WARM_GAIN * subject * subject) + _SHADOW_TINT * (
+        _ARMS_COOL_GAIN * subject * (1.0 - subject)
+    )
+    return _clip01(image + strength * luma[:, :, np.newaxis] * tint)
 
 
 def _tone(image: np.ndarray, strength: float, tint: np.ndarray) -> np.ndarray:
@@ -374,12 +540,42 @@ LOOKS: dict[LookId, Look] = {
         ((cool_tone, 1.6), (orton_glow, 1.0), (local_contrast, 0.4)),
         ground_steps=((lift_shadows, 0.6), (warm_tone, 1.0)),
     ),
+    # Nebulae: a luminous glow on the gas, or its filaments carved out.
+    "luminous": Look(
+        "luminous",
+        ((deep_black, 0.4), (inner_glow, 0.8), (colour_pop, 1.0)),
+    ),
+    "structure": Look(
+        "structure",
+        ((deep_black, 0.3), (local_contrast, 1.6), (colour_pop, 0.5)),
+    ),
+    # Galaxies: a deep black field round a crisp disc, or the core / arms colours.
+    "deep_field": Look(
+        "deep_field",
+        ((deep_black, 0.7), (local_contrast, 0.8), (star_glow, 0.4)),
+    ),
+    "warm_core": Look(
+        "warm_core",
+        ((deep_black, 0.3), (core_and_arms, 1.0), (colour_pop, 0.6)),
+    ),
+    # Star clusters: the stars' own colour and glow, or a velvet black field.
+    "sparkle": Look(
+        "sparkle",
+        ((deep_black, 0.3), (star_colour, 1.0), (star_glow, 1.0)),
+    ),
+    "night_velvet": Look(
+        "night_velvet",
+        ((deep_black, 1.6), (star_colour, 0.6), (vignette, 0.5)),
+    ),
 }
 
-#: Looks offered for every image, and the night-landscape ones offered only
-#: when the session has a sky mask (the gallery reads both from the looks route).
+#: The gallery's groups, by kind of picture (the looks route lists them). The
+#: night-landscape group is offered only when the session has a sky mask.
 GENERAL_LOOKS: tuple[LookId, ...] = ("vivid", "soft_glow", "cinematic")
 NIGHTSCAPE_LOOKS: tuple[LookId, ...] = ("galactic_core", "blue_hour")
+NEBULA_LOOKS: tuple[LookId, ...] = ("luminous", "structure")
+GALAXY_LOOKS: tuple[LookId, ...] = ("deep_field", "warm_core")
+CLUSTER_LOOKS: tuple[LookId, ...] = ("sparkle", "night_velvet")
 
 
 def look_description(look: LookParameters) -> str | None:

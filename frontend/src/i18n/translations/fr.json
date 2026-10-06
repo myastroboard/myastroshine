@@ -216,6 +216,14 @@
   },
   "style_panel": {
     "gallery_aria": "Styles de finition",
+    "scenes_aria": "Type de photo",
+    "scenes": {
+      "general": "Toute image",
+      "nightscape": "Paysage de nuit",
+      "nebula": "Nébuleuse",
+      "galaxy": "Galaxie",
+      "cluster": "Amas d'étoiles"
+    },
     "nightscape_note": "Votre photo contient un paysage : les premiers styles traitent le ciel et le sol séparément.",
     "none": {
       "name": "Sans style",
@@ -241,6 +249,30 @@
       "blue_hour": {
         "name": "Heure bleue",
         "hint": "Un ciel nocturne froid et lumineux, avec un halo doux sur la Voie lactée, au-dessus d'un paysage chaud."
+      },
+      "luminous": {
+        "name": "Lumineux",
+        "hint": "Un halo intérieur doux sur le gaz de la nébuleuse, un ciel plus noir et des couleurs plus riches."
+      },
+      "structure": {
+        "name": "Structure",
+        "hint": "Les filaments et les bandes sombres de la nébuleuse sculptés ; les étoiles gardent leur taille."
+      },
+      "deep_field": {
+        "name": "Champ profond",
+        "hint": "Un fond noir profond autour d'une galaxie nette, avec un léger halo sur les étoiles."
+      },
+      "warm_core": {
+        "name": "Cœur chaud",
+        "hint": "Un cœur chaud et doré, des bords plus froids et bleutés - les vraies couleurs d'une galaxie spirale."
+      },
+      "sparkle": {
+        "name": "Scintillement",
+        "hint": "Les couleurs propres des étoiles ressorties, avec un halo rond et doux - sans fausses aigrettes."
+      },
+      "night_velvet": {
+        "name": "Velours nocturne",
+        "hint": "Un fond noir velours qui fait ressortir chaque étoile."
       }
     },
     "amount": {

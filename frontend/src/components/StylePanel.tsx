@@ -1,44 +1,82 @@
-import type { CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 
 import { useTranslation } from '@/hooks/useTranslation';
-import type { LookId, LookParameters, LookScene } from '@/types';
+import type { LookCatalog, LookId, LookParameters, LookScene } from '@/types';
 
 export interface StylePanelProps {
   look: LookParameters;
-  /** The looks to offer, in order (from the session's look catalogue). */
-  looks: LookId[];
-  /** `'nightscape'`: the photo has a landscape - say the first looks use it. */
-  scene: LookScene;
+  /** The session's looks, grouped by kind of picture (`GET /api/looks/{id}`). */
+  catalog: LookCatalog;
   /** URL of a gallery thumbnail: the edit before its look, with `look` applied. */
   thumbnailUrl: (look: LookId | null) => string;
   onLookChange: <K extends keyof LookParameters>(key: K, value: LookParameters[K]) => void;
   isProcessing: boolean;
 }
 
+/** The group the gallery shows: the user's pick, else the chosen look's group,
+ * else the catalogue's suggestion - always one the catalogue has. */
+function shownScene(
+  catalog: LookCatalog,
+  picked: LookScene | null,
+  lookId: LookId | null,
+): LookScene {
+  const scenes = catalog.groups.map((group) => group.scene);
+  const ofLook = catalog.groups.find((group) => lookId !== null && group.looks.includes(lookId));
+  const wanted = picked ?? ofLook?.scene ?? catalog.scene;
+  return scenes.includes(wanted) ? wanted : (scenes[0] ?? catalog.scene);
+}
+
 /**
  * The "Style" step: a gallery of the user's own image in each finishing look,
- * plus one "how much" slider for the chosen look. Every look only reworks the
- * recorded light (see backend `app/services/looks.py`) - no added detail.
+ * plus one "how much" slider for the chosen look. Looks are grouped by kind of
+ * picture (any image, night landscape, nebula, galaxy, star cluster); a row of
+ * chips switches group - the kind of a deep-sky target is not guessed. Every
+ * look only reworks the recorded light (backend `app/services/looks.py`).
  */
 export function StylePanel({
   look,
-  looks,
-  scene,
+  catalog,
   thumbnailUrl,
   onLookChange,
   isProcessing,
 }: StylePanelProps) {
   const { t } = useTranslation();
+  const [picked, setPicked] = useState<LookScene | null>(null);
   const selected = look.lookId;
+  const scene = shownScene(catalog, picked, selected);
+  const group = catalog.groups.find((entry) => entry.scene === scene);
   // "No style" is always the first choice.
-  const choices: (LookId | null)[] = [null, ...looks];
+  const choices: (LookId | null)[] = [null, ...(group?.looks ?? [])];
   const nameOf = (id: LookId | null) =>
     id === null ? t('style_panel.none.name') : t(`style_panel.looks.${id}.name`);
   // Slider fill from 0 to the current amount (a per-instance runtime value).
-  const fill = { '--fill-from': 0, '--fill-to': look.amount / 100 } as CSSProperties;
+  const fill = {
+    '--fill-from': 0,
+    '--fill-to': look.amount / 100,
+  } as CSSProperties;
 
   return (
     <div className="flex flex-col gap-4">
+      {catalog.groups.length > 1 && (
+        <div
+          className="flex flex-wrap gap-1"
+          role="radiogroup"
+          aria-label={t('style_panel.scenes_aria')}
+        >
+          {catalog.groups.map((entry) => (
+            <button
+              key={entry.scene}
+              type="button"
+              role="radio"
+              aria-checked={entry.scene === scene}
+              className={`chip ${entry.scene === scene ? 'chip-active' : ''}`}
+              onClick={() => setPicked(entry.scene)}
+            >
+              {t(`style_panel.scenes.${entry.scene}`)}
+            </button>
+          ))}
+        </div>
+      )}
       {scene === 'nightscape' && (
         <p className="panel-inset text-xs text-muted">{t('style_panel.nightscape_note')}</p>
       )}
@@ -72,9 +110,7 @@ export function StylePanel({
       </div>
 
       <p className="text-xs text-faint" aria-live="polite">
-        {selected === null
-          ? t('style_panel.none.hint')
-          : t(`style_panel.looks.${selected}.hint`)}
+        {selected === null ? t('style_panel.none.hint') : t(`style_panel.looks.${selected}.hint`)}
       </p>
 
       {selected !== null && (

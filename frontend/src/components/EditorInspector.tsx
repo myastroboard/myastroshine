@@ -300,8 +300,7 @@ export function EditorInspector(props: EditorInspectorProps) {
       {activeStep === 'style' && (
         <StylePanel
           look={parameters.look}
-          looks={props.style.catalog.looks}
-          scene={props.style.catalog.scene}
+          catalog={props.style.catalog}
           thumbnailUrl={props.style.thumbnailUrl}
           onLookChange={props.style.onLookChange}
           isProcessing={props.isProcessing}

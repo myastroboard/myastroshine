@@ -165,6 +165,12 @@ frame), two more styles come first and treat the sky and the ground apart:
 **Galactic core** (a warm, golden Milky Way core with deep dust lanes over a cool
 sky, the landscape gently opened up) and **Blue hour** (a cool, luminous sky with
 a soft glow on the band over a warm landscape) - with no halo round the trees.
+Chips above the gallery switch to styles made for a **Nebula** (**Luminous**, a
+soft inner glow on the gas; **Structure**, filaments and dark lanes carved out),
+a **Galaxy** (**Deep field**, a deep black field round a crisp galaxy; **Warm
+core**, a golden core and bluer outskirts) or a **Star cluster** (**Sparkle**, the
+stars' own colours and a soft round glow; **Night velvet**, a velvet-black
+background). Stars keep their size and bright cores keep their detail.
 Styles only rework the light the camera recorded: no added stars, no fake
 detail. Changing only the style re-renders in a moment (the rest
 of the edit is kept), and applying a preset or Auto Astro keeps the chosen style.

@@ -216,6 +216,14 @@
   },
   "style_panel": {
     "gallery_aria": "Abschließende Stile",
+    "scenes_aria": "Art des Fotos",
+    "scenes": {
+      "general": "Jedes Bild",
+      "nightscape": "Nachtlandschaft",
+      "nebula": "Nebel",
+      "galaxy": "Galaxie",
+      "cluster": "Sternhaufen"
+    },
     "nightscape_note": "Dein Foto enthält eine Landschaft: Die ersten Stile behandeln Himmel und Boden getrennt.",
     "none": {
       "name": "Kein Stil",
@@ -241,6 +249,30 @@
       "blue_hour": {
         "name": "Blaue Stunde",
         "hint": "Ein kühler, leuchtender Nachthimmel mit sanftem Schimmer auf der Milchstraße über einer warmen Landschaft."
+      },
+      "luminous": {
+        "name": "Leuchtend",
+        "hint": "Ein sanftes inneres Leuchten im Gas des Nebels, auf tieferem schwarzem Himmel, mit kräftigeren Farben."
+      },
+      "structure": {
+        "name": "Struktur",
+        "hint": "Die Filamente und dunklen Bänder des Nebels herausgearbeitet; die Sterne behalten ihre Größe."
+      },
+      "deep_field": {
+        "name": "Tiefes Feld",
+        "hint": "Ein tiefschwarzes Feld um eine klare Galaxie, mit leichtem Schimmer auf den Sternen."
+      },
+      "warm_core": {
+        "name": "Warmer Kern",
+        "hint": "Ein warmer, goldener Kern und kühlere, blauere Außenbereiche - die echten Farben einer Spiralgalaxie."
+      },
+      "sparkle": {
+        "name": "Funkeln",
+        "hint": "Die eigenen Farben der Sterne hervorgehoben, mit sanftem rundem Schimmer - keine falschen Spikes."
+      },
+      "night_velvet": {
+        "name": "Nachtsamt",
+        "hint": "Ein samtschwarzer Hintergrund, vor dem jeder Stern hervortritt."
       }
     },
     "amount": {
