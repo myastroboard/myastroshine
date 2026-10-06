@@ -1,7 +1,7 @@
 name: Performance benchmarks
 
 # Checks the acceptance criteria in initial_plan/10_IMPLEMENTATION_ROADMAP.md
-# "Success Metrics" (full-res enhance < 5s, slider response < 500ms, stacking
+# "Success Metrics" (full-res enhance < 12s, slider response < 500ms, stacking
 # SNR gain ~sqrt(N)). Runs weekly and on demand, not on every push/PR: wall-clock
 # budgets are sensitive to which runner picks up the job, so this is a signal to
 # investigate on failure, not a merge gate. See tests/benchmarks/*.py.
@@ -28,4 +28,9 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements-dev.txt
       - run: pip install -r requirements-dev.txt
-      - run: RUN_BENCHMARKS=1 pytest tests/benchmarks --no-cov -v
+      # Runner hardware varies between runs; log it so a timing jump can be told
+      # apart from a code regression.
+      - run: lscpu | grep -E "Model name|^CPU\(s\)"
+      # --durations=0: print every test's time, passing ones included, so a drift
+      # is visible before it crosses a budget.
+      - run: RUN_BENCHMARKS=1 pytest tests/benchmarks --no-cov -v --durations=0

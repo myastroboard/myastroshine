@@ -144,17 +144,18 @@ pytest                 # test suite (target: 85%+ coverage)
 `pytest` includes `test_deps_fresh.py`, which queries PyPI/npm; it skips itself
 when offline or when `SKIP_DEPS_FRESH=1` is set.
 
-`tests/benchmarks/` (full-res enhance < 5s, slider response < 500ms, stacking
+`tests/benchmarks/` (full-res enhance < 12s, slider response < 500ms, stacking
 SNR gain ~sqrt(N)) is the opposite: skipped by default, since wall-clock
 budgets are sensitive to the machine running them. Run explicitly, without
 coverage (which measurably slows CPython down):
 
 ```bash
-RUN_BENCHMARKS=1 pytest tests/benchmarks --no-cov -v
+RUN_BENCHMARKS=1 pytest tests/benchmarks --no-cov -v --durations=0
 ```
 
 Runs weekly in CI (`.github/workflows/benchmarks.yml`) as a signal to
-investigate, not a merge gate.
+investigate, not a merge gate. `--durations=0` prints each test's time even when
+it passes, so a slow drift shows before it crosses the budget.
 
 `tests/regression/` is the opposite again: a handful of **golden-image**
 tests that run a small synthetic frame through the real enhancement/stacking
