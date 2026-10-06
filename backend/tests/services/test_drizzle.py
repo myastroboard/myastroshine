@@ -165,3 +165,19 @@ def test_drizzle_pass_resumes_after_a_crash(
 
     assert not registers  # resumed from the checkpoint
     assert result.composite.shape == (height * 2, width * 2, 3)
+
+
+def test_precomputed_reference_coords_match_the_matrix() -> None:
+    """Passing a frame's reference coordinates gives exactly the matrix result."""
+    from app.services.drizzle import affine_reference_coords
+
+    rng = np.random.default_rng(3)
+    frame = rng.random((12, 10, 3)).astype(np.float32)
+    matrix = np.array([[1.0, 0.0, 0.3], [0.0, 1.0, -0.2]])
+    by_matrix = (np.zeros((24, 20, 3), np.float32), np.zeros((24, 20), np.float32))
+    by_coords = (np.zeros((24, 20, 3), np.float32), np.zeros((24, 20), np.float32))
+    drizzle_accumulate(frame, matrix, 2, 1.0, *by_matrix)
+    coords = affine_reference_coords(matrix, 12, 10)
+    drizzle_accumulate(frame, np.eye(2, 3), 2, 1.0, *by_coords, reference_coords=coords)
+    assert np.allclose(by_matrix[0], by_coords[0])
+    assert np.allclose(by_matrix[1], by_coords[1])

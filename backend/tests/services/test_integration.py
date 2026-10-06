@@ -372,3 +372,54 @@ def test_a_distorted_wide_field_registers_with_a_polynomial_warp(
     monkeypatch.setattr(integration, "refine_warp", lambda *_args: None)
     rigid = stack("warp-off")
     assert refined < 0.6 * rigid
+
+
+def test_drizzle_rejects_with_the_warp_the_align_pass_used(
+    storage: StorageService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Drizzle's outlier rejection compares each input pixel with the median of
+    the warp-aligned frames, so it must place pixels with that same warp: placing
+    them with the global transform (as before) rejected clearly more star pixels
+    toward the field edges."""
+    from app.services import integration
+
+    shifts = (0.0, 15.0, 30.0, 45.0, 60.0)
+    for i, shift in enumerate(shifts):
+        storage.save_linear_frame("s", i, LinearFrame(data=_distorted_star_frame(shift)))
+
+    def star_rejection(legacy: bool) -> float:
+        rejected: list[float] = []
+        keep_fn = integration._drizzle_keep
+
+        def spy(
+            frame: np.ndarray, coords: tuple[np.ndarray, np.ndarray], *rest: object
+        ) -> np.ndarray:
+            keep = keep_fn(frame, coords, *rest)  # type: ignore[arg-type]
+            stars = frame.mean(axis=2) > 0.15
+            rejected.append(float(1.0 - keep[stars].mean()))
+            return keep
+
+        monkeypatch.setattr(integration, "_drizzle_keep", spy)
+        service = IntegrationService(storage)
+        if legacy:
+            drizzle = service._drizzle
+
+            def global_placement(stack_id: str, kept: list, *args: object, **kwargs: object):  # type: ignore[no-untyped-def]
+                for plan in kept:
+                    plan.warp = None
+                return drizzle(stack_id, kept, *args, **kwargs)
+
+            monkeypatch.setattr(service, "_drizzle", global_placement)
+        service.integrate(
+            "s",
+            list(range(len(shifts))),
+            transform="similarity",
+            combination="average",
+            rejection="sigma",
+            weighting="none",
+            drizzle=2,
+        )
+        monkeypatch.undo()
+        return float(np.mean(sorted(rejected)[1:]))  # the reference frame is not warped
+
+    assert star_rejection(legacy=False) < star_rejection(legacy=True) - 0.08

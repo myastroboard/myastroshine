@@ -20,7 +20,9 @@ single rotation + shift + scale can follow.
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 import cv2
 import numpy as np
@@ -78,14 +80,17 @@ class PolyWarp:
     """A smooth warp from reference-frame pixels to source-frame pixels.
 
     Coordinates are in the registration frame (``width`` x ``height``, the
-    half-resolution image star centroids were measured on); the polynomial takes
-    them normalised to ``[0, 1]``. It maps the *reference* grid to the *source*
-    (the direction ``cv2.remap`` needs). ``rms`` is the residual over the star
-    pairs, in source pixels.
+    half-resolution image star centroids were measured on); the polynomials take
+    them normalised to ``[0, 1]``. ``coeffs_*`` map the *reference* grid to the
+    *source* (the direction ``cv2.remap`` needs); ``forward_*`` map source to
+    reference (what drizzle needs: where each input pixel lands), fitted on the
+    same star pairs. ``rms`` is the residual over the pairs, in source pixels.
     """
 
     coeffs_x: np.ndarray
     coeffs_y: np.ndarray
+    forward_x: np.ndarray
+    forward_y: np.ndarray
     width: int
     height: int
     rms: float
@@ -95,6 +100,42 @@ class PolyWarp:
         terms = _warp_terms(xs / self.width, ys / self.height)
         return terms @ self.coeffs_x, terms @ self.coeffs_y
 
+    def reference_coords(self, xs: np.ndarray, ys: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """Reference pixel coordinates for source pixel coordinates ``(xs, ys)``."""
+        terms = _warp_terms(xs / self.width, ys / self.height)
+        return terms @ self.forward_x, terms @ self.forward_y
+
+    def reference_maps(
+        self, width: int, height: int, step: int = 8
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Where each pixel of a ``width`` x ``height`` source frame lands in the
+        reference, at that resolution (the drizzle counterpart of
+        :meth:`remap_maps`)."""
+        return _dense_maps(self.reference_coords, self.width, self.height, width, height, step)
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "coeffs_x": self.coeffs_x.tolist(),
+            "coeffs_y": self.coeffs_y.tolist(),
+            "forward_x": self.forward_x.tolist(),
+            "forward_y": self.forward_y.tolist(),
+            "width": self.width,
+            "height": self.height,
+            "rms": self.rms,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> PolyWarp:
+        return cls(
+            np.array(data["coeffs_x"], dtype=np.float64),
+            np.array(data["coeffs_y"], dtype=np.float64),
+            np.array(data["forward_x"], dtype=np.float64),
+            np.array(data["forward_y"], dtype=np.float64),
+            int(data["width"]),
+            int(data["height"]),
+            float(data["rms"]),
+        )
+
     def remap_maps(self, width: int, height: int, step: int = 8) -> tuple[np.ndarray, np.ndarray]:
         """``cv2.remap`` maps for an output of ``width`` x ``height`` pixels.
 
@@ -103,21 +144,36 @@ class PolyWarp:
         resolution ratio. The polynomial is smooth, so it is evaluated every
         ``step`` pixels and interpolated.
         """
-        scale_x, scale_y = width / self.width, height / self.height
-        # Coarse samples at output pixels 0, step, 2 step, ... (one past the edge).
-        grid_x = np.arange(0, width + step, step, dtype=np.float64)
-        grid_y = np.arange(0, height + step, step, dtype=np.float64)
-        xx, yy = np.meshgrid(grid_x, grid_y)
-        src_x, src_y = self.source_coords(xx.ravel() / scale_x, yy.ravel() / scale_y)
-        coarse_x = (src_x * scale_x).reshape(xx.shape).astype(np.float32)
-        coarse_y = (src_y * scale_y).reshape(xx.shape).astype(np.float32)
-        # Output pixel p lies at coarse index p / step: bilinear lookup there.
-        lookup_x, lookup_y = np.meshgrid(
-            np.arange(width, dtype=np.float32) / step, np.arange(height, dtype=np.float32) / step
-        )
-        map_x = cv2.remap(coarse_x, lookup_x, lookup_y, cv2.INTER_LINEAR)
-        map_y = cv2.remap(coarse_y, lookup_x, lookup_y, cv2.INTER_LINEAR)
-        return map_x, map_y
+        return _dense_maps(self.source_coords, self.width, self.height, width, height, step)
+
+
+def _dense_maps(
+    mapping: Callable[[np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray]],
+    reg_width: int,
+    reg_height: int,
+    width: int,
+    height: int,
+    step: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Evaluate a registration-frame ``mapping`` for every pixel of a ``width`` x
+    ``height`` image (coordinates scaled by the resolution ratio), on a coarse
+    grid every ``step`` pixels then bilinearly interpolated - the polynomials are
+    smooth, and evaluating them per pixel at 12 MP would cost gigabytes."""
+    scale_x, scale_y = width / reg_width, height / reg_height
+    # Coarse samples at output pixels 0, step, 2 step, ... (one past the edge).
+    grid_x = np.arange(0, width + step, step, dtype=np.float64)
+    grid_y = np.arange(0, height + step, step, dtype=np.float64)
+    xx, yy = np.meshgrid(grid_x, grid_y)
+    mapped_x, mapped_y = mapping(xx.ravel() / scale_x, yy.ravel() / scale_y)
+    coarse_x = (mapped_x * scale_x).reshape(xx.shape).astype(np.float32)
+    coarse_y = (mapped_y * scale_y).reshape(xx.shape).astype(np.float32)
+    # Output pixel p lies at coarse index p / step: bilinear lookup there.
+    lookup_x, lookup_y = np.meshgrid(
+        np.arange(width, dtype=np.float32) / step, np.arange(height, dtype=np.float32) / step
+    )
+    map_x = cv2.remap(coarse_x, lookup_x, lookup_y, cv2.INTER_LINEAR)
+    map_y = cv2.remap(coarse_y, lookup_x, lookup_y, cv2.INTER_LINEAR)
+    return map_x, map_y
 
 
 class StarMatchService:
@@ -199,7 +255,10 @@ def refine_warp(
     if warp_rms > _WARP_MIN_GAIN * global_rms:
         return None
 
-    warp = PolyWarp(coeffs_x, coeffs_y, width, height, warp_rms)
+    source_terms = _warp_terms(src_pts[keep, 0] / width, src_pts[keep, 1] / height)
+    forward_x, *_ = np.linalg.lstsq(source_terms, ref_pts[keep, 0], rcond=None)
+    forward_y, *_ = np.linalg.lstsq(source_terms, ref_pts[keep, 1], rcond=None)
+    warp = PolyWarp(coeffs_x, coeffs_y, forward_x, forward_y, width, height, warp_rms)
     grid_x, grid_y = np.meshgrid(
         np.linspace(0, width, _WARP_CHECK_GRID), np.linspace(0, height, _WARP_CHECK_GRID)
     )

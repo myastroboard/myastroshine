@@ -41,6 +41,9 @@ _MAX_SUB_IFDS = 16
 
 #: Below this fraction of non-sky pixels a frame is treated as all sky.
 _MIN_FOREGROUND_FRACTION = 0.01
+#: Below this fraction of sky pixels the mask is not used: too little sky to
+#: measure (an indoor shot, a matte that missed the sky).
+_MIN_SKY_FRACTION = 0.05
 _SKY_THRESHOLD = 0.5
 
 
@@ -53,7 +56,7 @@ def read_apple_sky_matte(data: bytes) -> np.ndarray | None:
     """
     try:
         return _read_sky_matte(data)
-    except struct.error, ValueError, IndexError, cv2.error:
+    except struct.error, ValueError, IndexError, KeyError, cv2.error:
         logger.warning("sky matte unreadable, ignoring it", size=len(data))
         return None
 
@@ -64,7 +67,9 @@ def fit_sky_mask(mask: np.ndarray | None, shape: tuple[int, ...]) -> np.ndarray 
     ``None`` when there is no mask, when its aspect ratio does not match the image
     (it belongs to something else - never stretch a mask onto the wrong frame), or
     when it marks (almost) nothing as foreground: an all-sky frame needs no mask,
-    and treating it as maskless keeps the deep-sky code path unchanged.
+    and treating it as maskless keeps the deep-sky code path unchanged. Also
+    ``None`` when it marks (almost) nothing as sky: every sky statistic would be
+    taken over an empty selection.
     """
     if mask is None or mask.ndim != 2:  # noqa: PLR2004 - a 2D mask
         return None
@@ -79,7 +84,8 @@ def fit_sky_mask(mask: np.ndarray | None, shape: tuple[int, ...]) -> np.ndarray 
         mask.astype(np.float32) / scale, (width, height), interpolation=cv2.INTER_LINEAR
     )
     sky = resized >= _SKY_THRESHOLD
-    if 1.0 - float(sky.mean()) < _MIN_FOREGROUND_FRACTION:
+    sky_fraction = float(sky.mean())
+    if 1.0 - sky_fraction < _MIN_FOREGROUND_FRACTION or sky_fraction < _MIN_SKY_FRACTION:
         return None
     return sky
 
@@ -98,8 +104,10 @@ def _read_sky_matte(data: bytes) -> np.ndarray | None:
         name = sub.get(_TAG_SEMANTIC_NAME)
         if not isinstance(name, bytes) or _SKY_MATTE_NAME not in name:
             continue
-        start = int(sub[_TAG_STRIP_OFFSETS][0])
-        length = int(sub[_TAG_STRIP_BYTE_COUNTS][0])
+        offsets, counts = sub.get(_TAG_STRIP_OFFSETS), sub.get(_TAG_STRIP_BYTE_COUNTS)
+        if not isinstance(offsets, list) or not isinstance(counts, list):
+            return None  # a tiled or otherwise unexpected layout: no mask, not an error
+        start, length = int(offsets[0]), int(counts[0])
         if start + length > len(data):
             return None
         matte = cv2.imdecode(np.frombuffer(data, np.uint8, length, start), cv2.IMREAD_GRAYSCALE)

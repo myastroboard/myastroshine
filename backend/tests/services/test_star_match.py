@@ -201,3 +201,24 @@ def test_warp_remap_maps_scale_to_a_larger_output() -> None:
         sx, sy = warp.source_coords(np.array([x / 2]), np.array([y / 2]))
         assert abs(float(map_x[y, x]) - 2 * float(sx[0])) < 0.05
         assert abs(float(map_y[y, x]) - 2 * float(sy[0])) < 0.05
+
+
+def test_the_forward_warp_inverts_the_backward_one() -> None:
+    """``reference_coords`` (source -> reference, for drizzle) undoes
+    ``source_coords`` (reference -> source, for remap) to well under a pixel,
+    and a warp round-trips through its dict form (the stack checkpoint)."""
+    source, reference, matrix = _shifted_distorted_pair(k=0.04)
+    warp = star_match.refine_warp(source, reference, matrix, (_H, _W))
+    assert warp is not None
+    xs, ys = np.meshgrid(np.linspace(60, _W - 60, 9), np.linspace(60, _H - 60, 9))
+    sx, sy = warp.source_coords(xs.ravel(), ys.ravel())
+    bx, by = warp.reference_coords(sx, sy)
+    assert float(np.max(np.hypot(bx - xs.ravel(), by - ys.ravel()))) < 0.1
+
+    restored = star_match.PolyWarp.from_dict(warp.to_dict())
+    assert np.array_equal(restored.forward_x, warp.forward_x)
+    assert restored.rms == warp.rms
+    map_x, map_y = warp.reference_maps(_W, _H)
+    rx, ry = warp.reference_coords(np.array([300.0]), np.array([400.0]))
+    assert abs(float(map_x[400, 300]) - float(rx[0])) < 0.05
+    assert abs(float(map_y[400, 300]) - float(ry[0])) < 0.05

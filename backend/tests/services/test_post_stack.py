@@ -618,3 +618,9 @@ def test_flatten_sky_colour_needs_enough_sky() -> None:
     sky = np.zeros((120, 160), dtype=bool)
     sky[:4] = True
     assert flatten_sky_colour(frame, sky) is frame
+
+
+def test_render_stack_base_survives_a_mask_with_no_sky() -> None:
+    """An all-landscape matte falls back to the maskless path instead of failing."""
+    out = render_stack_base(_linear_sky(120, 90), StackParameters(), np.zeros((30, 22), np.uint8))
+    assert np.isfinite(out).all()

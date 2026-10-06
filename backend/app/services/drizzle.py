@@ -21,6 +21,17 @@ _TINY = 1e-12
 _HALF = 0.5  # pixel-centre convention: cell C spans [C - 0.5, C + 0.5]
 
 
+def affine_reference_coords(
+    matrix: np.ndarray, height: int, width: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """Each pixel centre of a ``height`` x ``width`` frame mapped through a 2x3
+    affine ``matrix``: ``(x_ref, y_ref)``, float32."""
+    ys, xs = np.mgrid[0:height, 0:width].astype(np.float32)
+    x_ref = (matrix[0, 0] * xs + matrix[0, 1] * ys + matrix[0, 2]).astype(np.float32)
+    y_ref = (matrix[1, 0] * xs + matrix[1, 1] * ys + matrix[1, 2]).astype(np.float32)
+    return x_ref, y_ref
+
+
 def drizzle_accumulate(
     frame: np.ndarray,
     matrix: np.ndarray,
@@ -29,21 +40,26 @@ def drizzle_accumulate(
     flux: np.ndarray,
     weight: np.ndarray,
     keep: np.ndarray | None = None,
+    *,
+    reference_coords: tuple[np.ndarray, np.ndarray] | None = None,
 ) -> None:
     """Drop one ``(h, w, 3)`` frame into the ``(h*scale, w*scale, ...)`` accumulators.
 
     ``matrix`` (2x3) maps full-resolution frame pixel centres to full-resolution
     1x reference pixel centres; ``keep`` (``(h, w)`` bool) masks rejected input
     pixels. ``flux`` is ``(H, W, 3)`` and ``weight`` is ``(H, W)``, both float32.
+    ``reference_coords`` ``(x_ref, y_ref)`` - each input pixel's 1x reference
+    position, precomputed (a lens-distortion warp) - replaces ``matrix``.
     """
     height_in, width_in = frame.shape[:2]
     out_h, out_w = flux.shape[:2]
 
-    ys, xs = np.mgrid[0:height_in, 0:width_in]
-    xs = xs.astype(np.float32)
-    ys = ys.astype(np.float32)
-    x_out = (matrix[0, 0] * xs + matrix[0, 1] * ys + matrix[0, 2]) * scale
-    y_out = (matrix[1, 0] * xs + matrix[1, 1] * ys + matrix[1, 2]) * scale
+    if reference_coords is None:
+        x_ref, y_ref = affine_reference_coords(matrix, height_in, width_in)
+    else:
+        x_ref, y_ref = reference_coords
+    x_out = x_ref * scale
+    y_out = y_ref * scale
 
     half = _PIXFRAC * scale / 2.0
     x_lo, x_hi = x_out - half, x_out + half
