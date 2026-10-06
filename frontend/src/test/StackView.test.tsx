@@ -109,7 +109,7 @@ describe('StackView', () => {
     mocked.processStack.mockResolvedValue(RESULT);
   });
 
-  it('collects frames, uploads them in one batch, then stacks', async () => {
+  it('collects frames, uploads them, then stacks', async () => {
     const { container } = render(<StackView onEnhanceComposite={vi.fn()} />);
     await pickFramesAndUpload(container);
 
@@ -121,10 +121,16 @@ describe('StackView', () => {
       2,
       expect.objectContaining({ combinationMethod: 'average' }),
     );
-    expect(mocked.uploadStackFrames).toHaveBeenCalledWith('stack-1', 0, [
-      expect.any(File),
-      expect.any(File),
-    ]);
+    // Both frames sent, starting at index 0 (small uploads go one frame per request).
+    expect(mocked.uploadStackFrames).toHaveBeenCalledWith(
+      'stack-1',
+      0,
+      [expect.any(File)],
+      expect.any(Function),
+    );
+    expect(
+      mocked.uploadStackFrames.mock.calls.reduce((sum, call) => sum + call[2].length, 0),
+    ).toBe(2);
     expect(mocked.processStack).toHaveBeenCalledWith(
       'stack-1',
       expect.objectContaining({ combinationMethod: 'average' }),

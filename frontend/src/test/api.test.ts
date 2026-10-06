@@ -607,6 +607,79 @@ describe('stacking', () => {
     expect(form.getAll('files')).toHaveLength(2);
   });
 
+  describe('uploadStackFrames with progress (XMLHttpRequest)', () => {
+    class FakeXhr {
+      static last: FakeXhr;
+      upload: { onprogress: ((event: Partial<ProgressEvent>) => void) | null } = {
+        onprogress: null,
+      };
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      status = 0;
+      statusText = '';
+      responseText = '';
+      method = '';
+      url = '';
+      body: unknown = null;
+      constructor() {
+        FakeXhr.last = this;
+      }
+      open(method: string, url: string) {
+        this.method = method;
+        this.url = url;
+      }
+      send(body: unknown) {
+        this.body = body;
+      }
+    }
+
+    beforeEach(() => {
+      vi.stubGlobal('XMLHttpRequest', FakeXhr);
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      vi.stubGlobal('fetch', fetchMock);
+    });
+
+    it('reports the bytes sent and resolves the camelCased session', async () => {
+      const progress: [number, number][] = [];
+      const pending = apiClient.uploadStackFrames('st1', 4, [new File(['a'], 'a.fits')], (s, t) =>
+        progress.push([s, t]),
+      );
+      const xhr = FakeXhr.last;
+      expect(xhr.method).toBe('POST');
+      expect(xhr.url).toBe('/api/stack/st1/upload-frames');
+      expect((xhr.body as FormData).get('start_index')).toBe('4');
+      xhr.upload.onprogress?.({ lengthComputable: true, loaded: 30, total: 60 });
+      xhr.upload.onprogress?.({ lengthComputable: false, loaded: 0, total: 0 });
+      xhr.status = 202;
+      xhr.responseText = JSON.stringify({ stack_id: 'st1', received_frames: 5 });
+      xhr.onload?.();
+
+      await expect(pending).resolves.toMatchObject({ stackId: 'st1', receivedFrames: 5 });
+      expect(progress).toEqual([[30, 60]]);
+    });
+
+    it('turns an error answer into an ApiError', async () => {
+      const pending = apiClient.uploadStackFrames('st1', 0, [], () => undefined);
+      const xhr = FakeXhr.last;
+      xhr.status = 413;
+      xhr.statusText = 'Payload Too Large';
+      xhr.responseText = JSON.stringify({ error: { code: 'PAYLOAD_TOO_LARGE', message: 'too big' } });
+      xhr.onload?.();
+
+      await expect(pending).rejects.toMatchObject({ status: 413 });
+    });
+
+    it('rejects on a network failure', async () => {
+      const pending = apiClient.uploadStackFrames('st1', 0, [], () => undefined);
+      FakeXhr.last.onerror?.();
+
+      await expect(pending).rejects.toBeInstanceOf(TypeError);
+    });
+  });
+
   it('uploadStackFrames throws an ApiError on failure', async () => {
     fetchMock.mockResolvedValueOnce(textErrorResponse(500, 'boom'));
     await expect(apiClient.uploadStackFrames('st1', 0, [])).rejects.toMatchObject({ status: 500 });

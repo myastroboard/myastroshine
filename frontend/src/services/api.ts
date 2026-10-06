@@ -137,6 +137,43 @@ async function readError(response: Response): Promise<ApiError> {
   return error;
 }
 
+/** `(sent, total)` bytes of a request body on its way to the server. */
+export type UploadProgressFn = (sent: number, total: number) => void;
+
+/**
+ * POST a multipart form and report how much of it has been sent. `fetch` cannot
+ * observe an upload, so this one call uses XMLHttpRequest; errors come back as
+ * the same `ApiError` `fetch` callers get.
+ */
+function postFormWithProgress<T>(
+  url: string,
+  form: FormData,
+  onProgress: UploadProgressFn,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        onProgress(event.loaded, event.total);
+      }
+    };
+    xhr.onerror = () => reject(new TypeError('Failed to fetch'));
+    xhr.onload = () => {
+      const response = new Response(xhr.responseText, {
+        status: xhr.status,
+        statusText: xhr.statusText,
+      });
+      if (!response.ok) {
+        void readError(response).then(reject);
+        return;
+      }
+      resolve(fromServer<T>(JSON.parse(xhr.responseText)));
+    };
+    xhr.send(form);
+  });
+}
+
 interface RequestOptions {
   method?: string;
   json?: unknown;
@@ -530,15 +567,24 @@ export const apiClient = {
     return fromServer<UploadFrameResult>(await response.json());
   },
 
+  /** `onProgress`: report the bytes sent so far (switches to XMLHttpRequest). */
   async uploadStackFrames(
     stackId: string,
     startIndex: number,
     files: File[],
+    onProgress?: UploadProgressFn,
   ): Promise<StackSession> {
     const form = new FormData();
     form.append('start_index', String(startIndex));
     for (const file of files) {
       form.append('files', file);
+    }
+    if (onProgress) {
+      return postFormWithProgress<StackSession>(
+        `${API_URL}/stack/${stackId}/upload-frames`,
+        form,
+        onProgress,
+      );
     }
     const response = await fetch(`${API_URL}/stack/${stackId}/upload-frames`, {
       method: 'POST',
