@@ -31,6 +31,7 @@ _WIRE = {
         "background_extraction": 80,
         "color_calibration": False,
     },
+    "look": {"look_id": "cinematic", "amount": 45},
     "contrast": 1.5,
     "exposure": 0.1,
     "saturation": 1.2,
@@ -75,6 +76,15 @@ def test_all_wire_fields_round_trip() -> None:
     assert params.green_curve_points[1].y == 150
     assert params.blue_curve_points[1].y == 100
     assert params.model_dump() == _WIRE
+
+
+def test_look_defaults_to_none_and_rejects_unknown_ids() -> None:
+    """No look by default; an id outside the catalogue or an out-of-range amount is a 400."""
+    assert ProcessingParameters().look.look_id is None
+    with pytest.raises(ValidationError):
+        ProcessingParameters(look={"look_id": "starburst"})
+    with pytest.raises(ValidationError):
+        ProcessingParameters(look={"look_id": "vivid", "amount": -1})
 
 
 def test_curve_points_defaults_to_empty() -> None:

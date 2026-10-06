@@ -30,6 +30,10 @@ DenoiseEngine = Literal["classic", "deepsnr"]
 #: screen-transfer-function auto-stretch, kept for comparison and old edits.
 StretchMode = Literal["adaptive", "classic"]
 
+#: The "Style" step's looks (``app.services.looks``). Removing one later needs
+#: a migration path for stored sessions, like ``_RETIRED_KEYS``.
+LookId = Literal["vivid", "soft_glow", "cinematic"]
+
 
 class GeometryParameters(BaseModel):
     """Framing applied before enhancement: rotate, flip, straighten, crop.
@@ -87,6 +91,20 @@ class StackParameters(BaseModel):
     color_calibration: bool = True
 
 
+class LookParameters(BaseModel):
+    """The optional finishing look, applied last (``app.services.looks``).
+
+    ``look_id = None`` (the default) is no look at all: the output is
+    byte-identical to an edit without this step. ``amount`` (0-100) scales every
+    operation of the look; 0 is also an identity. Presets never carry a look.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    look_id: LookId | None = None
+    amount: int = Field(default=60, ge=0, le=100)
+
+
 #: Fields removed from ``ProcessingParameters`` over time. Dropped on the way in
 #: (see ``_drop_retired_keys``) so a stored preset / session parameter set from
 #: an older version still loads instead of failing ``extra="forbid"``.
@@ -113,6 +131,7 @@ class ProcessingParameters(BaseModel):
 
     geometry: GeometryParameters = Field(default_factory=GeometryParameters)
     stack: StackParameters = Field(default_factory=StackParameters)
+    look: LookParameters = Field(default_factory=LookParameters)
     contrast: float = Field(default=1.0, ge=0.5, le=3.0)
     exposure: float = Field(default=0.0, ge=-1.0, le=1.0)
     saturation: float = Field(default=1.0, ge=0.0, le=2.0)

@@ -19,7 +19,7 @@ from app.exceptions import (
     ResourceNotFoundError,
 )
 from app.logging_config import get_logger
-from app.models import PresetOut, ProcessingParameters
+from app.models import LookParameters, PresetOut, ProcessingParameters
 from app.types import JsonDict
 
 logger = get_logger(__name__)
@@ -189,7 +189,9 @@ class PresetService:
             name=name,
             category=category,
             description=description,
-            parameters=parameters.model_dump(),
+            # A preset is a starting point; the "Style" look is always chosen at
+            # the end of an edit, so it is never stored in a preset.
+            parameters=parameters.model_copy(update={"look": LookParameters()}).model_dump(),
             author="user",
             is_favorite=False,
         )

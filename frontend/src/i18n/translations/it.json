@@ -96,6 +96,7 @@
       "detail": "Dettaglio",
       "stars": "Stelle",
       "depth": "Effetto 3D",
+      "style": "Stile",
       "export": "Esporta",
       "phase": {
         "prepare": "Preparare",
@@ -113,6 +114,7 @@
         "detail": "Nitidezza, grana",
         "stars": "Ridurle o rimuoverle",
         "depth": "Parallasse animata",
+        "style": "Tocco finale facoltativo",
         "export": "Scarica o condividi"
       }
     },
@@ -156,6 +158,10 @@
         "help": "Trasforma la tua immagine in un delicato effetto 3D animato.",
         "more": "Scegli il punto focale, poi apri il visualizzatore Depth Shift per un'anteprima interattiva di parallasse."
       },
+      "style": {
+        "help": "Facoltativo: dai alla tua immagine uno stile finale per condividerla. Tocca uno stile, poi regolane l'intensità.",
+        "more": "Ogni stile rielabora solo la luce registrata dalla fotocamera - contrasto, colore, un bagliore morbido intorno alle zone luminose. Nulla viene inventato: nessuna stella aggiunta, nessun falso dettaglio. Puoi sempre scaricare l'immagine senza stile nel passaggio Esporta."
+      },
       "export": {
         "help": "Salva la tua immagine o conserva queste impostazioni per le prossime foto."
       }
@@ -195,11 +201,44 @@
     "returned": "Aggiunta all'oggetto Astrodex come nuova immagine.",
     "return_hint": "Aggiunge una copia all'oggetto Astrodex con l'immagine migliorata - l'originale viene conservato.",
     "return_hint_named": "Aggiunge una copia a '{object}' nell'Astrodex con l'immagine migliorata - l'originale viene conservato.",
+    "return_style_hint": "Viene inviata con lo stile '{style}'.",
     "return_failed": "Impossibile rinviare ad Astrodex: {error}",
     "ready_title": "La tua immagine è pronta",
     "recap": "Ritoccato: {steps}",
     "recap_none": "Ancora nessuna regolazione - è l'originale.",
-    "result_alt": "La tua immagine ritoccata"
+    "result_alt": "La tua immagine ritoccata",
+    "style": {
+      "aria": "Stile dell'immagine scaricata",
+      "with": "Con stile ({style})",
+      "without": "Senza stile",
+      "hint": "Un'immagine con stile ne riporta il nome nelle informazioni del file."
+    }
+  },
+  "style_panel": {
+    "gallery_aria": "Stili di finitura",
+    "none": {
+      "name": "Nessuno stile",
+      "hint": "La tua immagine esattamente come l'hai modificata, senza stile finale."
+    },
+    "looks": {
+      "vivid": {
+        "name": "Vivido",
+        "hint": "Un cielo più nero, strutture più marcate e colori più ricchi sul soggetto."
+      },
+      "soft_glow": {
+        "name": "Bagliore morbido",
+        "hint": "Un bagliore sognante intorno alle zone luminose, su un cielo più scuro."
+      },
+      "cinematic": {
+        "name": "Cinema",
+        "hint": "Uno sfondo freddo, un soggetto caldo e una leggera vignettatura - atmosfera da locandina."
+      }
+    },
+    "amount": {
+      "label": "Intensità",
+      "hint": "Quanto forte si applica lo stile."
+    },
+    "honest_note": "Gli stili rielaborano solo la luce catturata - non viene aggiunto nulla."
   },
   "image_preview": {
     "processed_alt": "Elaborata",

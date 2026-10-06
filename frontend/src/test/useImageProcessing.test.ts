@@ -656,6 +656,33 @@ describe('useImageProcessing.trackJob', () => {
     );
   });
 
+  it('updateLook updates the style live and defers the render like a slider', async () => {
+    mocked.processImage.mockResolvedValue({
+      sessionId: 's1',
+      jobId: 'job-1',
+      status: 'queued',
+      previewUrl: '/api/preview/s1',
+      estimatedTimeSeconds: 8,
+      wsStatusUrl: '/ws/processing-status/job-1',
+    });
+    const { result } = renderHook(() => useImageProcessing('s1'));
+
+    act(() => result.current.updateLook('lookId', 'soft_glow'));
+    act(() => result.current.updateLook('amount', 35));
+    expect(result.current.parameters.look).toEqual({ lookId: 'soft_glow', amount: 35 });
+    expect(mocked.processImage).not.toHaveBeenCalled();
+
+    await act(async () => {
+      document.dispatchEvent(new Event('pointerup'));
+    });
+
+    await waitFor(() => expect(mocked.processImage).toHaveBeenCalledTimes(1));
+    expect(mocked.processImage).toHaveBeenCalledWith(
+      's1',
+      expect.objectContaining({ look: { lookId: 'soft_glow', amount: 35 } }),
+    );
+  });
+
   it('updateChannelCurve stores points on the field for the given channel and defers the render', async () => {
     mocked.processImage.mockResolvedValue({
       sessionId: 's1',

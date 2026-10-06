@@ -96,6 +96,7 @@
       "detail": "Detail",
       "stars": "Sterne",
       "depth": "3D-Effekt",
+      "style": "Stil",
       "export": "Export",
       "phase": {
         "prepare": "Vorbereiten",
@@ -113,6 +114,7 @@
         "detail": "Schärfe, Rauschen",
         "stars": "Verkleinern oder entfernen",
         "depth": "Animierte Parallaxe",
+        "style": "Optionaler letzter Schliff",
         "export": "Herunterladen oder teilen"
       }
     },
@@ -156,6 +158,10 @@
         "help": "Verwandeln Sie Ihr Bild in einen sanften animierten 3D-Effekt.",
         "more": "Wählen Sie den Brennpunkt, dann öffnen Sie den Depth-Shift-Betrachter für eine interaktive Parallaxenvorschau."
       },
+      "style": {
+        "help": "Optional: Gib deinem Bild zum Teilen einen abschließenden Stil. Tippe auf einen Stil und stelle dann seine Stärke ein.",
+        "more": "Jeder Stil bearbeitet nur das Licht, das deine Kamera aufgenommen hat - Kontrast, Farbe, ein sanftes Leuchten um die hellen Bereiche. Nichts wird erfunden: keine hinzugefügten Sterne, keine falschen Details. Im Schritt Export kannst du das Bild weiterhin ohne Stil herunterladen."
+      },
       "export": {
         "help": "Speichern Sie Ihr Bild oder behalten Sie diese Einstellungen für die nächsten Fotos."
       }
@@ -195,11 +201,44 @@
     "returned": "Als neues Bild zum Astrodex-Objekt hinzugefügt.",
     "return_hint": "Fügt dem Astrodex-Objekt eine Kopie mit Ihrem verbesserten Bild hinzu - das Original bleibt erhalten.",
     "return_hint_named": "Fügt zu '{object}' im Astrodex eine Kopie mit Ihrem verbesserten Bild hinzu - das Original bleibt erhalten.",
+    "return_style_hint": "Es wird mit dem Stil '{style}' gesendet.",
     "return_failed": "Rücksendung an Astrodex fehlgeschlagen: {error}",
     "ready_title": "Ihr Bild ist fertig",
     "recap": "Bearbeitet: {steps}",
     "recap_none": "Noch keine Anpassungen - das ist das Original.",
-    "result_alt": "Ihr bearbeitetes Bild"
+    "result_alt": "Ihr bearbeitetes Bild",
+    "style": {
+      "aria": "Stil des heruntergeladenen Bildes",
+      "with": "Mit Stil ({style})",
+      "without": "Ohne Stil",
+      "hint": "Ein Bild mit Stil nennt den Stil in den Dateiinformationen."
+    }
+  },
+  "style_panel": {
+    "gallery_aria": "Abschließende Stile",
+    "none": {
+      "name": "Kein Stil",
+      "hint": "Dein Bild genau so, wie du es bearbeitet hast, ohne abschließenden Stil."
+    },
+    "looks": {
+      "vivid": {
+        "name": "Lebendig",
+        "hint": "Ein tieferer schwarzer Himmel, stärkere Strukturen und kräftigere Farben am Objekt."
+      },
+      "soft_glow": {
+        "name": "Sanftes Leuchten",
+        "hint": "Ein verträumtes Leuchten um die hellen Bereiche, auf einem dunkleren Himmel."
+      },
+      "cinematic": {
+        "name": "Kino",
+        "hint": "Ein kühler Hintergrund, ein warmes Motiv und eine sanfte Vignette - Filmplakat-Stimmung."
+      }
+    },
+    "amount": {
+      "label": "Stärke",
+      "hint": "Wie stark der Stil wirkt."
+    },
+    "honest_note": "Stile bearbeiten nur das aufgenommene Licht - es wird nichts hinzugefügt."
   },
   "image_preview": {
     "processed_alt": "Bearbeitet",

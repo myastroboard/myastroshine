@@ -20,6 +20,9 @@ original Keep a Changelog headings.
   Phone ProRAW keeps the phone's white balance and stacks with equal weights.
 - Stacking follows wide-angle lens distortion: stars stay sharp across the whole stack instead of
   turning into short streaks toward the corners.
+- New optional "Style" step before Export: Vivid, Soft glow or Cinematic finishing looks from a
+  gallery of your own image, one strength slider, nothing invented. See docs/ALGORITHMS.md "Looks".
+  The Astrodex copy carries the style, and its parameters gain a `look` key (myastroboard).
 
 ### Fixes
 

@@ -12,6 +12,7 @@ import {
   SparkleIcon,
   StarIcon,
   SunIcon,
+  WandIcon,
   type IconProps,
 } from '@/components/icons';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -40,6 +41,7 @@ export const STEP_ICONS: Record<EditorStepId, ComponentType<IconProps>> = {
   detail: FocusIcon,
   stars: StarIcon,
   depth: DepthIcon,
+  style: WandIcon,
   export: DownloadIcon,
 };
 

@@ -119,7 +119,9 @@ POST /api/process/{session}          (also: preset apply, Auto Astro)
   -> EnhancementService.run()             (background thread)
        - ImageProcessingService.apply_parameters() walks the pipeline
          (geometry -> sky/optics -> tone -> curves -> colour -> detail -> stars),
-         calling on_step(name, percent) at each stage
+         calling on_step(name, percent) at each stage - skipped when only the
+         "Style" look changed (the stored pre-look result is reused)
+       - ImageProcessingService.apply_look() adds the optional "Style" look last
        - each on_step updates the JobRecord and publishes a progress event
        - StorageService writes processed.jpg + preview.jpg; parameters are saved
          on the session
@@ -214,6 +216,8 @@ Everything hangs off `DATA_DIR` (`/data` in the container):
     original.jpg              full-resolution upload
     processed.jpg             full-resolution latest result
     preview.jpg               downscaled result (fast display)
+    prelook.npy / .json       lossless result before its "Style" look + the edit key
+    prelook_thumb.png         ~400 px copy, source of the Style gallery thumbnails
     depth/depth_map.png
     depth/layer_<n>.png       BGRA parallax layers, far (0) to near
   stacks/<stack>/

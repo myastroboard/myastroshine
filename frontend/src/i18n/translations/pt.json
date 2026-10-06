@@ -96,6 +96,7 @@
       "detail": "Detalhe",
       "stars": "Estrelas",
       "depth": "Efeito 3D",
+      "style": "Estilo",
       "export": "Exportar",
       "phase": {
         "prepare": "Preparar",
@@ -113,6 +114,7 @@
         "detail": "Nitidez, grão",
         "stars": "Reduzi-las ou removê-las",
         "depth": "Paralaxe animada",
+        "style": "Toque final opcional",
         "export": "Descarregar ou partilhar"
       }
     },
@@ -156,6 +158,10 @@
         "help": "Transforme a sua imagem num suave efeito 3D animado.",
         "more": "Escolha o ponto focal e depois abra o visualizador Depth Shift para uma pré-visualização interativa de paralaxe."
       },
+      "style": {
+        "help": "Opcional: dê à sua imagem um estilo final para partilhar. Toque num estilo e depois ajuste a intensidade.",
+        "more": "Cada estilo apenas retrabalha a luz que a sua câmara registou - contraste, cor, um brilho suave à volta das zonas claras. Nada é inventado: nenhuma estrela adicionada, nenhum detalhe falso. Pode sempre descarregar a imagem sem estilo no passo Exportar."
+      },
       "export": {
         "help": "Guarde a sua imagem ou mantenha estas definições para as próximas fotos."
       }
@@ -195,11 +201,44 @@
     "returned": "Adicionada ao objeto Astrodex como nova imagem.",
     "return_hint": "Adiciona uma cópia ao objeto Astrodex com a sua imagem melhorada - o original é mantido.",
     "return_hint_named": "Adiciona uma cópia a '{object}' no Astrodex com a sua imagem melhorada - o original é mantido.",
+    "return_style_hint": "É enviada com o estilo '{style}'.",
     "return_failed": "Não foi possível reenviar para o Astrodex: {error}",
     "ready_title": "A sua imagem está pronta",
     "recap": "Retocado: {steps}",
     "recap_none": "Ainda sem ajustes - é a original.",
-    "result_alt": "A sua imagem retocada"
+    "result_alt": "A sua imagem retocada",
+    "style": {
+      "aria": "Estilo da imagem descarregada",
+      "with": "Com estilo ({style})",
+      "without": "Sem estilo",
+      "hint": "Uma imagem com estilo indica o estilo nos dados do ficheiro."
+    }
+  },
+  "style_panel": {
+    "gallery_aria": "Estilos de acabamento",
+    "none": {
+      "name": "Sem estilo",
+      "hint": "A sua imagem exatamente como a editou, sem estilo final."
+    },
+    "looks": {
+      "vivid": {
+        "name": "Vívido",
+        "hint": "Um céu mais negro, estruturas mais marcadas e cores mais ricas no seu alvo."
+      },
+      "soft_glow": {
+        "name": "Brilho suave",
+        "hint": "Um brilho sonhador à volta das zonas claras, num céu mais escuro."
+      },
+      "cinematic": {
+        "name": "Cinema",
+        "hint": "Um fundo frio, um motivo quente e uma vinheta suave - ambiente de cartaz de cinema."
+      }
+    },
+    "amount": {
+      "label": "Intensidade",
+      "hint": "A força com que o estilo se aplica."
+    },
+    "honest_note": "Os estilos apenas retrabalham a luz captada - nada é adicionado."
   },
   "image_preview": {
     "processed_alt": "Processada",

@@ -23,12 +23,14 @@ from app import __version__
 from app.db.models import AstroDexLink, SessionRecord, WebhookToken
 from app.exceptions import ForbiddenError, ResourceNotFoundError, UnauthorizedError, UpstreamError
 from app.logging_config import get_logger
+from app.models import LookParameters
 from app.services.astrodex_integration import (
     canonical_json,
     decode_handoff_claims,
     sign_enhanced_upload,
     verify_handoff,
 )
+from app.services.looks import look_description
 from app.services.session import SessionService
 from app.services.storage import StorageService
 from app.types import JsonDict
@@ -166,7 +168,12 @@ class AstroDexHandoffService:
             "parameters": session.parameters if session and session.parameters else {},
             "myastroshine_version": __version__,
         }
-        image_bytes = image_utils.encode_image(self.storage.load_processed(session_id), "jpeg", 92)
+        # The version the user sees - with its "Style" look, if any, named in
+        # the file's metadata.
+        look = LookParameters.model_validate(payload["parameters"].get("look") or {})
+        image_bytes = image_utils.encode_image_described(
+            self.storage.load_processed(session_id), "jpeg", 92, look_description(look)
+        )
         secret = self._signing_secret(
             str(decode_handoff_claims(link.handoff_token).get("kid") or "")
         )

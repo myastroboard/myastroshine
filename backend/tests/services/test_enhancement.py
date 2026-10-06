@@ -9,7 +9,7 @@ import pytest
 
 from app.db.models import StackRecord
 from app.exceptions import SessionNotFoundError, UnsupportedImageError
-from app.models import ProcessingParameters, StackParameters
+from app.models import LookParameters, ProcessingParameters, StackParameters
 from app.services.enhancement import EnhancementService
 from app.services.image_processing import ImageProcessingService
 from app.services.job import JobService
@@ -545,3 +545,63 @@ def test_run_stops_and_fails_the_job_when_the_server_shuts_down(
     failed = enhancement.jobs.get(job.job_id)
     assert failed.status == "failed"
     assert failed.error == "interrupted by a server shutdown"
+
+
+def test_run_reuses_the_pre_look_render_when_only_the_look_changes(
+    enhancement: EnhancementService, sample_image: np.ndarray, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Changing only the look (or its amount) re-applies the look on the stored
+    pre-look render instead of re-running the pipeline - with the same result a
+    full render gives."""
+    record = enhancement.sessions.create_session(image_path="")
+    enhancement.storage.save_original(record.session_id, sample_image)
+    renders: list[ProcessingParameters] = []
+    real_render = enhancement._render
+
+    def counting_render(*args, **kwargs):  # type: ignore[no-untyped-def]
+        renders.append(args[1])
+        return real_render(*args, **kwargs)
+
+    monkeypatch.setattr(enhancement, "_render", counting_render)
+
+    def run(params: ProcessingParameters) -> np.ndarray:
+        job = enhancement.jobs.create(record.session_id)
+        enhancement.run(record.session_id, params, job.job_id)
+        return enhancement.storage.load_processed(record.session_id)
+
+    run(ProcessingParameters(contrast=1.4))
+    cached = run(
+        ProcessingParameters(contrast=1.4, look=LookParameters(look_id="cinematic", amount=80))
+    )
+    assert len(renders) == 1
+    run(ProcessingParameters(contrast=1.4, look=LookParameters(look_id="cinematic", amount=30)))
+    assert len(renders) == 1
+
+    run(ProcessingParameters(contrast=1.6, look=LookParameters(look_id="cinematic", amount=80)))
+    assert len(renders) == 2
+
+    # The cached path matches a cold render of the same edit.
+    enhancement.storage.prelook_path(record.session_id).unlink()
+    fresh = run(
+        ProcessingParameters(contrast=1.4, look=LookParameters(look_id="cinematic", amount=80))
+    )
+    assert len(renders) == 3
+    assert np.array_equal(cached, fresh)
+
+
+def test_run_keeps_the_pre_look_render_for_export_without_the_look(
+    enhancement: EnhancementService, sample_image: np.ndarray
+) -> None:
+    """The stored pre-look image is the edit without its look."""
+    record = enhancement.sessions.create_session(image_path="")
+    enhancement.storage.save_original(record.session_id, sample_image)
+    job = enhancement.jobs.create(record.session_id)
+    params = ProcessingParameters(contrast=1.4, look=LookParameters(look_id="vivid"))
+    enhancement.run(record.session_id, params, job.job_id)
+
+    prelook = enhancement.storage.load_prelook(record.session_id)
+    expected = ImageProcessingService().apply_parameters(
+        enhancement.storage.load_original(record.session_id), ProcessingParameters(contrast=1.4)
+    )
+    assert prelook is not None
+    assert np.array_equal(prelook, expected)

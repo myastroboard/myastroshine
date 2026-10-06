@@ -135,6 +135,18 @@ export function DownloadIcon(props: IconProps) {
 
 // -- Preset subjects ----------------------------------------------------------
 
+/** The "Style" step: a wand with a spark - a finishing touch. */
+export function WandIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 20 14.5 9.5" />
+      <path d="M12.5 7.5l4 4" />
+      <path d="M18 2.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z" />
+      <path d="M7 4v2M6 5h2" />
+    </Icon>
+  );
+}
+
 export function NebulaIcon(props: IconProps) {
   return (
     <Icon {...props}>

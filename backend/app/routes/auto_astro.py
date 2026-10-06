@@ -50,11 +50,13 @@ def apply_auto_astro(
     parameters = auto_astro.suggest_parameters(image)
 
     # Auto Astro proposes tone and star settings; framing (crop / rotate /
-    # straighten / flip) is composition, not a look, so carry the session's
-    # current geometry through rather than silently resetting the user's crop.
+    # straighten / flip) is composition and the "Style" look a final choice, so
+    # carry both through rather than silently resetting the user's crop or look.
     if session.parameters:
         current = ProcessingParameters.model_validate(session.parameters)
-        parameters = parameters.model_copy(update={"geometry": current.geometry})
+        parameters = parameters.model_copy(
+            update={"geometry": current.geometry, "look": current.look}
+        )
 
     client_ip = get_client_ip(http_request)
     result = enhancement.dispatch(session_id, parameters, client_ip)

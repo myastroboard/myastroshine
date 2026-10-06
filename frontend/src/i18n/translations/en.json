@@ -96,6 +96,7 @@
       "detail": "Detail",
       "stars": "Stars",
       "depth": "3D effect",
+      "style": "Style",
       "export": "Export",
       "phase": {
         "prepare": "Prepare",
@@ -113,6 +114,7 @@
         "detail": "Sharpen, remove grain",
         "stars": "Shrink or remove them",
         "depth": "Animated parallax",
+        "style": "Optional finishing touch",
         "export": "Download or share"
       }
     },
@@ -156,6 +158,10 @@
         "help": "Turn your image into a gentle animated 3D effect.",
         "more": "Pick the focal point, then open the Depth Shift viewer for an interactive parallax preview."
       },
+      "style": {
+        "help": "Optional: give your image a finishing style for sharing. Tap a style, then set its strength.",
+        "more": "Each style only reworks the light your camera recorded - contrast, colour, a soft glow from the bright parts. Nothing is invented: no added stars, no fake detail. You can still download the image without its style in the Export step."
+      },
       "export": {
         "help": "Save your image, or keep these settings for your next photos."
       }
@@ -195,11 +201,44 @@
     "returned": "Added to the Astrodex object as a new picture.",
     "return_hint": "Adds a copy to the Astrodex object with your enhanced image - the original is kept.",
     "return_hint_named": "Adds a copy to '{object}' in the Astrodex with your enhanced image - the original is kept.",
+    "return_style_hint": "It is sent with the style '{style}'.",
     "return_failed": "Could not send back to Astrodex: {error}",
     "ready_title": "Your image is ready",
     "recap": "Touched up: {steps}",
     "recap_none": "No adjustments yet - it is the original.",
-    "result_alt": "Your edited image"
+    "result_alt": "Your edited image",
+    "style": {
+      "aria": "Style of the downloaded image",
+      "with": "With style ({style})",
+      "without": "Without style",
+      "hint": "A styled image names its style in the file details."
+    }
+  },
+  "style_panel": {
+    "gallery_aria": "Finishing styles",
+    "none": {
+      "name": "No style",
+      "hint": "Your image exactly as you edited it, with no finishing style."
+    },
+    "looks": {
+      "vivid": {
+        "name": "Vivid",
+        "hint": "A deeper black sky, stronger structure and richer colours on your target."
+      },
+      "soft_glow": {
+        "name": "Soft glow",
+        "hint": "A dreamy glow around the bright parts, on a darker sky."
+      },
+      "cinematic": {
+        "name": "Cinematic",
+        "hint": "A cool background, a warm subject and a gentle vignette - a movie-poster mood."
+      }
+    },
+    "amount": {
+      "label": "Strength",
+      "hint": "How strongly the style applies."
+    },
+    "honest_note": "Styles only rework the light you captured - nothing is added."
   },
   "image_preview": {
     "processed_alt": "Processed",

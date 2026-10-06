@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_GEOMETRY, DEFAULT_PARAMETERS, parametersEqual } from '@/types';
 
+const withLook = (lookId: 'vivid' | 'soft_glow', amount = 60) => ({
+  ...DEFAULT_PARAMETERS,
+  look: { lookId, amount },
+});
+
 describe('parametersEqual', () => {
   it('is true for two untouched default parameter sets', () => {
     expect(parametersEqual(DEFAULT_PARAMETERS, { ...DEFAULT_PARAMETERS })).toBe(true);
@@ -74,5 +79,11 @@ describe('parametersEqual', () => {
         ],
       }),
     ).toBe(false);
+  });
+
+  it('compares the finishing style and its amount', () => {
+    expect(parametersEqual(withLook('vivid'), withLook('vivid'))).toBe(true);
+    expect(parametersEqual(withLook('vivid'), withLook('soft_glow'))).toBe(false);
+    expect(parametersEqual(withLook('vivid', 60), withLook('vivid', 30))).toBe(false);
   });
 });

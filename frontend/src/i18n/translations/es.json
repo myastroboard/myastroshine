@@ -96,6 +96,7 @@
       "detail": "Detalle",
       "stars": "Estrellas",
       "depth": "Efecto 3D",
+      "style": "Estilo",
       "export": "Exportar",
       "phase": {
         "prepare": "Preparar",
@@ -113,6 +114,7 @@
         "detail": "Nitidez, grano",
         "stars": "Reducirlas o quitarlas",
         "depth": "Paralaje animado",
+        "style": "Toque final opcional",
         "export": "Descargar o compartir"
       }
     },
@@ -156,6 +158,10 @@
         "help": "Convierte tu imagen en un suave efecto 3D animado.",
         "more": "Elija el punto focal y luego abra el visor Depth Shift para una vista previa interactiva de paralaje."
       },
+      "style": {
+        "help": "Opcional: da a tu imagen un estilo final para compartirla. Toca un estilo y luego ajusta su intensidad.",
+        "more": "Cada estilo solo retoca la luz que registró tu cámara - contraste, color, un brillo suave alrededor de las zonas luminosas. No se inventa nada: ni estrellas añadidas ni detalles falsos. Puedes seguir descargando la imagen sin su estilo en el paso Exportar."
+      },
       "export": {
         "help": "Guarda tu imagen o conserva estos ajustes para tus próximas fotos."
       }
@@ -195,11 +201,44 @@
     "returned": "Añadida al objeto de Astrodex como nueva imagen.",
     "return_hint": "Añade una copia al objeto de Astrodex con su imagen mejorada - se conserva la original.",
     "return_hint_named": "Añade una copia a '{object}' en Astrodex con su imagen mejorada - se conserva la original.",
+    "return_style_hint": "Se envía con el estilo '{style}'.",
     "return_failed": "No se pudo reenviar a Astrodex: {error}",
     "ready_title": "Tu imagen está lista",
     "recap": "Retocado: {steps}",
     "recap_none": "Aún sin ajustes - es la original.",
-    "result_alt": "Tu imagen retocada"
+    "result_alt": "Tu imagen retocada",
+    "style": {
+      "aria": "Estilo de la imagen descargada",
+      "with": "Con estilo ({style})",
+      "without": "Sin estilo",
+      "hint": "Una imagen con estilo indica su estilo en los datos del archivo."
+    }
+  },
+  "style_panel": {
+    "gallery_aria": "Estilos de acabado",
+    "none": {
+      "name": "Sin estilo",
+      "hint": "Tu imagen exactamente como la editaste, sin estilo final."
+    },
+    "looks": {
+      "vivid": {
+        "name": "Vívido",
+        "hint": "Un cielo más negro, estructuras más marcadas y colores más ricos en tu objetivo."
+      },
+      "soft_glow": {
+        "name": "Brillo suave",
+        "hint": "Un brillo de ensueño alrededor de las zonas luminosas, sobre un cielo más oscuro."
+      },
+      "cinematic": {
+        "name": "Cine",
+        "hint": "Un fondo frío, un sujeto cálido y una viñeta suave - ambiente de cartel de cine."
+      }
+    },
+    "amount": {
+      "label": "Intensidad",
+      "hint": "Con qué fuerza se aplica el estilo."
+    },
+    "honest_note": "Los estilos solo retocan la luz captada - no se añade nada."
   },
   "image_preview": {
     "processed_alt": "Procesada",

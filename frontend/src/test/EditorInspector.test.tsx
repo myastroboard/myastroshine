@@ -66,6 +66,11 @@ function makeProps(overrides: Partial<EditorInspectorProps> = {}): EditorInspect
       onOpenViewer: vi.fn(),
       error: null,
     },
+    style: {
+      thumbnailUrl: (look) => `/thumb/${look ?? 'none'}`,
+      onLookChange: vi.fn(),
+      onReset: vi.fn(),
+    },
     exportActions: {
       canReturnToAstroDex: false,
       astrodexObjectName: null,
@@ -438,6 +443,41 @@ describe('EditorInspector', () => {
 
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(screen.getByText('Auto Astro failed: boom')).toBeInTheDocument();
+  });
+
+  it('renders the style step and resets a chosen look from the header', () => {
+    const onReset = vi.fn();
+    const base = makeProps({ activeStep: 'style' });
+    const { rerender } = render(<EditorInspector {...base} />);
+
+    expect(screen.getByRole('heading', { name: 'Style' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'No style' })).toHaveAttribute('aria-checked', 'true');
+    // Nothing chosen yet: nothing to reset.
+    expect(screen.queryByRole('button', { name: 'Reset' })).not.toBeInTheDocument();
+
+    rerender(
+      <EditorInspector
+        {...base}
+        parameters={{ ...DEFAULT_PARAMETERS, look: { lookId: 'vivid', amount: 60 } }}
+        style={{ ...base.style, onReset }}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
+    expect(onReset).toHaveBeenCalled();
+  });
+
+  it('offers the export without its style when a look is active', () => {
+    render(
+      <EditorInspector
+        {...makeProps({
+          activeStep: 'export',
+          parameters: { ...DEFAULT_PARAMETERS, look: { lookId: 'cinematic', amount: 60 } },
+        })}
+      />,
+    );
+
+    expect(screen.getByRole('radio', { name: 'With style (Cinematic)' })).toBeInTheDocument();
+    expect(screen.getByText('Touched up: Style')).toBeInTheDocument();
   });
 
   it('recaps on the export step which steps changed the image', () => {

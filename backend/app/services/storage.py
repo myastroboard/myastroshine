@@ -5,6 +5,9 @@ Layout (per docs/ARCHITECTURE):
         original.jpg      full-resolution upload
         processed.jpg     full-resolution latest result
         preview.jpg       downscaled processed image (fast display)
+        prelook.npy       lossless full-res result *before* the "Style" look
+        prelook.json      {"key": ...} - the edit that produced prelook.npy
+        prelook_thumb.png downscaled prelook, the Style gallery's source
         depth/depth_map.png
         depth/layer_{n}.png    BGRA parallax layers, far (0) to near
 """
@@ -37,6 +40,9 @@ _CALIBRATION_KINDS = ("dark", "flat", "bias", "dark_flat")
 _FRAME_STORE_SCALE = 65535.0
 _FLOAT_STORE_BIT_DEPTH = 32
 _UINT8_MAX = 255.0
+#: Longest edge of the Style gallery's source image: two thumbnails side by side
+#: on a phone at 2x density.
+PRELOOK_THUMB_MAX_SIZE = 400
 
 
 @dataclass(frozen=True)
@@ -126,6 +132,53 @@ class StorageService:
 
     def load_processed(self, session_id: str) -> np.ndarray:
         return image_utils.load_image(self.processed_path(session_id))
+
+    # -- pre-look render (the "Style" step) -------------------------------
+
+    def prelook_path(self, session_id: str) -> Path:
+        return self.session_dir(session_id) / "prelook.npy"
+
+    def _prelook_key_path(self, session_id: str) -> Path:
+        return self.session_dir(session_id) / "prelook.json"
+
+    def prelook_thumb_path(self, session_id: str) -> Path:
+        return self.session_dir(session_id) / "prelook_thumb.png"
+
+    def save_prelook(self, session_id: str, image: np.ndarray, key: str) -> None:
+        """Keep the result before its look, losslessly, tagged with the edit ``key``.
+
+        The look is a final layer: re-rendering only its amount, the gallery
+        thumbnails, and an export without the look all start from this.
+        """
+        self.session_dir(session_id, create=True)
+        np.save(self.prelook_path(session_id), image.astype(np.uint8, copy=False))
+        thumb = image_utils.make_preview(image, PRELOOK_THUMB_MAX_SIZE)
+        image_utils.save_image(thumb, self.prelook_thumb_path(session_id))
+        self._prelook_key_path(session_id).write_text(json.dumps({"key": key}), encoding="utf-8")
+
+    def load_prelook(self, session_id: str, key: str | None = None) -> np.ndarray | None:
+        """The stored pre-look result, or ``None``.
+
+        With ``key``, only when it was produced by that same edit (anything but
+        the look unchanged) - otherwise the cache is stale.
+        """
+        path = self.prelook_path(session_id)
+        if not path.exists():
+            return None
+        if key is not None:
+            key_path = self._prelook_key_path(session_id)
+            if not key_path.exists():
+                return None
+            if json.loads(key_path.read_text(encoding="utf-8")).get("key") != key:
+                return None
+        image: np.ndarray = np.load(path)
+        return image
+
+    def load_prelook_thumb(self, session_id: str) -> np.ndarray | None:
+        path = self.prelook_thumb_path(session_id)
+        if not path.exists():
+            return None
+        return image_utils.load_image(path)
 
     # -- depth artifacts -------------------------------------------------
 

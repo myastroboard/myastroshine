@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from app.exceptions import DuplicateResourceError, ForbiddenError, PayloadTooLargeError
-from app.models import ProcessingParameters
+from app.models import LookParameters, ProcessingParameters
 from app.services.preset import PresetService
 
 
@@ -50,6 +50,15 @@ def test_list_presets_orders_system_first(db_session) -> None:
     authors = [p.author for p in service.list_presets()]
     assert authors[:5] == ["system"] * 5
     assert authors[-1] == "user"
+
+
+def test_save_preset_never_stores_a_look(db_session) -> None:
+    """A preset keeps the edit's starting parameters but drops the finishing look."""
+    service = PresetService(db_session)
+    params = ProcessingParameters(contrast=1.3, look=LookParameters(look_id="vivid", amount=80))
+    record = service.save_preset("Styled", params)
+    assert record.parameters["contrast"] == 1.3
+    assert record.parameters["look"] == LookParameters().model_dump()
 
 
 def test_save_preset_rejects_duplicate_name(db_session) -> None:

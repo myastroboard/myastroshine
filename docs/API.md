@@ -110,7 +110,8 @@ Every route is implemented and tested end to end.
 | GET | `/preview/{session_id}` | Session image: `?full=true` full-res result, `?original=true` untouched upload (add `&geometry=true` to apply the session's current crop/rotate/flip/straighten, no colour/tone enhancement), default downscaled result. `?v=` cache-buster |
 | POST | `/process/{session_id}` | Apply enhancement parameters |
 | WS | `/ws/processing-status/{job_id}` | Real-time job progress |
-| POST | `/download/{session_id}` | Download the processed image |
+| POST | `/download/{session_id}` | Download the processed image. Body: `format` (`jpeg` \| `png` \| `tiff`), `quality` (1-100), `style` (default `true`; with a "Style" look active, `false` exports the same edit without it). A styled export names its look in the file's metadata (JPEG comment, PNG `Description`, TIFF ImageDescription) |
+| GET | `/looks/{session_id}/thumbnail` | The "Style" gallery: the edit before its look, ~400 px JPEG, with `?look=<look_id>&amount=<0-100>` applied (no `look`: as is). Never re-runs the pipeline |
 | POST | `/depth-shift/{session_id}` | Generate depth map + parallax layers |
 | GET | `/depth-shift/{session_id}/metadata` | Depth statistics + layer URLs |
 | GET | `/depth-shift/{session_id}/depth_map` | Depth map as a grayscale PNG |
@@ -241,6 +242,19 @@ stage; it is ignored for an ordinary 8-bit image upload.
 | stretch_mode | - | - | `"adaptive"` | `"adaptive"` (colour-preserving, fitted to the image) \| `"classic"` (the original per-channel auto-stretch) |
 | background_extraction | 0 | 100 | 100 | int (how much of the fitted sky gradient to remove) |
 | color_calibration | - | - | true | bool (neutralise the sky, white-balance on the star field) |
+
+`look` is a nested object: the optional "Style" finishing look, applied **last**,
+after every other stage (see `docs/ALGORITHMS.md` "Looks"). `look_id: null` (the
+default) adds no stage at all, so the output is byte-identical to an edit without
+it. A saved user preset never stores a look (it is reset to the default), and
+applying a preset or Auto Astro keeps the session's current look. When only the
+look changed since the last render, the job reuses the stored pre-look result
+instead of re-running the pipeline.
+
+| Field | Min | Max | Default | Type |
+|-------|-----|-----|---------|------|
+| look_id | - | - | `null` | `null` \| `"vivid"` \| `"soft_glow"` \| `"cinematic"` |
+| amount | 0 | 100 | 60 | int (how strongly the look applies; 0 = identity) |
 
 `curve_points` is a tone curve: a list of `{x, y}` 8-bit input/output level
 pairs (both 0-255). `[]` (the default) means no curve. Otherwise: at least 2

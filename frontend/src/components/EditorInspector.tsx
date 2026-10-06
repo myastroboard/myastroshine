@@ -3,6 +3,7 @@ import { ExportPanel } from '@/components/ExportPanel';
 import { FramingControls } from '@/components/FramingControls';
 import { PresetButtons } from '@/components/PresetButtons';
 import { SliderGroup } from '@/components/SliderGroup';
+import { StylePanel } from '@/components/StylePanel';
 import { ToneCurveEditor } from '@/components/ToneCurveEditor';
 import { ChevronIcon, SparkleIcon } from '@/components/icons';
 import type { SliderRevert } from '@/hooks/useImageProcessing';
@@ -19,6 +20,8 @@ import {
   type EditorStepId,
   type FocusPoint,
   type GeometryParameters,
+  type LookId,
+  type LookParameters,
   type Preset,
   type DenoiseEngine,
   type ProcessingParameters,
@@ -89,6 +92,13 @@ export interface DepthBundle {
   error: string | null;
 }
 
+export interface StyleBundle {
+  /** Gallery thumbnail URL for a look (`null`: the edit without a look). */
+  thumbnailUrl: (look: LookId | null) => string;
+  onLookChange: <K extends keyof LookParameters>(key: K, value: LookParameters[K]) => void;
+  onReset: () => void;
+}
+
 export interface ExportBundle {
   /** The edited image, shown as the "ready" thumbnail. */
   resultUrl: string;
@@ -99,7 +109,7 @@ export interface ExportBundle {
   astrodexError: string | null;
   /** Seeds the Export step's editable filename field (no extension). */
   defaultFilename: string;
-  onDownload: (filename: string) => void;
+  onDownload: (filename: string, withStyle: boolean) => void;
   onReturnToAstroDex: () => void;
   onSaveAsPreset: () => void;
 }
@@ -122,6 +132,7 @@ export interface EditorInspectorProps {
   stars: StarsBundle;
   denoise: DenoiseBundle;
   depth: DepthBundle;
+  style: StyleBundle;
   exportActions: ExportBundle;
 }
 
@@ -135,6 +146,7 @@ const STEPS_WITH_DETAILS = new Set<EditorStepId>([
   'detail',
   'stars',
   'depth',
+  'style',
 ]);
 
 /** The single panel of controls for whichever workflow step the rail selects. */
@@ -155,6 +167,8 @@ export function EditorInspector(props: EditorInspectorProps) {
       props.onResetCurves();
     } else if (activeStep === 'stack') {
       props.stack.onReset();
+    } else if (activeStep === 'style') {
+      props.style.onReset();
     } else {
       // Only reachable with sliders: the button is hidden otherwise.
       props.onResetSection(sliderKeys);
@@ -162,7 +176,10 @@ export function EditorInspector(props: EditorInspectorProps) {
   }
 
   const showHeaderReset =
-    sectionResettable || activeStep === 'curves' || (activeStep === 'stack' && stackModified);
+    sectionResettable ||
+    activeStep === 'curves' ||
+    (activeStep === 'stack' && stackModified) ||
+    (activeStep === 'style' && parameters.look.lookId !== null);
   const StepIcon = STEP_ICONS[step.id];
   const NextIcon = nextStep ? STEP_ICONS[nextStep.id] : null;
   // The steps that touched the image, for the Export step's recap.
@@ -277,6 +294,15 @@ export function EditorInspector(props: EditorInspectorProps) {
 
       {activeStep === 'depth' && <DepthPanel {...props.depth} isProcessing={props.isProcessing} />}
 
+      {activeStep === 'style' && (
+        <StylePanel
+          look={parameters.look}
+          thumbnailUrl={props.style.thumbnailUrl}
+          onLookChange={props.style.onLookChange}
+          isProcessing={props.isProcessing}
+        />
+      )}
+
       {activeStep === 'export' && (
         <ExportPanel
           key={props.exportActions.defaultFilename}
@@ -289,6 +315,11 @@ export function EditorInspector(props: EditorInspectorProps) {
           defaultFilename={props.exportActions.defaultFilename}
           resultUrl={props.exportActions.resultUrl}
           touchedSteps={touchedSteps}
+          styleName={
+            parameters.look.lookId === null
+              ? null
+              : t(`style_panel.looks.${parameters.look.lookId}.name`)
+          }
           onDownload={props.exportActions.onDownload}
           onReturnToAstroDex={props.exportActions.onReturnToAstroDex}
           onSaveAsPreset={props.exportActions.onSaveAsPreset}
