@@ -111,6 +111,7 @@ Every route is implemented and tested end to end.
 | POST | `/process/{session_id}` | Apply enhancement parameters |
 | WS | `/ws/processing-status/{job_id}` | Real-time job progress |
 | POST | `/download/{session_id}` | Download the processed image. Body: `format` (`jpeg` \| `png` \| `tiff`), `quality` (1-100), `style` (default `true`; with a "Style" look active, `false` exports the same edit without it). A styled export names its look in the file's metadata (JPEG comment, PNG `Description`, TIFF ImageDescription) |
+| GET | `/looks/{session_id}` | The "Style" gallery's catalogue: `{"scene": "general" \| "nightscape", "looks": [...]}` in display order - `galactic_core` and `blue_hour` first when the session's composite has a sky mask |
 | GET | `/looks/{session_id}/thumbnail` | The "Style" gallery: the edit before its look, ~400 px JPEG, with `?look=<look_id>&amount=<0-100>` applied (no `look`: as is). Never re-runs the pipeline |
 | POST | `/depth-shift/{session_id}` | Generate depth map + parallax layers |
 | GET | `/depth-shift/{session_id}/metadata` | Depth statistics + layer URLs |
@@ -253,7 +254,7 @@ instead of re-running the pipeline.
 
 | Field | Min | Max | Default | Type |
 |-------|-----|-----|---------|------|
-| look_id | - | - | `null` | `null` \| `"vivid"` \| `"soft_glow"` \| `"cinematic"` |
+| look_id | - | - | `null` | `null` \| `"vivid"` \| `"soft_glow"` \| `"cinematic"` \| `"galactic_core"` \| `"blue_hour"` (the last two use the session's sky mask when it has one) |
 | amount | 0 | 100 | 60 | int (how strongly the look applies; 0 = identity) |
 
 `curve_points` is a tone curve: a list of `{x, y}` 8-bit input/output level

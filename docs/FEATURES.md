@@ -160,8 +160,13 @@ An optional finishing touch for sharing. A gallery shows **your own image** in
 each style - **Vivid** (deeper black sky, stronger structure, richer colours),
 **Soft glow** (a dreamy glow around the bright parts) and **Cinematic** (cool
 background, warm subject, gentle vignette) - next to **No style**. Tap one, then
-set its **Strength**. Styles only rework the light the camera recorded: no added
-stars, no fake detail. Changing only the style re-renders in a moment (the rest
+set its **Strength**. On a night landscape (an iPhone ProRAW with a landscape in
+frame), two more styles come first and treat the sky and the ground apart:
+**Galactic core** (a warm, golden Milky Way core with deep dust lanes over a cool
+sky, the landscape gently opened up) and **Blue hour** (a cool, luminous sky with
+a soft glow on the band over a warm landscape) - with no halo round the trees.
+Styles only rework the light the camera recorded: no added stars, no fake
+detail. Changing only the style re-renders in a moment (the rest
 of the edit is kept), and applying a preset or Auto Astro keeps the chosen style.
 
 ### Export

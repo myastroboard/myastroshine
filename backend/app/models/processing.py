@@ -32,7 +32,7 @@ StretchMode = Literal["adaptive", "classic"]
 
 #: The "Style" step's looks (``app.services.looks``). Removing one later needs
 #: a migration path for stored sessions, like ``_RETIRED_KEYS``.
-LookId = Literal["vivid", "soft_glow", "cinematic"]
+LookId = Literal["vivid", "soft_glow", "cinematic", "galactic_core", "blue_hour"]
 
 
 class GeometryParameters(BaseModel):
@@ -103,6 +103,18 @@ class LookParameters(BaseModel):
 
     look_id: LookId | None = None
     amount: int = Field(default=60, ge=0, le=100)
+
+
+#: What kind of picture the "Style" gallery is for: ``"nightscape"`` when the
+#: session has a sky mask (a night landscape), ``"general"`` otherwise.
+LookScene = Literal["general", "nightscape"]
+
+
+class LookCatalog(BaseModel):
+    """``GET /api/looks/{session_id}``: the looks offered, in display order."""
+
+    scene: LookScene
+    looks: list[LookId]
 
 
 #: Fields removed from ``ProcessingParameters`` over time. Dropped on the way in

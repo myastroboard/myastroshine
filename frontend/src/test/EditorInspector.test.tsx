@@ -5,6 +5,7 @@ import { EditorInspector, type EditorInspectorProps } from '@/components/EditorI
 import {
   DEFAULT_GEOMETRY,
   DEFAULT_PARAMETERS,
+  GENERAL_LOOK_CATALOG,
   type DenoiseEngine,
   type StarlessEngine,
 } from '@/types';
@@ -67,6 +68,7 @@ function makeProps(overrides: Partial<EditorInspectorProps> = {}): EditorInspect
       error: null,
     },
     style: {
+      catalog: GENERAL_LOOK_CATALOG,
       thumbnailUrl: (look) => `/thumb/${look ?? 'none'}`,
       onLookChange: vi.fn(),
       onReset: vi.fn(),

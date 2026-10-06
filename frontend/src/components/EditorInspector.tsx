@@ -20,6 +20,7 @@ import {
   type EditorStepId,
   type FocusPoint,
   type GeometryParameters,
+  type LookCatalog,
   type LookId,
   type LookParameters,
   type Preset,
@@ -93,6 +94,8 @@ export interface DepthBundle {
 }
 
 export interface StyleBundle {
+  /** The looks this session's gallery offers (night-landscape ones first). */
+  catalog: LookCatalog;
   /** Gallery thumbnail URL for a look (`null`: the edit without a look). */
   thumbnailUrl: (look: LookId | null) => string;
   onLookChange: <K extends keyof LookParameters>(key: K, value: LookParameters[K]) => void;
@@ -297,6 +300,8 @@ export function EditorInspector(props: EditorInspectorProps) {
       {activeStep === 'style' && (
         <StylePanel
           look={parameters.look}
+          looks={props.style.catalog.looks}
+          scene={props.style.catalog.scene}
           thumbnailUrl={props.style.thumbnailUrl}
           onLookChange={props.style.onLookChange}
           isProcessing={props.isProcessing}

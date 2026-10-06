@@ -12,6 +12,7 @@ import { useAutoAstro } from '@/hooks/useAutoAstro';
 import { useCaptureInfo } from '@/hooks/useCaptureInfo';
 import { useDepthShift } from '@/hooks/useDepthShift';
 import { useImageProcessing } from '@/hooks/useImageProcessing';
+import { useLookCatalog } from '@/hooks/useLookCatalog';
 import { useMilestones, type Milestone } from '@/hooks/useMilestones';
 import { usePresets } from '@/hooks/usePresets';
 import { useServerConfig } from '@/hooks/useServerConfig';
@@ -112,6 +113,7 @@ export function EditorView({ session, onExit }: EditorViewProps) {
   const starMask = useStarMask(session.sessionId);
   const autoAstro = useAutoAstro(session.sessionId);
   const captureInfo = useCaptureInfo(session.sessionId, Boolean(session.isStack));
+  const lookCatalog = useLookCatalog(session.sessionId);
   const astrodex = useAstroDexIntegration();
   const { detect: detectStars } = starMask;
 
@@ -475,6 +477,7 @@ export function EditorView({ session, onExit }: EditorViewProps) {
           error: depthShift.error,
         }}
         style={{
+          catalog: lookCatalog,
           thumbnailUrl: (look) =>
             apiClient.lookThumbnailUrl(session.sessionId, look, {
               amount: DEFAULT_LOOK_AMOUNT,

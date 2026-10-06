@@ -1,27 +1,37 @@
 import type { CSSProperties } from 'react';
 
 import { useTranslation } from '@/hooks/useTranslation';
-import { LOOK_IDS, type LookId, type LookParameters } from '@/types';
+import type { LookId, LookParameters, LookScene } from '@/types';
 
 export interface StylePanelProps {
   look: LookParameters;
+  /** The looks to offer, in order (from the session's look catalogue). */
+  looks: LookId[];
+  /** `'nightscape'`: the photo has a landscape - say the first looks use it. */
+  scene: LookScene;
   /** URL of a gallery thumbnail: the edit before its look, with `look` applied. */
   thumbnailUrl: (look: LookId | null) => string;
   onLookChange: <K extends keyof LookParameters>(key: K, value: LookParameters[K]) => void;
   isProcessing: boolean;
 }
 
-/** `null` first: "No style" is always the first choice. */
-const CHOICES: (LookId | null)[] = [null, ...LOOK_IDS];
-
 /**
  * The "Style" step: a gallery of the user's own image in each finishing look,
  * plus one "how much" slider for the chosen look. Every look only reworks the
  * recorded light (see backend `app/services/looks.py`) - no added detail.
  */
-export function StylePanel({ look, thumbnailUrl, onLookChange, isProcessing }: StylePanelProps) {
+export function StylePanel({
+  look,
+  looks,
+  scene,
+  thumbnailUrl,
+  onLookChange,
+  isProcessing,
+}: StylePanelProps) {
   const { t } = useTranslation();
   const selected = look.lookId;
+  // "No style" is always the first choice.
+  const choices: (LookId | null)[] = [null, ...looks];
   const nameOf = (id: LookId | null) =>
     id === null ? t('style_panel.none.name') : t(`style_panel.looks.${id}.name`);
   // Slider fill from 0 to the current amount (a per-instance runtime value).
@@ -29,12 +39,15 @@ export function StylePanel({ look, thumbnailUrl, onLookChange, isProcessing }: S
 
   return (
     <div className="flex flex-col gap-4">
+      {scene === 'nightscape' && (
+        <p className="panel-inset text-xs text-muted">{t('style_panel.nightscape_note')}</p>
+      )}
       <div
         className="grid grid-cols-2 gap-2"
         role="radiogroup"
         aria-label={t('style_panel.gallery_aria')}
       >
-        {CHOICES.map((id) => {
+        {choices.map((id) => {
           const active = id === selected;
           return (
             <button

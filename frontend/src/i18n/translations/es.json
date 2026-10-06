@@ -216,6 +216,7 @@
   },
   "style_panel": {
     "gallery_aria": "Estilos de acabado",
+    "nightscape_note": "Tu foto tiene un paisaje: los primeros estilos tratan el cielo y el suelo por separado.",
     "none": {
       "name": "Sin estilo",
       "hint": "Tu imagen exactamente como la editaste, sin estilo final."
@@ -232,6 +233,14 @@
       "cinematic": {
         "name": "Cine",
         "hint": "Un fondo frío, un sujeto cálido y una viñeta suave - ambiente de cartel de cine."
+      },
+      "galactic_core": {
+        "name": "Núcleo galáctico",
+        "hint": "Un núcleo de la Vía Láctea cálido y dorado, con bandas de polvo profundas sobre un cielo frío; el paisaje suavemente aclarado."
+      },
+      "blue_hour": {
+        "name": "Hora azul",
+        "hint": "Un cielo nocturno frío y luminoso, con un brillo suave sobre la Vía Láctea, encima de un paisaje cálido."
       }
     },
     "amount": {

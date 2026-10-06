@@ -48,6 +48,7 @@ from app.models.preset import (
 from app.models.processing import (
     CurvePoint,
     GeometryParameters,
+    LookCatalog,
     LookId,
     LookParameters,
     ProcessingParameters,
@@ -124,6 +125,7 @@ __all__ = [
     "LogLevels",
     "LogTailResponse",
     "LoginRequest",
+    "LookCatalog",
     "LookId",
     "LookParameters",
     "PresetListResponse",

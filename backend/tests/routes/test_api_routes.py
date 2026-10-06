@@ -20,6 +20,7 @@ def test_openapi_schema_is_served(client) -> None:
         "/api/upload",
         "/api/process/{session_id}",
         "/api/download/{session_id}",
+        "/api/looks/{session_id}",
         "/api/looks/{session_id}/thumbnail",
         "/api/presets",
         "/api/depth-shift/{session_id}",

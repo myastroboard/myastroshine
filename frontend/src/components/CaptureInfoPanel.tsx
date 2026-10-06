@@ -46,10 +46,10 @@ export function CaptureInfoPanel({ info }: CaptureInfoPanelProps) {
       rows.push([t('editor.capture_info.date'), parsed.toLocaleDateString()]);
     }
   }
-  if (info.gain !== undefined) {
+  if (typeof info.gain === 'number') {
     rows.push([t('editor.capture_info.gain'), String(info.gain)]);
   }
-  if (info.sensorTempC !== undefined) {
+  if (typeof info.sensorTempC === 'number') {
     rows.push([t('editor.capture_info.sensor_temp'), `${info.sensorTempC.toFixed(1)}°C`]);
   }
 

@@ -63,6 +63,9 @@ vi.mock('@/hooks/useServerConfig', () => ({
 vi.mock('@/hooks/useStarMask', () => ({ useStarMask: () => h.state.starMask }));
 vi.mock('@/hooks/useAutoAstro', () => ({ useAutoAstro: () => h.state.autoAstro }));
 vi.mock('@/hooks/useCaptureInfo', () => ({ useCaptureInfo: () => h.state.captureInfo }));
+vi.mock('@/hooks/useLookCatalog', () => ({
+  useLookCatalog: () => ({ scene: 'nightscape', looks: ['galactic_core', 'vivid'] }),
+}));
 vi.mock('@/hooks/useAstroDexIntegration', () => ({
   useAstroDexIntegration: () => h.state.astrodex,
 }));
@@ -479,6 +482,15 @@ describe('EditorView', () => {
       expect(update).toHaveBeenNthCalledWith(1, 'lookId', 'cinematic');
       expect(update).toHaveBeenNthCalledWith(2, 'amount', 30);
       expect(update).toHaveBeenNthCalledWith(3, 'lookId', null);
+    });
+
+    it('hands the session look catalogue to the gallery', () => {
+      renderEditor();
+
+      expect(inspector().style.catalog).toEqual({
+        scene: 'nightscape',
+        looks: ['galactic_core', 'vivid'],
+      });
     });
 
     it('builds gallery thumbnails at the default amount, cache-busted per render', () => {

@@ -218,6 +218,18 @@ describe('downloadImage', () => {
   });
 });
 
+describe('getLookCatalog', () => {
+  it('GETs the session look catalogue', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, { scene: 'nightscape', looks: ['galactic_core', 'vivid'] }),
+    );
+    const catalog = await apiClient.getLookCatalog('s1');
+    const [url] = lastCall();
+    expect(url).toBe('/api/looks/s1');
+    expect(catalog).toEqual({ scene: 'nightscape', looks: ['galactic_core', 'vivid'] });
+  });
+});
+
 describe('lookThumbnailUrl', () => {
   it('builds the plain thumbnail URL without a look', () => {
     expect(apiClient.lookThumbnailUrl('s1', null)).toBe('/api/looks/s1/thumbnail');

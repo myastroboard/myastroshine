@@ -9,7 +9,7 @@ import pytest
 
 from app.db.models import StackRecord
 from app.exceptions import SessionNotFoundError, UnsupportedImageError
-from app.models import LookParameters, ProcessingParameters, StackParameters
+from app.models import GeometryParameters, LookParameters, ProcessingParameters, StackParameters
 from app.services.enhancement import EnhancementService
 from app.services.image_processing import ImageProcessingService
 from app.services.job import JobService
@@ -605,3 +605,72 @@ def test_run_keeps_the_pre_look_render_for_export_without_the_look(
     )
     assert prelook is not None
     assert np.array_equal(prelook, expected)
+
+
+def _night_landscape(enhancement: EnhancementService, sample_image: np.ndarray) -> str:
+    """A stack-backed session whose composite has a sky mask: top half sky."""
+    record = enhancement.sessions.create_session(image_path="")
+    enhancement.storage.save_original(record.session_id, sample_image)
+    height, width = sample_image.shape[:2]
+    stack_id = _link_stack(enhancement, record.session_id, sample_image.astype(np.float32) / 255.0)
+    mask = np.zeros((height, width), dtype=np.uint8)
+    mask[: height // 2] = 255
+    enhancement.storage.save_stack_sky_mask(stack_id, mask)
+    return record.session_id
+
+
+def test_look_sky_mask_only_for_a_night_landscape_look(
+    enhancement: EnhancementService, sample_image: np.ndarray
+) -> None:
+    """The mask is loaded for a night-landscape look on a session that has one - not otherwise."""
+    session_id = _night_landscape(enhancement, sample_image)
+    plain = enhancement.sessions.create_session(image_path="")
+    shape = sample_image.shape[:2]
+    geometry = GeometryParameters()
+
+    assert enhancement.has_sky_mask(session_id)
+    assert not enhancement.has_sky_mask(plain.session_id)
+    assert enhancement.look_sky_mask(session_id, "vivid", geometry, shape) is None
+    assert enhancement.look_sky_mask(session_id, None, geometry, shape) is None
+    assert enhancement.look_sky_mask(plain.session_id, "galactic_core", geometry, shape) is None
+    sky = enhancement.look_sky_mask(session_id, "galactic_core", geometry, shape)
+    assert sky is not None
+    assert sky.shape == shape
+    assert sky[0].min() == 1.0
+    assert sky[-1].max() == 0.0
+
+
+def test_look_sky_mask_follows_the_framing(
+    enhancement: EnhancementService, sample_image: np.ndarray
+) -> None:
+    """A rotated and cropped edit gets its sky mask rotated and cropped the same way."""
+    session_id = _night_landscape(enhancement, sample_image)
+    height, width = sample_image.shape[:2]
+    # Turned upside down: the sky is now at the bottom.
+    flipped = GeometryParameters(rotate_quarters=2)
+    sky = enhancement.look_sky_mask(session_id, "blue_hour", flipped, (height, width))
+    assert sky is not None
+    assert sky[0].max() == 0.0
+    assert sky[-1].min() == 1.0
+    # Cropped to the top half (all sky), then asked at a thumbnail's size.
+    top = GeometryParameters(crop_h=0.5)
+    small = enhancement.look_sky_mask(session_id, "blue_hour", top, (8, 24))
+    assert small is not None
+    assert small.shape == (8, 24)
+    assert small.min() > 0.99
+
+
+def test_run_applies_a_night_landscape_look_through_the_sky_mask(
+    enhancement: EnhancementService, sample_image: np.ndarray
+) -> None:
+    """A night-landscape look renders, and changes the image."""
+    session_id = _night_landscape(enhancement, sample_image)
+    job = enhancement.jobs.create(session_id)
+    params = ProcessingParameters(look=LookParameters(look_id="galactic_core", amount=80))
+
+    enhancement.run(session_id, params, job.job_id)
+
+    assert enhancement.jobs.get(job.job_id).status == "completed"
+    prelook = enhancement.storage.load_prelook(session_id)
+    assert prelook is not None
+    assert not np.array_equal(enhancement.storage.load_processed(session_id), prelook)

@@ -25,6 +25,9 @@ _OPERATIONS = (
     looks.colour_pop,
     looks.split_toning,
     looks.vignette,
+    looks.warm_tone,
+    looks.cool_tone,
+    looks.lift_shadows,
 )
 _SKY = 0.08
 
@@ -246,3 +249,95 @@ def test_apply_look_on_an_8_bit_image() -> None:
     assert styled.shape == image.shape
     assert not np.array_equal(styled, image)
     assert np.array_equal(service.apply_look(image, LookParameters()), image)
+
+
+def _nightscape(height: int = 240, width: int = 320) -> tuple[np.ndarray, np.ndarray]:
+    """A noisy sky with a bright diagonal band over a dark, slightly lit foreground.
+
+    Returns the image and its sky mask (1 = sky), the horizon at two thirds down.
+    """
+    rng = np.random.default_rng(5)
+    ys, xs = np.mgrid[0:height, 0:width].astype(np.float32)
+    horizon = int(height * 2 / 3)
+    band = 0.35 * np.exp(-(((xs - ys * 1.2) / (width / 8)) ** 2))
+    image = np.full((height, width, 3), 0.12, dtype=np.float32)
+    image += (band)[:, :, np.newaxis] * np.array([0.8, 0.9, 1.0], np.float32)
+    image[horizon:] = np.array([0.03, 0.05, 0.06], np.float32)  # dark foreground
+    image += rng.normal(0.0, 0.005, image.shape).astype(np.float32)
+    mask = np.zeros((height, width), dtype=np.float32)
+    mask[:horizon] = 1.0
+    return np.clip(image, 0.0, 1.0), mask
+
+
+@pytest.mark.parametrize("look_id", ["galactic_core", "blue_hour"])
+def test_night_landscape_look_treats_sky_and_foreground_apart(look_id: str) -> None:
+    """The foreground gets only its own steps: lifted, never darkened, no sky toning."""
+    image, mask = _nightscape()
+    out = LooksService().apply(image, LookParameters(look_id=look_id, amount=100), mask)
+    ground = (slice(200, 240), slice(0, 320))
+    sky = (slice(0, 120), slice(0, 320))
+    assert float(_luma(out[ground]).mean()) > float(_luma(image[ground]).mean())
+    assert not np.allclose(out[sky], image[sky], atol=0.01)
+
+
+def test_galactic_core_keeps_the_foreground_hue() -> None:
+    """Galactic core lifts the foreground without tinting it like the sky."""
+    image, mask = _nightscape()
+    out = LooksService().apply(image, LookParameters(look_id="galactic_core", amount=100), mask)
+    ground = out[200:240].reshape(-1, 3).mean(axis=0)
+    source = image[200:240].reshape(-1, 3).mean(axis=0)
+    assert np.allclose(ground / ground.sum(), source / source.sum(), atol=0.01)
+
+
+def test_blue_hour_cools_the_sky_and_warms_the_foreground() -> None:
+    image, mask = _nightscape()
+    out = LooksService().apply(image, LookParameters(look_id="blue_hour", amount=100), mask)
+    sky_shift = out[:120].reshape(-1, 3).mean(axis=0) - image[:120].reshape(-1, 3).mean(axis=0)
+    ground_shift = out[200:].reshape(-1, 3).mean(axis=0) - image[200:].reshape(-1, 3).mean(axis=0)
+    assert sky_shift[0] > sky_shift[2]  # more blue than red in the sky
+    assert ground_shift[2] > ground_shift[0]  # more red than blue on the ground
+
+
+def test_night_landscape_look_draws_no_halo_round_a_badly_masked_tree() -> None:
+    """A dark tree the sky matte only half covers gets no bright rim in the sky next to it.
+
+    The phone's matte is coarser than a tree: dark leaves counted as "sky" must
+    not pull the local sky level down and make the sky beside them glow.
+    """
+    height, width = 240, 320
+    rng = np.random.default_rng(9)
+    image = np.full((height, width, 3), 0.3, dtype=np.float32)
+    image += rng.normal(0.0, 0.004, image.shape).astype(np.float32)
+    image[60:240, 200:260] = 0.04  # a dark tree trunk and crown
+    mask = np.ones((height, width), dtype=np.float32)
+    mask[60:240, 215:245] = 0.0  # the matte misses the tree's outer 15 px each side
+    out = LooksService().apply(image, LookParameters(look_id="galactic_core", amount=100), mask)
+
+    beside_tree = _luma(out[100:200, 180:198]).mean()
+    open_sky = _luma(out[100:200, 20:80]).mean()
+    assert beside_tree < open_sky + 0.01
+
+
+def test_night_landscape_look_without_a_mask_styles_the_whole_frame() -> None:
+    """No sky mask (an API call on an ordinary image): the sky steps apply everywhere."""
+    image, _ = _nightscape()
+    with_none = LooksService().apply(image, LookParameters(look_id="blue_hour", amount=80))
+    assert with_none.shape == image.shape
+    assert not np.array_equal(with_none, image)
+
+
+def test_night_landscape_look_resizes_a_smaller_mask() -> None:
+    """A mask at another resolution is resized to the image."""
+    image, mask = _nightscape()
+    small = cv2.resize(mask, (80, 60), interpolation=cv2.INTER_NEAREST)
+    full = LooksService().apply(image, LookParameters(look_id="galactic_core"), mask)
+    resized = LooksService().apply(image, LookParameters(look_id="galactic_core"), small)
+    assert float(np.abs(full - resized).mean()) < 0.01
+
+
+@pytest.mark.parametrize("operation", [looks.warm_tone, looks.cool_tone, looks.lift_shadows])
+def test_tone_and_lift_keep_black_black(operation: looks.Operation) -> None:
+    """Warm / cool tones and the shadow lift are gains, never offsets."""
+    black = np.zeros((8, 8, 3), dtype=np.float32)
+    assert np.array_equal(operation(black, 1.0), black)
+    assert operation(black, 0.0) is black

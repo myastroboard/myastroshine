@@ -400,6 +400,11 @@ class StorageService:
         self.stack_dir(stack_id, create=True)
         np.save(self.stack_composite_path(stack_id), composite.astype(np.float32))
 
+    def stack_composite_shape(self, stack_id: str) -> tuple[int, ...]:
+        """The composite's array shape, read from the file header without loading it."""
+        composite = np.load(self.stack_composite_path(stack_id), mmap_mode="r")
+        return tuple(int(n) for n in composite.shape)
+
     def load_stack_composite(self, stack_id: str) -> np.ndarray:
         composite: np.ndarray = np.load(self.stack_composite_path(stack_id))
         return composite
