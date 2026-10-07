@@ -12,6 +12,20 @@ original Keep a Changelog headings.
 
 ### Features
 
+- None.
+
+### Fixes
+
+- None.
+
+### Breaking changes
+
+- None.
+
+## 0.6.0 (2026-10-07)
+
+### Features
+
 - An iPhone ProRAW (`.dng`) opens in the linear editor, and a Milky Way shot with a landscape uses
   the phone's sky mask, single or stacked: no halos round trees, a dark night sky. See
   docs/ALGORITHMS.md "Nightscapes".
@@ -1131,4 +1145,3 @@ tagged yet.
   (`useDepthShift`). Found while adding parameter tooltips; not fixed since it
   needs a product decision (most likely: wire it as that viewer's starting
   value), not a copy change. *(Still open.)*
-
