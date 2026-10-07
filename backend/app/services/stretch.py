@@ -42,9 +42,12 @@ _NOISE_SAMPLE_PERCENTILE = 30.0  # the noise is measured where the sky is darkes
 # A 3x3-median residual underestimates the noise sigma; this puts it back on scale.
 _MEDIAN_RESIDUAL_TO_SIGMA = 1.4826 * 1.5
 _SHADOW_CLIP_SIGMA = 2.8  # black point = sky - this many noise sigma
-_DARK_SKY_PERCENTILE = 0.5  # protect_dark_sky: the darkest real sky stays above black
+_DARK_SKY_PERCENTILE = 0.5  # wide_field: the darkest real sky stays above black
 _DARK_SKY_MARGIN = 0.15  # ... by this fraction of its distance to the sky level
 _OBJECT_PERCENTILE = 99.0
+#: wide_field: a pixel keeps the fraction ``s / (s + this many noise sigma)`` of
+#: its colour, ``s`` its own level above the black point - see adaptive_stretch.
+_COLOUR_NOISE_SIGMA = 8.0
 _OBJECT_TARGET = 0.72
 _WHITE_PERCENTILE = 99.99  # of the brightest channel - stars included
 _FAMILY_RANGE = (-1.0, 1.0)  # lowered white point .. strongest arcsinh compression
@@ -63,7 +66,7 @@ def adaptive_stretch(
     source_peak: np.ndarray | None = None,
     sky_mask: np.ndarray | None = None,
     *,
-    protect_dark_sky: bool = False,
+    wide_field: bool = False,
 ) -> np.ndarray:
     """Sky-neutral linear RGB ``(H, W, 3)`` -> stretched BGR ``float32`` ``[0, 1]``.
 
@@ -74,17 +77,32 @@ def adaptive_stretch(
     to neutral instead of showing a coloured ring in a bright star's core.
     ``sky_mask`` (boolean, same size) takes the sky level, noise and object level
     from a nightscape's sky only, so a dark landscape does not set the black point.
-    ``protect_dark_sky`` keeps the black point under the darkest real sky (its
-    ``_DARK_SKY_PERCENTILE``) even when the noise is low: a deep stack of a wide
-    field, whose sky is never perfectly flat, otherwise crushed its darker
-    regions to black blotches - the black point (sky - 2.8 sigma) rises toward
-    the sky level as the noise falls.
+
+    ``wide_field`` (a Milky Way / night landscape lens - see ``RenderHints``)
+    changes two things:
+
+    - the black point stays under the darkest real sky (its
+      ``_DARK_SKY_PERCENTILE``) even when the noise is low: a wide field's sky is
+      never perfectly flat, and a deep stack's low noise otherwise lifted the
+      black point (sky - 2.8 sigma) toward the sky level and crushed the darker
+      regions to black blotches;
+    - the colour fades toward grey where the signal is near the noise. The
+      colour rides as a ratio to the luminance, and on the sky - 2.8 sigma above
+      black - that ratio is mostly the colour noise, amplified by the stretch.
+      A deep-sky stack's colour noise is fine-grained and the chroma denoise
+      takes it; a phone's night shot carries it at every scale up to tens of
+      pixels (its merge and denoise smear it into blotches), so real iPhone
+      frames came out covered in green and magenta mottle. Each pixel keeps
+      ``s / (s + _COLOUR_NOISE_SIGMA * noise)`` of its colour, ``s`` its level
+      above the black point: about a quarter on the sky, two thirds on the
+      Milky Way's bright parts, nearly all of it in a star. A stack, with less noise,
+      keeps more.
     """
     rgb = linear.astype(np.float32, copy=False)
     luma = rgb @ LUMA_RGB
     sky, noise, smooth, in_sky = _sky_noise(luma, sky_mask)
     black = sky - _SHADOW_CLIP_SIGMA * noise
-    if protect_dark_sky:
+    if wide_field:
         darkest = float(np.percentile(smooth[in_sky], _DARK_SKY_PERCENTILE))
         black = min(black, darkest - (sky - darkest) * _DARK_SKY_MARGIN)
 
@@ -100,6 +118,10 @@ def adaptive_stretch(
     y_luma = _curve(x_luma, family, x_sky, target_background, white_floor)
 
     scaled = np.clip((rgb - black) / white, 0.0, None) * (y_luma / x_luma)[..., np.newaxis]
+    if wide_field:
+        grey = y_luma[..., np.newaxis]
+        kept = x_luma / (x_luma + _COLOUR_NOISE_SIGMA * noise / white)
+        scaled = grey + (scaled - grey) * kept[..., np.newaxis]
     out = _fit_gamut(scaled, y_luma[..., np.newaxis])
 
     if source_peak is not None:

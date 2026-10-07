@@ -48,6 +48,9 @@ original Keep a Changelog headings.
   and your Stack settings kept. See docs/ALGORITHMS.md "Auto Astro".
 - Stacked composites no longer render with a green sky, and Denoise now also removes the coarser
   grain and colour mottle of real stacks while sparing faint stars. See docs/ALGORITHMS.md.
+- Phone Milky Way shots (wide-angle ProRAW) no longer come out covered in green and magenta blotches,
+  and a light-polluted sky no longer gets a dark arch and lavender sides. See docs/ALGORITHMS.md
+  "Render hints".
 
 ### Breaking changes
 

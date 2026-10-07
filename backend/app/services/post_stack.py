@@ -264,7 +264,7 @@ def render_stack_base(
             balanced, _ = calibrate_colour(np.clip(unneutralised, 0.0, None))
             linear, _ = neutralise_sky(balanced, sky)
     return adaptive_stretch(
-        linear, target, source_peak=source_peak, sky_mask=sky, protect_dark_sky=hints.wide_field
+        linear, target, source_peak=source_peak, sky_mask=sky, wide_field=hints.wide_field
     )
 
 
@@ -412,10 +412,15 @@ def extract_background(
     footprint); and the surface is subtracted from the sky only, fading out
     across the horizon so the landscape keeps its own tones.
 
-    ``wide_field`` without a sky mask (a Milky Way frame with no landscape): the
-    fit is a plane and the border correction is skipped - see
-    :class:`RenderHints`. The Milky Way's broad glow and the lens vignetting both
-    peak near the centre; any curved surface absorbs part of the Milky Way.
+    ``wide_field`` (a Milky Way lens - see :class:`RenderHints`), with or without a
+    sky mask: the fit is a plane and the border correction is skipped. The Milky
+    Way's broad glow and the lens vignetting both peak near the centre; any
+    curved surface absorbs part of the Milky Way. Under a mask, the degree-3
+    surface also failed on a real iPhone frame below a town's light dome: the
+    rejection dropped the dome's bright tiles as "objects", and the cubic fitted
+    to the rest left a dark arch above the horizon and bright lavender sides. A
+    plane takes the overall tilt and leaves the glow at the horizon, as the eye
+    sees it.
     """
     height, width = composite.shape[:2]
     scale = _BG_ESTIMATE_MAX_SIZE / max(height, width)
@@ -437,11 +442,10 @@ def extract_background(
         )
         > 0
     )
-    plane_only = wide_field and small_sky is None
-    if small_sky is not None:
-        degree = _BG_POLY_DEGREE_NIGHTSCAPE
-    elif plane_only:
+    if wide_field:
         degree = _BG_POLY_DEGREE_WIDE_FIELD
+    elif small_sky is not None:
+        degree = _BG_POLY_DEGREE_NIGHTSCAPE
     else:
         degree = _BG_POLY_DEGREE
 
@@ -468,7 +472,7 @@ def extract_background(
         samples = _tile_samples(small[..., channel], tiles, small_sky)
         coeffs, keep = _fit_sky_surface(samples, sky_tiles, grid_x, grid_y, degree)
         surface_coarse = _eval_poly2d(grid_x, grid_y, coeffs, degree).reshape(samples.shape)
-        if small_sky is None and not plane_only:
+        if small_sky is None and not wide_field:
             surface_coarse = surface_coarse + _border_residual(samples, surface_coarse, keep)
         surface = cv2.resize(
             surface_coarse.astype(np.float32), (width, height), interpolation=cv2.INTER_CUBIC
