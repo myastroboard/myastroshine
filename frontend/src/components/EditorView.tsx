@@ -275,8 +275,9 @@ export function EditorView({ session, onExit }: EditorViewProps) {
     clearActivePreset();
     const result = await autoAstro.apply();
     if (result) {
-      // Auto Astro proposes tone/star/gradient/white-balance/denoise settings
-      // only - carry the framing and the "Style" look over.
+      // Auto Astro proposes the finishing edit (tone curves, colour, noise,
+      // stars) and returns the Stack step unchanged - carry the framing and
+      // the "Style" look over.
       const next = {
         ...DEFAULT_PARAMETERS,
         ...result.parameters,

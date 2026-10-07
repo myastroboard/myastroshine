@@ -39,6 +39,10 @@ _MAX_REFERENCE_STARS = 400  # the best-SNR stars that set the white reference
 _MIN_REFERENCE_STARS = 20  # fewer than this and the median is not trusted
 _GAIN_CLIP = (0.25, 6.0)  # a real OSC sensor cast stays well inside this
 _SKY_LUMA_PERCENTILE = 50.0  # the sky is sampled on the darker half of the frame
+# The sky level is measured on a sparse lattice of pixels, and *which* of them are
+# sky is decided on a second lattice offset by half a step - see neutralise_sky.
+_SKY_SAMPLE_STEP = 4
+_SKY_SELECT_SMOOTH = 2.0  # Gaussian sigma (lattice cells) of the selecting luminance
 _TINY = 1e-8
 
 
@@ -52,15 +56,26 @@ def neutralise_sky(
     a sky-dominated sample on a frame-filling nebula. ``sky_mask`` (boolean, same
     size) restricts that sample to the sky of a nightscape - otherwise the darker
     half is the landscape. Returns ``(neutral, sky)``.
+
+    The darker half is chosen on *other* pixels than the ones measured: a smoothed
+    luminance of one lattice decides which pixels of a second lattice, offset by
+    half a step, are sky. Chosen on their own values, the choice followed each
+    pixel's noise - and luminance is 72% green, so "the darker pixels" were mostly
+    the ones whose green noise happened to be low. Green's sky level then came out
+    lowest, too little of it was subtracted, and every stretched composite had a
+    green sky (real Seestar stacks: R 25 / G 28 / B 22 of 255 on NGC 7023).
     """
-    sample = linear[::3, ::3]
-    luma = sample @ LUMA_RGB
+    step, offset = _SKY_SAMPLE_STEP, _SKY_SAMPLE_STEP // 2
+    measured = linear[offset::step, offset::step]
+    height, width = measured.shape[:2]
+    selecting = np.ascontiguousarray(linear[::step, ::step][:height, :width] @ LUMA_RGB)
+    luma = cv2.GaussianBlur(selecting, (0, 0), _SKY_SELECT_SMOOTH)
     if sky_mask is None:
         dark = luma <= np.percentile(luma, _SKY_LUMA_PERCENTILE)
     else:
-        in_sky = sky_mask[::3, ::3]
+        in_sky = sky_mask[offset::step, offset::step]
         dark = in_sky & (luma <= np.percentile(luma[in_sky], _SKY_LUMA_PERCENTILE))
-    sky = np.median(sample[dark], axis=0).astype(np.float32)
+    sky = np.median(measured[dark], axis=0).astype(np.float32)
     return (linear - sky).astype(np.float32), sky
 
 

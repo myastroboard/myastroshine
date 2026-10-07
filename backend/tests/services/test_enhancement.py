@@ -619,6 +619,48 @@ def _night_landscape(enhancement: EnhancementService, sample_image: np.ndarray) 
     return record.session_id
 
 
+def test_analysis_view_of_an_upload_is_its_original(
+    enhancement: EnhancementService, sample_image: np.ndarray
+) -> None:
+    record = enhancement.sessions.create_session(image_path="")
+    enhancement.storage.save_original(record.session_id, sample_image)
+
+    image, sky_mask, hints = enhancement.analysis_view(record.session_id, StackParameters())
+
+    assert image.shape == sample_image.shape
+    assert sky_mask is None
+    assert not hints.wide_field
+
+
+def test_analysis_view_of_a_composite_renders_its_stack_step(
+    enhancement: EnhancementService, sample_image: np.ndarray
+) -> None:
+    """A composite is measured as the session's own "Stack" settings render it,
+    not as the stored original (the default render, by whatever version made it)."""
+    record = enhancement.sessions.create_session(image_path="")
+    enhancement.storage.save_original(record.session_id, sample_image)
+    rng = np.random.default_rng(1)
+    composite = rng.random((64, 96, 3)).astype(np.float32) * 0.03 + 0.02
+    _link_stack(enhancement, record.session_id, composite)
+
+    subtle, _, _ = enhancement.analysis_view(record.session_id, StackParameters(stretch=0.0))
+    strong, _, _ = enhancement.analysis_view(record.session_id, StackParameters(stretch=1.0))
+
+    assert subtle.dtype == np.uint8
+    assert subtle.shape[:2] == composite.shape[:2]
+    assert float(strong.mean()) > float(subtle.mean())
+
+
+def test_analysis_view_of_a_night_landscape_carries_its_sky_mask(
+    enhancement: EnhancementService, sample_image: np.ndarray
+) -> None:
+    session_id = _night_landscape(enhancement, sample_image)
+
+    _, sky_mask, _ = enhancement.analysis_view(session_id, StackParameters())
+
+    assert sky_mask is not None
+
+
 def test_look_sky_mask_only_for_a_night_landscape_look(
     enhancement: EnhancementService, sample_image: np.ndarray
 ) -> None:

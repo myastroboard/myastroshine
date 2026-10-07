@@ -118,7 +118,7 @@ Every route is implemented and tested end to end.
 | GET | `/depth-shift/{session_id}/depth_map` | Depth map as a grayscale PNG |
 | GET | `/depth-shift/{session_id}/layer_{index}` | Single BGRA layer PNG |
 | POST | `/star-mask/{session_id}` | Detect stars in the original image for a mask overlay |
-| POST | `/auto-astro/{session_id}` | Analyse the original image and apply a one-click parameter set |
+| POST | `/auto-astro/{session_id}` | Analyse the picture the edit starts from and apply a one-click parameter set |
 | GET | `/presets` | List presets (5 built-ins + user presets) |
 | POST | `/presets` | Save a user preset |
 | DELETE | `/presets/{preset_id}` | Delete a user preset (403 for built-ins) |
@@ -411,10 +411,11 @@ image's pixel dimensions.
 
 ## Auto Astro
 
-`POST /auto-astro/{session_id}` takes no body. It analyses the session's
-original image (histogram black/white point, star density, background
-gradient, colour cast, noise level) and applies a computed parameter set - a
-dynamic alternative to a fixed preset. Returns the same shape as
+`POST /auto-astro/{session_id}` takes no body. It analyses the picture the
+session's edit starts from - a stacked composite's "Stack" render with the
+session's own Stack settings, or the uploaded photo - (sky and object levels,
+sky colour, noise, star density, kind of picture) and applies a computed
+parameter set - a dynamic alternative to a fixed preset. Returns the same shape as
 `POST /process/{session_id}` plus the computed `parameters`, so the frontend
 can sync its sliders in one round trip:
 
@@ -426,18 +427,18 @@ can sync its sliders in one round trip:
   "preview_url": "/api/preview/{id}",
   "estimated_time_seconds": 0,
   "ws_status_url": "/ws/processing-status/job-...",
-  "parameters": { "contrast": 1.8, "exposure": 0.1, "star_reduction": 35, "..." : "..." }
+  "parameters": { "curve_points": [{ "x": 0, "y": 0 }, "..."], "denoise": 32, "..." : "..." }
 }
 ```
 
-Scope is deliberately limited to what a single frame's own statistics can
-drive with confidence: `contrast`, `exposure`, `highlights`, `shadows`,
-`star_reduction`, `temperature`, `denoise`, and `chroma_denoise`. Everything
-else (saturation, sharpness, colour grading, geometry, `gradient_reduction`,
-`vignette_correction`) stays at its `ProcessingParameters` default - see
-`docs/ALGORITHMS.md` "Auto Astro" for why gradient reduction specifically was
-tried and reverted.
-See `docs/ALGORITHMS.md` "Auto Astro" for the heuristic.
+It sets `curve_points` (and, for a sky colour cast, `red_curve_points` /
+`green_curve_points` / `blue_curve_points`), `denoise`, `chroma_denoise`,
+`green_removal`, `vibrance`, `star_reduction` and, for the Moon or a planet,
+`sharpness`. The session's `stack`, `geometry` and `look` come back unchanged;
+everything else (the tone sliders, saturation, clarity, white balance,
+`gradient_reduction`, `vignette_correction`, the engines) stays at its
+`ProcessingParameters` default. See `docs/ALGORITHMS.md` "Auto Astro" for the
+rules and why gradient reduction specifically was tried and reverted.
 
 ## Client config
 

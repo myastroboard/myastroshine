@@ -44,8 +44,9 @@ runs just as well standalone, in a web browser.
   corrections (white balance, vignette, light-pollution gradient, dehaze), tone,
   master + per-channel **curves**, colour, detail (clarity, luma / colour
   denoise, sharpen).
-- **One-click Auto Astro** - analyses the histogram and star density and applies
-  an adaptive starting point. Plus five built-in **presets** and your own.
+- **One-click Auto Astro** - measures the sky, the object, the noise and the stars
+  and applies an edit that showcases the picture, never clipping the sky. Plus five
+  built-in **presets** and your own.
 - **Star handling** - shrink stars in place, or lift them out entirely (starless
   workflow) and screen-blend them back at the end.
 - **Geometry** - rotate, flip, straighten, crop, before the pixel pipeline runs.
