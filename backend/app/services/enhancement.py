@@ -17,7 +17,13 @@ from sqlalchemy import select
 from app.db.models import JobRecord, StackRecord
 from app.exceptions import AppError, ImageProcessingError
 from app.logging_config import get_logger
-from app.models import GeometryParameters, LookId, ProcessingParameters, ProcessResponse
+from app.models import (
+    GeometryParameters,
+    LookId,
+    ProcessingParameters,
+    ProcessResponse,
+    StackParameters,
+)
 from app.services import progress
 from app.services.engine_probe import get_engine_statuses
 from app.services.external_denoise import ExternalDenoiseService, blend_denoise
@@ -31,7 +37,7 @@ from app.services.image_processing import DenoiseStageFn, ImageProcessingService
 from app.services.job import JobService
 from app.services.job_runner import JobInterruptedError, get_job_runner, raise_if_stopping
 from app.services.looks import LOOKS
-from app.services.post_stack import RenderHints
+from app.services.post_stack import RenderHints, render_stack_base
 from app.services.session import SessionService
 from app.services.storage import StorageService
 from app.utils.app_settings import get_app_settings
@@ -273,6 +279,28 @@ class EnhancementService:
             starless_split=starless_split,
             denoise_stage=denoise_stage,
         )
+
+    def analysis_view(
+        self, session_id: str, stack: StackParameters
+    ) -> tuple[np.ndarray, np.ndarray | None, RenderHints]:
+        """The picture an edit starts from, for Auto Astro to measure.
+
+        ``(BGR uint8, sky mask or None, render hints)``. A stacked composite is
+        rendered fresh through its "Stack" step with ``stack`` - the session's own
+        settings - rather than read from the stored original, a JPEG of the
+        *default* render made by whichever version ingested it. An ordinary upload
+        is its original.
+        """
+        stack_id = self._backing_stack_id(session_id)
+        if stack_id is None:
+            return self.storage.load_original(session_id), None, RenderHints()
+        sky_mask = self.storage.load_stack_sky_mask(stack_id)
+        hints = RenderHints.from_dict(self.storage.load_stack_render_hints(stack_id))
+        base = render_stack_base(
+            self.storage.load_stack_composite(stack_id), stack, sky_mask, hints
+        )
+        image = np.clip(base * 255.0, 0, 255).astype(np.uint8)
+        return image, sky_mask, hints
 
     def has_sky_mask(self, session_id: str) -> bool:
         """True when the session is a night landscape: its composite has a sky mask."""

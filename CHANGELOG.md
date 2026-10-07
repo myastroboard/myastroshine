@@ -43,6 +43,11 @@ original Keep a Changelog headings.
 - Full-resolution renders are about 10% faster (vibrance, denoise and sharpen), with identical
   output. The weekly performance benchmark's full-res budget is now 12 s; see CONTRIBUTING.md.
 - Lib update
+- Auto Astro now showcases the picture instead of crushing its sky to black: a darker but never
+  clipped sky, a lifted object, a neutral background, noise and colour dosed per kind of picture,
+  and your Stack settings kept. See docs/ALGORITHMS.md "Auto Astro".
+- Stacked composites no longer render with a green sky, and Denoise now also removes the coarser
+  grain and colour mottle of real stacks while sparing faint stars. See docs/ALGORITHMS.md.
 
 ### Breaking changes
 

@@ -210,15 +210,29 @@ Applied in this order to minimize artifacts (`apply_parameters`):
    (`app/utils/starlet.py`). The **starlet** transform (isotropic undecimated
    "a trous" B3-spline - the transform PixInsight's MultiscaleLinearTransform and
    Siril's wavelets use) splits the plane into detail layers of doubling scale
-   plus a smooth residual, reconstructing exactly. The noise sigma is read off
-   the finest layer (MAD), each layer's threshold is `k * sigma * n_j` (`n_j` the
-   known per-layer response to unit white noise, `k = 3 * denoise/100`), and the
-   coefficients are shrunk with a **non-negative garrote**
-   (`w * max(0, 1 - t^2/w^2)`): noise-level coefficients go to zero while strong
-   ones - stars, filament edges - keep almost all their amplitude (a soft
-   threshold would dim every star by `t`). The threshold also follows a local
-   noise map (the finest layer's smoothed energy), so a stretched frame's noisier
-   background is cleaned harder than its brighter object. Four layers. The former
+   plus a smooth residual, reconstructing exactly. Each layer's threshold is
+   `k * sigma_j` (`k = 3 * denoise/100`), and the coefficients are shrunk with a
+   **non-negative garrote** (`w * max(0, 1 - t^2/w^2)`): noise-level coefficients
+   go to zero while strong ones - stars, filament edges - keep almost all their
+   amplitude (a soft threshold would dim every star by `t`).
+   `sigma_j` (`layer_noise`): the finest layer reads its own MAD; the coarser
+   layers follow the white-noise model `sigma * n_j` (`n_j` the known per-layer
+   response to unit white noise), with `sigma` read off whichever of the two
+   finest layers gives the higher value. Real data is rarely white noise:
+   debayering, the sub-pixel registration of every stacked frame and JPEG
+   compression correlate it over a pixel or two, which drains the finest layer.
+   On real Seestar stacks the second layer carried 3-7x what an extrapolation
+   from the first predicts, so the coarser grain and the colour mottle passed
+   through untouched whatever the setting. The coarser layers are *not* measured
+   themselves: there, faint stars and nebulosity outweigh the noise (a dense
+   Milky Way field read 20-60x the model at layer 4), and thresholding on that
+   blurred the field into a haze.
+   The threshold also follows a local noise map (the finest layer's smoothed
+   energy), so a stretched frame's noisier background is cleaned harder than its
+   brighter object. Each coefficient is capped at 3 noise sigma before it enters
+   that map: uncapped, a star read as local noise and raised the threshold round
+   itself up to the 4x ceiling, eating its faint neighbours (a faint star beside a
+   bright one kept 39% of its peak; 73% with the cap). Four layers. The former
    bilateral filter flattened faint stars and left a plastic texture.
    With `denoise_engine = "deepsnr"` this stage instead runs the DeepSNR model
    **early** (see "Quality path" below); the classical stage here becomes a no-op
@@ -275,8 +289,10 @@ Applied in this order to minimize artifacts (`apply_parameters`):
    own disc in place.
 17. **Sharpness** (0-2) - below 1.0 Gaussian blur. Above 1.0 the two finest
     starlet layers of the luma plane are boosted by `1 + 1.5 * (sharpness - 1)`,
-    but only where a coefficient clears 3 noise sigma (the same garrote weight as
-    denoise) - stars and fine filaments sharpen, the background grain is not
+    but only where a coefficient clears 3 noise sigma of its own layer (the same
+    garrote weight and `layer_noise` as denoise - extrapolated from the finest
+    layer, a stack's correlated grain cleared it and was sharpened too) - stars
+    and fine filaments sharpen, the background grain is not
     amplified, and colour is untouched (no coloured fringes). The former 3x3
     Laplacian kernel sharpened the grain as much as the signal.
 
@@ -544,74 +560,105 @@ banded discs only.
 
 ## Auto Astro (one-click adaptive enhancement)
 
-`AutoAstroService.suggest_parameters(image)` (`app/services/auto_astro.py`)
-analyses the session's original image and proposes a `ProcessingParameters`
-set - deliberately scoped to what a single frame's own statistics can drive
-with confidence (tone, star density, colour cast, noise); saturation,
-sharpness, colour grading, and geometry stay at their default - creative
-choices a heuristic has no business making.
+`AutoAstroService.suggest_parameters(image, sky_mask, wide_field=...)`
+(`app/services/auto_astro.py`) measures the picture an edit starts from and
+proposes the finishing edit that showcases it. That picture
+(`EnhancementService.analysis_view`) is, for a stacked composite, a fresh render
+of its "Stack" step with the session's own settings - not the stored original, a
+JPEG of the default render made by whichever version ingested it - and, for an
+ordinary upload, the upload. The route carries the "Stack" settings, the framing
+and the "Style" look through unchanged.
 
-Two of the measurements below (white balance, denoise) first need to tell
-"background sky" apart from "the DSO/stars own real signal" -
-`_sky_mask(gray)` stands in for that split as the darker half of the frame
-(`gray <= percentile(gray, 50)`), true on a typical deep-sky frame where the
-object occupies a minority of pixels. Both bail out to "no change" below
-`_MIN_SKY_PIXELS` (400) sky pixels, rather than measure anything on too
-small or unrepresentative a sample.
+**Measurements** (`measure`, everything on the 0-255 display scale). The
+regions are found on a copy downscaled to 800 px and median-filtered (5x5, which
+wipes the stars): the **background** is the darker 40% of the sky, the
+**object** what rises above the background by more than 30% of the way to the
+99th percentile - the nebula or galaxy body, not the stars. A night landscape's
+sky mask restricts both to the sky. Then: the sky level and each channel's
+(median over the background of a 7x7 local mean - what the eye sees and what the
+denoise leaves: a dark sky's noisiest channel clips at 0 most, so its raw median
+sits under its mean, and a sky neutral by the median came out blue once
+denoised), with each channel's histogram over the background; the object level
+(median luminance) and colour
+(mean max-min channel spread); the object's green excess (mean `G - (R+B)/2` as a
+fraction of its luminance - signed, so the noise does not count); the background
+noise of the luminance and of the noisier chroma plane (MAD of the finest
+starlet layer, as a white-noise sigma); the detected stars per megapixel.
 
-**Every constant below was checked against a real library of stacked FITS
-composites and real lunar photos, not just synthetic test images** - not a
-formality: the first cut of `denoise`/`chroma_denoise` and an earlier
-`gradient_reduction` heuristic both looked reasonable against synthetic
-noise/gradients and were wrong on real captures (see "Gradient reduction"
-and "Denoise" below). Synthetic tests still guard the *shape* of each
-heuristic (does noisier make `denoise` go up, does a neutral sky leave
-`temperature` alone); they cannot substitute for checking real output ranges
-before shipping a number that runs unsupervised.
+**Scene.** A sky under 6 with almost no noise (sigma under 1) is a **bright
+object on black** - the Moon or a planet. A sky mask, a wide-field lens
+(`RenderHints`) or a sky brighter than 60 (a light-polluted wide field, a phone's
+processed night shot) makes a **night landscape**. Anything else is **deep sky**.
 
-**Tone stretch** (grayscale luminance percentiles, robust to a few hot/cold
-pixels) is deliberately not a single uniform curve: the goal is *separation*
-between the background and the DSO, not just filling the tonal range evenly.
-- `bp = percentile(gray, 0.5)`, `wp = percentile(gray, 99.5)`. If
-  `wp - bp < 10` (a flat/degenerate frame), tone changes are skipped entirely.
-- `contrast = clip(210 / (wp - bp), 0.5, 3.0)` - stretch the real signal range
-  toward filling most (not all - headroom) of 0-255.
-- `exposure` is chosen so the black point, after `apply_contrast`'s own
-  mean-centered formula (`y = (x-mean)*contrast + mean`), settles near a
-  near-black floor (~3) - a crushed background reads as depth, so this isn't
-  protected from crushing the way an early version did (floor ~8, which read
-  as flat/washed-out against a real photo).
-- `highlights` is **never positive** - only pulled back (`clip(-clipped_fraction
-  * 8.0, -1.0, 0.0)`) when a meaningful fraction of pixels already clip near
-  white (`>= 250`), otherwise 0. An earlier version also boosted highlights
-  (`+0.2`) to lift the DSO's own bright detail, but this pipeline runs
-  `star_reduction` *after* highlights/contrast (see `apply_parameters`), so
-  boosting brightness here blew stars out toward flat, saturated plateaus
-  before the shrink step ever saw them - erosion can't meaningfully shrink a
-  plateau with no gradient left to eat into. A DSO's own brightness comes from
-  the contrast stretch above, not from this.
-- `shadows = -0.35` (deepens the background) unless the frame is already
-  mostly near-black (`<= 5`) beyond what a typical deep-sky background
-  accounts for, in which case further crushing would just eat real faint
-  signal. `apply_highlights_shadows` weights `shadows` toward the *darkest*
-  pixels only (`shadow_mask = (1 - gray)^2`), so this mostly darkens the empty
-  sky and barely touches the DSO itself - exactly the "highlight the object,
-  darken the background" separation real deep-sky processing aims for, rather
-  than one flat exposure shift.
-- All four values are rounded to 2 decimals before being returned - the raw
-  percentile-derived floats carry a dozen digits of spurious precision that
-  read as broken in the slider UI.
+**Tone curve** (all but the Moon and planets). A master curve through `(0, 0)`,
+`(sky, 0.6 * sky)` (never more than 25 levels down), `(object, object + 0.5 *
+(128 - object))` (never down, and never climbing more than 3x as steeply as the
+sky-to-object span: a faint object - a JPEG of IC 5070, 18 levels above its sky
+- asked for ~4x, which posterised 8-bit data and multiplied the noise just above
+the sky as much) and `(255, 255)`, drawn by the editor's monotone cubic: black stays black and nothing clips, the sky deepens and the object moves
+toward the midtones - the separation that makes an object stand out. No curve
+when the object is within 12 levels of the sky. It shows in the curve editor like
+any curve. A **sky cast** is additive (skyglow), so each channel whose sky - as
+the master curve leaves it - is a level or more off the grey of the same
+brightness gets its own curve, moving its sky onto it and converging to identity
+in the highlights (the "levels per channel" neutralisation of a photo editor).
+"As the master curve leaves it" is the mean of the curve over the channel's
+background histogram, not the curve at its sky level: the noise straddles the
+bend where the curve steepens above the sky, which lifts the mean, and a channel
+whose sky sits lower, on the straight part, is lifted less - neutral by the
+curve at the sky level, the result kept a 3-4 level cast. The channel curve's
+point is solved the same way, by bisection on the channel's histogram: lifting a
+starved channel takes a strongly concave curve, whose mean over a noisy sky falls
+short of its value at the mean (a JPEG of IC 5070 kept a 4-level red cast). A stacked
+composite's sky is already neutral (colour calibration), so this mostly serves
+JPEG uploads: a Seestar JPEG of IC 5070 came in at B 32 / G 33 / R 23 and came
+out at 19 / 16 / 18.
 
-**Star density** (reuses `StarDetectionService.detect` at its default
-`sensitivity=50, max_size=30`): `star_reduction = clip(round(5 *
-log1p(density)), 0, 50)`, where `density` is detected star count per
-megapixel. Log-scaled rather than linear: real star fields span orders of
-magnitude in density (tens/MP for a single short frame, 1000+/MP for a deep
-stack), and a linear mapping saturates at the cap for almost any real busy
-field, defeating "gentle starting point" - a first version (`density * 0.8`)
-hit its cap of 60 on a real ~1000/MP deep-stack photo just as readily as on a
-merely-busy one. Capped at 50 (not 100) regardless - Auto Astro is meant as a
-starting point, not a maxed-out edit.
+The tone sliders are not used. An earlier version stretched with `contrast` /
+`exposure` and deepened the sky with `shadows = -0.35`: on real stacks that
+crushed the sky to black (the M31 mosaic: sky 28 -> 3 of 255, 24% of the sky at
+0-2, the galaxy's outer halo gone; a NGC 281 JPEG: 32 -> 5, 19%), and the equal
+subtraction from every channel turned a faint cast into a magenta or blue tint.
+It also measured a composite's already-stretched render and stretched it again.
+
+**Noise.** The denoise strengths are thresholds relative to the measured noise
+(see "Denoise" above), so they encode how visible the noise is - its sigma
+times the tone curve's gain from the sky to the object, since the denoise runs
+after the curve: `denoise = clip(10 * (sigma * gain - 0.5), 0, 40)` and
+`chroma_denoise = clip(14 * sigma_chroma * gain, 0, 60)`, at least 50 for a
+camera night landscape (an iPhone ProRAW arrives denoised at the finest scale -
+its sigma reads low - but carries coarse colour blotches). Calibrated on real Seestar
+stacks (luma sigma 3-6) and JPEG uploads (1.5-4): a luma setting above 40
+smeared the faint stars of a dense field into a haze; colour takes a harder cut
+since it carries little detail.
+
+**Colour.** `green_removal = 50` when the object's green excess is over 3% (a
+one-shot-colour sensor's extra green; a blue reflection nebula or a red emission
+nebula reads negative and is left alone), never on the Moon. Deep sky only:
+`vibrance = 1.15 + 0.35 * clip((80 - object_chroma) / 80, 0, 1)` - the
+colour-preserving stretch leaves the colour pale, a galaxy's most of all. A night
+landscape gets no boost: its render is already saturated, and the boost made the
+Milky Way's colour mottle garish.
+
+**Stars.** Deep sky only: `star_reduction = clip(5 * ln(1 + density) - 10, 0,
+30)` - real fields span tens to 4000+ stars per megapixel, hence the log. A
+night landscape's stars are its subject; on the Moon the "stars" are craters.
+
+**Moon and planets** get only noise-aware sharpening (`sharpness = 1.3`).
+
+Never set: `gradient_reduction` and `vignette_correction` (below), saturation,
+clarity, the white balance sliders, and the engines (DeepSNR / StarNet2).
+
+**Checked against real images.** The opt-in benchmark
+`tests/benchmarks/test_auto_astro_real_images.py` runs the whole path (ingest,
+Auto Astro, render) on a folder of real captures and checks that the sky is
+deepened but never clipped, stays neutral, and gets no more visibly noisy (a
+sigma under 1 of 255 is invisible); it also writes before/after comparisons to
+look at. It caught the refinements above - the sky's mean colour, the curve's
+gain - that a fit-to-screen look had missed. Synthetic tests guard the *shape* of each
+rule; they cannot replace checking real output before shipping a number that
+runs unsupervised - every rule above was settled on real captures (Seestar
+stacks and JPEGs, iPhone ProRAW night landscapes, lunar JPEGs).
 
 **Gradient reduction (tried, removed)**: light pollution / vignetting shows up
 as a broad brightness trend across the frame, so the first version fitted a
@@ -639,62 +686,15 @@ and a centred bright object produce the identical centre-bright/edge-dim
 radial signature; no single-frame trick tells them apart). `gradient_reduction`
 is manual-only; `AutoAstroService` never sets it.
 
-**White balance**: only `temperature` (blue/orange) is proposed, from the sky
-mask's own mean blue-vs-red balance - `tint`'s green/magenta axis is left
-alone, harder to tell apart from a real nebula's own colour with one frame's
-confidence than a broad orange/blue cast (light pollution, the sensor's own
-response) is. The correction is *damped* to half the measured cast
-(`target_blue_gain = 1 + (red/blue - 1) * 0.5`) before being inverted through
-`kelvin_to_rgb_gain`'s own blue-channel slope (`0.3` per 2000K step) back into
-a Kelvin value - the same reasoning as the "Colour calibration" hint's own
-caveat: a full neutralisation can't tell a sensor cast apart from the
-target's own real colour (a blue reflection nebula, a red emission nebula),
-so it risks washing either out; a starting nudge doesn't carry that risk as
-sharply. A cast under `3%` (`abs(red/blue - 1) < 0.03`) is left at the neutral
-6500K default - more likely noise than a real tint.
-
-**Denoise**: the sky mask's Laplacian response, via its median absolute
-deviation (`sigma = median(abs(laplacian)) / 0.6745` - a standard,
-outlier-robust noise estimator, robust to the handful of real star-point
-edges that still fall inside the mask), maps to `denoise = clip(round(sigma *
-1.2), 0, 50)`, or 0 below a `1.5` sigma floor (a stack, or a clean low-ISO
-frame, is left untouched rather than softened for a marginal reading).
-
-The `1.2` scale is calibrated against real stacked composites, not just
-synthetic noise. A first version used `4.5`, tuned only against synthetic
-per-pixel noise injected into a flat test image; checked against a library
-of real stacked FITS (M31, several nebulae, several star clusters), every
-one of them read a sky sigma of 15-22, which `4.5` mapped to 70-100+ -
-capping at the (then) `60` ceiling on nearly every real capture tested, and
-`apply_denoise` runs on the *whole frame*, not just the sky, so that also
-meant smoothing away genuine DSO detail (dust lanes, resolved star clusters)
-along with the sky noise it was aimed at. `1.2` maps that same real 15-22
-range to a gentle ~20-25; a single very noisy raw sub-frame (sigma 50+,
-i.e. an unstacked light frame opened directly rather than through the
-multi-frame stacker) still reaches the new, lower `50` cap - appropriately,
-since that case usually is genuinely that noisy.
-
-**Chroma denoise**: colour speckle is usually more objectionable than luma
-noise in a stacked frame (see `apply_chroma_denoise`) - the exact same
-Laplacian-MAD estimator as denoise above, run on the Cr and Cb planes
-(`cv2.COLOR_BGR2YCrCb`) instead of luma, taking whichever of the two reads
-noisier. No separately-calibrated threshold/scale/cap of its own: it reuses
-denoise's `1.5` floor, `1.2` scale, and `50` cap verbatim, on the same
-reasoning `apply_chroma_denoise` itself is built on (chroma noise behaves
-like luma noise, just measured on a different plane) - not a claim the two
-are identical in practice.
-
-**A note on very bright stars**: any meaningful contrast stretch pushes
-already-bright pixels further toward clipping, including a photo's brightest
-stars - by the time `star_reduction` runs (after `contrast`/`highlights`/
-`shadows`, see the pipeline order above), a star that was already near-white
-in the original can be a wide, flat, saturated plateau with little gradient
-left for erosion to shrink into. This reads as a small round white disc even
-after reduction - expected for a frame's few brightest "anchor" stars (real
-astro-processing tools leave these visible after reduction too), not a defect
-in the shrink algorithm itself. Actually removing a star regardless of
-brightness is the separate, more aggressive "Star removal (starless)" operation
-above (`star_removal` / `star_recombine`), not reduction.
+**A note on very bright stars**: by the time `star_reduction` runs (after the
+tone stages, see the pipeline order above), a star that was already near-white
+can be a wide, flat, saturated plateau with little gradient left for erosion to
+shrink into. This reads as a small round white disc even after reduction -
+expected for a frame's few brightest "anchor" stars (real astro-processing tools
+leave these visible after reduction too), not a defect in the shrink algorithm
+itself. Actually removing a star regardless of brightness is the separate, more
+aggressive "Star removal (starless)" operation above (`star_removal` /
+`star_recombine`), not reduction.
 
 ## Depth map (v1, gradient-based)
 
@@ -984,6 +984,17 @@ the enhancement pipeline works on:
    its negative half. Clipping it at zero, as the former stretch did, leaves a
    positive bias proportional to each channel's noise, which a later channel gain
    (a Seestar's weak blue is boosted ~4x) turned into a purple, mottled sky.
+   *Which* pixels are the darker half is decided on other pixels than the ones
+   measured: the smoothed luminance of a 1-in-4 lattice selects the pixels of a
+   second lattice offset by half a step. Chosen on their own values, the choice
+   followed each pixel's noise - and luminance is 72% green, so the "darker"
+   pixels were the ones whose green noise happened to be low. Green's sky level
+   came out lowest, too little of it was subtracted, and every stretched
+   composite had a green sky (NGC 7023, 60 frames: R 25 / G 28 / B 22 of 255;
+   26 / 26 / 25 since). When too few stars are measured for the colour
+   calibration below, its fallback (`calibrate_colour`) runs on the data from
+   before this step, which zeroes each channel's sky itself: clipping the
+   neutralised data at zero would cut off the negative half of the sky noise.
 3. **Colour calibration** (`color_calibration`, on/off, `star_white_balance`) -
    **the star field is the white reference.** Stars are detected on a band-passed
    luminance (Gaussian 1 px minus 6 px, 8 sigma, 4-400 px components) of a copy

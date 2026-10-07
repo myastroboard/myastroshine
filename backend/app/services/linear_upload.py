@@ -21,6 +21,7 @@ which would take a dark landscape for a dead stack edge - is skipped.
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 import cv2
@@ -29,7 +30,12 @@ import numpy as np
 from app.db.models import SessionRecord, StackRecord
 from app.logging_config import get_logger
 from app.models import StackParameters
-from app.services.post_stack import crop_low_signal_border, render_hints_for, render_stack_base
+from app.services.post_stack import (
+    RenderHints,
+    crop_low_signal_border,
+    render_hints_for,
+    render_stack_base,
+)
 from app.services.session import SessionService
 from app.services.storage import StorageService
 from app.utils.app_settings import get_app_settings
@@ -83,6 +89,40 @@ def _to_linear_composite(frame: LinearFrame) -> np.ndarray:
     return np.ascontiguousarray(frame.data.astype(np.float32))
 
 
+@dataclass(frozen=True)
+class PreparedComposite:
+    """A linear upload made ready for the editor (see :func:`prepare_composite`)."""
+
+    composite: np.ndarray
+    sky_mask: np.ndarray | None  # a night landscape's sky matte, as stored
+    hints: RenderHints
+    border_crop: tuple[int, int, int, int] | None
+    metadata: dict[str, str]
+
+
+def prepare_composite(data: bytes, filename: str | None) -> PreparedComposite:
+    """Decode a linear upload into the composite the "Stack" step renders.
+
+    A night landscape keeps its sky matte; any other frame has its dead border
+    trimmed (``crop_low_signal_border``). No storage - the session ingest and the
+    real-image benchmark open a file the same way through this.
+    """
+    frame = ingest_frame(data, filename)
+    composite = _to_linear_composite(frame)
+    sky_mask = frame.sky_matte
+    border_crop = None  # with a matte, the dark edge is the landscape, not a dead border
+    if fit_sky_mask(sky_mask, composite.shape) is None:
+        sky_mask = None  # no matte, or one with no landscape in it: deep-sky path
+        composite, border_crop = crop_low_signal_border(composite)
+    return PreparedComposite(
+        composite=composite,
+        sky_mask=sky_mask,
+        hints=render_hints_for([frame.metadata]),
+        border_crop=border_crop,
+        metadata=frame.metadata,
+    )
+
+
 class LinearUploadService:
     """Turns one linear stack upload into a composite-backed editing session."""
 
@@ -98,20 +138,14 @@ class LinearUploadService:
         "Stack" render, and links a ``StackRecord`` so
         ``EnhancementService`` picks up the linear pre-stage.
         """
-        frame = ingest_frame(data, filename)
-        composite = _to_linear_composite(frame)
-        sky_mask = frame.sky_matte
-        if fit_sky_mask(sky_mask, composite.shape) is None:
-            sky_mask = None  # no matte, or one with no landscape in it: deep-sky path
-            composite, border_crop = crop_low_signal_border(composite)
-        else:
-            border_crop = None  # the dark edge here is the landscape, not a dead border
+        prepared = prepare_composite(data, filename)
+        composite, sky_mask, hints = prepared.composite, prepared.sky_mask, prepared.hints
+        border_crop = prepared.border_crop
 
         stack_id = str(uuid.uuid4())
         self.storage.save_stack_composite(stack_id, composite)
         if sky_mask is not None:
             self.storage.save_stack_sky_mask(stack_id, sky_mask)
-        hints = render_hints_for([frame.metadata])
         self.storage.save_stack_render_hints(stack_id, hints.to_dict())
 
         session = self.sessions.create_session(image_path="", original_filename=filename)
@@ -129,7 +163,7 @@ class LinearUploadService:
                 received_frames=1,
                 status="completed",
                 source="single",
-                capture_info=summarize_capture([frame.metadata]),
+                capture_info=summarize_capture([prepared.metadata]),
                 session_id=session.session_id,
                 post_process=False,
                 cosmetic_correction=False,

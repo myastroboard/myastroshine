@@ -54,10 +54,26 @@ def test_neutralise_sky_centres_each_channel_on_zero_without_clipping() -> None:
     neutral, sky = neutralise_sky(frame)
 
     assert sky == pytest.approx([0.32, 0.12, 0.07], abs=0.002)
-    luma = neutral @ LUMA_RGB
-    dark = neutral[luma < np.percentile(luma, 50)]
-    assert np.abs(np.median(dark, axis=0)).max() < 1e-3
+    assert np.abs(np.median(neutral, axis=(0, 1))).max() < 1e-3
     assert float(neutral.min()) < 0.0
+
+
+def test_neutralise_sky_leaves_no_green_cast_on_a_noisy_sky() -> None:
+    """Equal noise in every channel leaves every channel's sky at the same level.
+
+    Picking "the darker half" pixel by pixel on luminance (72% green) picks the
+    pixels whose green noise is low, so green's sky level came out lowest and a
+    green residual was left on the sky - the green background of every stretched
+    composite.
+    """
+    rng = np.random.default_rng(11)
+    sigma = 0.01
+    frame = (0.05 + rng.normal(0.0, sigma, (600, 600, 3))).astype(np.float32)
+
+    neutral, _ = neutralise_sky(frame)
+
+    residual = np.median(neutral, axis=(0, 1))
+    assert float(residual.max() - residual.min()) < 0.05 * sigma
 
 
 def test_star_white_balance_removes_a_sensor_cast() -> None:

@@ -245,6 +245,7 @@ def render_stack_base(
         linear, _ = extract_background(
             linear, params.background_extraction / 100.0, sky, wide_field=hints.wide_field
         )
+    unneutralised = linear
     linear, _ = neutralise_sky(linear, sky)
     # A nightscape or a camera-processed frame keeps the camera's white balance:
     # its star colours are not a usable reference - a phone lens' blue fringing
@@ -256,7 +257,12 @@ def render_stack_base(
         if gains is not None:
             linear = linear * gains
         else:  # too few clean stars: fall back to balancing the signal means
-            linear, _ = neutralise_sky(calibrate_colour(np.clip(linear, 0.0, None))[0], sky)
+            # On the data before neutralisation: calibrate_colour zeroes each
+            # channel's sky itself. Clipping the neutralised data at zero instead
+            # cut the negative half of the sky noise off - half the sky at exactly
+            # zero, and the stretch then read no noise and blew the sky up.
+            balanced, _ = calibrate_colour(np.clip(unneutralised, 0.0, None))
+            linear, _ = neutralise_sky(balanced, sky)
     return adaptive_stretch(
         linear, target, source_peak=source_peak, sky_mask=sky, protect_dark_sky=hints.wide_field
     )

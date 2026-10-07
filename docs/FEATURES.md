@@ -81,11 +81,14 @@ of the screen.
 
 ### Start: Auto Astro and presets
 
-**Auto Astro** - the main button of the Start step - analyses the image
-(histogram black/white point, star density) and applies a computed starting point - a contrast/exposure stretch that separates
-the object from the background, plus a gentle log-scaled star reduction. It is a
-starting point, not a finished edit: once applied, the Start step says so and
-points to the other steps for fine-tuning, or straight to Export.
+**Auto Astro** - the main button of the Start step - analyses the picture
+(sky and object levels, sky colour, noise, star density, and whether it is deep
+sky, a night landscape or the Moon) and applies an edit that showcases it: a
+tone curve that deepens the sky without ever clipping it and lifts the object, a
+neutral background, noise and colour mottle smoothed, colour and star reduction
+dosed for the kind of picture. Your Stack settings, framing and style are kept.
+Every value lands in the ordinary controls (the curve in the curve editor), so
+you can tweak any of them, or go straight to Export.
 
 **Presets** apply a saved look in one click; each is a card with an icon of the
 subject it is tuned for and a one-line description. Auto Astro and presets both keep
