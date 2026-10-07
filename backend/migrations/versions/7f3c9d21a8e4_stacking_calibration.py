@@ -1,6 +1,6 @@
 """stacking calibration
 
-Phase 2 of the stacking rebuild (``initial_plan/12_STACKING_REBUILD.md``): master
+Calibration (``docs/ALGORITHMS.md`` "Stacking" > "Calibration"): master
 dark / flat / bias frames are calibrated into each light before debayer, and a
 bad-pixel map from the master dark/flat drives a cosmetic (neighbour-median)
 repair. The calibration frames themselves live on disk under

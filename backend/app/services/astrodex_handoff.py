@@ -7,8 +7,8 @@
 
 Only ever calls *out* to MyAstroBoard (the board never needs to reach this
 instance), so the whole flow works whether the board is on the LAN or behind a
-public reverse proxy. See ``docs/API.md`` and
-``initial_plan/PASSATION_MYASTROBOARD_INTEGRATION.md``.
+public reverse proxy. See ``docs/API.md`` "Astrodex integration" and, for the
+board side, MyAstroBoard's ``docs/MYASTROSHINE.md``.
 """
 
 from __future__ import annotations

@@ -22,7 +22,7 @@ const KINDS: { kind: CalibrationKind; count: keyof CalibrationSummary['frames'] 
 
 const CAL_ACCEPT = '.png,.tiff,.tif,.fits,.fit,.fts,.cr2,.cr3,.nef,.arw,.dng,.orf,.rw2,.pef,.raf';
 
-/** Optional master dark / flat / bias frames for a stack (Phase 2). */
+/** Optional master dark / flat / bias frames for a stack. */
 export function StackCalibrationPanel({
   calibration,
   cosmeticCorrection,

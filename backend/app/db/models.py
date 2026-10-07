@@ -106,7 +106,7 @@ class AstroDexLink(Base):
 class StackRecord(Base):
     """A multi-frame stacking session (linear rebuild).
 
-    See ``initial_plan/12_STACKING_REBUILD.md``.
+    See ``docs/ALGORITHMS.md`` "Stacking".
     """
 
     __tablename__ = "stacks"

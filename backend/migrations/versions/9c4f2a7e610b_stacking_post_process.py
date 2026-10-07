@@ -1,6 +1,6 @@
 """stacking post process
 
-Phase 4 of the stacking rebuild (``initial_plan/12_STACKING_REBUILD.md``):
+Post-stack (``docs/ALGORITHMS.md`` "Stacking" > "Post-stack"):
 a post-stack cleanup step on the linear composite - crop the field-rotation
 wedge, subtract a low-order background gradient, neutralise and balance the
 colour - before it becomes an editable session.

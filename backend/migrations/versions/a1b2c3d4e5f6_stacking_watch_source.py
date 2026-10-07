@@ -1,8 +1,8 @@
 """stacking watch source
 
-Phase 5 of the stacking rebuild (``initial_plan/12_STACKING_REBUILD.md``):
-folder-watch ingest - ``source`` distinguishes a UI upload from a watch-folder
-stack, ``updated_at`` drives the watch idle timeout.
+Folder-watch ingest (``docs/FEATURES.md`` "Folder-watch ingest"): ``source``
+distinguishes a UI upload from a watch-folder stack, ``updated_at`` drives the
+watch idle timeout.
 
 (``drizzle_factor`` was originally added here too, but that broke DBs that had
 already run this revision - it now lives in ``c3d4e5f6a7b8``.)

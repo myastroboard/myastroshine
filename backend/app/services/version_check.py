@@ -1,8 +1,8 @@
 """Checks GitHub for a newer myastroshine release.
 
 Cached in-memory with a long TTL so a busy frontend can't hammer GitHub's API
-(see ALIGNMENT.md #3). The app is a single process, so an in-memory cache is
-the whole story.
+(see ``docs/API.md`` "Update check"). The app is a single process, so an
+in-memory cache is the whole story.
 """
 
 from __future__ import annotations

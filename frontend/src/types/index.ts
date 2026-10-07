@@ -936,7 +936,7 @@ export interface VersionCheckResult {
 }
 
 // --- Stacking (linear rebuild) ----------------------------------------------
-// See initial_plan/12_STACKING_REBUILD.md.
+// See docs/ALGORITHMS.md "Stacking".
 
 export type CombinationMethod = 'average' | 'median';
 export type RegistrationTransform = 'translation' | 'similarity' | 'affine';

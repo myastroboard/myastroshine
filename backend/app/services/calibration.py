@@ -1,7 +1,7 @@
 """CalibrationService - master dark/flat/bias frames and sensor defect removal.
 
 Real stackers calibrate every light frame **on the CFA mosaic, before debayer**
-(``initial_plan/12_STACKING_REBUILD.md`` Phase 2):
+(``docs/ALGORITHMS.md`` "Stacking" > "Calibration"):
 
     calibrated = (light - bias - dark) / flat_field
 

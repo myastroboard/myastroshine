@@ -1,7 +1,7 @@
 """Per-frame quality scoring and auto-reject for the stacking pipeline.
 
-Phase 3 of the stacking rebuild (``initial_plan/12_STACKING_REBUILD.md``). After
-the registration pass has measured every frame (star count, star FWHM and
+See ``docs/ALGORITHMS.md`` "Stacking" > "Frame quality". After the registration
+pass has measured every frame (star count, star FWHM and
 roundness, sky background, background noise, signal scale), :func:`score_frames`
 turns those raw numbers into:
 

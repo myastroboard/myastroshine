@@ -1,4 +1,4 @@
-"""Frame-quality scoring and auto-reject thresholds (Phase 3)."""
+"""Frame-quality scoring and auto-reject thresholds."""
 
 from __future__ import annotations
 

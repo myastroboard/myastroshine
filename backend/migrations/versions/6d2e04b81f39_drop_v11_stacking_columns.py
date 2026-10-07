@@ -2,7 +2,7 @@
 
 Removes ``registration_method`` / ``cosmic_ray_rejection`` /
 ``background_normalization`` from ``stacks`` - the linear rebuild
-(``initial_plan/12_STACKING_REBUILD.md``) replaced them with
+(``docs/ALGORITHMS.md`` "Stacking") replaced them with
 ``registration_transform`` / ``rejection_algo`` / ``weighting`` (added in
 ``4c7a1e9b52d0``) and nothing reads the old columns any more.
 

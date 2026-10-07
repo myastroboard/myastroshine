@@ -1,7 +1,6 @@
-"""Performance acceptance criteria (release-hardening backlog #4, see
-initial_plan/10_IMPLEMENTATION_ROADMAP.md "Success Metrics"):
+"""Performance acceptance criteria (see CONTRIBUTING.md "Backend checks"):
 
-    full-res enhance < 5s; slider (preview) response < 500ms
+    full-res enhance < 12s; slider (preview) response < 500ms
 
 Opt-in and excluded from the default ``pytest`` run: wall-clock budgets are
 inherently sensitive to the machine running them (a busy CI runner can be
@@ -33,7 +32,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 FULL_RES_BUDGET_SECONDS = 12.0  # was 5.0 at v0.1.0; 8.0 for v0.2's 5 new stages - see
-# ALGORITHMS.md "Missing core astro ops"; 12.0 since the float multiscale (starlet) denoise,
+# ALGORITHMS.md "Performance notes"; 12.0 since the float multiscale (starlet) denoise,
 # chroma denoise and sharpen replaced the 8-bit bilateral filter and Laplacian kernel (~9.6s
 # on a desktop CPU, and GitHub runners vary by up to ~1.5x between runs). Full-res enhance is
 # not the interactive path (that's the preview budget below, unaffected): it runs on-demand or

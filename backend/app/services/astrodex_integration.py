@@ -3,8 +3,8 @@
 MyAstroBoard mints a signed *handoff token* when a user sends an Astrodex
 picture here for enhancement; this instance verifies it, pulls the source image,
 and later POSTs the enhanced result back with its own signature. Both sides
-implement the primitives below identically (see ``docs/API.md`` and
-``initial_plan/PASSATION_MYASTROBOARD_INTEGRATION.md``).
+implement the primitives below identically (see ``docs/API.md`` "Astrodex
+integration" and MyAstroBoard's ``docs/MYASTROSHINE.md``).
 
 - Handoff token: ``b64url(payload_json).b64url(HMAC_SHA256(b64url(payload_json)))``
   - the MAC is over the base64url payload *string*, and the signature segment is

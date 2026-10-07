@@ -1,6 +1,6 @@
 """Stacking request/response models (linear rebuild).
 
-See ``initial_plan/12_STACKING_REBUILD.md``. The v1.1 ``sift``/``orb`` +
+See ``docs/ALGORITHMS.md`` "Stacking". The v1.1 ``sift``/``orb`` +
 ``median``/``sigma_clip`` + cosmic-ray-toggle contract is replaced by a
 transform model, a pixel-rejection algorithm, and a per-frame weighting mode.
 """
@@ -71,7 +71,7 @@ class UploadFrameResponse(BaseModel):
 
 
 class FrameQualityInfo(BaseModel):
-    """Per-frame quality metrics and the auto-reject verdict (Phase 3)."""
+    """Per-frame quality metrics and the auto-reject verdict."""
 
     star_count: int
     fwhm: float

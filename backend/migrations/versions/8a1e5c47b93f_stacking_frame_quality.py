@@ -1,6 +1,6 @@
 """stacking frame quality
 
-Phase 3 of the stacking rebuild (``initial_plan/12_STACKING_REBUILD.md``):
+Frame quality (``docs/ALGORITHMS.md`` "Stacking" > "Frame quality"):
 per-frame quality scoring with auto-reject. Adds the ``quality_filter`` strength
 setting and the ``included_frames`` list (frames the user has rescued from the
 auto-reject). Per-frame metrics themselves live in the existing

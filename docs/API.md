@@ -633,8 +633,10 @@ MyAstroBoard's MyAstroShine connector; it mints the handoff tokens below.
 The browser is opened here from MyAstroBoard with a signed **handoff token** in
 the URL. This instance never needs to be reachable *from* the board - it only
 ever calls out - so the flow works whether the board is on the LAN or behind a
-public reverse proxy. Full design:
-`initial_plan/PASSATION_MYASTROBOARD_INTEGRATION.md`.
+public reverse proxy. The board side (connector setup, its
+`/api/astrodex/integration/*` endpoints, the duplicated picture) is documented
+in MyAstroBoard's
+[docs/MYASTROSHINE.md](https://github.com/myastroboard/myastroboard/blob/main/docs/MYASTROSHINE.md).
 
 **Handoff token** - `b64url(payload).b64url(HMAC_SHA256(b64url(payload), secret))`,
 b64url without padding, the signature segment is the raw digest (not hex). The
