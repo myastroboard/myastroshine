@@ -1,12 +1,12 @@
 """IntegrationService - register, normalise and combine a frame stack.
 
-Three memory-bounded passes over the frames (see
-``initial_plan/12_STACKING_REBUILD.md`` Phases 1-3):
+Three memory-bounded passes over the frames (see ``docs/ALGORITHMS.md``
+"Stacking"):
 
-1. **Register** - calibrate (Phase 2) then superpixel-debayer every frame (half
+1. **Register** - calibrate then superpixel-debayer every frame (half
    resolution is plenty for star centroids), measure each frame's star count /
    FWHM / roundness / background / noise, **score** them and drop the ones the
-   ``quality_filter`` rejects (Phase 3), pick the best remaining frame as the
+   ``quality_filter`` rejects, pick the best remaining frame as the
    reference, and match each other frame's asterisms to it
    (:class:`StarMatchService`) for a transform. Frames that fail to match are
    rejected too.

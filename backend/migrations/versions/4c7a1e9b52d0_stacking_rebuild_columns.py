@@ -5,7 +5,7 @@ star-based registration transform, Winsorized-sigma rejection, frame weighting,
 manual frame exclusions, a per-frame quality report). The v1.1 columns
 (``registration_method`` / ``cosmic_ray_rejection`` / ``background_normalization``)
 are left in place here and dropped in a later migration once nothing reads them.
-See ``initial_plan/12_STACKING_REBUILD.md``.
+See ``docs/ALGORITHMS.md`` "Stacking".
 
 Revision ID: 4c7a1e9b52d0
 Revises: 623faa14df02

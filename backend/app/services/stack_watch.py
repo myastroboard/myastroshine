@@ -1,4 +1,4 @@
-"""Watch-folder ingest for stacking (``initial_plan/12_STACKING_REBUILD.md`` Phase 5).
+"""Watch-folder ingest for stacking (``docs/FEATURES.md`` "Folder-watch ingest").
 
 The in-process scheduler (``app.services.scheduler``) calls :func:`run_watch_tick`
 every minute. When ``stacking_watch_dir`` is set, new image files that land

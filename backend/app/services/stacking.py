@@ -4,10 +4,11 @@ initiate -> upload frames (each ingested to a linear ``LinearFrame``) -> process
 -> the composite becomes a normal session so the single-image enhancement routes
 work on it unchanged.
 
-``process`` builds master calibration frames (Phase 2) then delegates the
+``process`` builds master calibration frames then delegates the
 score -> register -> normalise -> reject -> combine work to
-:class:`app.services.integration.IntegrationService`. A post-stack colour/stretch
-step is still to come - see ``initial_plan/12_STACKING_REBUILD.md``.
+:class:`app.services.integration.IntegrationService`, and crops the result with
+:func:`app.services.post_stack.apply_post_stack`. See ``docs/ALGORITHMS.md``
+"Stacking".
 """
 
 from __future__ import annotations
@@ -230,7 +231,7 @@ class StackingService:
         self.db.refresh(record)
         return record
 
-    # -- calibration frames (Phase 2) -----------------------------------
+    # -- calibration frames ----------------------------------------------
 
     def add_calibration_frames(
         self, stack_id: str, kind: str, sources: Sequence[FrameSource]

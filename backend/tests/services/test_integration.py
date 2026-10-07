@@ -1,7 +1,7 @@
 """IntegrationService: the register -> align -> combine passes on CFA data.
 
 ``test_stacking`` covers the already-RGB path; these exercise the Bayer-mosaic
-path added in Phase 2 - half-resolution registration, then a full-resolution
+path - half-resolution registration, then a full-resolution
 interpolating debayer for the align/combine passes, with calibration folded in.
 """
 

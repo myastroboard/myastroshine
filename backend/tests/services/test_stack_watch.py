@@ -1,4 +1,4 @@
-"""Folder-watch ingest for stacking (Phase 5)."""
+"""Folder-watch ingest for stacking."""
 
 from __future__ import annotations
 

@@ -1,7 +1,7 @@
 name: Performance benchmarks
 
-# Checks the acceptance criteria in initial_plan/10_IMPLEMENTATION_ROADMAP.md
-# "Success Metrics" (full-res enhance < 12s, slider response < 500ms, stacking
+# Checks the acceptance criteria in CONTRIBUTING.md "Backend checks"
+# (full-res enhance < 12s, slider response < 500ms, stacking
 # SNR gain ~sqrt(N)). Runs weekly and on demand, not on every push/PR: wall-clock
 # budgets are sensitive to which runner picks up the job, so this is a signal to
 # investigate on failure, not a merge gate. See tests/benchmarks/*.py.

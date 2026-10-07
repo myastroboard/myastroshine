@@ -1,5 +1,5 @@
-"""Post-stack cleanup of a linear composite (``initial_plan/12_STACKING_REBUILD.md``
-Phase 4).
+"""Post-stack cleanup of a linear composite (``docs/ALGORITHMS.md`` "Stacking" >
+"Post-stack").
 
 Two stages, split by *when* they run:
 

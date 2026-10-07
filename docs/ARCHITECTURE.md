@@ -286,5 +286,5 @@ behind a reverse proxy.
   picture on the same object (never a replacement). Retried with backoff.
 
 The allowlist fails closed (empty = every URL refused) - the main SSRF guard.
-Contract detail: [API.md](API.md#astrodex-integration). Full design:
-`initial_plan/PASSATION_MYASTROBOARD_INTEGRATION.md`.
+Contract detail: [API.md](API.md#astrodex-integration). Board side: MyAstroBoard's
+[docs/MYASTROSHINE.md](https://github.com/myastroboard/myastroboard/blob/main/docs/MYASTROSHINE.md).

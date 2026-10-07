@@ -1,9 +1,9 @@
 """Product configuration - runtime-tunable settings, persisted as JSON.
 
-PASSATION section 1: ``docker compose up`` needs no ``.env`` editing. The session
-secret is auto-generated once and kept in the data volume; everything else a user
-tunes lives in ``DATA_DIR/app_settings.json`` and is edited from Settings in the
-UI, never from an environment variable.
+``docker compose up`` needs no ``.env`` editing (``docs/DEPLOYMENT.md``
+"Philosophy"). The session secret is auto-generated once and kept in the data
+volume; everything else a user tunes lives in ``DATA_DIR/app_settings.json`` and
+is edited from Settings in the UI, never from an environment variable.
 
 Loading: hard-coded defaults (the field defaults below), merged with the on-disk
 file, cached in memory. Call :func:`reload_app_settings` after an external write
@@ -69,7 +69,7 @@ class AppSettings(BaseModel):
     astrodex_max_retries: int = Field(default=3, ge=1, le=10)
     astrodex_retry_delay_seconds: float = Field(default=5.0, ge=0, le=60)
 
-    # Stacking (linear rebuild - see initial_plan/12_STACKING_REBUILD.md).
+    # Stacking (see docs/ALGORITHMS.md "Stacking").
     # Default sized for a real imaging night: a smart telescope at 10 s subs over
     # ~5-6 h of darkness produces ~2000 frames.
     stacking_enabled: bool = True

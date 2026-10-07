@@ -371,7 +371,7 @@ original Keep a Changelog headings.
   the flow works whether the board is on the LAN or behind a reverse proxy. The
   handoff token is HMAC-SHA256 signed with a webhook token's `signing_secret`,
   expires after 12 h, and is single-use for the return. See `docs/API.md`
-  "Astrodex integration" and `initial_plan/PASSATION_MYASTROBOARD_INTEGRATION.md`.
+  "Astrodex integration" and MyAstroBoard's `docs/MYASTROSHINE.md`.
 
 ### Removed
 

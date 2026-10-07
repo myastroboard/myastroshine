@@ -4,7 +4,7 @@ One entry point (:func:`get_logger`); never import ``logging`` or configure
 handlers directly elsewhere. structlog renders through the stdlib so we get a
 rotating file handler in the data volume alongside the console.
 
-Two sinks, two independently controlled levels (PASSATION section 4):
+Two sinks, two independently controlled levels (``docs/DEPLOYMENT.md`` "Logs"):
 
 - **console** -> ``stdout`` (``docker logs``); level ``console_log_level``
   (default ``warning``), ``ConsoleRenderer`` in development else JSON.

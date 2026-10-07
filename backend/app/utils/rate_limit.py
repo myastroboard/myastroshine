@@ -1,8 +1,7 @@
-"""Per-IP request rate limiting (release-hardening backlog item #2).
+"""Per-IP request rate limiting (``docs/API.md`` "Rate Limiting").
 
-A single ``api`` process is the deployment target for now (mono-poste, see
-ALIGNMENT.md #1), so a plain in-memory fixed-window counter is enough - no
-shared store needed.
+A single ``api`` process is the deployment target (one machine, one user), so a
+plain in-memory fixed-window counter is enough - no shared store needed.
 
 The companion "5 concurrent processing jobs per IP" limit (also in the API
 spec) is not handled here: it is a concurrency check, not a request-rate

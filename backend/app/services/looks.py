@@ -5,8 +5,7 @@ contrast, Orton glow, split toning, a deeper sky black, colour pop, vignette,
 warm / cool tones, a shadow lift), driven by one ``amount`` (0-100). Every
 operation only redistributes the recorded signal - tone, colour, contrast at a
 given scale, a glow made from the image's own bright areas. None adds a star, a
-spike or any structure that was not captured. See docs/ALGORITHMS.md "Looks"
-and initial_plan/15_LOOKS_STEP.md.
+spike or any structure that was not captured. See docs/ALGORITHMS.md "Looks".
 
 Spatial sizes are fractions of the image diagonal, not pixels, so a ~320 px
 gallery thumbnail shows the same look as the full-resolution export.

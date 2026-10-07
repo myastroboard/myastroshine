@@ -382,6 +382,14 @@ redistributable). Instead the operator installs the tool themselves and
 MyAstroShine shells out to it - arm's-length, never bundled. Setup and licensing:
 `docs/DEPLOYMENT.md` "External ML engines" and `THIRD_PARTY.md`.
 
+GraXpert's ONNX denoise model was evaluated first (2026-09-05) and not adopted:
+its contract (256 px tiles blended at a 128 px stride, inputs normalised by the
+image's median/MAD, a model-specific clip threshold) is not something a generic
+"bring your own model" switch can drive, and the model file is fetched from a
+private bucket, so there was nothing an operator could point at. Background
+extraction is classical for the same reason (see "Post-stack" below); GraXpert's
+AI mode would only come back the same way as StarNet2, as an external engine.
+
 `star_removal_engine` (`"classic"` / `"starnet2"`) and `denoise_engine`
 (`"classic"` / `"deepsnr"`) pick the backend per edit; the ML choice is honoured
 only when the matching `AppSettings` path points at a working binary (probed by
@@ -435,7 +443,7 @@ removal is active). The job keeps that pre-look result losslessly
 source's mtime), so changing only the look or its amount re-applies it in
 milliseconds instead of re-running the pipeline, the gallery thumbnails are
 rendered from a ~400 px copy, and an export "without style" is exact. No look
-is an identity. Design and roadmap: `initial_plan/15_LOOKS_STEP.md`.
+is an identity. What the user sees: [FEATURES.md](FEATURES.md#style).
 
 **Guardrail - no invented detail.** Every operation only redistributes the
 recorded signal: tone, colour, contrast at a given scale, a glow built from the

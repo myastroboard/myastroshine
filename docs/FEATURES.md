@@ -11,13 +11,13 @@ the tour.
 - [The single-image editor](#the-single-image-editor)
   - [Start: Auto Astro and presets](#start-auto-astro-and-presets)
   - [1. Framing](#1-framing)
-  - [2. Background](#2-background)
+  - [2. Clean the sky](#2-clean-the-sky)
   - [3. Light](#3-light)
   - [4. Curves](#4-curves)
   - [5. Colour](#5-colour)
   - [6. Detail](#6-detail)
   - [7. Stars](#7-stars)
-  - [8. Depth](#8-depth)
+  - [8. 3D effect](#8-3d-effect)
   - [Style](#style)
   - [Export](#export)
 - [Go-back points](#go-back-points)
@@ -30,6 +30,7 @@ the tour.
 - [Astrodex integration](#astrodex-integration)
 - [Themes and language](#themes-and-language)
 - [Settings](#settings)
+- [Out of scope](#out-of-scope)
 
 ## Two modes
 
@@ -315,3 +316,23 @@ or set their paths), **Astrodex** (tokens, callback allowlist and delivery),
 then tail, filter, clear, export a ZIP for a bug report) and **Maintenance**
 (disk usage, job history, configuration backup and restore). Full table:
 [DEPLOYMENT.md](DEPLOYMENT.md#runtime-settings-edited-in-the-ui).
+
+## Out of scope
+
+Decided against, not just not done yet:
+
+- **Still images only.** No animated or video export; the 3D effect stays an
+  interactive viewer.
+- **No invented detail.** Processing and styles only redistribute the light the
+  camera recorded: no added stars or spikes, no sky replacement, no generative
+  model ([ALGORITHMS.md](ALGORITHMS.md#looks-the-style-step)).
+- **One interface for everyone.** No Simple / Expert modes; approachability comes
+  from Auto Astro, presets, plain-language steps and the Style gallery.
+- **Works from the photos alone.** No per-camera profiles or procedures to
+  follow; calibration frames are optional.
+- **No bundled ML models.** Trained engines are installed by the operator and
+  called from outside ([External ML engines](#external-ml-engines)).
+- **Processing runs on the server**, not in the browser: stacking needs it.
+- **Not here:** collectible object cards, a Messier / NGC catalogue, animated
+  wallpapers, size comparisons. Planning a night and keeping observation
+  records belong to MyAstroBoard, capture to MyAstroShot.

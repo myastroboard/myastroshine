@@ -215,7 +215,7 @@ class StorageService:
         return path
 
     def stack_accum_dir(self, stack_id: str, *, create: bool = False) -> Path:
-        """Where the streaming-integration memmap accumulators live (Phase 1)."""
+        """Where the streaming-integration memmap accumulators live."""
         path = self.stack_dir(stack_id) / "accum"
         if create:
             path.mkdir(parents=True, exist_ok=True)
@@ -245,7 +245,7 @@ class StorageService:
         """The 32-bit linear composite (``.npy``), before any stretch/enhancement."""
         return self.stack_dir(stack_id) / "composite.npy"
 
-    # -- stacking: calibration frames (Phase 2) --------------------------
+    # -- stacking: calibration frames ------------------------------------
 
     def stack_cal_root(self, stack_id: str, *, create: bool = False) -> Path:
         """Where master calibration frames and the bad-pixel map live."""
