@@ -1072,8 +1072,9 @@ step measures the sky alone:
 - background extraction samples only lattice tiles that are at least half sky,
   from their sky pixels; never drops a tile for *touching* the landscape (that is
   the sky right above the horizon, where the light-pollution dome is); fits a
-  **cubic** (the dome climbs steeply toward the horizon; still far too smooth to
-  model the Milky Way); skips the frame-edge correction (that edge is the
+  **cubic** (the dome climbs steeply toward the horizon) - except on a
+  wide-field frame, which gets a plane (see `wide_field` below); skips the
+  frame-edge correction (that edge is the
   landscape, not a stack footprint); and subtracts the surface **from the sky
   only**, feathered across the horizon (mask grown by twice the ramp first, so the
   ramp falls on the dark landscape side - a ramp on the sky side left a bright rim
@@ -1123,13 +1124,32 @@ with the composite:
   tiles - the Milky Way's own colour - left out, 2-sigma rejection), normalised
   to their median, and R and B divided by them: colour only, so it cannot carve
   the Milky Way's brightness. Then **background extraction fits only a tilted
-  plane** and skips the border correction (with no sky mask): a curved surface
-  bends to the Milky Way's broad glow, carving dark holes into it. Finally the
-  stretch **keeps the darkest real sky above the black point**
-  (`protect_dark_sky`: black <= the sky's 0.5th percentile minus 15% of its
-  distance to the sky level). A stack's low noise otherwise lifts the black point
-  (sky - 2.8 sigma) up to the sky level, and the slightly darker parts of a
-  never-quite-flat wide-field sky were crushed to black blotches.
+  plane** and skips the border correction, with or without a sky mask: a curved
+  surface bends to the Milky Way's broad glow, carving dark holes into it (under
+  a mask the cubic took up to 87% of a broad synthetic band), and on a real
+  iPhone frame below a town's light dome the cubic - its outlier rejection
+  dropping the dome's bright tiles - left a dark arch above the horizon and
+  bright lavender sides. The plane takes the overall tilt and leaves the glow
+  at the horizon. Finally the stretch (`adaptive_stretch(wide_field=True)`)
+  **keeps the darkest real sky above the black point** (black <= the sky's
+  0.5th percentile minus 15% of its distance to the sky level - a stack's low
+  noise otherwise lifts the black point, sky - 2.8 sigma, up to the sky level,
+  and the slightly darker parts of a never-quite-flat wide-field sky were
+  crushed to black blotches) and **fades the colour toward grey where the
+  signal is near the noise**: each pixel keeps `s / (s + 8 sigma)` of its
+  colour, `s` its level above the black point - about a quarter on the sky, two
+  thirds on the Milky Way's bright parts, nearly all of it in a star. The
+  stretch carries colour as a ratio to the luminance, and 2.8 sigma above black
+  that ratio is mostly colour noise. A deep-sky stack's colour noise is
+  fine-grained and the chroma denoise takes it, but a phone merges and denoises
+  its night shot into noise at every scale up to tens of pixels (on real iPhone
+  frames the coarser wavelet layers carry 20-50x the white-noise level), and
+  the Milky Way came out under green and magenta blotches - the phone's own
+  render, far flatter, showed none. A stack, with less noise, keeps more of its
+  colour. Not solved: a single frame cannot tell the vignetting from a glow
+  that rises toward a frame edge, so a frame with a strong horizon glow can
+  keep a brighter edge (asking the photographer for flat frames is out of
+  scope).
 
 A **stack** of ProRAW frames gets its mask from the **reference frame**: each
 frame's matte is stored with it at upload (`frames/NNNN_sky.npy`), every frame is

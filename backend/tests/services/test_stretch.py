@@ -214,10 +214,10 @@ def test_a_sky_mask_puts_the_sky_at_the_target_despite_a_dark_landscape() -> Non
     assert unmasked > masked + 0.05
 
 
-def test_protect_dark_sky_keeps_a_darker_region_above_black() -> None:
+def test_wide_field_keeps_a_darker_region_above_black() -> None:
     """A clean (low-noise) frame with a small region of darker sky (under the 10%
-    the sky level is read from): by default it is crushed to pure black;
-    protected, none of it is."""
+    the sky level is read from): by default it is crushed to pure black; as a
+    wide field, none of it is."""
     rng = np.random.default_rng(3)
     sky = np.full((160, 200), 0.01, dtype=np.float32)
     sky[:, -16:] = 0.0075  # 8% of the frame, 25% darker
@@ -225,10 +225,58 @@ def test_protect_dark_sky_keeps_a_darker_region_above_black() -> None:
     linear = linear.astype(np.float32)
 
     plain = adaptive_stretch(linear, 0.10)
-    protected = adaptive_stretch(linear, 0.10, protect_dark_sky=True)
+    protected = adaptive_stretch(linear, 0.10, wide_field=True)
 
     def crushed(img: np.ndarray) -> float:
         return float((img[:, -12:].max(axis=2) == 0).mean())
 
     assert crushed(plain) > 0.95
     assert crushed(protected) == 0.0
+
+
+def _night_sky_with_colour_noise(seed: int = 5) -> np.ndarray:
+    """A sky-neutralised night sky whose noise is mostly colour, smeared over a few
+    pixels (a phone's merge and denoise), with a red and a blue star (and a
+    bright white one, so the coloured two land in the mid-tones)."""
+    rng = np.random.default_rng(seed)
+    chroma = cv2.GaussianBlur(rng.normal(0, 0.0006, (200, 200, 3)), (0, 0), 3.0)
+    grain = rng.normal(0, 0.0001, (200, 200, 1))
+    linear = (chroma + grain).astype(np.float32)
+    linear[60:63, 60:63] += np.array([0.003, 0.0012, 0.0008], dtype=np.float32)  # red star
+    linear[140:143, 140:143] += np.array([0.0008, 0.0012, 0.003], dtype=np.float32)  # blue star
+    linear[20:23, 180:183] += 0.3  # a bright white star sets the white point
+    return linear
+
+
+def _sky_chroma(img: np.ndarray) -> float:
+    """Mean channel spread over the sky, away from the stars."""
+    sky = img[90:120, 10:190]
+    return float((sky.max(axis=2) - sky.min(axis=2)).mean())
+
+
+def test_wide_field_fades_the_sky_colour_noise_more_than_star_colours() -> None:
+    """Near the noise the colour is mostly noise: a wide field fades the sky's
+    colour toward grey (to under a third), while a star well above the noise
+    keeps most of its colour - and its hue."""
+    linear = _night_sky_with_colour_noise()
+    plain = adaptive_stretch(linear, 0.10)
+    wide = adaptive_stretch(linear, 0.10, wide_field=True)
+
+    sky_kept = _sky_chroma(wide) / _sky_chroma(plain)
+    assert sky_kept < 0.35
+    for y, x in ((61, 61), (141, 141)):  # the red star, the blue star
+        assert np.ptp(wide[y, x]) / np.ptp(plain[y, x]) > 2 * sky_kept
+    assert wide[61, 61, 2] > 1.5 * wide[61, 61, 0]  # still red (BGR)
+    assert wide[141, 141, 0] > 1.5 * wide[141, 141, 2]  # still blue
+
+
+def test_wide_field_keeps_the_sky_brightness() -> None:
+    """Fading the colour toward grey leaves each pixel's stretched luminance as it was."""
+    linear = _night_sky_with_colour_noise()
+    plain = adaptive_stretch(linear, 0.10)
+    wide = adaptive_stretch(linear, 0.10, wide_field=True)
+
+    def luma(img: np.ndarray) -> np.ndarray:
+        return img[90:120, 10:190] @ np.array([0.114, 0.587, 0.299], dtype=np.float32)
+
+    assert abs(float(luma(wide).mean()) - float(luma(plain).mean())) < 0.01

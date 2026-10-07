@@ -543,6 +543,22 @@ def test_wide_field_background_extraction_fits_only_a_plane() -> None:
     assert band_height > 0.008  # the band (0.01) survives
 
 
+def test_wide_field_background_extraction_keeps_a_broad_band_under_a_sky_mask() -> None:
+    """A wide-field night landscape keeps a broad Milky Way: the degree-3 surface
+    a sky mask otherwise gets bent into the band and took up to 87% of it; the
+    plane only takes the gradient."""
+    composite, sky = _nightscape()
+    width = composite.shape[1]
+    xx = np.arange(width, dtype=np.float32)[np.newaxis, :]
+    band = 0.01 * np.exp(-(((xx - width / 2) / 40) ** 2))
+    composite = composite + np.where(sky, band, 0.0)[..., np.newaxis]
+
+    flat, _ = extract_background(composite, 1.0, sky, wide_field=True)
+    luma = flat.mean(axis=2)
+    assert float(luma[60:120, 85:95].mean() - luma[60:120, :15].mean()) > 0.008
+    assert abs(float(luma[:30, :20].mean() - luma[140:170, :20].mean())) < 0.0006
+
+
 def test_render_hints_follow_the_source_frames() -> None:
     """Every frame camera-processed -> camera_processed; a focal of at most 50 mm
     (35 mm equivalent) -> wide_field; and they round-trip through a dict."""
