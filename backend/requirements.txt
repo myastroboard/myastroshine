@@ -2,7 +2,7 @@
 # Pins are kept at the latest release; scripts/check_deps_fresh.py enforces this.
 
 # Web framework
-fastapi==0.142.2
+fastapi==0.143.0
 uvicorn[standard]==0.54.0
 python-multipart==0.0.32
 websockets==17.2
