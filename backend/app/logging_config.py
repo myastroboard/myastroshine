@@ -71,7 +71,7 @@ _CALLSITE = structlog.processors.CallsiteParameterAdder(
 )
 
 # Noisy third-party loggers pinned to WARNING regardless of our file level.
-_QUIET_LOGGERS = ("httpx", "httpcore", "python_multipart", "PIL", "asyncio")
+_QUIET_LOGGERS = ("httpx2", "httpcore2", "python_multipart", "PIL", "asyncio")
 
 
 def _render_file(_logger: Any, _method: str, event_dict: EventDict) -> str:

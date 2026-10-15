@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import asyncio
 
-import httpx
+import httpx2
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -63,7 +63,7 @@ class AstroDexHandoffService:
         db: Session,
         sessions: SessionService,
         storage: StorageService,
-        transport: httpx.AsyncBaseTransport | None = None,
+        transport: httpx2.AsyncBaseTransport | None = None,
     ) -> None:
         self.db = db
         self.sessions = sessions
@@ -123,7 +123,7 @@ class AstroDexHandoffService:
 
     async def _pull_source(self, callback_base: str, handoff: str) -> tuple[JsonDict, bytes]:
         try:
-            async with httpx.AsyncClient(
+            async with httpx2.AsyncClient(
                 transport=self._transport, timeout=_PULL_TIMEOUT_SECONDS
             ) as client:
                 meta_response = await client.get(
@@ -140,12 +140,12 @@ class AstroDexHandoffService:
                 image_response = await client.get(f"{callback_base}{image_path}")
                 image_response.raise_for_status()
                 image_bytes = image_response.content
-        except httpx.HTTPStatusError as exc:
+        except httpx2.HTTPStatusError as exc:
             logger.warning("astrodex source rejected", status=exc.response.status_code)
             raise UpstreamError(
                 f"Astrodex rejected the handoff ({exc.response.status_code})"
             ) from exc
-        except (httpx.RequestError, ValueError) as exc:
+        except (httpx2.RequestError, ValueError) as exc:
             logger.warning("astrodex source unreachable", error=str(exc))
             raise UpstreamError("Could not reach Astrodex to fetch the source image") from exc
 
@@ -215,11 +215,11 @@ class AstroDexHandoffService:
         last_error = "delivery failed"
         for attempt in range(1, settings.astrodex_max_retries + 1):
             try:
-                async with httpx.AsyncClient(
+                async with httpx2.AsyncClient(
                     transport=self._transport, timeout=_RETURN_TIMEOUT_SECONDS
                 ) as client:
                     response = await client.post(url, data=form, files=files, headers=headers)
-            except httpx.RequestError as exc:
+            except httpx2.RequestError as exc:
                 last_error = f"could not reach Astrodex ({exc.__class__.__name__})"
                 logger.warning("enhanced return request error", attempt=attempt, error=str(exc))
             else:
@@ -227,7 +227,7 @@ class AstroDexHandoffService:
                     return
                 # 409 == the board already consumed this handoff: a previous
                 # attempt landed even though its response did not reach us.
-                if response.status_code == httpx.codes.CONFLICT:
+                if response.status_code == httpx2.codes.CONFLICT:
                     logger.info("enhanced image already delivered (handoff consumed)")
                     return
                 if response.status_code not in _RETRYABLE_STATUS:

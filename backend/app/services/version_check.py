@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import time
 
-import httpx
+import httpx2
 from packaging.version import InvalidVersion, Version
 
 from app import __version__
@@ -38,7 +38,7 @@ def _is_newer(latest: str, current: str) -> bool:
 class VersionCheckService:
     """Fetches, and caches, the latest GitHub release for this repository."""
 
-    def __init__(self, transport: httpx.AsyncBaseTransport | None = None) -> None:
+    def __init__(self, transport: httpx2.AsyncBaseTransport | None = None) -> None:
         self._transport = transport
         self._cached_result: JsonDict | None = None
         self._cached_at = 0.0
@@ -72,14 +72,14 @@ class VersionCheckService:
 
     async def _fetch_latest_release(self) -> JsonDict:
         try:
-            async with httpx.AsyncClient(transport=self._transport, timeout=10.0) as client:
+            async with httpx2.AsyncClient(transport=self._transport, timeout=10.0) as client:
                 response = await client.get(
                     GITHUB_RELEASES_URL, headers={"Accept": "application/vnd.github+json"}
                 )
-        except httpx.TimeoutException:
+        except httpx2.TimeoutException:
             logger.warning("version check timed out")
             return self._error_result("Request timed out")
-        except httpx.RequestError as exc:
+        except httpx2.RequestError as exc:
             logger.warning("version check request failed", error=str(exc))
             return self._error_result("Request failed")
 
@@ -105,11 +105,11 @@ class VersionCheckService:
             "error": None,
         }
 
-    def _status_error(self, response: httpx.Response) -> str | None:
+    def _status_error(self, response: httpx2.Response) -> str | None:
         """Return an error message for a non-2xx GitHub response, else ``None``."""
-        if response.status_code == httpx.codes.NOT_FOUND:
+        if response.status_code == httpx2.codes.NOT_FOUND:
             return "Repository not found"
-        if response.status_code == httpx.codes.FORBIDDEN:
+        if response.status_code == httpx2.codes.FORBIDDEN:
             logger.warning("version check rate limited by GitHub")
             return "Rate limit exceeded"
         if not response.is_success:

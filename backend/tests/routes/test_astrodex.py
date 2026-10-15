@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from collections.abc import Iterator
 
-import httpx
+import httpx2
 import pytest
 
 from app.db.database import get_db
@@ -32,11 +32,11 @@ def mock_board(client, sample_jpeg: bytes) -> Iterator[dict[str, object]]:
     """Override the handoff service with one whose HTTP calls hit a mock board."""
     state: dict[str, object] = {"enhanced_status": 201, "enhanced_requests": []}
 
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request: httpx2.Request) -> httpx2.Response:
         path = request.url.path
         if path.endswith("/integration/source"):
             handoff = request.url.params.get("handoff")
-            return httpx.Response(
+            return httpx2.Response(
                 200,
                 json={
                     "object": {"item_id": "item-1", "name": "M31"},
@@ -49,13 +49,13 @@ def mock_board(client, sample_jpeg: bytes) -> Iterator[dict[str, object]]:
                 },
             )
         if path.endswith("/integration/source/image"):
-            return httpx.Response(200, content=sample_jpeg, headers={"content-type": "image/jpeg"})
+            return httpx2.Response(200, content=sample_jpeg, headers={"content-type": "image/jpeg"})
         if path.endswith("/integration/enhanced"):
             state["enhanced_requests"].append(bytes(request.content))  # type: ignore[union-attr]
-            return httpx.Response(int(state["enhanced_status"]), json={"status": "created"})
-        return httpx.Response(404)
+            return httpx2.Response(int(state["enhanced_status"]), json={"status": "created"})
+        return httpx2.Response(404)
 
-    transport = httpx.MockTransport(handler)
+    transport = httpx2.MockTransport(handler)
 
     def override_service() -> AstroDexHandoffService:
         db = next(app.dependency_overrides[get_db]())
