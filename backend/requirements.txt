@@ -25,7 +25,7 @@ SQLAlchemy==2.1.4
 alembic==1.20.0
 
 # HTTP client (AstroDex webhooks, GitHub release checks)
-httpx==0.28.1
+httpx2==2.13.1
 
 # Version comparison (update check against GitHub releases)
 packaging==26.3

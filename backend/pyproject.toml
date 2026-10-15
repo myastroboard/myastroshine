@@ -52,10 +52,6 @@ warn_return_any = false
 testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "-ra --cov=app --cov-report=term-missing"
-filterwarnings = [
-    # Emitted only when a newer starlette than we pin is installed locally.
-    "ignore:Using `httpx` with `starlette.testclient` is deprecated",
-]
 
 [tool.coverage.run]
 branch = true

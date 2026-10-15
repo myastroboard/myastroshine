@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-import httpx
+import httpx2
 import pytest
 
 from app import __version__
 from app.services.version_check import VersionCheckService, _is_newer
 
 
-def _release_response(tag: str, **overrides: object) -> httpx.Response:
+def _release_response(tag: str, **overrides: object) -> httpx2.Response:
     body = {
         "tag_name": tag,
         "html_url": f"https://github.com/myastroboard/myastroshine/releases/tag/{tag}",
@@ -18,7 +18,7 @@ def _release_response(tag: str, **overrides: object) -> httpx.Response:
         "published_at": "2026-09-05T00:00:00Z",
         **overrides,
     }
-    return httpx.Response(200, json=body)
+    return httpx2.Response(200, json=body)
 
 
 def test_is_newer_compares_semantic_versions() -> None:
@@ -37,11 +37,11 @@ def test_is_newer_returns_false_for_unparseable_input() -> None:
 
 @pytest.mark.asyncio
 async def test_check_for_updates_reports_available_update() -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request: httpx2.Request) -> httpx2.Response:
         assert request.headers["accept"] == "application/vnd.github+json"
         return _release_response("v999.0.0")
 
-    service = VersionCheckService(transport=httpx.MockTransport(handler))
+    service = VersionCheckService(transport=httpx2.MockTransport(handler))
     result = await service.check_for_updates()
 
     assert result == {
@@ -58,10 +58,10 @@ async def test_check_for_updates_reports_available_update() -> None:
 
 @pytest.mark.asyncio
 async def test_check_for_updates_reports_no_update_when_already_current() -> None:
-    def handler(_request: httpx.Request) -> httpx.Response:
+    def handler(_request: httpx2.Request) -> httpx2.Response:
         return _release_response(f"v{__version__}")
 
-    service = VersionCheckService(transport=httpx.MockTransport(handler))
+    service = VersionCheckService(transport=httpx2.MockTransport(handler))
     result = await service.check_for_updates()
 
     assert result["update_available"] is False
@@ -72,11 +72,11 @@ async def test_check_for_updates_caches_and_does_not_refetch() -> None:
     """A second call within the TTL never hits the transport again."""
     calls = {"n": 0}
 
-    def handler(_request: httpx.Request) -> httpx.Response:
+    def handler(_request: httpx2.Request) -> httpx2.Response:
         calls["n"] += 1
         return _release_response("v999.0.0")
 
-    service = VersionCheckService(transport=httpx.MockTransport(handler))
+    service = VersionCheckService(transport=httpx2.MockTransport(handler))
     first = await service.check_for_updates()
     second = await service.check_for_updates()
 
@@ -86,7 +86,7 @@ async def test_check_for_updates_caches_and_does_not_refetch() -> None:
 
 @pytest.mark.asyncio
 async def test_check_for_updates_handles_404() -> None:
-    service = VersionCheckService(transport=httpx.MockTransport(lambda _r: httpx.Response(404)))
+    service = VersionCheckService(transport=httpx2.MockTransport(lambda _r: httpx2.Response(404)))
     result = await service.check_for_updates()
 
     assert result["update_available"] is False
@@ -95,7 +95,7 @@ async def test_check_for_updates_handles_404() -> None:
 
 @pytest.mark.asyncio
 async def test_check_for_updates_handles_github_rate_limit() -> None:
-    service = VersionCheckService(transport=httpx.MockTransport(lambda _r: httpx.Response(403)))
+    service = VersionCheckService(transport=httpx2.MockTransport(lambda _r: httpx2.Response(403)))
     result = await service.check_for_updates()
 
     assert result["update_available"] is False
@@ -104,10 +104,10 @@ async def test_check_for_updates_handles_github_rate_limit() -> None:
 
 @pytest.mark.asyncio
 async def test_check_for_updates_handles_timeout() -> None:
-    def handler(_request: httpx.Request) -> httpx.Response:
-        raise httpx.TimeoutException("timed out")
+    def handler(_request: httpx2.Request) -> httpx2.Response:
+        raise httpx2.TimeoutException("timed out")
 
-    service = VersionCheckService(transport=httpx.MockTransport(handler))
+    service = VersionCheckService(transport=httpx2.MockTransport(handler))
     result = await service.check_for_updates()
 
     assert result["update_available"] is False
@@ -116,10 +116,10 @@ async def test_check_for_updates_handles_timeout() -> None:
 
 @pytest.mark.asyncio
 async def test_check_for_updates_handles_a_connection_error() -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
-        raise httpx.ConnectError("connection refused", request=request)
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        raise httpx2.ConnectError("connection refused", request=request)
 
-    service = VersionCheckService(transport=httpx.MockTransport(handler))
+    service = VersionCheckService(transport=httpx2.MockTransport(handler))
     result = await service.check_for_updates()
 
     assert result["update_available"] is False
@@ -132,13 +132,13 @@ async def test_a_transient_failure_is_only_cached_briefly() -> None:
     call after the short error window retries and can then succeed."""
     calls = {"n": 0}
 
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request: httpx2.Request) -> httpx2.Response:
         calls["n"] += 1
         if calls["n"] == 1:
-            raise httpx.TimeoutException("timed out")
+            raise httpx2.TimeoutException("timed out")
         return _release_response("v999.0.0")
 
-    service = VersionCheckService(transport=httpx.MockTransport(handler))
+    service = VersionCheckService(transport=httpx2.MockTransport(handler))
     first = await service.check_for_updates()
     assert first["error"] == "Request timed out"
 
@@ -154,7 +154,7 @@ async def test_a_transient_failure_is_only_cached_briefly() -> None:
 @pytest.mark.asyncio
 async def test_check_for_updates_handles_malformed_response() -> None:
     service = VersionCheckService(
-        transport=httpx.MockTransport(lambda _r: httpx.Response(200, json={"unexpected": True}))
+        transport=httpx2.MockTransport(lambda _r: httpx2.Response(200, json={"unexpected": True}))
     )
     result = await service.check_for_updates()
 

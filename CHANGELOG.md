@@ -16,7 +16,8 @@ original Keep a Changelog headings.
 
 ### Fixes
 
-- None.
+- The backend HTTP client moves from the frozen `httpx` to its maintained fork `httpx2` (Astrodex
+  handoff, update check); HTTPS now verifies against the system certificate store.
 
 ### Breaking changes
 

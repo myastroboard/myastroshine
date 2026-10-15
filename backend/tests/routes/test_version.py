@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import httpx
+import httpx2
 
 import app.main as main_module
 from app import __version__
@@ -12,7 +12,7 @@ from app.services.version_check import VersionCheckService
 
 def _override_version_check(handler) -> None:
     main_module.app.dependency_overrides[get_version_check_service] = lambda: VersionCheckService(
-        transport=httpx.MockTransport(handler)
+        transport=httpx2.MockTransport(handler)
     )
 
 
@@ -24,8 +24,8 @@ def test_read_version_reports_the_running_version(client) -> None:
 
 
 def test_check_updates_reports_an_available_update(client) -> None:
-    def handler(_request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
+    def handler(_request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(
             200,
             json={
                 "tag_name": "v999.0.0",
@@ -49,7 +49,7 @@ def test_check_updates_reports_an_available_update(client) -> None:
 
 
 def test_check_updates_never_5xxs_on_a_github_outage(client) -> None:
-    _override_version_check(lambda _r: httpx.Response(503))
+    _override_version_check(lambda _r: httpx2.Response(503))
 
     response = client.get("/api/version/check-updates")
 
