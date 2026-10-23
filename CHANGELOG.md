@@ -18,6 +18,8 @@ original Keep a Changelog headings.
 
 - The backend HTTP client moves from the frozen `httpx` to its maintained fork `httpx2` (Astrodex
   handoff, update check); HTTPS now verifies against the system certificate store.
+- Security: Pillow moves to 13.0.0, fixing the 15 security advisories `pip-audit` reports
+  against 12.3.0, and every other backend and frontend dependency is brought to its latest release.
 
 ### Breaking changes
 
