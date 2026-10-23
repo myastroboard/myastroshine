@@ -16,6 +16,20 @@ original Keep a Changelog headings.
 
 ### Fixes
 
+- None.
+
+### Breaking changes
+
+- None.
+
+## 0.6.1 (2026-10-23)
+
+### Features
+
+- None.
+
+### Fixes
+
 - The backend HTTP client moves from the frozen `httpx` to its maintained fork `httpx2` (Astrodex
   handoff, update check); HTTPS now verifies against the system certificate store.
 - Security: Pillow moves to 13.0.0, fixing the 15 security advisories `pip-audit` reports
