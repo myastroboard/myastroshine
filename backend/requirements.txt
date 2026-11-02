@@ -9,7 +9,7 @@ websockets==17.3
 
 # Configuration
 pydantic==2.14.1
-pydantic-settings==2.16.1
+pydantic-settings==2.16.2
 
 # Image processing
 opencv-python-headless==5.0.0.93
