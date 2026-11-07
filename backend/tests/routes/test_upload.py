@@ -228,3 +228,21 @@ def test_preview_original_with_geometry_falls_back_before_any_processing(
     )
     assert response.status_code == 200
     assert _decode(response.content).shape[:2] == (64, 96)
+
+
+def test_preview_serves_the_starless_sky_only_once_a_render_made_one(
+    client, sample_jpeg: bytes
+) -> None:
+    """``starless=true`` is the edited sky without its stars: 404 until a render
+    separates them, then a JPEG."""
+    import numpy as np
+
+    from app.services.storage import StorageService
+
+    session_id = _upload(client, sample_jpeg).json()["session_id"]
+    assert client.get(f"/api/preview/{session_id}", params={"starless": "true"}).status_code == 404
+
+    StorageService().save_starless(session_id, np.full((20, 30, 3), 40, dtype=np.uint8))
+    response = client.get(f"/api/preview/{session_id}", params={"starless": "true"})
+    assert response.status_code == 200
+    assert response.content[:2] == b"\xff\xd8"

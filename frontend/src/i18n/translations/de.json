@@ -129,7 +129,7 @@
       },
       "stack": {
         "help": "Holen Sie die schwachen Details aus Ihrem gestackten Bild.",
-        "more": "Das lineare Stapelkomposit, vor jeder kreativen Bearbeitung: das schwache Signal strecken, den Himmelsgradienten abziehen, die Farbe neutralisieren. Zerstörungsfrei - alles wird aus den 32-Bit-Daten neu berechnet."
+        "more": "Das lineare gestapelte Komposit, vor jeder kreativen Arbeit, in der Reihenfolge der Astrofotografen: dekonvolvieren, den Himmelsgradienten abziehen, die Farbe kalibrieren, dann das schwache Signal strecken. Nicht destruktiv - alles wird aus den 32-Bit-Daten neu berechnet."
       },
       "frame": {
         "help": "Legen Sie zuerst den Ausschnitt fest - zuschneiden, Horizont begradigen, drehen oder spiegeln. Alles danach arbeitet mit dem zugeschnittenen Bild.",
@@ -329,7 +329,10 @@
     "set_focal_point": "Brennpunkt festlegen",
     "clear_focal_point": "Brennpunkt löschen",
     "before": "Vorher",
-    "after": "Nachher"
+    "after": "Nachher",
+    "after_sky_alone": "Nachher - nur Himmel",
+    "show_with_stars": "Mit Sternen zeigen",
+    "show_sky_alone": "Nur den Himmel zeigen"
   },
   "preset_buttons": {
     "confirm_delete_aria": "Löschen der Voreinstellung {name} bestätigen",
@@ -506,6 +509,10 @@
     "color_calibration": {
       "label": "Farbkalibrierung",
       "hint": "Neutralisiert den Himmelshintergrund zu Grau und richtet den Weißabgleich am Sternfeld aus: der Median der ungesättigten Sterne wird weiß. Da die Sterne die Referenz sind, nicht das ganze Bild, behalten ein roter Emissionsnebel oder die blauen Plejaden ihre echte Farbe."
+    },
+    "deconvolution": {
+      "label": "Dekonvolution",
+      "hint": "Macht die Sterne kleiner und schärft feine Details, indem sie die Unschärfe von Atmosphäre und Optik rückgängig macht, gemessen an Ihren eigenen Sternen. Läuft zuerst, auf den linearen Daten, vor jeder Rauschminderung. Erhöhen Sie sie schrittweise: Bei einem verrauschten Stapel holt sie auch die Körnung hervor. Mit zu wenigen gut belichteten Sternen tut sie nichts."
     }
   },
   "stars_panel": {

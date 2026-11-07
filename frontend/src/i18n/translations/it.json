@@ -129,7 +129,7 @@
       },
       "stack": {
         "help": "Fai emergere i dettagli deboli della tua immagine sommata.",
-        "more": "Il composito stack lineare, prima di qualsiasi lavoro creativo: distendere il segnale debole, sottrarre il gradiente del cielo, neutralizzare il colore. Non distruttivo - tutto viene ricalcolato dai dati a 32 bit."
+        "more": "Il composito impilato lineare, prima di ogni lavoro creativo, nell'ordine degli astrofotografi: deconvolvere, sottrarre il gradiente del cielo, calibrare il colore, poi stirare il segnale debole. Non distruttivo - tutto si ricalcola dai dati a 32 bit."
       },
       "frame": {
         "help": "Imposta prima l'inquadratura - ritaglia, livella l'orizzonte, ruota o capovolgi. Tutto ciò che segue lavora sull'immagine inquadrata.",
@@ -329,7 +329,10 @@
     "set_focal_point": "Imposta punto focale",
     "clear_focal_point": "Cancella punto focale",
     "before": "Prima",
-    "after": "Dopo"
+    "after": "Dopo",
+    "after_sky_alone": "Dopo - solo cielo",
+    "show_with_stars": "Mostra con le stelle",
+    "show_sky_alone": "Mostra solo il cielo"
   },
   "preset_buttons": {
     "confirm_delete_aria": "Conferma eliminazione del preset {name}",
@@ -506,6 +509,10 @@
     "color_calibration": {
       "label": "Calibrazione del colore",
       "hint": "Neutralizza il fondo cielo in grigio e bilancia il bianco sul campo stellare: la mediana delle stelle non sature diventa bianca. Poiché il riferimento sono le stelle e non l'intera immagine, una nebulosa rossa o le Pleiadi blu mantengono il loro colore reale."
+    },
+    "deconvolution": {
+      "label": "Deconvoluzione",
+      "hint": "Stringe le stelle e affina i dettagli fini annullando la sfocatura dell'atmosfera e dell'ottica, misurata sulle tue stesse stelle. Viene per prima, sui dati lineari, prima di ogni riduzione del rumore. Alzala gradualmente: su una pila rumorosa fa emergere anche la grana. Con troppo poche stelle ben esposte non fa nulla."
     }
   },
   "stars_panel": {

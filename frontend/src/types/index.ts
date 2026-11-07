@@ -86,6 +86,9 @@ export type StretchMode = 'adaptive' | 'classic';
 export const STRETCH_MODES: StretchMode[] = ['adaptive', 'classic'];
 
 export interface StackParameters {
+  /** Linear deconvolution against the stars' own PSF (0 = off, 100 = strongest),
+   * first of all - ahead of any noise reduction. */
+  deconvolution: number;
   /** Auto-stretch intensity: 0 = subtle (dark sky), 1 = aggressive. */
   stretch: number;
   stretchMode: StretchMode;
@@ -96,6 +99,7 @@ export interface StackParameters {
 }
 
 export const DEFAULT_STACK_PARAMETERS: StackParameters = {
+  deconvolution: 0,
   stretch: 0.5,
   stretchMode: 'adaptive',
   backgroundExtraction: 100,
@@ -104,6 +108,7 @@ export const DEFAULT_STACK_PARAMETERS: StackParameters = {
 
 export function stackParametersEqual(a: StackParameters, b: StackParameters): boolean {
   return (
+    a.deconvolution === b.deconvolution &&
     a.stretch === b.stretch &&
     a.stretchMode === b.stretchMode &&
     a.backgroundExtraction === b.backgroundExtraction &&

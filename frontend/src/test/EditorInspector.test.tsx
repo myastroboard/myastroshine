@@ -392,6 +392,29 @@ describe('EditorInspector', () => {
     expect(onParameterChange).toHaveBeenCalledWith('backgroundExtraction', 60);
   });
 
+  it('lays the stack controls out in the order they run, deconvolution first', () => {
+    const onParameterChange = vi.fn();
+    render(
+      <EditorInspector
+        {...makeProps({
+          activeStep: 'stack',
+          stack: { available: true, onParameterChange, onReset: vi.fn() },
+        })}
+      />,
+    );
+
+    const order = ['Deconvolution', 'Background extraction', 'Stretch'].map((label) =>
+      screen.getByLabelText(label),
+    );
+    for (let index = 1; index < order.length; index += 1) {
+      expect(
+        order[index - 1].compareDocumentPosition(order[index]) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+    fireEvent.change(screen.getByLabelText('Deconvolution'), { target: { value: '50' } });
+    expect(onParameterChange).toHaveBeenCalledWith('deconvolution', 50);
+  });
+
   it('shows the tone curve on the curves step and resets it from the header', () => {
     const onResetCurves = vi.fn();
     render(<EditorInspector {...makeProps({ activeStep: 'curves', onResetCurves })} />);

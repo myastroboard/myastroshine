@@ -91,7 +91,9 @@ class StackParameters(BaseModel):
 
     A stacked composite opens the editor on its 32-bit linear data; these run as
     a non-destructive pre-stage (``post_stack.render_stack_base``) ahead of the
-    normal pipeline. ``stretch`` (0 = subtle .. 1 = aggressive) sets the
+    normal pipeline. ``deconvolution`` (0 = off .. 100) sharpens the linear data
+    against the stars' own PSF, first of all (``app.services.deconvolution``).
+    ``stretch`` (0 = subtle .. 1 = aggressive) sets the
     auto-stretch target background; ``stretch_mode`` picks the stretch itself;
     ``background_extraction`` (0 = off .. 100) is how much of the fitted
     low-order sky gradient to subtract; ``color_calibration`` neutralises the sky
@@ -101,6 +103,7 @@ class StackParameters(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    deconvolution: int = Field(default=0, ge=0, le=100)
     stretch: float = Field(default=0.5, ge=0.0, le=1.0)
     stretch_mode: StretchMode = "adaptive"
     background_extraction: int = Field(default=100, ge=0, le=100)

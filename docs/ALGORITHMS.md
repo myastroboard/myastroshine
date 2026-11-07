@@ -145,15 +145,20 @@ before or after a first denoise - it is the data and the photographer's taste;
 nobody puts noise reduction after sharpening, or star reduction on the starless
 image.
 
-**How MyAstroShine maps it.** A stacked composite runs steps 1-3 and 6-7 in the
-linear "Stack" step (wedge crop, background extraction, colour calibration on
-the stars, DeepSNR on the linear data when installed, the stretch). An ordinary
+**How MyAstroShine maps it.** A stacked composite runs steps 1-3 and 5-7 in the
+linear "Stack" step: the wedge crop, then the deconvolution first of all (RC
+Astro's rule: no noise reduction before it), DeepSNR on the linear data when
+installed, then the background extraction, the colour calibration on the stars
+and the stretch. Deconvolution and gradient removal are both (near-)linear
+operations on a smooth background, so running the deconvolution ahead of the
+background extraction changes nothing that matters; running it after a noise
+reduction would. An ordinary
 upload is already stretched, so the rail starts at the non-linear side, with
 touch-up versions of the same corrections:
 
 | Rail step | Stages | Reference step |
 |---|---|---|
-| Stack (composites) | `stack_base` (+ linear DeepSNR) | 1-3, 6-7 |
+| Stack (composites) | `deconvolution`, linear DeepSNR, `stack_base` | 1-3, 5-7 |
 | Framing | `geometry` | 1 |
 | Clean the sky | `vignette_correction`, `gradient_reduction`, `dehaze`, then `color_correction`, `green_removal` | 2-4 |
 | Noise | `denoise`, `chroma_denoise` | 6 |
@@ -168,11 +173,16 @@ steps. While the stars are set aside, the rail titles the Enhance phase as
 starless and each of its steps says so; the Export step warns when the stars
 were set aside and never put back.
 
-**Not there yet.** Deconvolution (reference step 5) has no stage: the Detail
-step's sharpening is a noise-aware starlet boost of the stretched data, not a
-deconvolution, so it rightly comes after the noise reduction. A future
-Richardson-Lucy stage belongs in the linear Stack step, ahead of every noise
-reduction, per RC Astro's rule above.
+The Detail step's sharpening is a different tool: a noise-aware starlet boost
+of the stretched data, not a deconvolution, so it rightly comes after the noise
+reduction.
+
+**Working on the sky alone.** While the stars are set aside, the preview of the
+Enhance steps shows the sky they edit, without its stars (the starless view a
+PixInsight or Siril user works on), with a switch back to the result. It costs
+no extra render: the pipeline hands over the image just before the stars go
+back (`apply_parameters(on_starless=...)`), stored as `starless.jpg` with the
+render it came from and served by `GET /preview/{id}?starless=true`.
 
 ## Single-image pipeline
 
@@ -1052,6 +1062,31 @@ a copy downscaled to <=384 px), then the largest centred rectangle that stays
 and skipped entirely when the trim would be larger (a mis-detection) or smaller
 than a few pixels. Also baked into `composite.npy`; the box is recorded in
 `quality_report["border_crop"]`.
+
+**Deconvolution** (`deconvolution`, 0-100, `app/services/deconvolution.py`) runs
+first on every editor render of a composite, ahead of the linear DeepSNR pass and
+of `render_stack_base` - no noise reduction may come before a deconvolution.
+Richardson-Lucy against a Gaussian PSF measured on the image's own stars: second
+moments of isolated, unsaturated stars at least 15 noise sigma above their local
+sky (15x15 cut-outs, the median over up to 300 of them; at least 8 are needed and
+the sigma must fall within 0.6-6 px, otherwise nothing is done). It deconvolves
+with 0.8x that sigma and up to 10 iterations at 100: on real Seestar stacks (M 31,
+NGC 7000) the PSF at face value with 20 iterations rang - a dark gap and a bright
+ring round every star - while a slightly tighter PSF can only under-correct. Each
+RGB plane is deconvolved on its own with the one PSF, so it redistributes only its
+own flux: on the raw data, before the colour calibration, a channel can be
+several times fainter than another (blue x4.6 on M 31), and any mixing between
+channels turned into purple rings once balanced. Applied only where there is
+signal - 1 to 3 noise sigma of luminance above the *local* background (a
+morphological opening that removes the stars and keeps the galaxy: against the
+global sky, the stars on M 31's bulge sank into dark holes), dilated over each
+star's footprint (3 PSF sigma) and feathered: Richardson-Lucy moves the wings'
+flux into the core, and a weight fading out in the wings kept the core's gain
+without the wings' loss, adding 2% flux. Nothing may sink more than 3 noise sigma
+below its local background (no dark rings); a tighter floor lifted the noise and
+drew a light disc round each bright star. Flux is conserved and the stars'
+photometric colour kept (the star white-balance gains moved by under 1% on
+M 31). About 3 s at amount 100 on a 16-megapixel stack.
 
 **`render_stack_base`** runs on every editor render (the "Stack" step, driven by
 `ProcessingParameters.stack`), turning the linear composite into the BGR image

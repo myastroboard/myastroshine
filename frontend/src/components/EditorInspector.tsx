@@ -463,9 +463,11 @@ function StartPanel({
 
 /**
  * The Stack step (composite sessions only): the linear post-stack pre-stage.
- * It runs on the 32-bit stacked composite ahead of every other stage - stretch
- * the faint signal, subtract the sky gradient, neutralise the colour - all
- * non-destructive, recomputed from the linear composite on every change.
+ * It runs on the 32-bit stacked composite ahead of every other stage, and its
+ * controls read in the order they run - deconvolve (before any noise
+ * reduction), subtract the sky gradient, calibrate the colour, then stretch the
+ * faint signal - all non-destructive, recomputed from the linear composite on
+ * every change.
  */
 function StackPanel({
   parameters,
@@ -479,6 +481,69 @@ function StackPanel({
   const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1.5 text-sm">
+        <span className="flex items-baseline justify-between">
+          <label htmlFor="stack-deconv" className="text-muted">
+            {t('stack_panel.deconvolution.label')}
+          </label>
+          <span className="text-xs tabular-nums text-faint">
+            {parameters.deconvolution}
+          </span>
+        </span>
+        <input
+          id="stack-deconv"
+          type="range"
+          className="slider"
+          min={0}
+          max={100}
+          step={1}
+          value={parameters.deconvolution}
+          disabled={isProcessing}
+          onChange={(event) =>
+            onParameterChange('deconvolution', Number(event.target.value))
+          }
+        />
+        <p className="text-xs text-faint">{t('stack_panel.deconvolution.hint')}</p>
+      </div>
+
+      <div className="flex flex-col gap-1.5 text-sm">
+        <span className="flex items-baseline justify-between">
+          <label htmlFor="stack-bg" className="text-muted">
+            {t('stack_panel.background_extraction.label')}
+          </label>
+          <span className="text-xs tabular-nums text-faint">
+            {parameters.backgroundExtraction}
+          </span>
+        </span>
+        <input
+          id="stack-bg"
+          type="range"
+          className="slider"
+          min={0}
+          max={100}
+          step={1}
+          value={parameters.backgroundExtraction}
+          disabled={isProcessing}
+          onChange={(event) =>
+            onParameterChange('backgroundExtraction', Number(event.target.value))
+          }
+        />
+        <p className="text-xs text-faint">{t('stack_panel.background_extraction.hint')}</p>
+      </div>
+
+      <label className="flex items-center justify-between gap-2 text-sm text-muted">
+        <span className="flex flex-col gap-0.5">
+          {t('stack_panel.color_calibration.label')}
+          <span className="text-xs text-faint">{t('stack_panel.color_calibration.hint')}</span>
+        </span>
+        <input
+          type="checkbox"
+          className="size-4 shrink-0 accent-accent"
+          checked={parameters.colorCalibration}
+          disabled={isProcessing}
+          onChange={(event) => onParameterChange('colorCalibration', event.target.checked)}
+        />
+      </label>
       <div className="flex flex-col gap-1.5 text-sm">
         <span className="flex items-baseline justify-between">
           <label htmlFor="stack-stretch" className="text-muted">
@@ -524,44 +589,6 @@ function StackPanel({
         </p>
       </div>
 
-      <div className="flex flex-col gap-1.5 text-sm">
-        <span className="flex items-baseline justify-between">
-          <label htmlFor="stack-bg" className="text-muted">
-            {t('stack_panel.background_extraction.label')}
-          </label>
-          <span className="text-xs tabular-nums text-faint">
-            {parameters.backgroundExtraction}
-          </span>
-        </span>
-        <input
-          id="stack-bg"
-          type="range"
-          className="slider"
-          min={0}
-          max={100}
-          step={1}
-          value={parameters.backgroundExtraction}
-          disabled={isProcessing}
-          onChange={(event) =>
-            onParameterChange('backgroundExtraction', Number(event.target.value))
-          }
-        />
-        <p className="text-xs text-faint">{t('stack_panel.background_extraction.hint')}</p>
-      </div>
-
-      <label className="flex items-center justify-between gap-2 text-sm text-muted">
-        <span className="flex flex-col gap-0.5">
-          {t('stack_panel.color_calibration.label')}
-          <span className="text-xs text-faint">{t('stack_panel.color_calibration.hint')}</span>
-        </span>
-        <input
-          type="checkbox"
-          className="size-4 shrink-0 accent-accent"
-          checked={parameters.colorCalibration}
-          disabled={isProcessing}
-          onChange={(event) => onParameterChange('colorCalibration', event.target.checked)}
-        />
-      </label>
     </div>
   );
 }

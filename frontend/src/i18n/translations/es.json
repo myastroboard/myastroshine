@@ -129,7 +129,7 @@
       },
       "stack": {
         "help": "Saca a la luz los detalles débiles de tu imagen apilada.",
-        "more": "El composite apilado lineal, antes de cualquier trabajo creativo: estirar la señal débil, restar el degradado del cielo, neutralizar el color. No destructivo - todo se recalcula a partir de los datos de 32 bits."
+        "more": "El composite apilado lineal, antes de cualquier trabajo creativo, en el orden de los astrofotógrafos: deconvolucionar, restar el gradiente del cielo, calibrar el color y luego estirar la señal débil. No destructivo - todo se recalcula a partir de los datos de 32 bits."
       },
       "frame": {
         "help": "Defina primero el encuadre - recorte, nivele el horizonte, gire o voltee. Todo lo que sigue trabaja sobre la imagen encuadrada.",
@@ -329,7 +329,10 @@
     "set_focal_point": "Definir el punto focal",
     "clear_focal_point": "Borrar el punto focal",
     "before": "Antes",
-    "after": "Después"
+    "after": "Después",
+    "after_sky_alone": "Después - solo cielo",
+    "show_with_stars": "Ver con estrellas",
+    "show_sky_alone": "Ver solo el cielo"
   },
   "preset_buttons": {
     "confirm_delete_aria": "Confirmar eliminación del preajuste {name}",
@@ -506,6 +509,10 @@
     "color_calibration": {
       "label": "Calibración de color",
       "hint": "Neutraliza el fondo de cielo a gris y equilibra el blanco con el campo estelar: la mediana de las estrellas no saturadas pasa a ser blanca. Como la referencia son las estrellas y no la imagen entera, una nebulosa roja o las Pléyades azules conservan su color real."
+    },
+    "deconvolution": {
+      "label": "Deconvolución",
+      "hint": "Reduce las estrellas y afina los detalles finos deshaciendo el desenfoque de la atmósfera y la óptica, medido en tus propias estrellas. Va primero, sobre los datos lineales, antes de cualquier reducción de ruido. Súbela poco a poco: en una pila ruidosa también hace resaltar el grano. Sin suficientes estrellas bien expuestas, no hace nada."
     }
   },
   "stars_panel": {

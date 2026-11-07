@@ -23,6 +23,7 @@ import numpy as np
 
 from app.logging_config import get_logger
 from app.models import CurvePoint, GeometryParameters, LookParameters, ProcessingParameters
+from app.services.deconvolution import deconvolve
 from app.services.external_starless import StarlessSplitFn
 from app.services.looks import LooksService
 from app.services.post_stack import RenderHints, render_stack_base
@@ -39,6 +40,8 @@ StepCallback = Callable[[str, int], None]
 #: ``(image, linear) -> denoised``, ``float32`` in and out. ``linear`` is true when
 #: the stage runs on a linear stacked composite (RGB planes, before the stretch).
 DenoiseStageFn = Callable[[np.ndarray, bool], np.ndarray]
+#: Receives the edited starless sky (BGR ``uint8``) just before the stars go back.
+StarlessViewFn = Callable[[np.ndarray], None]
 
 logger = get_logger(__name__)
 
@@ -679,6 +682,7 @@ class ImageProcessingService:
         denoise_stage: DenoiseStageFn | None = None,
         sky_mask: np.ndarray | None = None,
         render_hints: RenderHints | None = None,
+        on_starless: StarlessViewFn | None = None,
     ) -> np.ndarray:
         """Run the full pipeline in the editor's workflow order.
 
@@ -687,7 +691,8 @@ class ImageProcessingService:
 
         The order is the editor rail's, one to one (``EDITOR_STEPS`` in the
         frontend's ``types/index.ts``; the reasoning and its references are in
-        docs/ALGORITHMS.md "Editing workflow"): [stack_base] -> framing -> sky
+        docs/ALGORITHMS.md "Editing workflow"): [deconvolution -> (linear
+        DeepSNR) -> stack_base, the composite's "Stack" step] -> framing -> sky
         (background, then colour) -> noise -> separate stars -> light -> curves
         -> colour -> detail -> stars (shrink, put back).
 
@@ -711,8 +716,15 @@ class ImageProcessingService:
         Like ``starless_split``, the caller has vetted it and wrapped its
         fallback. Both engines exchange 16-bit or float data, never 8-bit.
 
+        ``on_starless``: with the stars separated, called once with the edited
+        starless sky (BGR ``uint8``) just before the stars go back - what the
+        Enhance steps work on, for the editor's "sky alone" preview. Never called
+        without a split.
+
         ``linear_composite``: ``image`` is a linear stacked composite (RGB
-        planes, ``float32``), not a uint8 upload - prepend the ``stack_base``
+        planes, ``float32``), not a uint8 upload - prepend the linear
+        ``deconvolution`` (``params.stack.deconvolution``; first, ahead of any
+        noise reduction) and the ``stack_base``
         pre-stage (background extraction, colour calibration and the tunable
         stretch, all from ``params.stack``) which turns it into the BGR
         ``float32`` the rest of the pipeline expects. ``sky_mask`` (a
@@ -747,6 +759,12 @@ class ImageProcessingService:
                     (name, (lambda r: deepsnr(r, False)) if name == "denoise" else stage)
                     for name, stage in noise
                 ]
+        if linear_composite:
+            # First of all: no noise reduction may run before a deconvolution.
+            background = [
+                ("deconvolution", lambda r: deconvolve(r, params.stack.deconvolution)),
+                *background,
+            ]
 
         stages: list[tuple[str, Callable[[np.ndarray], np.ndarray]]]
         if params.star_removal <= 0:
@@ -773,6 +791,8 @@ class ImageProcessingService:
                 return starless
 
             def recombine(r: np.ndarray) -> np.ndarray:
+                if on_starless is not None:
+                    on_starless(_to_u8(r))
                 stars = self._starless.reduce_layer(stars_layer[0], params.star_reduction)
                 return self._starless.recombine(r, stars, params.star_recombine)
 

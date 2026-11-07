@@ -129,7 +129,7 @@
       },
       "stack": {
         "help": "Revele os detalhes ténues da sua imagem empilhada.",
-        "more": "O composto de empilhamento linear, antes de qualquer trabalho criativo: esticar o sinal fraco, subtrair o gradiente do céu, neutralizar a cor. Não destrutivo - tudo é recalculado a partir dos dados de 32 bits."
+        "more": "O composto empilhado linear, antes de qualquer trabalho criativo, na ordem dos astrofotógrafos: deconvoluir, subtrair o gradiente do céu, calibrar a cor e depois esticar o sinal fraco. Não destrutivo - tudo se recalcula a partir dos dados de 32 bits."
       },
       "frame": {
         "help": "Defina primeiro o enquadramento - recorte, nivele o horizonte, rode ou inverta. Tudo o que se segue trabalha sobre a imagem enquadrada.",
@@ -329,7 +329,10 @@
     "set_focal_point": "Definir o ponto focal",
     "clear_focal_point": "Limpar o ponto focal",
     "before": "Antes",
-    "after": "Depois"
+    "after": "Depois",
+    "after_sky_alone": "Depois - só o céu",
+    "show_with_stars": "Ver com estrelas",
+    "show_sky_alone": "Ver só o céu"
   },
   "preset_buttons": {
     "confirm_delete_aria": "Confirmar eliminação da predefinição {name}",
@@ -506,6 +509,10 @@
     "color_calibration": {
       "label": "Calibração de cor",
       "hint": "Neutraliza o fundo de céu para cinzento e equilibra o branco pelo campo estelar: a mediana das estrelas não saturadas passa a branco. Como a referência são as estrelas e não a imagem inteira, uma nebulosa vermelha ou as Plêiades azuis mantêm a sua cor real."
+    },
+    "deconvolution": {
+      "label": "Deconvolução",
+      "hint": "Aperta as estrelas e afina os detalhes finos desfazendo a desfocagem da atmosfera e da ótica, medida nas suas próprias estrelas. Vem primeiro, sobre os dados lineares, antes de qualquer redução de ruído. Suba-a aos poucos: numa pilha ruidosa também faz sobressair o grão. Sem estrelas bem expostas suficientes, não faz nada."
     }
   },
   "stars_panel": {

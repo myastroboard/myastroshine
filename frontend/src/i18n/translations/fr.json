@@ -129,7 +129,7 @@
       },
       "stack": {
         "help": "Faites ressortir les détails faibles de votre image empilée.",
-        "more": "Le composite empilé linéaire, avant tout travail créatif : étirer le signal faible, soustraire le dégradé de ciel, neutraliser la couleur. Non destructif - tout se recalcule depuis les données 32 bits."
+        "more": "Le composite empilé linéaire, avant tout travail créatif, dans l'ordre des astrophotographes : déconvoluer, soustraire le dégradé de ciel, calibrer la couleur, puis étirer le signal faible. Non destructif - tout se recalcule depuis les données 32 bits."
       },
       "frame": {
         "help": "Cadrez d'abord - recadrage, redressement de l'horizon, rotation ou miroir. Tout ce qui suit travaille sur l'image cadrée.",
@@ -329,7 +329,10 @@
     "set_focal_point": "Définir le point focal",
     "clear_focal_point": "Effacer le point focal",
     "before": "Avant",
-    "after": "Après"
+    "after": "Après",
+    "after_sky_alone": "Après - ciel seul",
+    "show_with_stars": "Voir avec les étoiles",
+    "show_sky_alone": "Voir le ciel seul"
   },
   "preset_buttons": {
     "confirm_delete_aria": "Confirmer la suppression du préréglage {name}",
@@ -506,6 +509,10 @@
     "color_calibration": {
       "label": "Calibration des couleurs",
       "hint": "Neutralise le fond de ciel en gris et équilibre les blancs sur le champ d'étoiles : la médiane des étoiles non saturées devient blanche. La référence étant les étoiles et non l'image entière, une nébuleuse rouge ou les Pléiades bleues gardent leur vraie couleur."
+    },
+    "deconvolution": {
+      "label": "Déconvolution",
+      "hint": "Resserre les étoiles et affine les fins détails en défaisant le flou de l'atmosphère et de l'optique, mesuré sur vos propres étoiles. Passe en premier, sur les données linéaires, avant toute réduction du bruit. Montez-la progressivement : sur une pile bruitée, elle fait aussi ressortir le grain. Sans assez d'étoiles bien exposées, elle ne fait rien."
     }
   },
   "stars_panel": {

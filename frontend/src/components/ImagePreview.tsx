@@ -37,6 +37,9 @@ export interface ImagePreviewProps {
   framing?: FramingState | null;
   /** Detected star circles to draw over the preview, or null to hide the overlay. */
   starMaskOverlay?: StarSourceInfo[] | null;
+  /** The "sky alone" switch while the stars are separated (`processedUrl` is then
+   * the starless sky when `active`), or null when there is no starless view. */
+  skyAlone?: { active: boolean; onToggle: () => void } | null;
   /** The currently-set Depth Shift focal point, or null/undefined if none. */
   focalPoint?: FocusPoint | null;
   /** While true, a click on the image sets the focal point instead of dragging the divider. */
@@ -61,6 +64,7 @@ export function ImagePreview({
   progressLabel,
   framing,
   starMaskOverlay,
+  skyAlone,
   focalPoint,
   pickingFocalPoint = false,
   onFocalPointPick,
@@ -273,8 +277,20 @@ export function ImagePreview({
             )}
             {showAfter && (
               <div className="pointer-events-none absolute bottom-3 right-3 rounded-md bg-black/55 px-2.5 py-1 text-xs font-medium text-white/85 backdrop-blur-sm">
-                {t('image_preview.after')}
+                {skyAlone?.active ? t('image_preview.after_sky_alone') : t('image_preview.after')}
               </div>
+            )}
+
+            {skyAlone && (
+              // Image chrome: dark in both themes, like the zoom controls.
+              <button
+                type="button"
+                className="absolute left-3 top-3 rounded-md border border-white/10 bg-black/55 px-2.5 py-1 text-xs font-medium text-white/85 backdrop-blur-sm transition-colors hover:bg-black/70"
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={skyAlone.onToggle}
+              >
+                {skyAlone.active ? t('image_preview.show_with_stars') : t('image_preview.show_sky_alone')}
+              </button>
             )}
 
             <div

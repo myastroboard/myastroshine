@@ -169,6 +169,12 @@ describe('previewUrl', () => {
     expect(apiClient.previewUrl('s1', { full: true })).toBe('/api/preview/s1?full=true');
   });
 
+  it('asks for the starless sky (always full resolution), over full', () => {
+    expect(apiClient.previewUrl('s1', { starless: true, full: true, v: 2 })).toBe(
+      '/api/preview/s1?starless=true&v=2',
+    );
+  });
+
   it('prefers original over full when both are set', () => {
     expect(apiClient.previewUrl('s1', { original: true, full: true })).toBe(
       '/api/preview/s1?original=true',

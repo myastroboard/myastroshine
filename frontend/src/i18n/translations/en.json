@@ -129,7 +129,7 @@
       },
       "stack": {
         "help": "Bring the faint detail out of your stacked image.",
-        "more": "The linear stacked composite, before any creative work: stretch the faint signal, subtract the sky gradient, neutralise the colour. Non-destructive - it all recomputes from the 32-bit data."
+        "more": "The linear stacked composite, before any creative work, in the order astrophotographers use: deconvolve, subtract the sky gradient, calibrate the colour, then stretch the faint signal. Non-destructive - it all recomputes from the 32-bit data."
       },
       "frame": {
         "help": "Set the frame first - crop, level the horizon, rotate or flip. Everything after this works on the framed image.",
@@ -329,7 +329,10 @@
     "set_focal_point": "Set focal point",
     "clear_focal_point": "Clear focal point",
     "before": "Before",
-    "after": "After"
+    "after": "After",
+    "after_sky_alone": "After - sky alone",
+    "show_with_stars": "Show with stars",
+    "show_sky_alone": "Show the sky alone"
   },
   "preset_buttons": {
     "confirm_delete_aria": "Confirm delete preset {name}",
@@ -506,6 +509,10 @@
     "color_calibration": {
       "label": "Colour calibration",
       "hint": "Neutralises the sky background to grey and white-balances on the star field: the median of the unsaturated stars is made white. Because the reference is the stars, not the whole frame, a red emission nebula or the blue Pleiades keep their real colour."
+    },
+    "deconvolution": {
+      "label": "Deconvolution",
+      "hint": "Tightens the stars and sharpens fine detail by undoing the blur of the atmosphere and optics, measured on your own stars. Runs first, on the linear data, before any noise reduction. Raise it gradually: on a noisy stack it also brings out grain. With too few well-exposed stars it does nothing."
     }
   },
   "stars_panel": {

@@ -693,3 +693,50 @@ def test_star_removal_pipeline_recombines_in_float(service: ImageProcessingServi
     assert int(out[60, 60].mean()) > 200
     starless = service.apply_parameters(image, params.model_copy(update={"star_recombine": 0}))
     assert int(starless[60, 60].mean()) < 120
+
+
+def test_on_starless_receives_the_edited_sky_only_with_a_split(
+    service: ImageProcessingService,
+) -> None:
+    """The hook sees the sky after the Enhance steps, before the stars go back -
+    and is never called when the stars stay in."""
+    image, stars = _nebula_star_field()
+    seen: list[np.ndarray] = []
+    params = ProcessingParameters(
+        contrast=1.4, star_removal=100, star_recombine=100, star_sensitivity=70
+    )
+
+    result = service.apply_parameters(image, params, on_starless=seen.append)
+
+    assert len(seen) == 1
+    assert seen[0].dtype == np.uint8
+    assert _star_flux(seen[0], stars) < _star_flux(result, stars)
+
+    seen.clear()
+    service.apply_parameters(
+        image, params.model_copy(update={"star_removal": 0}), on_starless=seen.append
+    )
+    assert seen == []
+
+
+def test_a_composite_is_deconvolved_first_then_denoised_then_stretched(
+    service: ImageProcessingService,
+) -> None:
+    """The linear "Stack" step: deconvolution ahead of any noise reduction (the
+    linear DeepSNR pass), both ahead of the stretch (``stack_base``)."""
+    rng = np.random.default_rng(3)
+    composite = (0.05 + rng.normal(0.0, 0.002, (64, 64, 3))).astype(np.float32)
+    steps: list[str] = []
+
+    def engine(image: np.ndarray, linear: bool) -> np.ndarray:
+        return image
+
+    service.apply_parameters(
+        composite,
+        ProcessingParameters(denoise=30),
+        lambda name, _pct: steps.append(name),
+        linear_composite=True,
+        denoise_stage=engine,
+    )
+
+    assert steps[:3] == ["deconvolution", "denoise", "stack_base"]

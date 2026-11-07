@@ -134,7 +134,8 @@ Optional, the first half of the **starless workflow**: **which points are stars*
 (**Catch fainter stars** / **Largest star size**, previewable as a live "N
 sources" overlay), then **remove stars** lifts them out of the sky. The next four
 steps then work on the nebula or galaxy alone - the rail titles them "Enhance -
-stars set aside" and each says so - until the Stars step puts the stars back. The
+stars set aside", each says so, and the preview shows **the sky alone** (a switch
+on the image goes back to the result) - until the Stars step puts the stars back. The
 classical reconstruction handles a nebula or galaxy over a normal star field
 well; a dense Milky Way field is its known ceiling - that is what the StarNet2
 engine is for (a picker chooses it here when installed). Left at 0, the stars stay
@@ -261,18 +262,23 @@ frames.
 ### The Stack step
 
 A stacked composite opens in the editor with an extra **Stack** step at the top -
-a non-destructive pre-stage on the 32-bit linear data:
+a non-destructive pre-stage on the 32-bit linear data, its controls in the order
+they run:
 
-- **Stretch** (0-1) - auto-stretch intensity; higher lifts fainter signal at the
-  cost of a brighter, noisier background. Two methods: **Adaptive** (default) -
-  a colour-preserving stretch fitted to the image's own sky and object levels, so
-  a galaxy core keeps its structure and stars keep their colour - and
-  **Classic**, the original per-channel auto-stretch, kept for comparison.
+- **Deconvolution** (0-100, off by default) - tightens the stars and sharpens
+  fine detail by undoing the blur measured on your own stars (Richardson-Lucy).
+  First of all, before any noise reduction; no ringing round the stars, colours
+  kept. With too few well-exposed stars it does nothing.
 - **Background extraction** (0-100) - fits and subtracts the sky gradient
   (degree-2 polynomial, so it can never be mistaken for a nebula).
 - **Colour calibration** (on/off) - neutralises the sky and white-balances on
   the star field (the median unsaturated star is made white), so a red emission
   nebula or the blue Pleiades keep their real colour.
+- **Stretch** (0-1) - auto-stretch intensity; higher lifts fainter signal at the
+  cost of a brighter, noisier background. Two methods: **Adaptive** (default) -
+  a colour-preserving stretch fitted to the image's own sky and object levels, so
+  a galaxy core keeps its structure and stars keep their colour - and
+  **Classic**, the original per-channel auto-stretch, kept for comparison.
 
 Nothing here touches `composite.npy`; every value recomputes the working image
 from the linear data, so these choices stay reversible.

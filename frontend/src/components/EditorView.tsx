@@ -23,11 +23,13 @@ import {
   DEFAULT_GEOMETRY,
   DEFAULT_LOOK_AMOUNT,
   DEFAULT_PARAMETERS,
+  EDITOR_STEPS,
   PRESET_LOOK_SCENE,
   geometryEquals,
   hasEdits,
   isDefaultGeometry,
   parametersEqual,
+  starsSeparated,
   type CurveChannel,
   type CurvePoint,
   type Dimensions,
@@ -123,6 +125,18 @@ export function EditorView({ session, onExit }: EditorViewProps) {
   const { detect: detectStars } = starMask;
 
   const [activeStep, setActiveStep] = useState<EditorStepId>(session.isStack ? 'stack' : 'start');
+  // The "sky alone" view: with the stars separated, the Enhance steps show the
+  // sky they edit, without its stars - the starless workflow's working view.
+  // `skyAloneChoice` is the user's own pick on the current step (null: follow
+  // the step); `starlessRendered` says the latest finished render made one.
+  const [skyAloneChoice, setSkyAloneChoice] = useState<boolean | null>(null);
+  const [starlessRendered, setStarlessRendered] = useState(false);
+  const [renderSeen, setRenderSeen] = useState(previewVersion);
+  if (renderSeen !== previewVersion) {
+    // A render just finished: it made a starless sky iff the edit separates the stars.
+    setRenderSeen(previewVersion);
+    setStarlessRendered(starsSeparated(parameters));
+  }
   const [showDepthViewer, setShowDepthViewer] = useState(false);
   const [showSavePreset, setShowSavePreset] = useState(false);
   const [presetVersion, setPresetVersion] = useState(0);
@@ -223,7 +237,13 @@ export function EditorView({ session, onExit }: EditorViewProps) {
   const originalUrl = geometryChanged
     ? apiClient.previewUrl(session.sessionId, { original: true, geometry: true, v: version })
     : apiClient.previewUrl(session.sessionId, { original: true });
-  const processedUrl = apiClient.previewUrl(session.sessionId, { full: true, v: version });
+  const resultUrl = apiClient.previewUrl(session.sessionId, { full: true, v: version });
+  const activePhase = EDITOR_STEPS.find((step) => step.id === activeStep)?.phase;
+  const skyAloneAvailable = starsSeparated(parameters) && starlessRendered;
+  const skyAlone = skyAloneAvailable && (skyAloneChoice ?? activePhase === 'enhance');
+  const processedUrl = skyAlone
+    ? apiClient.previewUrl(session.sessionId, { starless: true, v: version })
+    : resultUrl;
 
   function handleStepChange(next: EditorStepId): void {
     // Leaving the Framing step with an uncommitted crop commits it.
@@ -234,6 +254,7 @@ export function EditorView({ session, onExit }: EditorViewProps) {
     if (activeStep === 'depth' && next !== 'depth') {
       setPickingFocalPoint(false);
     }
+    setSkyAloneChoice(null);
     setActiveStep(next);
   }
 
@@ -501,7 +522,7 @@ export function EditorView({ session, onExit }: EditorViewProps) {
           astrodexReturned: astrodex.success,
           astrodexError: astrodex.error,
           defaultFilename: defaultExportName(session),
-          resultUrl: processedUrl,
+          resultUrl,
           onDownload: (filename, withStyle) => void handleDownload(filename, withStyle),
           onReturnToAstroDex: () => void handleReturnToAstrodex(),
           onSaveAsPreset: () => setShowSavePreset(true),
@@ -534,6 +555,11 @@ export function EditorView({ session, onExit }: EditorViewProps) {
               : null
           }
           starMaskOverlay={starMaskEnabled && !framingActive ? starMask.stars : null}
+          skyAlone={
+            skyAloneAvailable && !framingActive
+              ? { active: skyAlone, onToggle: () => setSkyAloneChoice(!skyAlone) }
+              : null
+          }
           focalPoint={framingActive ? null : focalPoint}
           pickingFocalPoint={activeStep === 'depth' && pickingFocalPoint}
           onFocalPointPick={handleFocalPointPick}

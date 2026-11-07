@@ -222,6 +222,43 @@ describe('EditorView', () => {
       expect(preview().aspectRatio).toBe(0.5);
     });
 
+    it('shows the sky alone on the Enhance steps once a render separated the stars', () => {
+      resetState({ ...DEFAULT_PARAMETERS, starRemoval: 100 });
+      const { rerender } = renderEditor();
+      // No render has made a starless sky yet: nothing to switch to.
+      expect(preview().skyAlone).toBeNull();
+
+      h.state.processing.previewVersion = 1;
+      rerender(<EditorView session={SESSION} onExit={vi.fn()} />);
+      // On Start (not an Enhance step) the result shows, with the switch offered.
+      expect(preview().skyAlone).toEqual({ active: false, onToggle: expect.any(Function) });
+      expect(preview().processedUrl).not.toContain('starless');
+
+      act(() => inspector().onStepChange('light'));
+      expect(preview().skyAlone?.active).toBe(true);
+      expect(preview().processedUrl).toContain('starless=true');
+      // The Export recap thumbnail is always the result, never the starless sky.
+      expect(inspector().exportActions.resultUrl).not.toContain('starless');
+
+      act(() => preview().skyAlone?.onToggle());
+      expect(preview().skyAlone?.active).toBe(false);
+      expect(preview().processedUrl).not.toContain('starless');
+
+      // A new step follows the step again.
+      act(() => inspector().onStepChange('curves'));
+      expect(preview().skyAlone?.active).toBe(true);
+    });
+
+    it('offers no sky-alone view once the stars stay in', () => {
+      resetState({ ...DEFAULT_PARAMETERS, starRemoval: 0 });
+      h.state.processing.previewVersion = 3;
+      renderEditor();
+      act(() => inspector().onStepChange('light'));
+
+      expect(preview().skyAlone).toBeNull();
+      expect(preview().processedUrl).not.toContain('starless');
+    });
+
     it('labels a StarNet2 pass while it runs', () => {
       resetState({ ...DEFAULT_PARAMETERS, starRemovalEngine: 'starnet2' });
       h.state.processing.currentStep = 'star_removal';

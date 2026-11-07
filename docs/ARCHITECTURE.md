@@ -218,6 +218,7 @@ Everything hangs off `DATA_DIR` (`/data` in the container):
     preview.jpg               downscaled result (fast display)
     prelook.npy / .json       lossless result before its "Style" look + the edit key
     prelook_thumb.png         ~400 px copy, source of the Style gallery thumbnails
+    starless.jpg              the edited sky without its stars, same render (stars separated only)
     depth/depth_map.png
     depth/layer_<n>.png       BGRA parallax layers, far (0) to near
   stacks/<stack>/

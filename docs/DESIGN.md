@@ -131,7 +131,9 @@ differently. A missing icon gets drawn in this family and added there.
   `types/index.ts` - and is the backend pipeline order, step for step (see
   ALGORITHMS.md "Editing workflow"). While the stars are separated, the Enhance
   heading reads "Enhance - stars set aside" and each Enhance step opens on an
-  accent note leading to the Stars step.
+  accent note leading to the Stars step, while the preview shows the sky alone
+  with a "Show with stars" switch top-left - image chrome, dark in both themes
+  like the zoom controls.
 - Below `lg` the editor reflows for a phone: the rail panel dissolves
   (`contents`) and its nav becomes a **fixed bottom tab bar** (icon over label),
   and the preview is **pinned on top** (`sticky top-14`, image capped at 42vh) so
