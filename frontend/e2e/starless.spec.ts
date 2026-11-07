@@ -11,18 +11,23 @@ async function openEditor(page: Page): Promise<void> {
 
 /** Click a step in the workflow rail. */
 async function openStep(page: Page, name: string): Promise<void> {
-  await page.locator('nav[aria-label="Editing workflow"]').getByRole('button', { name }).click();
+  // Anchored at the start so 'Stars' does not also match 'Separate stars'; not
+  // exact, because a changed step's name ends with a 'changed from default' marker.
+  const label = new RegExp(`^${name}\\b`);
+  await page
+    .locator('nav[aria-label="Editing workflow"]')
+    .getByRole('button', { name: label })
+    .click();
 }
 
 test('star removal splits the pipeline, then recombine brings the stars back', async ({ page }) => {
   await openEditor(page);
-  await openStep(page, 'Stars');
+  await openStep(page, 'Separate stars');
 
   const processed = page.locator('img[alt="Processed"]');
   await expect(processed).toBeVisible();
 
   const remove = page.getByRole('slider', { name: 'Remove stars' });
-  const recombine = page.getByRole('slider', { name: 'Bring stars back' });
   await expect(remove).toHaveValue('0');
 
   // Raising Remove re-runs the pipeline down the starless branch.
@@ -35,12 +40,16 @@ test('star removal splits the pipeline, then recombine brings the stars back', a
   ]);
   await expect(processed).not.toHaveAttribute('src', beforeRemove ?? '');
 
-  // The Stars rail step now carries the "changed from default" dot.
+  // The Separate stars rail step now carries the "changed from default" dot.
   await expect(
-    page.locator('nav[aria-label="Editing workflow"]').getByRole('button', { name: 'Stars' }),
+    page
+      .locator('nav[aria-label="Editing workflow"]')
+      .getByRole('button', { name: /^Separate stars\b/ }),
   ).toHaveAccessibleName(/changed from default/);
 
-  // Bringing the stars back triggers another reprocess.
+  // Bringing the stars back (the other half, in the Stars step) reprocesses again.
+  await openStep(page, 'Stars');
+  const recombine = page.getByRole('slider', { name: 'Bring stars back' });
   const beforeRecombine = await processed.getAttribute('src');
   await Promise.all([
     page.waitForResponse((r) => r.url().includes('/api/process/') && r.ok()),

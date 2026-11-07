@@ -11,7 +11,13 @@ async function openEditor(page: Page): Promise<void> {
 
 /** Click a step in the workflow rail (Start / Framing / Light / ... / Export). */
 async function openStep(page: Page, name: string): Promise<void> {
-  await page.locator('nav[aria-label="Editing workflow"]').getByRole('button', { name }).click();
+  // Anchored at the start so 'Stars' does not also match 'Separate stars'; not
+  // exact, because a changed step's name ends with a 'changed from default' marker.
+  const label = new RegExp(`^${name}\\b`);
+  await page
+    .locator('nav[aria-label="Editing workflow"]')
+    .getByRole('button', { name: label })
+    .click();
 }
 
 const processed = (page: Page) =>
