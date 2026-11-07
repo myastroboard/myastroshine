@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from app.models import ProcessingParameters
-from app.services.auto_astro import AutoAstroService
+from app.services.auto_astro import AutoAstroService, _luma, _regions, _SkyProbe
 from app.services.image_processing import ImageProcessingService
 from app.services.star_detection import StarDetectionService
 
@@ -264,3 +264,26 @@ def test_never_suggests_gradient_reduction(service: AutoAstroService) -> None:
     params = service.suggest_parameters(image)
 
     assert params.gradient_reduction == 0
+
+
+def test_sky_probe_reads_the_sky_the_way_the_measurement_does(service: AutoAstroService) -> None:
+    """The channel curves are solved against the very reading that judges the
+    result: with no LUT, the probe's level of each channel is the measured sky."""
+    image = _frame(sky=(34.0, 30.0, 22.0))
+    background, _ = _regions(_luma(image), None)
+    probe = _SkyProbe(image, background)
+    measured = service.measure(image)
+    for channel in range(3):
+        assert probe.level(channel) == pytest.approx(measured.sky_bgr[channel], abs=0.5)
+
+
+def test_channel_curves_neutralise_a_noisy_cast_sky_after_the_noise_step(
+    service: AutoAstroService,
+) -> None:
+    """A strongly cast, noisy sky comes out neutral through the full pipeline,
+    which denoises before the tone curve."""
+    image = _frame(sky=(40.0, 34.0, 20.0), noise=6.0)
+    params = service.suggest_parameters(image)
+    assert params.denoise > 0
+    out = service.measure(_render(image, params))
+    assert max(out.sky_bgr) - min(out.sky_bgr) <= 3.0  # as test_neutralises_a_sky_cast

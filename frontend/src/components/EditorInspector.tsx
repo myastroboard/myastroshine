@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 import { STEP_ICONS } from '@/components/EditorRail';
 import { ExportPanel } from '@/components/ExportPanel';
 import { FramingControls } from '@/components/FramingControls';
@@ -12,6 +14,7 @@ import {
   DEFAULT_STACK_PARAMETERS,
   editorStepsFor,
   stackParametersEqual,
+  starsSeparated,
   stepIsModified,
   STRETCH_MODES,
   type CurveChannel,
@@ -146,6 +149,8 @@ export interface EditorInspectorProps {
 const STEPS_WITH_DETAILS = new Set<EditorStepId>([
   'stack',
   'sky',
+  'noise',
+  'starless',
   'light',
   'curves',
   'colour',
@@ -154,6 +159,10 @@ const STEPS_WITH_DETAILS = new Set<EditorStepId>([
   'depth',
   'style',
 ]);
+
+/** Steps whose sliders come in titled groups (their own panel below), not as
+ * one flat list. */
+const GROUPED_SLIDER_STEPS = new Set<EditorStepId>(['sky', 'noise', 'starless', 'stars']);
 
 /** The single panel of controls for whichever workflow step the rail selects. */
 export function EditorInspector(props: EditorInspectorProps) {
@@ -165,6 +174,13 @@ export function EditorInspector(props: EditorInspectorProps) {
   const nextStep = steps[stepIndex + 1];
 
   const sliderKeys = step.params;
+  const sliderProps: SliderPanelProps = {
+    parameters,
+    onParameterChange: props.onParameterChange,
+    isProcessing: props.isProcessing,
+    revert: props.sliderRevert,
+    onRevert: props.onSliderRevert,
+  };
   const sectionResettable = sliderKeys.length > 0;
   const stackModified = !stackParametersEqual(parameters.stack, DEFAULT_STACK_PARAMETERS);
 
@@ -225,6 +241,41 @@ export function EditorInspector(props: EditorInspectorProps) {
         )}
       </div>
 
+      {step.phase === 'enhance' && starsSeparated(parameters) && (
+        // The starless bracket, said where it applies: these steps edit the sky
+        // alone, and the stars are still waiting in the Stars step.
+        <div
+          className="flex flex-col items-start gap-1.5 rounded-md border border-accent/30 bg-accent-wash px-3 py-2 text-xs text-ink"
+          role="note"
+        >
+          <p>{t('editor.starless_banner')}</p>
+          <button
+            type="button"
+            className="font-medium text-accent hover:opacity-80"
+            onClick={() => onStepChange('stars')}
+          >
+            {t('editor.starless_banner_action')}
+          </button>
+        </div>
+      )}
+
+      {activeStep === 'export' && starsSeparated(parameters) && parameters.starRecombine === 0 && (
+        // Separated and never put back: almost always a forgotten step.
+        <div
+          className="flex flex-col items-start gap-1.5 rounded-md border border-danger/30 bg-danger-wash px-3 py-2 text-xs text-danger"
+          role="status"
+        >
+          <p>{t('editor.stars_not_back')}</p>
+          <button
+            type="button"
+            className="font-medium underline hover:opacity-80"
+            onClick={() => onStepChange('stars')}
+          >
+            {t('editor.starless_banner_action')}
+          </button>
+        </div>
+      )}
+
       {activeStep === 'start' && <StartPanel {...props.start} isProcessing={props.isProcessing} />}
 
       {activeStep === 'stack' && (
@@ -252,37 +303,18 @@ export function EditorInspector(props: EditorInspectorProps) {
           <p className="text-xs text-faint">{t('editor.steps.frame.unavailable')}</p>
         ))}
 
-      {sliderKeys.length > 0 && activeStep !== 'stars' && activeStep !== 'detail' && (
-        <SliderGroup
-          keys={sliderKeys}
-          parameters={parameters}
-          onParameterChange={props.onParameterChange}
-          isProcessing={props.isProcessing}
-          revert={props.sliderRevert}
-          onRevert={props.onSliderRevert}
-        />
+      {sliderKeys.length > 0 && !GROUPED_SLIDER_STEPS.has(activeStep) && (
+        <SliderGroup keys={sliderKeys} {...sliderProps} />
       )}
+
+      {activeStep === 'sky' && <SkyPanel {...sliderProps} />}
+
+      {activeStep === 'noise' && <NoisePanel {...sliderProps} denoise={props.denoise} />}
+
+      {activeStep === 'starless' && <StarlessPanel {...sliderProps} stars={props.stars} />}
 
       {activeStep === 'stars' && (
-        <StarsPanel
-          parameters={parameters}
-          onParameterChange={props.onParameterChange}
-          isProcessing={props.isProcessing}
-          revert={props.sliderRevert}
-          onRevert={props.onSliderRevert}
-          stars={props.stars}
-        />
-      )}
-
-      {activeStep === 'detail' && (
-        <DetailPanel
-          parameters={parameters}
-          onParameterChange={props.onParameterChange}
-          isProcessing={props.isProcessing}
-          revert={props.sliderRevert}
-          onRevert={props.onSliderRevert}
-          denoise={props.denoise}
-        />
+        <StarsPanel {...sliderProps} onGoToStarless={() => onStepChange('starless')} />
       )}
 
       {activeStep === 'curves' && (
@@ -431,9 +463,11 @@ function StartPanel({
 
 /**
  * The Stack step (composite sessions only): the linear post-stack pre-stage.
- * It runs on the 32-bit stacked composite ahead of every other stage - stretch
- * the faint signal, subtract the sky gradient, neutralise the colour - all
- * non-destructive, recomputed from the linear composite on every change.
+ * It runs on the 32-bit stacked composite ahead of every other stage, and its
+ * controls read in the order they run - deconvolve (before any noise
+ * reduction), subtract the sky gradient, calibrate the colour, then stretch the
+ * faint signal - all non-destructive, recomputed from the linear composite on
+ * every change.
  */
 function StackPanel({
   parameters,
@@ -447,6 +481,69 @@ function StackPanel({
   const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1.5 text-sm">
+        <span className="flex items-baseline justify-between">
+          <label htmlFor="stack-deconv" className="text-muted">
+            {t('stack_panel.deconvolution.label')}
+          </label>
+          <span className="text-xs tabular-nums text-faint">
+            {parameters.deconvolution}
+          </span>
+        </span>
+        <input
+          id="stack-deconv"
+          type="range"
+          className="slider"
+          min={0}
+          max={100}
+          step={1}
+          value={parameters.deconvolution}
+          disabled={isProcessing}
+          onChange={(event) =>
+            onParameterChange('deconvolution', Number(event.target.value))
+          }
+        />
+        <p className="text-xs text-faint">{t('stack_panel.deconvolution.hint')}</p>
+      </div>
+
+      <div className="flex flex-col gap-1.5 text-sm">
+        <span className="flex items-baseline justify-between">
+          <label htmlFor="stack-bg" className="text-muted">
+            {t('stack_panel.background_extraction.label')}
+          </label>
+          <span className="text-xs tabular-nums text-faint">
+            {parameters.backgroundExtraction}
+          </span>
+        </span>
+        <input
+          id="stack-bg"
+          type="range"
+          className="slider"
+          min={0}
+          max={100}
+          step={1}
+          value={parameters.backgroundExtraction}
+          disabled={isProcessing}
+          onChange={(event) =>
+            onParameterChange('backgroundExtraction', Number(event.target.value))
+          }
+        />
+        <p className="text-xs text-faint">{t('stack_panel.background_extraction.hint')}</p>
+      </div>
+
+      <label className="flex items-center justify-between gap-2 text-sm text-muted">
+        <span className="flex flex-col gap-0.5">
+          {t('stack_panel.color_calibration.label')}
+          <span className="text-xs text-faint">{t('stack_panel.color_calibration.hint')}</span>
+        </span>
+        <input
+          type="checkbox"
+          className="size-4 shrink-0 accent-accent"
+          checked={parameters.colorCalibration}
+          disabled={isProcessing}
+          onChange={(event) => onParameterChange('colorCalibration', event.target.checked)}
+        />
+      </label>
       <div className="flex flex-col gap-1.5 text-sm">
         <span className="flex items-baseline justify-between">
           <label htmlFor="stack-stretch" className="text-muted">
@@ -492,125 +589,131 @@ function StackPanel({
         </p>
       </div>
 
-      <div className="flex flex-col gap-1.5 text-sm">
-        <span className="flex items-baseline justify-between">
-          <label htmlFor="stack-bg" className="text-muted">
-            {t('stack_panel.background_extraction.label')}
-          </label>
-          <span className="text-xs tabular-nums text-faint">
-            {parameters.backgroundExtraction}
-          </span>
-        </span>
-        <input
-          id="stack-bg"
-          type="range"
-          className="slider"
-          min={0}
-          max={100}
-          step={1}
-          value={parameters.backgroundExtraction}
-          disabled={isProcessing}
-          onChange={(event) =>
-            onParameterChange('backgroundExtraction', Number(event.target.value))
-          }
-        />
-        <p className="text-xs text-faint">{t('stack_panel.background_extraction.hint')}</p>
-      </div>
-
-      <label className="flex items-center justify-between gap-2 text-sm text-muted">
-        <span className="flex flex-col gap-0.5">
-          {t('stack_panel.color_calibration.label')}
-          <span className="text-xs text-faint">{t('stack_panel.color_calibration.hint')}</span>
-        </span>
-        <input
-          type="checkbox"
-          className="size-4 shrink-0 accent-accent"
-          checked={parameters.colorCalibration}
-          disabled={isProcessing}
-          onChange={(event) => onParameterChange('colorCalibration', event.target.checked)}
-        />
-      </label>
     </div>
   );
 }
 
-/**
- * The Stars step: two ways to handle stars, grouped so it's clear which is
- * which and when to reach for it. "Reduce" shrinks each star where it is (quick,
- * every star kept). "Remove" lifts the stars out entirely so every other step
- * only touches the nebula, then fades them back in (the starless workflow).
- * Both read the same "Detection" controls.
- */
-function StarsPanel({
-  parameters,
-  onParameterChange,
-  isProcessing,
-  revert,
-  onRevert,
-  stars,
-}: {
+/** What every slider panel below passes straight through to its `SliderGroup`s. */
+interface SliderPanelProps {
   parameters: ProcessingParameters;
   onParameterChange: (key: SliderParameterKey, value: number) => void;
   isProcessing: boolean;
   revert: SliderRevert | null;
   onRevert: () => void;
-  stars: StarsBundle;
-}) {
+}
+
+/** A titled group of sliders inside a step: heading, one line of help, the
+ * sliders, then whatever extra control the group needs (`children`). */
+function SliderSection({
+  id,
+  keys,
+  children,
+  ...sliders
+}: SliderPanelProps & { id: string; keys: SliderParameterKey[]; children?: ReactNode }) {
   const { t } = useTranslation();
-  const sub = (keys: SliderParameterKey[], id: string) => (
+  return (
     <div className="flex flex-col gap-2">
-      <span className="text-xs font-medium text-ink">{t(`stars_panel.${id}.heading`)}</span>
-      <p className="text-xs text-faint">{t(`stars_panel.${id}.help`)}</p>
-      <SliderGroup
-        keys={keys}
-        parameters={parameters}
-        onParameterChange={onParameterChange}
-        isProcessing={isProcessing}
-        revert={revert}
-        onRevert={onRevert}
-      />
+      <span className="text-xs font-medium text-ink">{t(`${id}.heading`)}</span>
+      <p className="text-xs text-faint">{t(`${id}.help`)}</p>
+      {children}
+      <SliderGroup keys={keys} {...sliders} />
     </div>
   );
+}
+
+/**
+ * The sky step, in the order the corrections run: the background first
+ * (vignette, light-pollution gradient, haze), then the colour balance read on
+ * that flattened background, the green cast last.
+ */
+function SkyPanel(props: SliderPanelProps) {
   return (
     <div className="flex flex-col gap-4">
-      {sub(['starReduction'], 'reduce')}
-      <div className="flex flex-col gap-2">
-        <span className="text-xs font-medium text-ink">{t('stars_panel.remove.heading')}</span>
-        <p className="text-xs text-faint">{t('stars_panel.remove.help')}</p>
+      <SliderSection
+        id="sky_panel.background"
+        keys={['vignetteCorrection', 'gradientReduction', 'dehaze']}
+        {...props}
+      />
+      <SliderSection id="sky_panel.colour" keys={['temperature', 'tint', 'greenRemoval']} {...props} />
+    </div>
+  );
+}
+
+/** The noise step: before the stars are separated and before any tone push. */
+function NoisePanel({ denoise, ...props }: SliderPanelProps & { denoise: DenoiseBundle }) {
+  return (
+    <SliderSection id="noise_panel" keys={['denoise', 'chromaDenoise']} {...props}>
+      {denoise.engines.length > 1 && (
+        <EnginePicker
+          engines={denoise.engines}
+          engine={denoise.engine}
+          onChange={denoise.onEngineChange}
+          disabled={props.isProcessing}
+          i18nPrefix="noise_panel.engine"
+          hintEngine="deepsnr"
+        />
+      )}
+    </SliderSection>
+  );
+}
+
+/**
+ * "Separate stars": the first half of the starless workflow. Which points count
+ * as stars (shared with the Stars step's in-place shrink), then how much of them
+ * to lift out of the sky - the Enhance steps then work on the sky alone, and the
+ * Stars step puts them back.
+ */
+function StarlessPanel({ stars, ...props }: SliderPanelProps & { stars: StarsBundle }) {
+  return (
+    <div className="flex flex-col gap-4">
+      <SliderSection id="stars_panel.detection" keys={['starSensitivity', 'starMaxSize']} {...props}>
+        <StarMaskToggle {...stars} />
+      </SliderSection>
+      <SliderSection id="stars_panel.remove" keys={['starRemoval']} {...props}>
         {stars.engines.length > 1 && (
           <EnginePicker
             engines={stars.engines}
             engine={stars.engine}
             onChange={stars.onEngineChange}
-            disabled={isProcessing}
+            disabled={props.isProcessing}
             i18nPrefix="stars_panel.remove.engine"
             hintEngine="starnet2"
           />
         )}
-        <SliderGroup
-          keys={['starRemoval', 'starRecombine']}
-          parameters={parameters}
-          onParameterChange={onParameterChange}
-          isProcessing={isProcessing}
-          revert={revert}
-          onRevert={onRevert}
-        />
-      </div>
-      <div className="flex flex-col gap-2">
-        <span className="text-xs font-medium text-ink">
-          {t('stars_panel.detection.heading')}
-        </span>
-        <p className="text-xs text-faint">{t('stars_panel.detection.help')}</p>
-        <SliderGroup
-          keys={['starSensitivity', 'starMaxSize']}
-          parameters={parameters}
-          onParameterChange={onParameterChange}
-          isProcessing={isProcessing}
-          revert={revert}
-          onRevert={onRevert}
-        />
-        <StarMaskToggle {...stars} />
-      </div>
+      </SliderSection>
+    </div>
+  );
+}
+
+/**
+ * "Stars": the second half, after the sky work. With the stars separated,
+ * shrink the stars layer and put it back over the edited sky. Without, there is
+ * nothing to put back: the stars are shrunk where they are, found by the
+ * detection set in "Separate stars".
+ */
+function StarsPanel({
+  onGoToStarless,
+  ...props
+}: SliderPanelProps & { onGoToStarless: () => void }) {
+  const { t } = useTranslation();
+  const separated = starsSeparated(props.parameters);
+  return (
+    <div className="flex flex-col gap-4">
+      {separated ? (
+        <SliderSection id="stars_panel.back" keys={['starRecombine']} {...props} />
+      ) : (
+        <p className="text-xs text-faint">{t('stars_panel.not_separated')}</p>
+      )}
+      <SliderSection
+        id={separated ? 'stars_panel.reduce_layer' : 'stars_panel.reduce'}
+        keys={['starReduction']}
+        {...props}
+      />
+      {!separated && (
+        <button type="button" className="btn btn-ghost btn-sm self-start" onClick={onGoToStarless}>
+          {t('stars_panel.detection_link')}
+        </button>
+      )}
     </div>
   );
 }
@@ -655,65 +758,6 @@ function EnginePicker<E extends string>({
       {hintEngine && engine === hintEngine && (
         <p className="text-xs text-faint">{t(`${i18nPrefix}.hint`)}</p>
       )}
-    </div>
-  );
-}
-
-function DetailPanel({
-  parameters,
-  onParameterChange,
-  isProcessing,
-  revert,
-  onRevert,
-  denoise,
-}: {
-  parameters: ProcessingParameters;
-  onParameterChange: (key: SliderParameterKey, value: number) => void;
-  isProcessing: boolean;
-  revert: SliderRevert | null;
-  onRevert: () => void;
-  denoise: DenoiseBundle;
-}) {
-  const { t } = useTranslation();
-  return (
-    <div className="flex flex-col gap-4">
-      <SliderGroup
-        keys={['clarity']}
-        parameters={parameters}
-        onParameterChange={onParameterChange}
-        isProcessing={isProcessing}
-        revert={revert}
-        onRevert={onRevert}
-      />
-      <div className="flex flex-col gap-2">
-        <span className="text-xs font-medium text-ink">{t('detail_panel.denoise.heading')}</span>
-        {denoise.engines.length > 1 && (
-          <EnginePicker
-            engines={denoise.engines}
-            engine={denoise.engine}
-            onChange={denoise.onEngineChange}
-            disabled={isProcessing}
-            i18nPrefix="detail_panel.denoise.engine"
-            hintEngine="deepsnr"
-          />
-        )}
-        <SliderGroup
-          keys={['denoise', 'chromaDenoise']}
-          parameters={parameters}
-          onParameterChange={onParameterChange}
-          isProcessing={isProcessing}
-          revert={revert}
-          onRevert={onRevert}
-        />
-      </div>
-      <SliderGroup
-        keys={['sharpness']}
-        parameters={parameters}
-        onParameterChange={onParameterChange}
-        isProcessing={isProcessing}
-        revert={revert}
-        onRevert={onRevert}
-      />
     </div>
   );
 }

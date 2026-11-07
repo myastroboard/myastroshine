@@ -142,12 +142,12 @@ describe('EditorInspector', () => {
     expect(screen.getByText(/stacked composite/i)).toBeInTheDocument();
   });
 
-  it('groups reduce, remove and detection on the stars step', () => {
+  it('puts detection and removal on the separate-stars step, not the shrink or put-back', () => {
     const onToggle = vi.fn();
     render(
       <EditorInspector
         {...makeProps({
-          activeStep: 'stars',
+          activeStep: 'starless',
           stars: {
             enabled: false,
             onToggle,
@@ -161,28 +161,117 @@ describe('EditorInspector', () => {
       />,
     );
 
-    // reduce + remove + detection sliders all live in the one step
-    expect(screen.getByLabelText('Star reduction')).toBeInTheDocument();
-    expect(screen.getByLabelText('Remove stars')).toBeInTheDocument();
-    expect(screen.getByLabelText('Bring stars back')).toBeInTheDocument();
     expect(screen.getByLabelText('Catch fainter stars')).toBeInTheDocument();
+    expect(screen.getByLabelText('Remove stars')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Star reduction')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Bring stars back')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('checkbox', { name: /show star mask/i }));
     expect(onToggle).toHaveBeenCalledWith(true);
   });
 
-  it('routes the header Reset on the stars step across all of its params', () => {
+  it('routes the header Reset on each star step to its own params', () => {
     const onResetSection = vi.fn();
-    render(<EditorInspector {...makeProps({ activeStep: 'stars', onResetSection })} />);
-
+    const { rerender } = render(
+      <EditorInspector {...makeProps({ activeStep: 'starless', onResetSection })} />,
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
-    expect(onResetSection).toHaveBeenCalledWith([
-      'starReduction',
-      'starRemoval',
-      'starRecombine',
-      'starSensitivity',
-      'starMaxSize',
-    ]);
+    expect(onResetSection).toHaveBeenLastCalledWith(['starSensitivity', 'starMaxSize', 'starRemoval']);
+
+    rerender(<EditorInspector {...makeProps({ activeStep: 'stars', onResetSection })} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
+    expect(onResetSection).toHaveBeenLastCalledWith(['starReduction', 'starRecombine']);
+  });
+
+  it('shrinks the stars in place when they were not separated, pointing back to detection', () => {
+    const onStepChange = vi.fn();
+    render(<EditorInspector {...makeProps({ activeStep: 'stars', onStepChange })} />);
+
+    expect(screen.getByLabelText('Star reduction')).toBeInTheDocument();
+    // Nothing was set aside, so there is nothing to put back.
+    expect(screen.queryByLabelText('Bring stars back')).not.toBeInTheDocument();
+    expect(screen.getByText(/nothing to put back/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /set in Separate stars/ }));
+    expect(onStepChange).toHaveBeenCalledWith('starless');
+  });
+
+  it('shrinks the stars layer and puts it back when the stars were separated', () => {
+    render(
+      <EditorInspector
+        {...makeProps({
+          activeStep: 'stars',
+          parameters: { ...DEFAULT_PARAMETERS, starRemoval: 100 },
+        })}
+      />,
+    );
+
+    expect(screen.getByLabelText('Bring stars back')).toBeInTheDocument();
+    expect(screen.getByLabelText('Star reduction')).toBeInTheDocument();
+    expect(screen.getByText(/Works on the separated stars alone/)).toBeInTheDocument();
+    expect(screen.queryByText(/nothing to put back/)).not.toBeInTheDocument();
+  });
+
+  it('says on the enhance steps that the stars are set aside, with a way to the Stars step', () => {
+    const onStepChange = vi.fn();
+    const separated = { ...DEFAULT_PARAMETERS, starRemoval: 80 };
+    const { rerender } = render(
+      <EditorInspector {...makeProps({ activeStep: 'light', onStepChange })} />,
+    );
+    expect(screen.queryByText(/without its stars/)).not.toBeInTheDocument();
+
+    rerender(
+      <EditorInspector {...makeProps({ activeStep: 'light', onStepChange, parameters: separated })} />,
+    );
+    expect(screen.getByText(/without its stars/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Go to Stars' }));
+    expect(onStepChange).toHaveBeenCalledWith('stars');
+
+    // Not on a prepare step: the stars are only set aside from here on.
+    rerender(
+      <EditorInspector {...makeProps({ activeStep: 'noise', onStepChange, parameters: separated })} />,
+    );
+    expect(screen.queryByText(/without its stars/)).not.toBeInTheDocument();
+  });
+
+  it('warns on export when the stars were set aside and never put back', () => {
+    const onStepChange = vi.fn();
+    const { rerender } = render(
+      <EditorInspector
+        {...makeProps({
+          activeStep: 'export',
+          onStepChange,
+          parameters: { ...DEFAULT_PARAMETERS, starRemoval: 100, starRecombine: 0 },
+        })}
+      />,
+    );
+    expect(screen.getByText(/set aside and not put back/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Go to Stars' }));
+    expect(onStepChange).toHaveBeenCalledWith('stars');
+
+    rerender(
+      <EditorInspector
+        {...makeProps({
+          activeStep: 'export',
+          parameters: { ...DEFAULT_PARAMETERS, starRemoval: 100, starRecombine: 100 },
+        })}
+      />,
+    );
+    expect(screen.queryByText(/set aside and not put back/)).not.toBeInTheDocument();
+  });
+
+  it('groups the sky step into the background, then the colour balance', () => {
+    render(<EditorInspector {...makeProps({ activeStep: 'sky' })} />);
+
+    const background = screen.getByText('Background');
+    const colour = screen.getByText('Colour balance');
+    expect(background.compareDocumentPosition(colour) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      screen
+        .getByLabelText('Light-pollution gradient')
+        .compareDocumentPosition(screen.getByLabelText('Remove green cast')) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it('shows the linear post-stack controls on the stack step', () => {
@@ -303,6 +392,29 @@ describe('EditorInspector', () => {
     expect(onParameterChange).toHaveBeenCalledWith('backgroundExtraction', 60);
   });
 
+  it('lays the stack controls out in the order they run, deconvolution first', () => {
+    const onParameterChange = vi.fn();
+    render(
+      <EditorInspector
+        {...makeProps({
+          activeStep: 'stack',
+          stack: { available: true, onParameterChange, onReset: vi.fn() },
+        })}
+      />,
+    );
+
+    const order = ['Deconvolution', 'Background extraction', 'Stretch'].map((label) =>
+      screen.getByLabelText(label),
+    );
+    for (let index = 1; index < order.length; index += 1) {
+      expect(
+        order[index - 1].compareDocumentPosition(order[index]) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+    fireEvent.change(screen.getByLabelText('Deconvolution'), { target: { value: '50' } });
+    expect(onParameterChange).toHaveBeenCalledWith('deconvolution', 50);
+  });
+
   it('shows the tone curve on the curves step and resets it from the header', () => {
     const onResetCurves = vi.fn();
     render(<EditorInspector {...makeProps({ activeStep: 'curves', onResetCurves })} />);
@@ -313,8 +425,8 @@ describe('EditorInspector', () => {
     expect(onResetCurves).toHaveBeenCalled();
   });
 
-  it('offers the StarNet2 engine on the stars step when the server has it', () => {
-    const base = makeProps({ activeStep: 'stars' });
+  it('offers the StarNet2 engine on the separate-stars step when the server has it', () => {
+    const base = makeProps({ activeStep: 'starless' });
     const onEngineChange = vi.fn();
     const { rerender } = render(
       <EditorInspector
@@ -338,7 +450,7 @@ describe('EditorInspector', () => {
   });
 
   it('shows the star mask source count once detection finishes', () => {
-    const base = makeProps({ activeStep: 'stars' });
+    const base = makeProps({ activeStep: 'starless' });
     const { rerender } = render(
       <EditorInspector {...base} stars={{ ...base.stars, enabled: true, loading: true }} />,
     );
@@ -353,8 +465,8 @@ describe('EditorInspector', () => {
     expect(screen.queryByText(/sources/)).not.toBeInTheDocument();
   });
 
-  it('offers the DeepSNR engine on the detail step when the server has it', () => {
-    const base = makeProps({ activeStep: 'detail' });
+  it('offers the DeepSNR engine on the noise step when the server has it', () => {
+    const base = makeProps({ activeStep: 'noise' });
     const onEngineChange = vi.fn();
     render(
       <EditorInspector
@@ -417,7 +529,7 @@ describe('EditorInspector', () => {
     expect(details).not.toBeNull();
     expect(details).not.toHaveAttribute('open');
     expect(details).toHaveTextContent('Learn more');
-    expect(details).toHaveTextContent(/white balance, lens vignetting/);
+    expect(details).toHaveTextContent(/the background first/);
   });
 
   it('offers no Learn more on a step with only a short help line', () => {

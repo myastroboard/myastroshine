@@ -49,6 +49,13 @@ _ESTIMATE_SMOOTH_SIGMA = 3.0  # tidies the upscale seam and the last of the fiel
 _EXCESS_THRESHOLD = 8.0
 _EXCESS_DILATE_PX = 2
 _BLOAT_REACH_PX = 10  # how far past a star's own circle the bloat grow can extend
+# Shrinking the stars-only layer: the same erosion schedule as the in-place
+# `ImageProcessingService.apply_star_reduction` (1-4 passes of a 3x3 ellipse,
+# blended in at 0.4-1.0 and darkened by up to 60%), so one "Shrink stars" value
+# reads the same whether or not the stars were separated.
+_REDUCE_MAX_EXTRA_PASSES = 3
+_REDUCE_BLEND_FLOOR = 0.4
+_REDUCE_DARKEN = 0.6
 
 
 class StarlessService:
@@ -157,6 +164,29 @@ class StarlessService:
         )
         bloated = cv2.morphologyEx(bloated, cv2.MORPH_CLOSE, smooth)
         return cast("np.ndarray", cv2.max(mask, bloated))
+
+    def reduce_layer(self, stars_layer: np.ndarray, amount: int) -> np.ndarray:
+        """Shrink every star of a stars-only layer (``amount`` 0-100), before it
+        goes back with :meth:`recombine`.
+
+        The starless workflow's own star reduction: the layer holds nothing but
+        stars on black, so no detection or mask is needed - the whole layer is
+        eroded and dimmed, and the starless image under it already fills where
+        the stars' outer rings were. ``uint8`` or ``float32``; 0 returns the
+        layer untouched.
+        """
+        if amount <= 0:
+            return stars_layer
+        strength = amount / 100.0
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+        passes = 1 + round(strength * _REDUCE_MAX_EXTRA_PASSES)
+        layer = stars_layer.astype(np.float32)
+        eroded = cv2.erode(layer, kernel, iterations=passes) * (1.0 - _REDUCE_DARKEN * strength)
+        weight = _REDUCE_BLEND_FLOOR + (1.0 - _REDUCE_BLEND_FLOOR) * strength
+        reduced = layer * (1.0 - weight) + eroded * weight
+        if stars_layer.dtype == np.uint8:
+            return to_uint8(reduced)
+        return cast("np.ndarray", np.clip(reduced, 0.0, 1.0).astype(np.float32))
 
     def recombine(
         self, starless: np.ndarray, stars_layer: np.ndarray, recombine_amount: int

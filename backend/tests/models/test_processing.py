@@ -12,7 +12,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from app.models import GeometryParameters, ProcessingParameters
+from app.models import GeometryParameters, ProcessingParameters, StackParameters
 
 _WIRE = {
     "geometry": {
@@ -26,6 +26,7 @@ _WIRE = {
         "crop_h": 0.9,
     },
     "stack": {
+        "deconvolution": 55,
         "stretch": 0.35,
         "stretch_mode": "classic",
         "background_extraction": 80,
@@ -71,6 +72,7 @@ def test_all_wire_fields_round_trip() -> None:
     assert params.geometry.rotate_quarters == 1
     assert params.stack.background_extraction == 80
     assert params.stack.color_calibration is False
+    assert params.stack.deconvolution == 55
     assert params.curve_points[1].y == 160
     assert params.red_curve_points[1].y == 170
     assert params.green_curve_points[1].y == 150
@@ -191,3 +193,12 @@ def test_out_of_range_is_rejected() -> None:
 def test_crop_past_edge_is_rejected() -> None:
     with pytest.raises(ValidationError):
         GeometryParameters(crop_x=0.5, crop_w=0.8)
+
+
+def test_deconvolution_defaults_off_and_rejects_out_of_range() -> None:
+    """A stack stored before the deconvolution existed loads with it off."""
+    assert StackParameters().deconvolution == 0
+    assert ProcessingParameters(stack={"stretch": 0.5}).stack.deconvolution == 0
+    for value in (-1, 101):
+        with pytest.raises(ValidationError):
+            StackParameters(deconvolution=value)

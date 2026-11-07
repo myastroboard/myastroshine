@@ -25,6 +25,7 @@ from app.models import (
     StackParameters,
 )
 from app.services import progress
+from app.services.deconvolution import deconvolve
 from app.services.engine_probe import get_engine_statuses
 from app.services.external_denoise import ExternalDenoiseService, blend_denoise
 from app.services.external_engine import ExternalEngineError, ModelEstimateCache
@@ -33,7 +34,12 @@ from app.services.external_starless import (
     StarlessSplitFn,
     blend_starless,
 )
-from app.services.image_processing import DenoiseStageFn, ImageProcessingService, StepCallback
+from app.services.image_processing import (
+    DenoiseStageFn,
+    ImageProcessingService,
+    StarlessViewFn,
+    StepCallback,
+)
 from app.services.job import JobService
 from app.services.job_runner import JobInterruptedError, get_job_runner, raise_if_stopping
 from app.services.looks import LOOKS
@@ -251,6 +257,7 @@ class EnhancementService:
         params: ProcessingParameters,
         stack_id: str | None,
         on_step: StepCallback,
+        on_starless: StarlessViewFn | None = None,
     ) -> np.ndarray:
         """Run the full pipeline - everything but the "Style" look - to ``uint8`` BGR."""
         starless_split = self._starless_split(session_id, params, on_step)
@@ -270,6 +277,7 @@ class EnhancementService:
                 denoise_stage=denoise_stage,
                 sky_mask=self.storage.load_stack_sky_mask(stack_id),
                 render_hints=RenderHints.from_dict(self.storage.load_stack_render_hints(stack_id)),
+                on_starless=on_starless,
             )
         original = self.storage.load_original(session_id)
         return self.processing.apply_parameters(
@@ -278,6 +286,7 @@ class EnhancementService:
             on_step,
             starless_split=starless_split,
             denoise_stage=denoise_stage,
+            on_starless=on_starless,
         )
 
     def analysis_view(
@@ -296,9 +305,8 @@ class EnhancementService:
             return self.storage.load_original(session_id), None, RenderHints()
         sky_mask = self.storage.load_stack_sky_mask(stack_id)
         hints = RenderHints.from_dict(self.storage.load_stack_render_hints(stack_id))
-        base = render_stack_base(
-            self.storage.load_stack_composite(stack_id), stack, sky_mask, hints
-        )
+        composite = deconvolve(self.storage.load_stack_composite(stack_id), stack.deconvolution)
+        base = render_stack_base(composite, stack, sky_mask, hints)
         image = np.clip(base * 255.0, 0, 255).astype(np.uint8)
         return image, sky_mask, hints
 
@@ -363,8 +371,12 @@ class EnhancementService:
         if prelook is not None:
             logger.info("reusing the pre-look render", session_id=session_id)
             return prelook
-        prelook = self._render(session_id, params, stack_id, on_step)
+        starless: list[np.ndarray] = []
+        prelook = self._render(session_id, params, stack_id, on_step, starless.append)
         self.storage.save_prelook(session_id, prelook, key)
+        # Saved with the render it came from, never ahead of it: a render that
+        # kept its stars drops the last one.
+        self.storage.save_starless(session_id, starless[0] if starless else None)
         return prelook
 
     def run(self, session_id: str, params: ProcessingParameters, job_id: str) -> None:

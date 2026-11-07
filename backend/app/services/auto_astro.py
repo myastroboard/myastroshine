@@ -28,6 +28,7 @@ import numpy as np
 
 from app.logging_config import get_logger
 from app.models import CurvePoint, ProcessingParameters
+from app.services.image_processing import ImageProcessingService
 from app.services.star_detection import StarDetectionService
 from app.utils.math_utils import curve_points_to_lut
 from app.utils.sky_mask import fit_sky_mask
@@ -55,6 +56,8 @@ _FINEST_LAYER_NOISE = 0.889  # starlet layer 1 sigma for unit white noise
 #: A dark sky's noisiest channel clips at 0 most, so its median sits under its
 #: mean - a sky neutral by the median came out blue once denoised.
 _SKY_MEAN_WINDOW = 7
+#: Background pixels the channel-curve solve reads its sky level off.
+_SKY_PROBE_SAMPLE = 200_000
 
 # -- scene --------------------------------------------------------------------
 #: A Moon or planet shot: a bright disc on a black, noise-free background.
@@ -79,7 +82,8 @@ _MAX_CURVE_GAIN = 3.0
 # The denoise strengths are noise thresholds relative to the measured noise (see
 # app.utils.starlet), so these map how *visible* the noise is - its sigma on the
 # 0-255 display scale, times the tone curve's gain above the sky, since the
-# denoise runs after the curve - to how hard to cut it. Calibrated on real Seestar stacks
+# curve will lift what the denoise leaves (it runs just before) - to how hard to cut
+# it. Calibrated on real Seestar stacks
 # (sigma 3-6) and JPEG uploads (1.5-4): above 40 the luma denoise smeared the
 # faint stars of a dense field into a haze; chroma takes a harder cut since
 # colour carries little detail.
@@ -115,9 +119,6 @@ class Measurements:
 
     sky: float  # background luminance
     sky_bgr: tuple[float, float, float]  # background level of each channel
-    #: Histograms (256 bins) of the background's B, G and R levels: what a tone
-    #: curve does to the sky depends on the whole spread of its noise.
-    sky_histograms: tuple[np.ndarray, np.ndarray, np.ndarray]
     object_level: float  # median luminance of the object
     object_chroma: float  # object's mean max-min channel spread
     green_excess: float  # object's mean G - (R+B)/2, as a fraction of its luminance
@@ -131,6 +132,7 @@ class AutoAstroService:
 
     def __init__(self, star_detector: StarDetectionService) -> None:
         self.star_detector = star_detector
+        self._processing = ImageProcessingService()
 
     def suggest_parameters(
         self,
@@ -151,6 +153,18 @@ class AutoAstroService:
         camera_landscape = sky is not None or wide_field
         scene = _scene(measured, landscape=camera_landscape)
         parameters = _parameters(measured, scene, camera_landscape=camera_landscape)
+        if parameters.curve_points and image.ndim == _COLOR_NDIM:
+            # The channel curves are solved on the sky the curve will meet: the
+            # green cast and the noise steps (whose strengths the master curve
+            # set) run before it, and a denoised sky is narrower.
+            ready = self._before_the_curve(image, parameters)
+            background, _ = _regions(_luma(image), sky)
+            parameters = _parameters(
+                measured,
+                scene,
+                camera_landscape=camera_landscape,
+                probe=_SkyProbe(ready, background),
+            )
         logger.info(
             "auto astro analysed",
             scene=scene,
@@ -161,6 +175,16 @@ class AutoAstroService:
             star_density=round(measured.star_density),
         )
         return parameters
+
+    def _before_the_curve(self, image: np.ndarray, parameters: ProcessingParameters) -> np.ndarray:
+        """``image`` (BGR ``uint8``) through the stages Auto Astro sets that run
+        ahead of the tone curve - the green cast, then the Noise step - quantised
+        back to the 0-255 levels the curve's LUT maps."""
+        ready = image.astype(np.float32) / _LEVELS
+        ready = self._processing.apply_green_removal(ready, parameters.green_removal)
+        ready = self._processing.apply_denoise(ready, parameters.denoise)
+        ready = self._processing.apply_chroma_denoise(ready, parameters.chroma_denoise)
+        return np.clip(np.rint(ready * _LEVELS), 0, _WHITE).astype(np.uint8)
 
     def measure(self, image: np.ndarray, sky: np.ndarray | None = None) -> Measurements:
         """Read the sky, the object, the noise and the stars off ``image``.
@@ -180,7 +204,6 @@ class AutoAstroService:
             float(np.median(local_mean[..., c][background])) * _LEVELS for c in range(3)
         )
         sky_level = float(np.median(cv2.blur(luma, window)[background])) * _LEVELS
-        histograms = [np.bincount(bgr[..., c][background], minlength=_WHITE + 1) for c in range(3)]
         if obj.any():
             object_pixels = pixels[obj]
             object_luma = luma[obj]
@@ -197,7 +220,6 @@ class AutoAstroService:
         return Measurements(
             sky=sky_level,
             sky_bgr=(sky_bgr[0], sky_bgr[1], sky_bgr[2]),
-            sky_histograms=(histograms[0], histograms[1], histograms[2]),
             object_level=object_level,
             object_chroma=object_chroma,
             green_excess=green_excess,
@@ -208,6 +230,38 @@ class AutoAstroService:
             ),
             star_density=len(stars) / megapixels,
         )
+
+
+def _luma(image: np.ndarray) -> np.ndarray:
+    """The 0-1 luma plane of a BGR ``uint8`` picture (Rec. 601, as ``measure``)."""
+    pixels = image.astype(np.float32) / _LEVELS
+    return np.ascontiguousarray(cv2.cvtColor(pixels, cv2.COLOR_BGR2YCrCb)[..., 0])
+
+
+class _SkyProbe:
+    """The sky's level in one channel after tone LUTs, read the way
+    :meth:`AutoAstroService.measure` reads it: the median, over the background,
+    of a local mean - what the eye sees, not the raw pixels' mean.
+
+    The channel curves are solved against this very reading. Solved on the mean
+    of the pixels instead, a sky whose noise is skewed (clipped at black,
+    lifted by a concave curve) sat levels off the measured neutral: a C 11 JPEG
+    kept a 4-level red cast. The LUTs are applied to the ``uint8`` planes as the
+    pipeline's curve stages do, and the median is read off an even sample of the
+    background, which is plenty for a level.
+    """
+
+    def __init__(self, bgr: np.ndarray, background: np.ndarray) -> None:
+        self._planes = [np.ascontiguousarray(bgr[..., c]) for c in range(3)]
+        flat = np.flatnonzero(background)
+        self._sample = flat[:: max(1, flat.size // _SKY_PROBE_SAMPLE)]
+
+    def level(self, channel: int, *luts: np.ndarray) -> float:
+        plane = self._planes[channel]
+        for lut in luts:
+            plane = cv2.LUT(plane, lut)
+        local = cv2.blur(plane.astype(np.float32), (_SKY_MEAN_WINDOW, _SKY_MEAN_WINDOW))
+        return float(np.median(local.ravel()[self._sample]))
 
 
 def _regions(luma: np.ndarray, sky: np.ndarray | None) -> tuple[np.ndarray, np.ndarray]:
@@ -260,9 +314,15 @@ def _scene(measured: Measurements, *, landscape: bool) -> Scene:
 
 
 def _parameters(
-    measured: Measurements, scene: Scene, *, camera_landscape: bool
+    measured: Measurements,
+    scene: Scene,
+    *,
+    camera_landscape: bool,
+    probe: _SkyProbe | None = None,
 ) -> ProcessingParameters:
-    curves, gain = ({}, 1.0) if scene == "bright_on_black" else _tone_curves(measured)
+    """The parameter set; the channel curves only with a ``probe`` of the sky as
+    the tone curve will meet it (``None``: the master curve alone)."""
+    curves, gain = ({}, 1.0) if scene == "bright_on_black" else _tone_curves(measured, probe)
 
     chroma_noise = measured.chroma_noise * gain
     chroma_denoise = int(
@@ -297,7 +357,9 @@ def _parameters(
     )
 
 
-def _tone_curves(measured: Measurements) -> tuple[dict[str, list[CurvePoint]], float]:
+def _tone_curves(
+    measured: Measurements, probe: _SkyProbe | None
+) -> tuple[dict[str, list[CurvePoint]], float]:
     """The master tone curve, plus a per-channel curve for each channel whose sky
     is off neutral - and the curve's gain from the sky to the object (1 for no curve).
 
@@ -308,11 +370,11 @@ def _tone_curves(measured: Measurements) -> tuple[dict[str, list[CurvePoint]], f
     off-neutral channel gets a curve that moves its sky - as the master curve left
     it - onto the neutral level, converging back to identity in the highlights.
 
-    "As the master curve left it" is the mean of the curve over the sky's actual
-    levels, not the curve at the sky's level: the noise straddles the bend where
-    the curve steepens above the sky, which lifts the mean - a channel whose sky
-    sits lower, on the straight part, is lifted less, and a sky neutral by the
-    curve at its level came out cast once the denoise averaged it.
+    "As the master curve left it" is read off the sky itself (``probe``, the
+    picture after the stages ahead of the curve), not the curve at the sky's
+    level: the noise straddles the bend where the curve steepens above the sky,
+    which lifts the local mean - a channel whose sky sits lower, on the straight
+    part, is lifted less. Without a probe only the master curve is drawn.
     """
     sky_x = round(measured.sky)
     object_x = round(measured.object_level)
@@ -331,44 +393,37 @@ def _tone_curves(measured: Measurements) -> tuple[dict[str, list[CurvePoint]], f
     master = [(0, 0), (sky_x, sky_y), (object_x, object_y), (_WHITE, _WHITE)]
     curves: dict[str, list[CurvePoint]] = {"curve_points": _points(master)}
 
+    gain = (object_y - sky_y) / (object_x - sky_x)
+    if probe is None:
+        return curves, gain
     lut = curve_points_to_lut(master)
-    levels = [_mean_level(histogram, lut) for histogram in measured.sky_histograms]
+    levels = [probe.level(channel, lut) for channel in range(3)]
     neutral = float(np.dot(levels, _LUMA_BGR))  # the grey of the same brightness
     target = round(neutral)
-    for name, histogram, level in zip(
-        ("blue", "green", "red"), measured.sky_histograms, levels, strict=True
-    ):
+    for channel, (name, level) in enumerate(zip(("blue", "green", "red"), levels, strict=True)):
         if abs(level - neutral) < 1.0 or not 0 < target < _WHITE:
             continue
-        source = _channel_source(histogram, lut, target)
+        source = _channel_source(probe, channel, lut, target)
         if source != target:
             curves[f"{name}_curve_points"] = _points([(0, 0), (source, target), (_WHITE, _WHITE)])
-    return curves, (object_y - sky_y) / (object_x - sky_x)
+    return curves, gain
 
 
-def _mean_level(histogram: np.ndarray, *luts: np.ndarray) -> float:
-    """Mean level of a channel's sky after the ``luts`` (applied in order)."""
-    levels = np.arange(histogram.size)
-    for lut in luts:
-        levels = lut[levels]
-    return float((histogram * levels).sum() / max(int(histogram.sum()), 1))
-
-
-def _channel_source(histogram: np.ndarray, master: np.ndarray, target: int) -> int:
+def _channel_source(probe: _SkyProbe, channel: int, master: np.ndarray, target: int) -> int:
     """The input level of a channel curve ``(0,0) - (source, target) - (255,255)``
-    that brings the channel's sky, after ``master``, to ``target`` on average.
+    that brings the channel's sky, after ``master``, to ``target``.
 
-    Solved on the sky's histogram rather than set to its mean: lifting a starved
+    Solved on the sky itself rather than set to its level: lifting a starved
     channel takes a strongly concave curve, and over the spread of a noisy sky
-    the mean of a concave curve falls short of the curve of the mean - a JPEG of
-    IC 5070 kept a 4-level red cast. The mean falls as ``source`` rises, so a
-    bisection finds it.
+    the concave curve of each pixel falls short of the curve of the level - a
+    JPEG of IC 5070 kept a 4-level red cast. The level falls as ``source``
+    rises, so a bisection finds it.
     """
     low, high = 1, _WHITE - 1
     while low < high:
         source = (low + high) // 2
-        channel = curve_points_to_lut([(0, 0), (source, target), (_WHITE, _WHITE)])
-        if _mean_level(histogram, master, channel) > target:
+        lut = curve_points_to_lut([(0, 0), (source, target), (_WHITE, _WHITE)])
+        if probe.level(channel, master, lut) > target:
             low = source + 1
         else:
             high = source

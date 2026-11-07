@@ -716,3 +716,24 @@ def test_run_applies_a_night_landscape_look_through_the_sky_mask(
     prelook = enhancement.storage.load_prelook(session_id)
     assert prelook is not None
     assert not np.array_equal(enhancement.storage.load_processed(session_id), prelook)
+
+
+def test_run_keeps_the_starless_sky_only_while_the_stars_are_separated(
+    enhancement: EnhancementService, sample_image: np.ndarray
+) -> None:
+    """A render that separates the stars stores the edited sky without them (the
+    editor's "sky alone" view); one that keeps them drops the stale copy."""
+    record = enhancement.sessions.create_session(image_path="")
+    enhancement.storage.save_original(record.session_id, sample_image)
+    starless = enhancement.storage.starless_path(record.session_id)
+
+    separated = ProcessingParameters(star_removal=100, star_recombine=100, contrast=1.3)
+    enhancement.run(record.session_id, separated, enhancement.jobs.create(record.session_id).job_id)
+    assert starless.exists()
+
+    enhancement.run(
+        record.session_id,
+        separated.model_copy(update={"star_removal": 0}),
+        enhancement.jobs.create(record.session_id).job_id,
+    )
+    assert not starless.exists()

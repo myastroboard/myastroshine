@@ -26,6 +26,14 @@ describe('stepChanged', () => {
     expect(stepChanged(step('light'), base, { ...base, saturation: 1.5 }, null, null)).toBe(false);
   });
 
+  it('splits the star controls between separating the stars and putting them back', () => {
+    expect(stepChanged(step('starless'), base, { ...base, starRemoval: 50 }, null, null)).toBe(true);
+    expect(stepChanged(step('starless'), base, { ...base, starRecombine: 50 }, null, null)).toBe(false);
+    expect(stepChanged(step('stars'), base, { ...base, starRecombine: 50 }, null, null)).toBe(true);
+    expect(stepChanged(step('noise'), base, { ...base, denoise: 30 }, null, null)).toBe(true);
+    expect(stepChanged(step('detail'), base, { ...base, denoise: 30 }, null, null)).toBe(false);
+  });
+
   it('compares the linear stack stage and the framing', () => {
     const stack = { ...base, stack: { ...DEFAULT_STACK_PARAMETERS, stretch: 0.9 } };
     expect(stepChanged(step('stack'), base, stack, null, null)).toBe(true);

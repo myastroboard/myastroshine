@@ -78,6 +78,31 @@ describe('ImagePreview', () => {
     expect(container.querySelectorAll('svg circle')).toHaveLength(2);
   });
 
+  it('switches between the sky alone and the result while the stars are separated', () => {
+    const onToggle = vi.fn();
+    const { rerender } = render(<ImagePreview originalUrl="/a" processedUrl="/b" />);
+    expect(screen.queryByRole('button', { name: /sky alone|with stars/i })).not.toBeInTheDocument();
+
+    rerender(
+      <ImagePreview originalUrl="/a" processedUrl="/b" skyAlone={{ active: true, onToggle }} />,
+    );
+    expect(screen.getByText('After - sky alone')).toBeInTheDocument();
+    const toggle = screen.getByRole('button', { name: 'Show with stars' });
+    // Pressing it must not start a divider drag on the image under it.
+    const pointerDown = new Event('pointerdown', { bubbles: true, cancelable: true });
+    const stop = vi.spyOn(pointerDown, 'stopPropagation');
+    toggle.dispatchEvent(pointerDown);
+    expect(stop).toHaveBeenCalled();
+    fireEvent.click(toggle);
+    expect(onToggle).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <ImagePreview originalUrl="/a" processedUrl="/b" skyAlone={{ active: false, onToggle }} />,
+    );
+    expect(screen.getByText('After')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show the sky alone' })).toBeInTheDocument();
+  });
+
   it('renders no overlay circles without a mask', () => {
     const { container } = render(<ImagePreview originalUrl="/a" processedUrl="/b" />);
     expect(container.querySelectorAll('svg circle')).toHaveLength(0);

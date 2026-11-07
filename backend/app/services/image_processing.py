@@ -23,6 +23,7 @@ import numpy as np
 
 from app.logging_config import get_logger
 from app.models import CurvePoint, GeometryParameters, LookParameters, ProcessingParameters
+from app.services.deconvolution import deconvolve
 from app.services.external_starless import StarlessSplitFn
 from app.services.looks import LooksService
 from app.services.post_stack import RenderHints, render_stack_base
@@ -39,6 +40,8 @@ StepCallback = Callable[[str, int], None]
 #: ``(image, linear) -> denoised``, ``float32`` in and out. ``linear`` is true when
 #: the stage runs on a linear stacked composite (RGB planes, before the stretch).
 DenoiseStageFn = Callable[[np.ndarray, bool], np.ndarray]
+#: Receives the edited starless sky (BGR ``uint8``) just before the stars go back.
+StarlessViewFn = Callable[[np.ndarray], None]
 
 logger = get_logger(__name__)
 
@@ -593,15 +596,17 @@ class ImageProcessingService:
     def _background_stages(
         self, params: ProcessingParameters
     ) -> list[tuple[str, Callable[[np.ndarray], np.ndarray]]]:
-        """Geometry + the sky/optics corrections - these belong on the whole
-        frame (stars included), so they run before any starless split."""
+        """Editor steps "Framing" and "Clean the sky": geometry, then the sky and
+        optics corrections, on the whole frame (stars included).
+
+        In the order the deep-sky references give for the post-stack corrections:
+        the multiplicative vignette (what a flat would have fixed) before the
+        additive light-pollution gradient and haze, then the colour balance on the
+        flattened background, and the green cast (SCNR) last, once it is balanced -
+        a white balance read through a gradient balances the gradient.
+        """
         return [
             ("geometry", lambda r: self.apply_geometry(r, params.geometry)),
-            (
-                "color_correction",
-                lambda r: self.apply_white_balance(r, params.temperature, params.tint),
-            ),
-            ("green_removal", lambda r: self.apply_green_removal(r, params.green_removal)),
             (
                 "vignette_correction",
                 lambda r: self.apply_vignette_correction(r, params.vignette_correction),
@@ -611,16 +616,40 @@ class ImageProcessingService:
                 lambda r: self.apply_gradient_reduction(r, params.gradient_reduction),
             ),
             ("dehaze", lambda r: self.apply_dehaze(r, params.dehaze)),
+            (
+                "color_correction",
+                lambda r: self.apply_white_balance(r, params.temperature, params.tint),
+            ),
+            ("green_removal", lambda r: self.apply_green_removal(r, params.green_removal)),
+        ]
+
+    def _noise_stages(
+        self, params: ProcessingParameters
+    ) -> list[tuple[str, Callable[[np.ndarray], np.ndarray]]]:
+        """Editor step "Noise": before the star split and before any tone push.
+
+        Every tone stage after this amplifies whatever noise is left, and the
+        sharpening of the Detail step must see denoised data - so noise reduction
+        comes as early as the data allows (the DeepSNR engine, for the same
+        reason, runs on the linear data of a composite). The starlet shrinkage
+        keeps star cores (their coefficients sit far above the noise), so it is
+        safe ahead of the star separation.
+        """
+        return [
+            ("denoise", lambda r: self.apply_denoise(r, params.denoise)),
+            ("chroma_denoise", lambda r: self.apply_chroma_denoise(r, params.chroma_denoise)),
         ]
 
     def _creative_stages(
         self, params: ProcessingParameters
     ) -> list[tuple[str, Callable[[np.ndarray], np.ndarray]]]:
-        """Tone, colour, and detail work - runs on the starless image when star
-        removal is active, so the nebula can be pushed without bloating stars."""
+        """Editor steps "Light", "Curves", "Colour" and "Detail", in that order,
+        each step's sliders in their display order. They run on the starless image
+        when the stars were separated, so the nebula can be pushed without
+        bloating the stars."""
         return [
-            ("contrast", lambda r: self.apply_contrast(r, params.contrast)),
             ("exposure", lambda r: self.apply_exposure(r, params.exposure)),
+            ("contrast", lambda r: self.apply_contrast(r, params.contrast)),
             (
                 "highlights_shadows",
                 lambda r: self.apply_highlights_shadows(r, params.highlights, params.shadows),
@@ -639,14 +668,6 @@ class ImageProcessingService:
             ("saturation", lambda r: self.apply_saturation(r, params.saturation)),
             ("vibrance", lambda r: self.apply_vibrance(r, params.vibrance)),
             ("clarity", lambda r: self.apply_clarity(r, params.clarity)),
-            ("denoise", lambda r: self.apply_denoise(r, params.denoise)),
-            ("chroma_denoise", lambda r: self.apply_chroma_denoise(r, params.chroma_denoise)),
-            (
-                "star_reduction",
-                lambda r: self.apply_star_reduction(
-                    r, params.star_reduction, params.star_sensitivity, params.star_max_size
-                ),
-            ),
             ("sharpness", lambda r: self.apply_sharpness(r, params.sharpness)),
         ]
 
@@ -661,33 +682,49 @@ class ImageProcessingService:
         denoise_stage: DenoiseStageFn | None = None,
         sky_mask: np.ndarray | None = None,
         render_hints: RenderHints | None = None,
+        on_starless: StarlessViewFn | None = None,
     ) -> np.ndarray:
-        """Run the full pipeline in the recommended order.
+        """Run the full pipeline in the editor's workflow order.
 
         Returns the input unchanged when every parameter is at its default.
         ``on_step(step_name, percent)`` is called as each stage begins.
 
-        When ``star_removal`` is set, the pipeline splits after the background
-        corrections: the stars are pulled out, every creative stage runs on the
-        starless image, and ``star_recombine`` screen-blends the removed star flux
-        back at the end. ``star_removal = 0`` (the default) is byte-identical to
-        the flat pipeline. The split defaults to the classical
-        ``StarlessService.split``; ``starless_split`` overrides it with an
-        alternative backend of the same shape (the StarNet2 engine - see
+        The order is the editor rail's, one to one (``EDITOR_STEPS`` in the
+        frontend's ``types/index.ts``; the reasoning and its references are in
+        docs/ALGORITHMS.md "Editing workflow"): [deconvolution -> (linear
+        DeepSNR) -> stack_base, the composite's "Stack" step] -> framing -> sky
+        (background, then colour) -> noise -> separate stars -> light -> curves
+        -> colour -> detail -> stars (shrink, put back).
+
+        When ``star_removal`` is set, the stars are pulled out after the noise
+        stages, every creative stage runs on the starless image, then the final
+        stage shrinks the stars-only layer by ``star_reduction`` and
+        ``star_recombine`` screen-blends it back. Without a split,
+        ``star_reduction`` shrinks the stars in place at that same final point.
+        ``star_removal = 0`` (the default) never splits. The split defaults to
+        the classical ``StarlessService.split``; ``starless_split`` overrides it
+        with an alternative backend of the same shape (the StarNet2 engine - see
         ``app.services.external_starless``), which the caller has already vetted
         and wrapped with its own fallback.
 
         ``denoise_stage``: when given (the DeepSNR engine - see
-        ``app.services.external_denoise``), the classical ``denoise`` creative
-        stage is dropped so denoise never runs twice, and the engine runs instead
-        - on a stacked composite, on the **linear** data ahead of ``stack_base``
-        (before any stretch amplifies and reshapes the noise, which is what the
-        model is trained on); on an ordinary image, right after the background
-        corrections. Like ``starless_split``, the caller has vetted it and wrapped
-        its fallback. Both engines exchange 16-bit or float data, never 8-bit.
+        ``app.services.external_denoise``), the classical ``denoise`` stage is
+        dropped so denoise never runs twice, and the engine runs instead - on a
+        stacked composite, on the **linear** data ahead of ``stack_base`` (before
+        any stretch amplifies and reshapes the noise, which is what the model is
+        trained on); on an ordinary image, in the classical stage's own slot.
+        Like ``starless_split``, the caller has vetted it and wrapped its
+        fallback. Both engines exchange 16-bit or float data, never 8-bit.
+
+        ``on_starless``: with the stars separated, called once with the edited
+        starless sky (BGR ``uint8``) just before the stars go back - what the
+        Enhance steps work on, for the editor's "sky alone" preview. Never called
+        without a split.
 
         ``linear_composite``: ``image`` is a linear stacked composite (RGB
-        planes, ``float32``), not a uint8 upload - prepend the ``stack_base``
+        planes, ``float32``), not a uint8 upload - prepend the linear
+        ``deconvolution`` (``params.stack.deconvolution``; first, ahead of any
+        noise reduction) and the ``stack_base``
         pre-stage (background extraction, colour calibration and the tunable
         stretch, all from ``params.stack``) which turns it into the BGR
         ``float32`` the rest of the pipeline expects. ``sky_mask`` (a
@@ -700,6 +737,7 @@ class ImageProcessingService:
         build the gallery thumbnails, or to export without it).
         """
         background = self._background_stages(params)
+        noise = self._noise_stages(params)
         creative = self._creative_stages(params)
         if linear_composite:
             background = [
@@ -715,12 +753,32 @@ class ImageProcessingService:
             deepsnr = denoise_stage
             if linear_composite:
                 background = [("denoise", lambda r: deepsnr(r, True)), *background]
+                noise = [(name, stage) for name, stage in noise if name != "denoise"]
             else:
-                background = [*background, ("denoise", lambda r: deepsnr(r, False))]
-            creative = [(name, stage) for name, stage in creative if name != "denoise"]
+                noise = [
+                    (name, (lambda r: deepsnr(r, False)) if name == "denoise" else stage)
+                    for name, stage in noise
+                ]
+        if linear_composite:
+            # First of all: no noise reduction may run before a deconvolution.
+            background = [
+                ("deconvolution", lambda r: deconvolve(r, params.stack.deconvolution)),
+                *background,
+            ]
 
+        stages: list[tuple[str, Callable[[np.ndarray], np.ndarray]]]
         if params.star_removal <= 0:
-            stages = background + creative
+            stages = [
+                *background,
+                *noise,
+                *creative,
+                (
+                    "star_reduction",
+                    lambda r: self.apply_star_reduction(
+                        r, params.star_reduction, params.star_sensitivity, params.star_max_size
+                    ),
+                ),
+            ]
         else:
             split_impl = starless_split or self.classic_starless_split
             stars_layer: list[np.ndarray] = []
@@ -733,10 +791,14 @@ class ImageProcessingService:
                 return starless
 
             def recombine(r: np.ndarray) -> np.ndarray:
-                return self._starless.recombine(r, stars_layer[0], params.star_recombine)
+                if on_starless is not None:
+                    on_starless(_to_u8(r))
+                stars = self._starless.reduce_layer(stars_layer[0], params.star_reduction)
+                return self._starless.recombine(r, stars, params.star_recombine)
 
             stages = [
                 *background,
+                *noise,
                 ("star_removal", split),
                 *creative,
                 ("star_recombine", recombine),

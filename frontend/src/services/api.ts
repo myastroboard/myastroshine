@@ -278,12 +278,20 @@ export const apiClient = {
    *   flip/straighten (but no colour/tone enhancement) - keeps the "before"
    *   side aligned with the result's frame once geometry has changed it
    * - `full`: full-resolution current result (default: downscaled preview)
+   * - `starless`: the latest render's edited sky without its stars (full
+   *   resolution; only exists while the edit separates them)
    * - `v`: cache-busting token; bump it when the result changes so the
    *   browser re-fetches an otherwise-identical URL.
    */
   previewUrl(
     sessionId: string,
-    opts: { full?: boolean; original?: boolean; geometry?: boolean; v?: number | string } = {},
+    opts: {
+      full?: boolean;
+      original?: boolean;
+      geometry?: boolean;
+      starless?: boolean;
+      v?: number | string;
+    } = {},
   ): string {
     const params = new URLSearchParams();
     if (opts.original) {
@@ -291,6 +299,8 @@ export const apiClient = {
       if (opts.geometry) {
         params.set('geometry', 'true');
       }
+    } else if (opts.starless) {
+      params.set('starless', 'true');
     } else if (opts.full) {
       params.set('full', 'true');
     }

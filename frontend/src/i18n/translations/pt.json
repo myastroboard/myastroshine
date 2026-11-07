@@ -101,7 +101,8 @@
       "phase": {
         "prepare": "Preparar",
         "enhance": "Realçar",
-        "finish": "Acabamento"
+        "finish": "Acabamento",
+        "enhance_starless": "Realçar - estrelas de lado"
       },
       "hint": {
         "start": "Um clique ou uma predefinição",
@@ -111,12 +112,16 @@
         "light": "Brilho e contraste",
         "curves": "Afinar os tons",
         "colour": "Intensidade das cores",
-        "detail": "Nitidez, grão",
-        "stars": "Reduzi-las ou removê-las",
+        "detail": "Contraste local, nitidez",
+        "stars": "Reduzi-las, repô-las",
         "depth": "Paralaxe animada",
         "style": "Toque final opcional",
-        "export": "Descarregar ou partilhar"
-      }
+        "export": "Descarregar ou partilhar",
+        "noise": "Grão e ruído de cor",
+        "starless": "Pôr as estrelas de lado"
+      },
+      "noise": "Ruído",
+      "starless": "Separar estrelas"
     },
     "steps": {
       "start": {
@@ -124,7 +129,7 @@
       },
       "stack": {
         "help": "Revele os detalhes ténues da sua imagem empilhada.",
-        "more": "O composto de empilhamento linear, antes de qualquer trabalho criativo: esticar o sinal fraco, subtrair o gradiente do céu, neutralizar a cor. Não destrutivo - tudo é recalculado a partir dos dados de 32 bits."
+        "more": "O composto empilhado linear, antes de qualquer trabalho criativo, na ordem dos astrofotógrafos: deconvoluir, subtrair o gradiente do céu, calibrar a cor e depois esticar o sinal fraco. Não destrutivo - tudo se recalcula a partir dos dados de 32 bits."
       },
       "frame": {
         "help": "Defina primeiro o enquadramento - recorte, nivele o horizonte, rode ou inverta. Tudo o que se segue trabalha sobre a imagem enquadrada.",
@@ -132,7 +137,7 @@
       },
       "sky": {
         "help": "Remova a poluição luminosa e as dominantes para um céu natural.",
-        "more": "Limpe o sinal em bruto antes de qualquer ajuste criativo: balanço de brancos, vinhetagem da objetiva, gradientes de poluição luminosa e neblina."
+        "more": "Corrija os dados antes de qualquer trabalho criativo, na ordem dos astrofotógrafos: primeiro o fundo do céu (vinhetagem, gradiente de poluição luminosa, neblina), depois o equilíbrio de cor, lido nesse céu aplanado, e a dominante verde por último."
       },
       "light": {
         "help": "Quão luminosa e viva é a imagem.",
@@ -147,12 +152,12 @@
         "more": "Quão vivas são as cores. A vivacidade protege as áreas já saturadas; a saturação escala tudo por igual."
       },
       "detail": {
-        "help": "Suavize o grão e realce as estruturas finas.",
-        "more": "Textura local: microcontraste, redução de ruído e nitidez. Faça isto depois de definidos o tom e a cor."
+        "help": "Faça sobressair as estruturas finas.",
+        "more": "Contraste local e nitidez, depois de acertados os tons e as cores. A nitidez só reforça as estruturas acima do ruído: o grão que resta após o passo Ruído não é acentuado."
       },
       "stars": {
-        "help": "Torne as estrelas menores ou remova-as para trabalhar só a nebulosa.",
-        "more": "Duas formas de tratar as estrelas: reduzi-las onde estão, ou removê-las por completo para que o resto da edição afete apenas a nebulosa."
+        "help": "Reduza as estrelas, e reponha-as se as pôs de lado.",
+        "more": "A segunda metade do fluxo sem estrelas: a camada de estrelas é reduzida sozinha e depois fundida de novo sobre o céu retocado. Se as estrelas nunca foram separadas, são reduzidas no lugar."
       },
       "depth": {
         "help": "Transforme a sua imagem num suave efeito 3D animado.",
@@ -164,6 +169,14 @@
       },
       "export": {
         "help": "Guarde a sua imagem ou mantenha estas definições para as próximas fotos."
+      },
+      "noise": {
+        "help": "Suavize o grão e o ruído de cor antes que algo os amplifique.",
+        "more": "A redução de ruído vem cedo: cada ajuste de brilho ou contraste posterior amplificaria o grão, e a nitidez não o deve ver. Também torna mais limpa a separação de estrelas do passo seguinte. As estrelas e os filamentos finos ficam muito acima do ruído, por isso são preservados."
+      },
+      "starless": {
+        "help": "Opcional: ponha as estrelas de lado para que os passos seguintes trabalhem só o céu.",
+        "more": "O fluxo sem estrelas do processamento de céu profundo: as estrelas são extraídas aqui, Luz, Curvas, Cor e Detalhe realçam depois a nebulosa ou a galáxia sem inchar nem branquear as estrelas, e o passo Estrelas repõe-nas. Deixe em 0 para manter as estrelas na imagem do princípio ao fim."
       }
     },
     "milestones": {
@@ -191,7 +204,10 @@
     "slider_tip": "Dica: faça duplo clique num cursor para o repor no neutro.",
     "auto_astro_hint": "Analisa a sua foto e ajusta cada passo por si.",
     "auto_astro_done": "Feito - cada passo está ajustado. Retoque o que quiser ou vá direto para Exportar.",
-    "presets_hint": "Ou parta de um estilo pensado para o seu objeto."
+    "presets_hint": "Ou parta de um estilo pensado para o seu objeto.",
+    "starless_banner": "Está a trabalhar o céu sem as suas estrelas. Voltam no passo Estrelas.",
+    "starless_banner_action": "Ir para Estrelas",
+    "stars_not_back": "A sua imagem não tem estrelas: foram postas de lado e não repostas."
   },
   "export_panel": {
     "filename_label": "Nome do ficheiro",
@@ -313,7 +329,10 @@
     "set_focal_point": "Definir o ponto focal",
     "clear_focal_point": "Limpar o ponto focal",
     "before": "Antes",
-    "after": "Depois"
+    "after": "Depois",
+    "after_sky_alone": "Depois - só o céu",
+    "show_with_stars": "Ver com estrelas",
+    "show_sky_alone": "Ver só o céu"
   },
   "preset_buttons": {
     "confirm_delete_aria": "Confirmar eliminação da predefinição {name}",
@@ -434,11 +453,11 @@
       },
       "starRemoval": {
         "label": "Remover estrelas",
-        "hint": "Extrai as estrelas para que todos os outros ajustes afetem apenas a nebulosa."
+        "hint": "Extrai as estrelas para que Luz, Curvas, Cor e Detalhe trabalhem só o céu; o passo Estrelas repõe-nas."
       },
       "starRecombine": {
         "label": "Repor estrelas",
-        "hint": "Reincorpora as estrelas removidas no final por mistura de ecrã: 0 mantém a imagem sem estrelas, 100 repõe-nas na totalidade."
+        "hint": "Funde (modo ecrã) as estrelas separadas sobre o céu retocado: 0 mantém a imagem sem estrelas, 100 repõe-nas com toda a intensidade."
       },
       "sharpness": {
         "label": "Nitidez",
@@ -490,38 +509,41 @@
     "color_calibration": {
       "label": "Calibração de cor",
       "hint": "Neutraliza o fundo de céu para cinzento e equilibra o branco pelo campo estelar: a mediana das estrelas não saturadas passa a branco. Como a referência são as estrelas e não a imagem inteira, uma nebulosa vermelha ou as Plêiades azuis mantêm a sua cor real."
+    },
+    "deconvolution": {
+      "label": "Deconvolução",
+      "hint": "Aperta as estrelas e afina os detalhes finos desfazendo a desfocagem da atmosfera e da ótica, medida nas suas próprias estrelas. Vem primeiro, sobre os dados lineares, antes de qualquer redução de ruído. Suba-a aos poucos: numa pilha ruidosa também faz sobressair o grão. Sem estrelas bem expostas suficientes, não faz nada."
     }
   },
   "stars_panel": {
     "reduce": {
       "heading": "Reduzir estrelas",
-      "help": "Reduz cada estrela no lugar - rápido, e todas as estrelas ficam."
+      "help": "Reduz cada estrela no lugar, para que as nebulosidades fracas sobressaiam."
     },
     "remove": {
-      "heading": "Remover estrelas",
-      "help": "Retira as estrelas para que os outros passos só toquem a nebulosa; o segundo cursor devolve-as no fim.",
+      "heading": "Pôr as estrelas de lado",
+      "help": "0 mantém-nas na imagem. Mais alto extrai-as, e os passos do céu trabalham então sem elas.",
       "engine": {
         "aria": "Motor de remoção de estrelas",
         "classic": "Clássico",
         "starnet2": "StarNet2",
-        "hint": "Utiliza o modelo StarNet2 instalado no servidor. A primeira passagem numa imagem nova pode demorar; os controlos de deteção abaixo não se aplicam."
+        "hint": "Usa o modelo StarNet2 instalado no servidor. A primeira passagem numa imagem nova pode demorar; as definições de deteção acima não são usadas."
       }
     },
     "detection": {
       "heading": "Que pontos são estrelas",
-      "help": "As duas ferramentas acima usam isto. Ative a máscara de estrelas para verificar o que é detetado."
-    }
-  },
-  "detail_panel": {
-    "denoise": {
-      "heading": "Redução de ruído",
-      "engine": {
-        "aria": "Motor de redução de ruído",
-        "classic": "Clássico",
-        "deepsnr": "DeepSNR",
-        "hint": "Utiliza o modelo DeepSNR instalado no servidor, aplicado numa fase inicial (antes do esticamento tonal). A primeira passagem numa imagem nova pode demorar."
-      }
-    }
+      "help": "Ative a máscara de estrelas para verificar o que é detetado."
+    },
+    "back": {
+      "heading": "Repor as estrelas",
+      "help": "Funde as estrelas sobre o céu retocado: 0 deixa a imagem sem estrelas, 100 repõe-nas com toda a intensidade."
+    },
+    "reduce_layer": {
+      "heading": "Reduzir estrelas",
+      "help": "Atua só sobre as estrelas separadas, antes de voltarem - o céu por baixo não é tocado."
+    },
+    "not_separated": "As estrelas não foram postas de lado, por isso não há nada a repor. Para trabalhar o céu sem elas, use Separar estrelas.",
+    "detection_link": "Que pontos são estrelas: definido em Separar estrelas"
   },
   "histogram": {
     "aria_label": "Histograma RGB",
@@ -932,6 +954,26 @@
       "calibration": "Calibração",
       "settings": "Definições",
       "result": "Resultado"
+    }
+  },
+  "noise_panel": {
+    "engine": {
+      "aria": "Motor de redução de ruído",
+      "classic": "Clássico",
+      "deepsnr": "DeepSNR",
+      "hint": "Utiliza o modelo DeepSNR instalado no servidor, aplicado numa fase inicial (antes do esticamento tonal). A primeira passagem numa imagem nova pode demorar."
+    },
+    "heading": "Redução de ruído",
+    "help": "O grão de brilho, depois o ruído de cor."
+  },
+  "sky_panel": {
+    "background": {
+      "heading": "Fundo do céu",
+      "help": "Vinhetagem, gradiente de poluição luminosa e neblina - corrigidos primeiro."
+    },
+    "colour": {
+      "heading": "Equilíbrio de cor",
+      "help": "Lido no fundo limpo: torne o céu neutro e depois retire qualquer dominante verde."
     }
   }
 }

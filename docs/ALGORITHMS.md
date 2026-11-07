@@ -10,6 +10,7 @@ accepts `uint8`); the Stack step works on the linear composite.
 ## Contents
 
 - [Upload ingest: FITS / RAW / 16-bit](#upload-ingest-fits--raw--16-bit)
+- [Editing workflow](#editing-workflow)
 - [Single-image pipeline](#single-image-pipeline)
 - [Star removal (starless)](#star-removal-starless)
 - [Looks (the "Style" step)](#looks-the-style-step)
@@ -105,22 +106,94 @@ export (not a linear stack), the composite route's deep stretch will
 over-brighten it - export finished work as 8-bit instead, or pull the "Stretch"
 control down and turn colour calibration off in the editor's Stack step.
 
+## Editing workflow
+
+The editor's rail and the pipeline are **one ordered list**: each step on the
+rail is a contiguous run of stages in `apply_parameters`, in the same order, so
+a setting is never applied after a step that comes later on the rail
+(`EDITOR_STEPS` in `frontend/src/types/index.ts`; a backend test pins the stage
+order). That order follows how deep-sky images are processed after stacking in
+the reference tools (PixInsight, Siril) and their documentation.
+
+**What the references agree on.** Linear operations first, the stretch in the
+middle, non-linear enhancements last ([Lumina astro wiki, "Post-processing
+workflow"](https://lumina-astro-wiki.pages.dev/en/astrophotography/processing/workflow/)):
+
+1. crop the stacking edges;
+2. remove the background gradient (DBE / ABE / GraXpert), before the stretch
+   makes it obvious;
+3. calibrate the colour (PCC / SPCC), on the linear data, after the gradient is
+   gone - the background is neutralised first;
+4. green cast (SCNR) once the colour is calibrated (the
+   [Siril processing tutorial](https://free-astro.org/index.php/Siril:Processing_tutorial)
+   ends on it);
+5. deconvolution, on linear data that has *not* been noise-reduced - "Noise
+   reduction of any kind should never be applied before deconvolution of any
+   kind" ([RC Astro, NoiseXTerminator manual](https://rc-astro.com/noisexterminator-2-ai3-user-manual-pixinsight));
+6. noise reduction - on the linear data or right after the stretch, before
+   anything amplifies it;
+7. the stretch;
+8. separate the stars (StarNet / StarXTerminator) into a starless and a
+   stars-only image;
+9. on the starless image: curves, local contrast, saturation, sharpening -
+   pushed without bloating or whitening stars;
+10. on the stars-only image: shrink and tame the stars;
+11. recombine (screen blend), then the final touches and the export.
+
+Where the sources differ - linear vs stretched noise reduction, star removal
+before or after a first denoise - it is the data and the photographer's taste;
+nobody puts noise reduction after sharpening, or star reduction on the starless
+image.
+
+**How MyAstroShine maps it.** A stacked composite runs steps 1-3 and 5-7 in the
+linear "Stack" step: the wedge crop, then the deconvolution first of all (RC
+Astro's rule: no noise reduction before it), DeepSNR on the linear data when
+installed, then the background extraction, the colour calibration on the stars
+and the stretch. Deconvolution and gradient removal are both (near-)linear
+operations on a smooth background, so running the deconvolution ahead of the
+background extraction changes nothing that matters; running it after a noise
+reduction would. An ordinary
+upload is already stretched, so the rail starts at the non-linear side, with
+touch-up versions of the same corrections:
+
+| Rail step | Stages | Reference step |
+|---|---|---|
+| Stack (composites) | `deconvolution`, linear DeepSNR, `stack_base` | 1-3, 5-7 |
+| Framing | `geometry` | 1 |
+| Clean the sky | `vignette_correction`, `gradient_reduction`, `dehaze`, then `color_correction`, `green_removal` | 2-4 |
+| Noise | `denoise`, `chroma_denoise` | 6 |
+| Separate stars | `star_removal` (split) | 8 |
+| Light, Curves, Colour, Detail | `exposure` ... `vibrance`, `clarity`, `sharpness` | 9 |
+| Stars | `star_reduction` (on the stars layer when separated), `star_recombine` | 10-11 |
+| Style, 3D effect, Export | the look, the parallax viewer, the download | 11 |
+
+The removal and the recombination are **two rail steps**, bracketing the sky
+work - the separation is not one action, it is the frame around the creative
+steps. While the stars are set aside, the rail titles the Enhance phase as
+starless and each of its steps says so; the Export step warns when the stars
+were set aside and never put back.
+
+The Detail step's sharpening is a different tool: a noise-aware starlet boost
+of the stretched data, not a deconvolution, so it rightly comes after the noise
+reduction.
+
+**Working on the sky alone.** While the stars are set aside, the preview of the
+Enhance steps shows the sky they edit, without its stars (the starless view a
+PixInsight or Siril user works on), with a switch back to the result. It costs
+no extra render: the pipeline hands over the image just before the stars go
+back (`apply_parameters(on_starless=...)`), stored as `starless.jpg` with the
+render it came from and served by `GET /preview/{id}?starless=true`.
+
 ## Single-image pipeline
 
-Applied in this order to minimize artifacts (`apply_parameters`):
+Applied in the editor's workflow order (`apply_parameters`, see "Editing
+workflow" above):
 
 0. **Geometry** (`geometry`) - quarter turns (clockwise), then flips, then
    straighten (`cv2.getRotationMatrix2D` + `warpAffine`, scaled up by
    `max((w·cos+h·sin)/w, (w·sin+h·cos)/h)` so the frame stays full), then the
    crop rectangle. Runs first; it changes the working dimensions.
-1. **White balance** (`temperature`, `tint`) - per-channel gain in linear RGB;
-   6500K is neutral. Warm shifts reduce blue, cool shifts boost blue.
-   **Green removal** (`green_removal`, 0-100) follows it: SCNR "average
-   neutral", `G' = G - amount * max(0, G - (R + B) / 2)`. A one-shot-colour
-   sensor's residual green cast goes (almost nothing in the deep sky is green),
-   while a teal OIII filament keeps most of its colour because its blue lifts the
-   cap.
-2. **Vignette** (`vignette_correction`, -100..100) - a generic radial gain
+1. **Vignette** (`vignette_correction`, -100..100) - a generic radial gain
    model (not a per-lens calibrated profile), `gain = 1 + (amount/100) *
    dist^2 * 0.8` where `dist` is the normalized distance from centre (0 at
    centre, 1 at the corners). `+100` lifts the corners by 80% (counteracts lens
@@ -129,7 +202,7 @@ Applied in this order to minimize artifacts (`apply_parameters`):
    content - so the gain map is computed on a small downscaled grid (128px) and
    resized up; full-resolution precision would be wasted work for a smooth
    analytic function.
-3. **Gradient reduction** (`gradient_reduction`, 0-100) - flattens smooth
+2. **Gradient reduction** (`gradient_reduction`, 0-100) - flattens smooth
    background gradients (light pollution, sky glow). A very large Gaussian
    blur approximates the background; genuine DSO structure is
    higher-frequency and survives mostly in the residual, so subtracting the
@@ -139,7 +212,7 @@ Applied in this order to minimize artifacts (`apply_parameters`):
    infeasible (an 8000px-wide frame would need a ~5000px-wide kernel to reach
    the same effective sigma), and a smooth low-frequency estimate doesn't
    lose anything by downscaling first.
-4. **Dehaze** (`dehaze`, 0-100) - dark-channel-prior haze removal, restoring
+3. **Dehaze** (`dehaze`, 0-100) - dark-channel-prior haze removal, restoring
    contrast/colour lost to a veiling glow (thin cloud, humidity,
    light-pollution haze). Distinct from gradient reduction's smooth
    *background level* correction: this estimates a per-pixel transmission map
@@ -154,59 +227,16 @@ Applied in this order to minimize artifacts (`apply_parameters`):
    estimation (two large-kernel erosions - the expensive part) runs on a
    downscaled copy (800px); only the final per-pixel recovery formula runs at
    full resolution, using the transmission map resized back up.
-5. **Contrast** (`contrast`, 0.5-3.0) - linear scaling around the image mean,
-   `y = (x - mean) * contrast + mean`, then a mild gamma for a smooth response.
-6. **Exposure** (`exposure`, -1..1) - pixel offset, `beta = exposure * 50`.
-7. **Highlights / shadows** (-1..1) - masked tone curves; `gray^2` emphasizes
-   bright regions, `(1 - gray)^2` emphasizes dark regions, scaled by 0.3.
-8. **Whites / blacks** (`whites` / `blacks`, -1..1) - the same masked-tone-curve
-   shape as highlights/shadows, but narrower and more aggressive (`gray^4` /
-   `(1-gray)^4` weighting, scaled by 0.4) so only the true near-white/near-black
-   tail moves, not the broader upper/lower-mid range - the usual distinction
-   between "Highlights"/"Shadows" and "Whites"/"Blacks" in most photo editors.
-   `x**4` is computed as `square(square(x))`, not `power(x, 4)` - the repeated-
-   squaring path is measurably faster at 24MP.
-9. **Tone curve** (`curve_points`, empty by default = identity) - a 256-entry
-   lookup table (`app/utils/math_utils.py:curve_points_to_lut`), applied via
-   `cv2.LUT` identically on each BGR channel (a combined RGB curve - see
-   "Colour curves" below for independent per-channel curves). Points are
-   `(input, output)` 8-bit level
-   pairs spanning the full 0-255 range (`ProcessingParameters` validates: at
-   least 2, first at x=0, last at x=255, strictly increasing x); between them
-   the curve is a **monotone cubic Hermite spline** (Fritsch-Carlson tangent
-   correction), not a plain polyline - a handful of dragged points make a
-   smooth curve instead of visible straight-line kinks, and the correction
-   guarantees the spline never overshoots past a control point's value in the
-   segments next to it (an overshoot would locally crush shadows or blow out
-   highlights the user never asked for). A user-drawn curve subsumes and can
-   replace manual contrast/exposure/highlights/shadows tweaking, but doesn't
-   replace those sliders - both stages run, in this order, so a curve is a
-   fine-tuning layer on top of the basic tone controls, matching how most
-   photo editors separate "Basic" tone sliders from a "Curve" panel.
-10. **Colour curves** (`red_curve_points` / `green_curve_points` /
-   `blue_curve_points`, each empty by default = identity) - the same
-   `curve_points_to_lut` LUT/spline as the master tone curve above, but one
-   independent curve per channel (`cv2.split`, `cv2.LUT` per channel,
-   `cv2.merge`) instead of one curve applied identically to all three. For
-   colour grading, or a colour cast a single white-balance gain can't reach
-   at just one tonal range (e.g. a slightly green background sky only in the
-   midtones - white balance is one multiplicative gain per channel, uniform
-   across the whole tonal range, so it can't fix a cast that only shows up
-   at one brightness level). Runs immediately after the master curve, so it's
-   a further fine-tuning layer on top of it, same relationship the master
-   curve has with the basic tone sliders. Any of the three left empty is
-   skipped independently - a red-only edit never touches green/blue.
-11. **Saturation** (0-2) - each pixel's colour is scaled away from its own
-   luminance, `L + (rgb - L) * s` (Rec. 709 weights), in float - brightness is
-   kept, and a faint low-chroma nebula is not posterised the way the former
-   8-bit HSV round trip quantised it.
-12. **Vibrance** (0-2) - the same luminance-anchored boost, weighted by
-   `(1 - current_saturation)` (saturation = `(max - min) / max`) so
-   already-saturated pixels move less.
-13. **Clarity** (-1..1) - unsharp mask against a Gaussian blur with
-   `sigmaX=9` (`cv2.GaussianBlur` auto-selects an odd kernel from sigma,
-   around the high-20px range here); positive sharpens, negative softens.
-14. **Denoise** (0-100) - multiscale wavelet shrinkage of the luma plane
+4. **White balance** (`temperature`, `tint`) - per-channel gain in linear RGB;
+   6500K is neutral. Warm shifts reduce blue, cool shifts boost blue.
+   **Green removal** (`green_removal`, 0-100) follows it: SCNR "average
+   neutral", `G' = G - amount * max(0, G - (R + B) / 2)`. A one-shot-colour
+   sensor's residual green cast goes (almost nothing in the deep sky is green),
+   while a teal OIII filament keeps most of its colour because its blue lifts the
+   cap.
+5. **Denoise** (0-100) - right after the sky corrections, ahead of every tone
+   stage and of the sharpening (the editor's "Noise" step; why, in "Editing
+   workflow"). Multiscale wavelet shrinkage of the luma plane
    (`app/utils/starlet.py`). The **starlet** transform (isotropic undecimated
    "a trous" B3-spline - the transform PixInsight's MultiscaleLinearTransform and
    Siril's wavelets use) splits the plane into detail layers of doubling scale
@@ -237,14 +267,76 @@ Applied in this order to minimize artifacts (`apply_parameters`):
    With `denoise_engine = "deepsnr"` this stage instead runs the DeepSNR model
    **early** (see "Quality path" below); the classical stage here becomes a no-op
    and the 0-100 value blends DeepSNR's output back.
-15. **Chroma denoise** (`chroma_denoise`, 0-100) - the same starlet shrinkage on
+6. **Chroma denoise** (`chroma_denoise`, 0-100) - the same starlet shrinkage on
    the Cr/Cb planes only (`COLOR_BGR2YCrCb`), one layer deeper (five) and harder
    (`k = 4 * amount/100`, one global threshold), luma untouched. Colour speckle
    is usually more objectionable than luma noise in a stacked astro frame, and
    can be smoothed much harder than luma without an apparent loss of detail,
    since detail lives almost entirely in luma.
-16. **Star reduction** (`star_reduction` 0-100, `star_sensitivity` /
-   `star_max_size` 0-100) - shrink *individually detected* stars, leaving
+7. **Exposure** (`exposure`, -1..1) - pixel offset, `beta = exposure * 50`.
+8. **Contrast** (`contrast`, 0.5-3.0) - linear scaling around the image mean,
+   `y = (x - mean) * contrast + mean`, then a mild gamma for a smooth response.
+9. **Highlights / shadows** (-1..1) - masked tone curves; `gray^2` emphasizes
+   bright regions, `(1 - gray)^2` emphasizes dark regions, scaled by 0.3.
+10. **Whites / blacks** (`whites` / `blacks`, -1..1) - the same masked-tone-curve
+   shape as highlights/shadows, but narrower and more aggressive (`gray^4` /
+   `(1-gray)^4` weighting, scaled by 0.4) so only the true near-white/near-black
+   tail moves, not the broader upper/lower-mid range - the usual distinction
+   between "Highlights"/"Shadows" and "Whites"/"Blacks" in most photo editors.
+   `x**4` is computed as `square(square(x))`, not `power(x, 4)` - the repeated-
+   squaring path is measurably faster at 24MP.
+11. **Tone curve** (`curve_points`, empty by default = identity) - a 256-entry
+   lookup table (`app/utils/math_utils.py:curve_points_to_lut`), applied via
+   `cv2.LUT` identically on each BGR channel (a combined RGB curve - see
+   "Colour curves" below for independent per-channel curves). Points are
+   `(input, output)` 8-bit level
+   pairs spanning the full 0-255 range (`ProcessingParameters` validates: at
+   least 2, first at x=0, last at x=255, strictly increasing x); between them
+   the curve is a **monotone cubic Hermite spline** (Fritsch-Carlson tangent
+   correction), not a plain polyline - a handful of dragged points make a
+   smooth curve instead of visible straight-line kinks, and the correction
+   guarantees the spline never overshoots past a control point's value in the
+   segments next to it (an overshoot would locally crush shadows or blow out
+   highlights the user never asked for). A user-drawn curve subsumes and can
+   replace manual contrast/exposure/highlights/shadows tweaking, but doesn't
+   replace those sliders - both stages run, in this order, so a curve is a
+   fine-tuning layer on top of the basic tone controls, matching how most
+   photo editors separate "Basic" tone sliders from a "Curve" panel.
+12. **Colour curves** (`red_curve_points` / `green_curve_points` /
+   `blue_curve_points`, each empty by default = identity) - the same
+   `curve_points_to_lut` LUT/spline as the master tone curve above, but one
+   independent curve per channel (`cv2.split`, `cv2.LUT` per channel,
+   `cv2.merge`) instead of one curve applied identically to all three. For
+   colour grading, or a colour cast a single white-balance gain can't reach
+   at just one tonal range (e.g. a slightly green background sky only in the
+   midtones - white balance is one multiplicative gain per channel, uniform
+   across the whole tonal range, so it can't fix a cast that only shows up
+   at one brightness level). Runs immediately after the master curve, so it's
+   a further fine-tuning layer on top of it, same relationship the master
+   curve has with the basic tone sliders. Any of the three left empty is
+   skipped independently - a red-only edit never touches green/blue.
+13. **Saturation** (0-2) - each pixel's colour is scaled away from its own
+   luminance, `L + (rgb - L) * s` (Rec. 709 weights), in float - brightness is
+   kept, and a faint low-chroma nebula is not posterised the way the former
+   8-bit HSV round trip quantised it.
+14. **Vibrance** (0-2) - the same luminance-anchored boost, weighted by
+   `(1 - current_saturation)` (saturation = `(max - min) / max`) so
+   already-saturated pixels move less.
+15. **Clarity** (-1..1) - unsharp mask against a Gaussian blur with
+   `sigmaX=9` (`cv2.GaussianBlur` auto-selects an odd kernel from sigma,
+   around the high-20px range here); positive sharpens, negative softens.
+16. **Sharpness** (0-2) - below 1.0 Gaussian blur. Above 1.0 the two finest
+    starlet layers of the luma plane are boosted by `1 + 1.5 * (sharpness - 1)`,
+    but only where a coefficient clears 3 noise sigma of its own layer (the same
+    garrote weight and `layer_noise` as denoise - extrapolated from the finest
+    layer, a stack's correlated grain cleared it and was sharpened too) - stars
+    and fine filaments sharpen, the background grain is not
+    amplified, and colour is untouched (no coloured fringes). The former 3x3
+    Laplacian kernel sharpened the grain as much as the signal.
+17. **Star reduction** (`star_reduction` 0-100, `star_sensitivity` /
+   `star_max_size` 0-100) - last, after the sky work (the editor's "Stars"
+   step); with the stars separated, the stars-only layer is shrunk instead (see
+   "Star removal (starless)"). Shrinks *individually detected* stars, leaving
    everything else untouched. Detection (`StarDetectionService.detect`, shared
    with the `POST /api/star-mask/{id}` mask-preview endpoint) isolates compact
    bright features with the same 9x9-ellipse white top-hat as before
@@ -287,25 +379,19 @@ Applied in this order to minimize artifacts (`apply_parameters`):
    photo - worse than the black-dot bug it was meant to fix - because
    inpainting fills from the mask boundary rather than shrinking the star's
    own disc in place.
-17. **Sharpness** (0-2) - below 1.0 Gaussian blur. Above 1.0 the two finest
-    starlet layers of the luma plane are boosted by `1 + 1.5 * (sharpness - 1)`,
-    but only where a coefficient clears 3 noise sigma of its own layer (the same
-    garrote weight and `layer_noise` as denoise - extrapolated from the finest
-    layer, a stack's correlated grain cleared it and was sharpened too) - stars
-    and fine filaments sharpen, the background grain is not
-    amplified, and colour is untouched (no coloured fringes). The former 3x3
-    Laplacian kernel sharpened the grain as much as the signal.
 
 Preview path downscales to 512 px (`preview_max_size`) for instant feedback; the
 full-resolution result is computed on demand or via the job queue.
 
 **Star removal splits this list.** When `star_removal > 0` (see "Star removal
-(starless)" below), stages 0-4 (geometry + the sky/optics corrections) run on
-the whole frame, then the stars are pulled out, stages 5-17 run on the
-*starless* image, and a final `star_recombine` step screen-blends the stars
-back. `star_removal = 0` (the default) runs the flat list above unchanged. The
-split and the recombine exchange `float32` with the pipeline (the classical
-split round-trips to uint8 internally; StarNet2 does not).
+(starless)" below), stages 0-6 (geometry, the sky corrections and the noise
+reduction) run on the whole frame, then the stars are pulled out, stages 7-16
+run on the *starless* image, and a final `star_recombine` step shrinks the
+stars-only layer by `star_reduction` (`StarlessService.reduce_layer`) and
+screen-blends it back - it takes the place of stage 17. `star_removal = 0` (the
+default) runs the flat list above unchanged. The split and the recombine
+exchange `float32` with the pipeline (the classical split round-trips to uint8
+internally; StarNet2 does not).
 
 ## Star removal (starless)
 
@@ -354,12 +440,16 @@ is additive but must not clip the nebulosity it lands on. The stars were pulled
 dimmer than a normal edit leaves them - that is the point of working starless;
 `star_recombine = 100` is a straight restore.
 
-**Split point** (after `dehaze`, before `contrast`): geometry, white balance,
-vignette correction, gradient reduction and dehaze are corrections to the sky
-and the optics - they belong on the whole frame, stars included - so they run
-before the split. Everything creative runs on the starless image. `star_reduction`
-keeps its slot in the creative stages and is a natural no-op once the stars are
-gone.
+**Split point** (after `chroma_denoise`, before `exposure` - the editor's
+"Separate stars" step): geometry, the sky corrections (vignette, gradient, haze,
+white balance, green cast) and the noise reduction belong on the whole frame,
+stars included, so they run before the split; a star separation is also cleaner
+on denoised data. Everything creative runs on the starless image. The other half,
+the editor's "Stars" step, runs last: `star_reduction` shrinks the stars-only
+layer (`StarlessService.reduce_layer` - the in-place reduction's erosion schedule,
+with no detection needed since the layer holds nothing but stars), then
+`star_recombine` puts it back. Shrinking the stars layer on its own before the
+recombination is the standard starless practice (see "Editing workflow").
 
 **Known ceiling** (confirmed on real photos - NGC 281, the Pelican, M31, M74,
 IC 342, NGC 7000, the Bubble): a nebula or galaxy over a normal star field comes
@@ -586,7 +676,7 @@ sky mask restricts both to the sky. Then: the sky level and each channel's
 (median over the background of a 7x7 local mean - what the eye sees and what the
 denoise leaves: a dark sky's noisiest channel clips at 0 most, so its raw median
 sits under its mean, and a sky neutral by the median came out blue once
-denoised), with each channel's histogram over the background; the object level
+denoised); the object level
 (median luminance) and colour
 (mean max-min channel spread); the object's green excess (mean `G - (R+B)/2` as a
 fraction of its luminance - signed, so the noise does not count); the background
@@ -610,14 +700,21 @@ any curve. A **sky cast** is additive (skyglow), so each channel whose sky - as
 the master curve leaves it - is a level or more off the grey of the same
 brightness gets its own curve, moving its sky onto it and converging to identity
 in the highlights (the "levels per channel" neutralisation of a photo editor).
-"As the master curve leaves it" is the mean of the curve over the channel's
-background histogram, not the curve at its sky level: the noise straddles the
-bend where the curve steepens above the sky, which lifts the mean, and a channel
-whose sky sits lower, on the straight part, is lifted less - neutral by the
-curve at the sky level, the result kept a 3-4 level cast. The channel curve's
-point is solved the same way, by bisection on the channel's histogram: lifting a
-starved channel takes a strongly concave curve, whose mean over a noisy sky falls
-short of its value at the mean (a JPEG of IC 5070 kept a 4-level red cast). A stacked
+"As the master curve leaves it" is read off the sky itself, not the curve at its
+sky level: the picture is first taken through the stages Auto Astro sets ahead of
+the curve (green cast, then the Noise step, as the pipeline will run them), the
+master curve's LUT is applied to each channel, and the level is read exactly as
+the measurement reads it - the median over the background of a 7x7 local mean
+(on an even sample of up to 200,000 background pixels). The noise straddles the
+bend where the curve steepens above the sky, which lifts the local mean, and a
+channel whose sky sits lower, on the straight part, is lifted less - neutral by
+the curve at the sky level, the result kept a 3-4 level cast. The channel curve's
+point is solved the same way, by bisection on that reading: lifting a starved
+channel takes a strongly concave curve, whose value over a noisy sky falls short
+of its value at the level (a JPEG of IC 5070 kept a 4-level red cast). An earlier
+version solved on the mean of the raw pixels, before the denoise; it reached
+neutral only because the denoise then ran after the curve, and once the Noise
+step moved ahead of it a C 11 JPEG kept a 4-level red cast. A stacked
 composite's sky is already neutral (colour calibration), so this mostly serves
 JPEG uploads: a Seestar JPEG of IC 5070 came in at B 32 / G 33 / R 23 and came
 out at 19 / 16 / 18.
@@ -631,8 +728,8 @@ It also measured a composite's already-stretched render and stretched it again.
 
 **Noise.** The denoise strengths are thresholds relative to the measured noise
 (see "Denoise" above), so they encode how visible the noise is - its sigma
-times the tone curve's gain from the sky to the object, since the denoise runs
-after the curve: `denoise = clip(10 * (sigma * gain - 0.5), 0, 40)` and
+times the tone curve's gain from the sky to the object, since the curve lifts
+whatever the denoise (which runs just before it, the Noise step) leaves: `denoise = clip(10 * (sigma * gain - 0.5), 0, 40)` and
 `chroma_denoise = clip(14 * sigma_chroma * gain, 0, 60)`, at least 50 for a
 camera night landscape (an iPhone ProRAW arrives denoised at the finest scale -
 its sigma reads low - but carries coarse colour blotches). Calibrated on real Seestar
@@ -965,6 +1062,31 @@ a copy downscaled to <=384 px), then the largest centred rectangle that stays
 and skipped entirely when the trim would be larger (a mis-detection) or smaller
 than a few pixels. Also baked into `composite.npy`; the box is recorded in
 `quality_report["border_crop"]`.
+
+**Deconvolution** (`deconvolution`, 0-100, `app/services/deconvolution.py`) runs
+first on every editor render of a composite, ahead of the linear DeepSNR pass and
+of `render_stack_base` - no noise reduction may come before a deconvolution.
+Richardson-Lucy against a Gaussian PSF measured on the image's own stars: second
+moments of isolated, unsaturated stars at least 15 noise sigma above their local
+sky (15x15 cut-outs, the median over up to 300 of them; at least 8 are needed and
+the sigma must fall within 0.6-6 px, otherwise nothing is done). It deconvolves
+with 0.8x that sigma and up to 10 iterations at 100: on real Seestar stacks (M 31,
+NGC 7000) the PSF at face value with 20 iterations rang - a dark gap and a bright
+ring round every star - while a slightly tighter PSF can only under-correct. Each
+RGB plane is deconvolved on its own with the one PSF, so it redistributes only its
+own flux: on the raw data, before the colour calibration, a channel can be
+several times fainter than another (blue x4.6 on M 31), and any mixing between
+channels turned into purple rings once balanced. Applied only where there is
+signal - 1 to 3 noise sigma of luminance above the *local* background (a
+morphological opening that removes the stars and keeps the galaxy: against the
+global sky, the stars on M 31's bulge sank into dark holes), dilated over each
+star's footprint (3 PSF sigma) and feathered: Richardson-Lucy moves the wings'
+flux into the core, and a weight fading out in the wings kept the core's gain
+without the wings' loss, adding 2% flux. Nothing may sink more than 3 noise sigma
+below its local background (no dark rings); a tighter floor lifted the noise and
+drew a light disc round each bright star. Flux is conserved and the stars'
+photometric colour kept (the star white-balance gains moved by under 1% on
+M 31). About 3 s at amount 100 on a 16-megapixel stack.
 
 **`render_stack_base`** runs on every editor render (the "Stack" step, driven by
 `ProcessingParameters.stack`), turning the linear composite into the BGR image

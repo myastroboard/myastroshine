@@ -101,7 +101,8 @@
       "phase": {
         "prepare": "Vorbereiten",
         "enhance": "Verschönern",
-        "finish": "Feinschliff"
+        "finish": "Feinschliff",
+        "enhance_starless": "Verschönern - Sterne beiseite"
       },
       "hint": {
         "start": "Ein Klick oder ein Preset",
@@ -111,12 +112,16 @@
         "light": "Helligkeit und Kontrast",
         "curves": "Tonwerte feinjustieren",
         "colour": "Wie kräftig die Farben sind",
-        "detail": "Schärfe, Rauschen",
-        "stars": "Verkleinern oder entfernen",
+        "detail": "Lokaler Kontrast, Schärfe",
+        "stars": "Verkleinern, zurückholen",
         "depth": "Animierte Parallaxe",
         "style": "Optionaler letzter Schliff",
-        "export": "Herunterladen oder teilen"
-      }
+        "export": "Herunterladen oder teilen",
+        "noise": "Körnung und Farbrauschen",
+        "starless": "Sterne beiseitelegen"
+      },
+      "noise": "Rauschen",
+      "starless": "Sterne trennen"
     },
     "steps": {
       "start": {
@@ -124,7 +129,7 @@
       },
       "stack": {
         "help": "Holen Sie die schwachen Details aus Ihrem gestackten Bild.",
-        "more": "Das lineare Stapelkomposit, vor jeder kreativen Bearbeitung: das schwache Signal strecken, den Himmelsgradienten abziehen, die Farbe neutralisieren. Zerstörungsfrei - alles wird aus den 32-Bit-Daten neu berechnet."
+        "more": "Das lineare gestapelte Komposit, vor jeder kreativen Arbeit, in der Reihenfolge der Astrofotografen: dekonvolvieren, den Himmelsgradienten abziehen, die Farbe kalibrieren, dann das schwache Signal strecken. Nicht destruktiv - alles wird aus den 32-Bit-Daten neu berechnet."
       },
       "frame": {
         "help": "Legen Sie zuerst den Ausschnitt fest - zuschneiden, Horizont begradigen, drehen oder spiegeln. Alles danach arbeitet mit dem zugeschnittenen Bild.",
@@ -132,7 +137,7 @@
       },
       "sky": {
         "help": "Entfernen Sie Lichtverschmutzung und Farbstiche für einen natürlichen Himmel.",
-        "more": "Bereinigen Sie das Rohsignal vor jeder kreativen Bearbeitung: Weißabgleich, Objektivvignettierung, Lichtverschmutzungsgradienten und Dunst."
+        "more": "Korrigieren Sie die Daten vor jeder kreativen Arbeit, in der Reihenfolge der Astrofotografen: zuerst der Himmelshintergrund (Vignettierung, Lichtverschmutzungsgradient, Dunst), dann die Farbbalance auf diesem geebneten Himmel, der Grünstich zuletzt."
       },
       "light": {
         "help": "Wie hell und knackig das Bild wirkt.",
@@ -147,12 +152,12 @@
         "more": "Wie kräftig die Farben sind. Dynamik schützt bereits gesättigte Bereiche; Sättigung wirkt auf alles gleichermaßen."
       },
       "detail": {
-        "help": "Glätten Sie Rauschen und betonen Sie feine Strukturen.",
-        "more": "Lokale Textur: Mikrokontrast, Rauschunterdrückung und Schärfung. Erst durchführen, wenn Tonwert und Farbe feststehen."
+        "help": "Holen Sie feine Strukturen hervor.",
+        "more": "Lokaler Kontrast und Schärfe, sobald Töne und Farben stehen. Das Schärfen verstärkt nur Strukturen über dem Rauschen, die nach dem Schritt Rauschen verbliebene Körnung wird nicht geschärft."
       },
       "stars": {
-        "help": "Machen Sie Sterne kleiner oder entfernen Sie sie, um nur den Nebel zu bearbeiten.",
-        "more": "Zwei Wege, Sterne zu behandeln: sie an Ort und Stelle verkleinern, oder sie vollständig entfernen, damit der Rest Ihrer Bearbeitung nur den Nebel betrifft."
+        "help": "Verkleinern Sie die Sterne und holen Sie sie zurück, wenn Sie sie beiseitegelegt haben.",
+        "more": "Die zweite Hälfte des sternlosen Ablaufs: Die Sternebene wird für sich verkleinert und dann wieder über den bearbeiteten Himmel geblendet. Wurden die Sterne nie getrennt, werden sie an Ort und Stelle verkleinert."
       },
       "depth": {
         "help": "Verwandeln Sie Ihr Bild in einen sanften animierten 3D-Effekt.",
@@ -164,6 +169,14 @@
       },
       "export": {
         "help": "Speichern Sie Ihr Bild oder behalten Sie diese Einstellungen für die nächsten Fotos."
+      },
+      "noise": {
+        "help": "Glätten Sie Körnung und Farbrauschen, bevor etwas sie verstärkt.",
+        "more": "Die Rauschminderung kommt früh: Jede spätere Helligkeits- oder Kontraständerung würde die Körnung verstärken, und das Schärfen darf sie nicht sehen. Sie macht auch die Sterntrennung im nächsten Schritt sauberer. Sterne und feine Filamente liegen weit über dem Rauschen und bleiben erhalten."
+      },
+      "starless": {
+        "help": "Optional: Legen Sie die Sterne beiseite, damit die nächsten Schritte nur den Himmel bearbeiten.",
+        "more": "Der sternlose Arbeitsablauf der Deep-Sky-Bearbeitung: Die Sterne werden hier herausgelöst, Licht, Kurven, Farbe und Detail verstärken dann Nebel oder Galaxie, ohne die Sterne aufzublähen oder weiß werden zu lassen, und der Schritt Sterne holt sie zurück. Bei 0 bleiben die Sterne durchgehend im Bild."
       }
     },
     "milestones": {
@@ -191,7 +204,10 @@
     "slider_tip": "Tipp: Ein Doppelklick auf einen Regler setzt ihn auf neutral zurück.",
     "auto_astro_hint": "Analysiert Ihr Foto und stellt jeden Schritt für Sie ein.",
     "auto_astro_done": "Fertig - jeder Schritt ist eingestellt. Passen Sie nach Wunsch an oder gehen Sie direkt zum Export.",
-    "presets_hint": "Oder starten Sie mit einem Look für Ihr Motiv."
+    "presets_hint": "Oder starten Sie mit einem Look für Ihr Motiv.",
+    "starless_banner": "Sie bearbeiten den Himmel ohne seine Sterne. Sie kommen im Schritt Sterne zurück.",
+    "starless_banner_action": "Zu Sterne",
+    "stars_not_back": "Ihr Bild hat keine Sterne: Sie wurden beiseitegelegt und nicht zurückgeholt."
   },
   "export_panel": {
     "filename_label": "Dateiname",
@@ -313,7 +329,10 @@
     "set_focal_point": "Brennpunkt festlegen",
     "clear_focal_point": "Brennpunkt löschen",
     "before": "Vorher",
-    "after": "Nachher"
+    "after": "Nachher",
+    "after_sky_alone": "Nachher - nur Himmel",
+    "show_with_stars": "Mit Sternen zeigen",
+    "show_sky_alone": "Nur den Himmel zeigen"
   },
   "preset_buttons": {
     "confirm_delete_aria": "Löschen der Voreinstellung {name} bestätigen",
@@ -434,11 +453,11 @@
       },
       "starRemoval": {
         "label": "Sterne entfernen",
-        "hint": "Entfernt die Sterne, damit alle anderen Anpassungen nur auf den Nebel wirken."
+        "hint": "Löst die Sterne heraus, damit Licht, Kurven, Farbe und Detail nur den Himmel bearbeiten; der Schritt Sterne holt sie zurück."
       },
       "starRecombine": {
         "label": "Sterne zurückholen",
-        "hint": "Blendet die entfernten Sterne am Ende per Aufhellen-Modus wieder ein: 0 hält das Bild sternenlos, 100 stellt sie in voller Stärke wieder her."
+        "hint": "Blendet (Negativ multiplizieren) die getrennten Sterne über den bearbeiteten Himmel: 0 lässt das Bild sternlos, 100 stellt sie in voller Stärke wieder her."
       },
       "sharpness": {
         "label": "Schärfe",
@@ -490,38 +509,41 @@
     "color_calibration": {
       "label": "Farbkalibrierung",
       "hint": "Neutralisiert den Himmelshintergrund zu Grau und richtet den Weißabgleich am Sternfeld aus: der Median der ungesättigten Sterne wird weiß. Da die Sterne die Referenz sind, nicht das ganze Bild, behalten ein roter Emissionsnebel oder die blauen Plejaden ihre echte Farbe."
+    },
+    "deconvolution": {
+      "label": "Dekonvolution",
+      "hint": "Macht die Sterne kleiner und schärft feine Details, indem sie die Unschärfe von Atmosphäre und Optik rückgängig macht, gemessen an Ihren eigenen Sternen. Läuft zuerst, auf den linearen Daten, vor jeder Rauschminderung. Erhöhen Sie sie schrittweise: Bei einem verrauschten Stapel holt sie auch die Körnung hervor. Mit zu wenigen gut belichteten Sternen tut sie nichts."
     }
   },
   "stars_panel": {
     "reduce": {
       "heading": "Sterne verkleinern",
-      "help": "Verkleinert jeden Stern an Ort und Stelle - schnell, alle Sterne bleiben erhalten."
+      "help": "Verkleinert jeden Stern an Ort und Stelle, damit schwache Nebel hervortreten."
     },
     "remove": {
-      "heading": "Sterne entfernen",
-      "help": "Hebt die Sterne heraus, damit die übrigen Schritte nur den Nebel bearbeiten; der zweite Regler blendet sie am Ende wieder ein.",
+      "heading": "Sterne beiseitelegen",
+      "help": "0 lässt sie im Bild. Höher löst sie heraus, und die Himmelsschritte arbeiten dann ohne sie.",
       "engine": {
         "aria": "Sternentfernungs-Engine",
         "classic": "Klassisch",
         "starnet2": "StarNet2",
-        "hint": "Verwendet das auf dem Server installierte StarNet2-Modell. Der erste Durchlauf bei einem neuen Bild kann eine Weile dauern; die unten stehenden Erkennungseinstellungen gelten dann nicht."
+        "hint": "Verwendet das auf dem Server installierte StarNet2-Modell. Der erste Durchlauf auf einem neuen Bild kann dauern; die Erkennungseinstellungen oben werden nicht verwendet."
       }
     },
     "detection": {
       "heading": "Welche Punkte Sterne sind",
-      "help": "Beide Werkzeuge oben nutzen dies. Schalten Sie die Sternmaske ein, um die Erkennung zu prüfen."
-    }
-  },
-  "detail_panel": {
-    "denoise": {
-      "heading": "Rauschunterdrückung",
-      "engine": {
-        "aria": "Entrauschungs-Engine",
-        "classic": "Klassisch",
-        "deepsnr": "DeepSNR",
-        "hint": "Verwendet das auf dem Server installierte DeepSNR-Modell, früh angewendet (vor der Tonwertstreckung). Der erste Durchlauf bei einem neuen Bild kann eine Weile dauern."
-      }
-    }
+      "help": "Schalten Sie die Sternmaske ein, um zu prüfen, was erkannt wird."
+    },
+    "back": {
+      "heading": "Sterne zurückholen",
+      "help": "Blendet die Sterne wieder über den bearbeiteten Himmel: 0 lässt das Bild sternlos, 100 holt sie in voller Stärke zurück."
+    },
+    "reduce_layer": {
+      "heading": "Sterne verkleinern",
+      "help": "Wirkt nur auf die getrennten Sterne, bevor sie zurückkommen - der Himmel darunter bleibt unberührt."
+    },
+    "not_separated": "Die Sterne wurden nicht beiseitegelegt, es gibt also nichts zurückzuholen. Um den Himmel ohne sie zu bearbeiten, nutzen Sie Sterne trennen.",
+    "detection_link": "Welche Punkte Sterne sind: in Sterne trennen eingestellt"
   },
   "histogram": {
     "aria_label": "RGB-Histogramm",
@@ -932,6 +954,26 @@
       "calibration": "Kalibrierung",
       "settings": "Einstellungen",
       "result": "Ergebnis"
+    }
+  },
+  "noise_panel": {
+    "engine": {
+      "aria": "Entrauschungs-Engine",
+      "classic": "Klassisch",
+      "deepsnr": "DeepSNR",
+      "hint": "Verwendet das auf dem Server installierte DeepSNR-Modell, früh angewendet (vor der Tonwertstreckung). Der erste Durchlauf bei einem neuen Bild kann eine Weile dauern."
+    },
+    "heading": "Rauschminderung",
+    "help": "Helligkeitskörnung, dann Farbrauschen."
+  },
+  "sky_panel": {
+    "background": {
+      "heading": "Hintergrund",
+      "help": "Vignettierung, Lichtverschmutzungsgradient und Dunst - zuerst korrigiert."
+    },
+    "colour": {
+      "heading": "Farbbalance",
+      "help": "Auf dem bereinigten Hintergrund gemessen: Himmel neutral machen, dann einen Grünstich entfernen."
     }
   }
 }

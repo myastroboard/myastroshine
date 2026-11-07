@@ -8,6 +8,8 @@ Layout (per docs/ARCHITECTURE):
         prelook.npy       lossless full-res result *before* the "Style" look
         prelook.json      {"key": ...} - the edit that produced prelook.npy
         prelook_thumb.png downscaled prelook, the Style gallery's source
+        starless.jpg      the edited sky without its stars, from the same render
+                          as prelook.npy - only while the stars are separated
         depth/depth_map.png
         depth/layer_{n}.png    BGRA parallax layers, far (0) to near
 """
@@ -173,6 +175,19 @@ class StorageService:
                 return None
         image: np.ndarray = np.load(path)
         return image
+
+    def starless_path(self, session_id: str) -> Path:
+        return self.session_dir(session_id) / "starless.jpg"
+
+    def save_starless(self, session_id: str, image: np.ndarray | None) -> None:
+        """Keep the edited starless sky of the latest render (the editor's "sky
+        alone" view), or drop a stale one when that render kept its stars."""
+        path = self.starless_path(session_id)
+        if image is None:
+            path.unlink(missing_ok=True)
+            return
+        self.session_dir(session_id, create=True)
+        image_utils.save_image(image, path, quality=92)
 
     def load_prelook_thumb(self, session_id: str) -> np.ndarray | None:
         path = self.prelook_thumb_path(session_id)

@@ -1,7 +1,8 @@
 """Image upload and preview routes.
 
 POST /api/upload            - validate an image, open a session
-GET  /api/preview/{id}      - current preview JPEG (?full=true for full res)
+GET  /api/preview/{id}      - current preview JPEG (?full=true for full res,
+                              ?starless=true for the edited sky without its stars)
 """
 
 from __future__ import annotations
@@ -101,6 +102,7 @@ async def get_preview(
     full: bool = False,
     original: bool = False,
     geometry: bool = False,
+    starless: bool = False,
 ) -> Response:
     """Return an image for a session.
 
@@ -110,6 +112,8 @@ async def get_preview(
     session's current crop/rotate/flip/straighten to the original (but none of
     the colour/tone enhancement) - the "before" side of the comparison once a
     crop has changed the result's frame, so the two images still align.
+    ``starless=true`` serves the edited sky of the latest render without its
+    stars (full resolution) - only while the edit separates them, 404 otherwise.
     """
     if not is_valid_session_id(session_id):
         raise SessionNotFoundError(f"Session {session_id} not found")
@@ -126,6 +130,8 @@ async def get_preview(
 
     if original:
         path = storage.original_path(session_id)
+    elif starless:
+        path = storage.starless_path(session_id)
     elif full:
         path = storage.processed_path(session_id)
     else:

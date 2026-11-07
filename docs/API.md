@@ -107,7 +107,7 @@ Every route is implemented and tested end to end.
 | GET | `/admin/config-export` | Settings + user presets (never the 5 built-ins), bundled for backup or moving to a new instance |
 | POST | `/admin/config-import` | Restore settings + presets from a `config-export` file - a name collision is skipped, never overwritten |
 | POST | `/upload` | Upload an image, open a session |
-| GET | `/preview/{session_id}` | Session image: `?full=true` full-res result, `?original=true` untouched upload (add `&geometry=true` to apply the session's current crop/rotate/flip/straighten, no colour/tone enhancement), default downscaled result. `?v=` cache-buster |
+| GET | `/preview/{session_id}` | Session image: `?full=true` full-res result, `?original=true` untouched upload (add `&geometry=true` to apply the session's current crop/rotate/flip/straighten, no colour/tone enhancement), `?starless=true` the edited sky without its stars from the latest render (404 unless that render separated them - the editor's "sky alone" view), default downscaled result. `?v=` cache-buster |
 | POST | `/process/{session_id}` | Apply enhancement parameters |
 | WS | `/ws/processing-status/{job_id}` | Real-time job progress |
 | POST | `/download/{session_id}` | Download the processed image. Body: `format` (`jpeg` \| `png` \| `tiff`), `quality` (1-100), `style` (default `true`; with a "Style" look active, `false` exports the same edit without it). A styled export names its look in the file's metadata (JPEG comment, PNG `Description`, TIFF ImageDescription) |
@@ -239,6 +239,7 @@ stage; it is ignored for an ordinary 8-bit image upload.
 
 | Field | Min | Max | Default | Type |
 |-------|-----|-----|---------|------|
+| deconvolution | 0 | 100 | 0 | int (Richardson-Lucy against the stars' own PSF, run first - before any noise reduction) |
 | stretch | 0.0 | 1.0 | 0.5 | float (auto-stretch intensity: 0 subtle, 1 aggressive) |
 | stretch_mode | - | - | `"adaptive"` | `"adaptive"` (colour-preserving, fitted to the image) \| `"classic"` (the original per-channel auto-stretch) |
 | background_extraction | 0 | 100 | 100 | int (how much of the fitted sky gradient to remove) |
@@ -269,10 +270,11 @@ send the points the user actually dragged, not a full 256-entry table:
 ```
 
 `star_removal` (v0.3) turns star removal on: when it is above 0 the pipeline
-splits after the background corrections - the stars are pulled out, every
-creative stage runs on the starless image, and `star_recombine` screen-blends
-the removed star flux back at the end (0 = fully starless output, 100 = stars at
-full strength). Detection reuses `star_sensitivity` / `star_max_size`. `0` (the
+splits after the sky corrections and the noise reduction - the stars are pulled
+out, every creative stage runs on the starless image, and `star_recombine`
+screen-blends the removed star flux back at the end (0 = fully starless output,
+100 = stars at full strength), after `star_reduction` has shrunk that stars
+layer. Detection reuses `star_sensitivity` / `star_max_size`. `0` (the
 default) is byte-identical to the flat pipeline. See `docs/ALGORITHMS.md`
 "Star removal (starless)".
 
@@ -314,13 +316,15 @@ re-reads the job from the DB, so a client never waits on an event it missed.
 `status`: `queued`, `processing`, `completed`, `failed`, `superseded` (or
 `unknown` if the `job_id` is not found). `superseded` means a newer `/process`
 for the same session arrived while this job was still queued - it will not run
-and its result should be ignored. Image steps: `geometry`, `color_correction`,
-`vignette_correction`, `gradient_reduction`, `dehaze`, `contrast`, `exposure`,
-`highlights_shadows`, `whites_blacks`, `tone_curve`, `channel_curves`,
-`saturation`, `vibrance`, `clarity`, `denoise`, `chroma_denoise`,
-`star_reduction`, `sharpness`, `rendering`, `done`. With `star_removal` set, the
-extra steps `star_removal` (after `dehaze`) and `star_recombine` (last) bracket
-the creative stages. For a stacked-composite session a `stack_base` step runs
+and its result should be ignored. Image steps, in the editor's workflow order:
+`geometry`, `vignette_correction`, `gradient_reduction`, `dehaze`,
+`color_correction`, `green_removal`, `denoise`, `chroma_denoise`, `exposure`,
+`contrast`, `highlights_shadows`, `whites_blacks`, `tone_curve`,
+`channel_curves`, `saturation`, `vibrance`, `clarity`, `sharpness`,
+`star_reduction`, `rendering`, `done`. With `star_removal` set, `star_removal`
+(after `chroma_denoise`) and `star_recombine` (last, in place of
+`star_reduction`, which then shrinks the stars layer) bracket the creative
+stages. For a stacked-composite session a `stack_base` step runs
 first (the linear `stack` pre-stage). Stack steps: `calibration`,
 `registration`, `normalization`, `integration`, `post-processing`, `done`.
 
