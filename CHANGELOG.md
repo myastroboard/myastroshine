@@ -12,6 +12,20 @@ original Keep a Changelog headings.
 
 ### Features
 
+- None.
+
+### Fixes
+
+- None.
+
+### Breaking changes
+
+- None.
+
+## 0.6.2 (2026-11-07)
+
+### Features
+
 - Editor rail follows the astrophotography workflow: new Noise and Separate stars steps before
   the sky work, Stars (shrink, put back) after it; the pipeline runs in that exact order. See
   [ALGORITHMS.md "Editing workflow"](docs/ALGORITHMS.md#editing-workflow).
