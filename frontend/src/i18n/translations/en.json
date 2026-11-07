@@ -101,7 +101,8 @@
       "phase": {
         "prepare": "Prepare",
         "enhance": "Enhance",
-        "finish": "Finish"
+        "finish": "Finish",
+        "enhance_starless": "Enhance - stars set aside"
       },
       "hint": {
         "start": "One click, or a preset",
@@ -111,12 +112,16 @@
         "light": "Brightness and contrast",
         "curves": "Fine-tune the tones",
         "colour": "How vivid it looks",
-        "detail": "Sharpen, remove grain",
-        "stars": "Shrink or remove them",
+        "detail": "Local contrast, sharpness",
+        "stars": "Shrink them, put them back",
         "depth": "Animated parallax",
         "style": "Optional finishing touch",
-        "export": "Download or share"
-      }
+        "export": "Download or share",
+        "noise": "Grain and colour speckle",
+        "starless": "Set the stars aside"
+      },
+      "noise": "Noise",
+      "starless": "Separate stars"
     },
     "steps": {
       "start": {
@@ -132,7 +137,7 @@
       },
       "sky": {
         "help": "Remove light pollution and colour casts so the sky looks natural.",
-        "more": "Clean up the raw signal before any creative grading: white balance, lens vignetting, light-pollution gradients, and haze."
+        "more": "Correct the data before any creative work, in the order astrophotographers use: the background first (lens vignetting, light-pollution gradient, haze), then the colour balance, read on that flattened sky, and the green cast last."
       },
       "light": {
         "help": "How bright and punchy the image is.",
@@ -147,12 +152,12 @@
         "more": "How vivid the colours are. Vibrance protects already-saturated areas; saturation scales everything."
       },
       "detail": {
-        "help": "Smooth away grain and bring out fine structure.",
-        "more": "Local texture: micro-contrast, noise reduction, and sharpening. Do this after tone and colour are settled."
+        "help": "Bring out fine structure.",
+        "more": "Local contrast and sharpening, once tones and colours are settled. Sharpening only boosts structure that rises above the noise, so the grain left after the Noise step is not sharpened."
       },
       "stars": {
-        "help": "Make stars smaller, or remove them to work on the nebula alone.",
-        "more": "Two ways to handle stars: shrink them where they are, or lift them out entirely so the rest of your edit only touches the nebula."
+        "help": "Shrink the stars, and put them back if you set them aside.",
+        "more": "The second half of the starless workflow: the stars layer is shrunk on its own, then blended back over the edited sky. If the stars were never separated, they are shrunk where they are."
       },
       "depth": {
         "help": "Turn your image into a gentle animated 3D effect.",
@@ -164,6 +169,14 @@
       },
       "export": {
         "help": "Save your image, or keep these settings for your next photos."
+      },
+      "noise": {
+        "help": "Smooth away grain and colour speckle before anything amplifies them.",
+        "more": "Noise reduction comes early: every brightness and contrast change after it would amplify the grain, and sharpening must not see it. It also makes the star separation of the next step cleaner. Stars and fine filaments stand far above the noise, so they are kept."
+      },
+      "starless": {
+        "help": "Optional: set the stars aside so the next steps work on the sky alone.",
+        "more": "The starless workflow of deep-sky processing: the stars are lifted out here, Light, Curves, Colour and Detail then push the nebula or galaxy without bloating or whitening the stars, and the Stars step puts them back. Leave it at 0 to keep the stars in the picture all the way."
       }
     },
     "milestones": {
@@ -191,7 +204,10 @@
     "slider_tip": "Tip: double-click a slider to put it back to neutral.",
     "auto_astro_hint": "Analyses your photo and sets every step for you.",
     "auto_astro_done": "Done - every step is set. Tweak any of them, or go straight to Export.",
-    "presets_hint": "Or start from a look tuned for your subject."
+    "presets_hint": "Or start from a look tuned for your subject.",
+    "starless_banner": "You are working on the sky without its stars. They come back in the Stars step.",
+    "starless_banner_action": "Go to Stars",
+    "stars_not_back": "Your image has no stars: they were set aside and not put back."
   },
   "export_panel": {
     "filename_label": "File name",
@@ -434,11 +450,11 @@
       },
       "starRemoval": {
         "label": "Remove stars",
-        "hint": "Pulls the stars out so every other adjustment works on the nebula alone."
+        "hint": "Lifts the stars out so Light, Curves, Colour and Detail work on the sky alone; the Stars step puts them back."
       },
       "starRecombine": {
         "label": "Bring stars back",
-        "hint": "Screen-blends the removed stars back at the end: 0 keeps the image starless, 100 restores them full strength."
+        "hint": "Screen-blends the separated stars back over the edited sky: 0 keeps the image starless, 100 restores them at full strength."
       },
       "sharpness": {
         "label": "Sharpness",
@@ -494,34 +510,33 @@
   },
   "stars_panel": {
     "reduce": {
-      "heading": "Reduce stars",
-      "help": "Shrinks every star where it is - quick, and every star is kept."
+      "heading": "Shrink stars",
+      "help": "Shrinks every star where it is, so faint nebulosity stands out."
     },
     "remove": {
-      "heading": "Remove stars",
-      "help": "Lifts the stars out so the other steps only touch the nebula; the second slider fades them back in at the end.",
+      "heading": "Set the stars aside",
+      "help": "0 keeps them in the picture. Higher lifts them out, and the sky steps then work without them.",
       "engine": {
         "aria": "Star removal engine",
         "classic": "Classic",
         "starnet2": "StarNet2",
-        "hint": "Uses the StarNet2 model installed on the server. The first pass on a new image can take a while; detection controls below don't apply."
+        "hint": "Uses the StarNet2 model installed on the server. The first pass on a new image can take a while; the detection settings above are not used."
       }
     },
     "detection": {
       "heading": "Which points are stars",
-      "help": "Both tools above use this. Turn on the star mask to check what is picked up."
-    }
-  },
-  "detail_panel": {
-    "denoise": {
-      "heading": "Noise reduction",
-      "engine": {
-        "aria": "Denoise engine",
-        "classic": "Classic",
-        "deepsnr": "DeepSNR",
-        "hint": "Uses the DeepSNR model installed on the server, applied early (before the tone stretch). The first pass on a new image can take a while."
-      }
-    }
+      "help": "Turn on the star mask to check what is picked up."
+    },
+    "back": {
+      "heading": "Put the stars back",
+      "help": "Blends the stars back over the edited sky: 0 leaves the image starless, 100 brings them back at full strength."
+    },
+    "reduce_layer": {
+      "heading": "Shrink stars",
+      "help": "Works on the separated stars alone, before they go back - the sky under them is not touched."
+    },
+    "not_separated": "The stars were not set aside, so there is nothing to put back. To edit the sky without them, use Separate stars.",
+    "detection_link": "Which points are stars: set in Separate stars"
   },
   "histogram": {
     "aria_label": "RGB histogram",
@@ -932,6 +947,26 @@
       "calibration": "Calibration",
       "settings": "Settings",
       "result": "Result"
+    }
+  },
+  "noise_panel": {
+    "engine": {
+      "aria": "Denoise engine",
+      "classic": "Classic",
+      "deepsnr": "DeepSNR",
+      "hint": "Uses the DeepSNR model installed on the server, applied early (before the tone stretch). The first pass on a new image can take a while."
+    },
+    "heading": "Noise reduction",
+    "help": "Brightness grain, then colour speckle."
+  },
+  "sky_panel": {
+    "background": {
+      "heading": "Background",
+      "help": "Vignetting, light-pollution gradient and haze - corrected first."
+    },
+    "colour": {
+      "heading": "Colour balance",
+      "help": "Read on the cleaned background: make the sky neutral, then remove any green cast."
     }
   }
 }

@@ -432,22 +432,32 @@ export function temperatureIndex(kelvin: number): number {
 }
 
 /**
- * The editor workflow, in retouching order. This mirrors the backend pipeline
- * order in `app/services/image_processing.py::apply_parameters`: geometry first,
- * then white balance and background corrections, then tone, curves, colour,
- * detail, then stars (reduce in place, or remove entirely - `star_removal`
- * splits the backend pipeline; see that method). The rail, the inspector panel
- * switch, and the "modified" dots all derive from this one list.
+ * The editor workflow, in the order an astrophotographer processes an image -
+ * and, one to one, the order the backend runs it
+ * (`app/services/image_processing.py::apply_parameters`). docs/ALGORITHMS.md
+ * "Editing workflow" gives the reasoning and the references it follows:
  *
- * `start` and `export` are workflow brackets (no step number): a one-click
- * starting point, and getting the result out. `style` is the optional finishing
- * look just before export - the backend runs it last, after every other stage.
+ * - the linear stack (composites only), then the one-click start;
+ * - prepare the data, on the whole frame: framing, the sky (background, then
+ *   colour balance), noise - before any tone push amplifies it - then separate
+ *   the stars;
+ * - enhance the sky: light, curves, colour, detail - on the starless image when
+ *   the stars were separated;
+ * - finish: the stars (shrink them, put them back - the other half of the
+ *   separation, after the sky work it brackets);
+ * - deliver: the optional style look, the 3D effect (an animation of the
+ *   result, not a change to it), and the export.
+ *
+ * The rail, the inspector panel switch, and the "modified" dots all derive from
+ * this one list.
  */
 export type EditorStepId =
   | 'start'
   | 'stack'
   | 'frame'
   | 'sky'
+  | 'noise'
+  | 'starless'
   | 'light'
   | 'curves'
   | 'colour'
@@ -458,9 +468,9 @@ export type EditorStepId =
   | 'export';
 
 /**
- * The rail groups the steps into phases so eleven tools read as four moves:
- * begin (one-click start), prepare the raw image, enhance it, finish it - then
- * deliver. Labels live in `editor.rail.phase.<phase>`.
+ * The rail groups the steps into phases so the tools read as a few moves:
+ * begin (one-click start), prepare the data, enhance the sky, finish the stars -
+ * then deliver. Labels live in `editor.rail.phase.<phase>`.
  */
 export type EditorPhase = 'begin' | 'prepare' | 'enhance' | 'finish' | 'deliver';
 
@@ -485,14 +495,24 @@ export const EDITOR_STEPS: EditorStep[] = [
   {
     id: 'sky',
     phase: 'prepare',
+    // Background first (vignette, gradient, haze), then the colour balance read
+    // on the flattened background, the green cast last - see SkyPanel.
     params: [
-      'temperature',
-      'tint',
-      'greenRemoval',
       'vignetteCorrection',
       'gradientReduction',
       'dehaze',
+      'temperature',
+      'tint',
+      'greenRemoval',
     ],
+  },
+  { id: 'noise', phase: 'prepare', params: ['denoise', 'chromaDenoise'] },
+  {
+    id: 'starless',
+    phase: 'prepare',
+    // What counts as a star (shared with the in-place shrink of the Stars
+    // step), then how much of it to lift out of the sky.
+    params: ['starSensitivity', 'starMaxSize', 'starRemoval'],
   },
   {
     id: 'light',
@@ -501,19 +521,19 @@ export const EDITOR_STEPS: EditorStep[] = [
   },
   { id: 'curves', phase: 'enhance', params: [] },
   { id: 'colour', phase: 'enhance', params: ['saturation', 'vibrance'] },
-  { id: 'detail', phase: 'finish', params: ['clarity', 'denoise', 'chromaDenoise', 'sharpness'] },
-  {
-    id: 'stars',
-    phase: 'finish',
-    // Reduce (shrink in place), remove (starless split + recombine), and the
-    // shared detection controls - all rendered as one grouped panel, see
-    // EditorInspector's StarsPanel.
-    params: ['starReduction', 'starRemoval', 'starRecombine', 'starSensitivity', 'starMaxSize'],
-  },
-  { id: 'depth', phase: 'finish', params: [] },
+  { id: 'detail', phase: 'enhance', params: ['clarity', 'sharpness'] },
+  // The other half of the separation: shrink the stars, put them back.
+  { id: 'stars', phase: 'finish', params: ['starReduction', 'starRecombine'] },
   { id: 'style', phase: 'deliver', params: [] },
+  { id: 'depth', phase: 'deliver', params: [] },
   { id: 'export', phase: 'deliver', params: [] },
 ];
+
+/** True when this edit lifts the stars out (the "Separate stars" step), so the
+ * Enhance steps work on the starless sky until the "Stars" step puts them back. */
+export function starsSeparated(parameters: ProcessingParameters): boolean {
+  return parameters.starRemoval > 0;
+}
 
 /** True when a step's controls hold different values in two edit states - the
  * rail's "modified" dot (against the defaults) and the names given to the

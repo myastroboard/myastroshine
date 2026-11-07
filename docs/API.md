@@ -269,10 +269,11 @@ send the points the user actually dragged, not a full 256-entry table:
 ```
 
 `star_removal` (v0.3) turns star removal on: when it is above 0 the pipeline
-splits after the background corrections - the stars are pulled out, every
-creative stage runs on the starless image, and `star_recombine` screen-blends
-the removed star flux back at the end (0 = fully starless output, 100 = stars at
-full strength). Detection reuses `star_sensitivity` / `star_max_size`. `0` (the
+splits after the sky corrections and the noise reduction - the stars are pulled
+out, every creative stage runs on the starless image, and `star_recombine`
+screen-blends the removed star flux back at the end (0 = fully starless output,
+100 = stars at full strength), after `star_reduction` has shrunk that stars
+layer. Detection reuses `star_sensitivity` / `star_max_size`. `0` (the
 default) is byte-identical to the flat pipeline. See `docs/ALGORITHMS.md`
 "Star removal (starless)".
 
@@ -314,13 +315,15 @@ re-reads the job from the DB, so a client never waits on an event it missed.
 `status`: `queued`, `processing`, `completed`, `failed`, `superseded` (or
 `unknown` if the `job_id` is not found). `superseded` means a newer `/process`
 for the same session arrived while this job was still queued - it will not run
-and its result should be ignored. Image steps: `geometry`, `color_correction`,
-`vignette_correction`, `gradient_reduction`, `dehaze`, `contrast`, `exposure`,
-`highlights_shadows`, `whites_blacks`, `tone_curve`, `channel_curves`,
-`saturation`, `vibrance`, `clarity`, `denoise`, `chroma_denoise`,
-`star_reduction`, `sharpness`, `rendering`, `done`. With `star_removal` set, the
-extra steps `star_removal` (after `dehaze`) and `star_recombine` (last) bracket
-the creative stages. For a stacked-composite session a `stack_base` step runs
+and its result should be ignored. Image steps, in the editor's workflow order:
+`geometry`, `vignette_correction`, `gradient_reduction`, `dehaze`,
+`color_correction`, `green_removal`, `denoise`, `chroma_denoise`, `exposure`,
+`contrast`, `highlights_shadows`, `whites_blacks`, `tone_curve`,
+`channel_curves`, `saturation`, `vibrance`, `clarity`, `sharpness`,
+`star_reduction`, `rendering`, `done`. With `star_removal` set, `star_removal`
+(after `chroma_denoise`) and `star_recombine` (last, in place of
+`star_reduction`, which then shrinks the stars layer) bracket the creative
+stages. For a stacked-composite session a `stack_base` step runs
 first (the linear `stack` pre-stage). Stack steps: `calibration`,
 `registration`, `normalization`, `integration`, `post-processing`, `done`.
 

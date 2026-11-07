@@ -101,7 +101,8 @@
       "phase": {
         "prepare": "Preparar",
         "enhance": "Realzar",
-        "finish": "Acabado"
+        "finish": "Acabado",
+        "enhance_starless": "Realzar - estrellas apartadas"
       },
       "hint": {
         "start": "Un clic o un ajuste",
@@ -111,12 +112,16 @@
         "light": "Brillo y contraste",
         "curves": "Afinar los tonos",
         "colour": "Intensidad del color",
-        "detail": "Nitidez, grano",
-        "stars": "Reducirlas o quitarlas",
+        "detail": "Contraste local, nitidez",
+        "stars": "Reducirlas, devolverlas",
         "depth": "Paralaje animado",
         "style": "Toque final opcional",
-        "export": "Descargar o compartir"
-      }
+        "export": "Descargar o compartir",
+        "noise": "Grano y ruido de color",
+        "starless": "Apartar las estrellas"
+      },
+      "noise": "Ruido",
+      "starless": "Separar estrellas"
     },
     "steps": {
       "start": {
@@ -132,7 +137,7 @@
       },
       "sky": {
         "help": "Elimina la contaminación lumínica y las dominantes para un cielo natural.",
-        "more": "Limpie la señal en bruto antes de cualquier ajuste creativo: balance de blancos, viñeteado del objetivo, degradados de contaminación lumínica y neblina."
+        "more": "Corrige los datos antes de cualquier trabajo creativo, en el orden de los astrofotógrafos: primero el fondo de cielo (viñeteo, gradiente de contaminación lumínica, bruma), luego el equilibrio de color, medido sobre ese cielo aplanado, y la dominante verde al final."
       },
       "light": {
         "help": "Lo luminosa e impactante que es la imagen.",
@@ -147,12 +152,12 @@
         "more": "Cuán vivos son los colores. La viveza protege las zonas ya saturadas; la saturación escala todo por igual."
       },
       "detail": {
-        "help": "Suaviza el grano y resalta las estructuras finas.",
-        "more": "Textura local: microcontraste, reducción de ruido y nitidez. Haga esto después de fijar el tono y el color."
+        "help": "Haz resaltar las estructuras finas.",
+        "more": "Contraste local y nitidez, una vez ajustados tonos y colores. La nitidez solo refuerza las estructuras que superan el ruido: el grano que queda tras el paso Ruido no se enfoca."
       },
       "stars": {
-        "help": "Haz las estrellas más pequeñas o quítalas para trabajar solo la nebulosa.",
-        "more": "Dos formas de tratar las estrellas: reducirlas donde están, o eliminarlas por completo para que el resto de la edición actúe solo sobre la nebulosa."
+        "help": "Reduce las estrellas y devuélvelas si las apartaste.",
+        "more": "La segunda mitad del flujo sin estrellas: la capa de estrellas se reduce por separado y luego se funde de nuevo sobre el cielo retocado. Si las estrellas nunca se separaron, se reducen en su sitio."
       },
       "depth": {
         "help": "Convierte tu imagen en un suave efecto 3D animado.",
@@ -164,6 +169,14 @@
       },
       "export": {
         "help": "Guarda tu imagen o conserva estos ajustes para tus próximas fotos."
+      },
+      "noise": {
+        "help": "Suaviza el grano y el ruido de color antes de que algo los amplifique.",
+        "more": "La reducción de ruido va pronto: cada cambio de brillo o contraste posterior amplificaría el grano, y la nitidez no debe verlo. También deja más limpia la separación de estrellas del paso siguiente. Las estrellas y los filamentos finos quedan muy por encima del ruido, así que se conservan."
+      },
+      "starless": {
+        "help": "Opcional: aparta las estrellas para que los pasos siguientes trabajen solo el cielo.",
+        "more": "El flujo sin estrellas del procesado de cielo profundo: las estrellas se extraen aquí, Luz, Curvas, Color y Detalle realzan luego la nebulosa o la galaxia sin hinchar ni blanquear las estrellas, y el paso Estrellas las devuelve. Déjalo en 0 para mantener las estrellas en la imagen todo el tiempo."
       }
     },
     "milestones": {
@@ -191,7 +204,10 @@
     "slider_tip": "Consejo: haz doble clic en un control deslizante para devolverlo a neutro.",
     "auto_astro_hint": "Analiza tu foto y ajusta cada paso por ti.",
     "auto_astro_done": "Listo - cada paso está ajustado. Retoca el que quieras o ve directo a Exportar.",
-    "presets_hint": "O parte de un estilo pensado para tu objeto."
+    "presets_hint": "O parte de un estilo pensado para tu objeto.",
+    "starless_banner": "Estás trabajando el cielo sin sus estrellas. Vuelven en el paso Estrellas.",
+    "starless_banner_action": "Ir a Estrellas",
+    "stars_not_back": "Tu imagen no tiene estrellas: se apartaron y no se devolvieron."
   },
   "export_panel": {
     "filename_label": "Nombre del archivo",
@@ -434,11 +450,11 @@
       },
       "starRemoval": {
         "label": "Eliminar estrellas",
-        "hint": "Extrae las estrellas para que el resto de los ajustes actúen solo sobre la nebulosa."
+        "hint": "Extrae las estrellas para que Luz, Curvas, Color y Detalle trabajen solo el cielo; el paso Estrellas las devuelve."
       },
       "starRecombine": {
         "label": "Recuperar estrellas",
-        "hint": "Reincorpora al final las estrellas eliminadas mediante mezcla de trama: 0 mantiene la imagen sin estrellas, 100 las restaura por completo."
+        "hint": "Funde (modo trama) las estrellas separadas sobre el cielo retocado: 0 deja la imagen sin estrellas, 100 las restaura con toda su intensidad."
       },
       "sharpness": {
         "label": "Nitidez",
@@ -495,33 +511,32 @@
   "stars_panel": {
     "reduce": {
       "heading": "Reducir estrellas",
-      "help": "Reduce cada estrella en su sitio - rápido, y se conservan todas."
+      "help": "Reduce cada estrella en su sitio, para que resalten las nebulosidades débiles."
     },
     "remove": {
-      "heading": "Quitar estrellas",
-      "help": "Saca las estrellas para que los demás pasos solo toquen la nebulosa; el segundo control las devuelve al final.",
+      "heading": "Apartar las estrellas",
+      "help": "0 las deja en la imagen. Más alto las extrae, y los pasos del cielo trabajan entonces sin ellas.",
       "engine": {
         "aria": "Motor de eliminación de estrellas",
         "classic": "Clásico",
         "starnet2": "StarNet2",
-        "hint": "Usa el modelo StarNet2 instalado en el servidor. La primera pasada sobre una imagen nueva puede tardar; los controles de detección de abajo no se aplican."
+        "hint": "Usa el modelo StarNet2 instalado en el servidor. La primera pasada sobre una imagen nueva puede tardar; los ajustes de detección de arriba no se usan."
       }
     },
     "detection": {
       "heading": "Qué puntos son estrellas",
-      "help": "Las dos herramientas de arriba lo usan. Activa la máscara de estrellas para comprobar qué se detecta."
-    }
-  },
-  "detail_panel": {
-    "denoise": {
-      "heading": "Reducción de ruido",
-      "engine": {
-        "aria": "Motor de reducción de ruido",
-        "classic": "Clásico",
-        "deepsnr": "DeepSNR",
-        "hint": "Usa el modelo DeepSNR instalado en el servidor, aplicado en una fase temprana (antes del estiramiento tonal). La primera pasada sobre una imagen nueva puede tardar."
-      }
-    }
+      "help": "Activa la máscara de estrellas para comprobar lo que se detecta."
+    },
+    "back": {
+      "heading": "Devolver las estrellas",
+      "help": "Funde las estrellas sobre el cielo retocado: 0 deja la imagen sin estrellas, 100 las devuelve con toda su intensidad."
+    },
+    "reduce_layer": {
+      "heading": "Reducir estrellas",
+      "help": "Actúa solo sobre las estrellas separadas, antes de que vuelvan - el cielo de debajo no se toca."
+    },
+    "not_separated": "Las estrellas no se apartaron, así que no hay nada que devolver. Para trabajar el cielo sin ellas, usa Separar estrellas.",
+    "detection_link": "Qué puntos son estrellas: se ajusta en Separar estrellas"
   },
   "histogram": {
     "aria_label": "Histograma RGB",
@@ -932,6 +947,26 @@
       "calibration": "Calibración",
       "settings": "Ajustes",
       "result": "Resultado"
+    }
+  },
+  "noise_panel": {
+    "engine": {
+      "aria": "Motor de reducción de ruido",
+      "classic": "Clásico",
+      "deepsnr": "DeepSNR",
+      "hint": "Usa el modelo DeepSNR instalado en el servidor, aplicado en una fase temprana (antes del estiramiento tonal). La primera pasada sobre una imagen nueva puede tardar."
+    },
+    "heading": "Reducción de ruido",
+    "help": "El grano de brillo, luego el ruido de color."
+  },
+  "sky_panel": {
+    "background": {
+      "heading": "Fondo de cielo",
+      "help": "Viñeteo, gradiente de contaminación lumínica y bruma - corregidos primero."
+    },
+    "colour": {
+      "heading": "Equilibrio de color",
+      "help": "Medido sobre el fondo limpio: deja el cielo neutro y luego quita cualquier dominante verde."
     }
   }
 }

@@ -101,7 +101,8 @@
       "phase": {
         "prepare": "Préparer",
         "enhance": "Embellir",
-        "finish": "Finitions"
+        "finish": "Finitions",
+        "enhance_starless": "Embellir - étoiles de côté"
       },
       "hint": {
         "start": "En un clic, ou un préréglage",
@@ -111,12 +112,16 @@
         "light": "Luminosité et contraste",
         "curves": "Affiner les tons",
         "colour": "Intensité des couleurs",
-        "detail": "Netteté, grain",
-        "stars": "Les réduire ou les retirer",
+        "detail": "Contraste local, netteté",
+        "stars": "Les réduire, les remettre",
         "depth": "Parallaxe animée",
         "style": "Touche finale facultative",
-        "export": "Télécharger ou partager"
-      }
+        "export": "Télécharger ou partager",
+        "noise": "Grain et bruit de couleur",
+        "starless": "Mettre les étoiles de côté"
+      },
+      "noise": "Bruit",
+      "starless": "Séparer les étoiles"
     },
     "steps": {
       "start": {
@@ -132,7 +137,7 @@
       },
       "sky": {
         "help": "Retirez la pollution lumineuse et les dominantes pour un ciel naturel.",
-        "more": "Corrigez le signal brut avant tout réglage créatif : balance des blancs, vignetage de l'objectif, dégradés de pollution lumineuse et brume."
+        "more": "Corrigez les données avant tout travail créatif, dans l'ordre des astrophotographes : d'abord le fond de ciel (vignetage de l'objectif, dégradé de pollution lumineuse, brume), puis la balance des couleurs, lue sur ce ciel aplani, et la dominante verte en dernier."
       },
       "light": {
         "help": "La luminosité et le peps de l'image.",
@@ -147,12 +152,12 @@
         "more": "L'intensité des couleurs. La vibrance protège les zones déjà saturées ; la saturation agit sur tout."
       },
       "detail": {
-        "help": "Lissez le grain et faites ressortir les fines structures.",
-        "more": "Texture locale : micro-contraste, réduction du bruit et netteté. À faire une fois tons et couleurs réglés."
+        "help": "Faites ressortir les fines structures.",
+        "more": "Contraste local et netteté, une fois tons et couleurs réglés. La netteté ne renforce que les structures qui dépassent le bruit : le grain restant après l'étape Bruit n'est pas accentué."
       },
       "stars": {
-        "help": "Rendez les étoiles plus discrètes, ou retirez-les pour ne travailler que la nébuleuse.",
-        "more": "Deux façons de traiter les étoiles : les réduire sur place, ou les extraire entièrement pour que le reste de la retouche n'agisse que sur la nébuleuse."
+        "help": "Réduisez les étoiles, et remettez-les si vous les avez mises de côté.",
+        "more": "La seconde moitié du flux sans étoiles : le calque d'étoiles est réduit seul, puis fondu à nouveau sur le ciel retouché. Si les étoiles n'ont pas été séparées, elles sont réduites sur place."
       },
       "depth": {
         "help": "Transformez votre image en un léger effet 3D animé.",
@@ -164,6 +169,14 @@
       },
       "export": {
         "help": "Enregistrez votre image, ou gardez ces réglages pour vos prochaines photos."
+      },
+      "noise": {
+        "help": "Lissez le grain et le bruit de couleur avant que quoi que ce soit ne l'amplifie.",
+        "more": "La réduction du bruit vient tôt : chaque réglage de luminosité ou de contraste qui suit amplifierait le grain, et la netteté ne doit pas le voir. Elle rend aussi plus propre la séparation des étoiles de l'étape suivante. Les étoiles et les filaments fins dépassent largement le bruit, ils sont donc préservés."
+      },
+      "starless": {
+        "help": "Facultatif : mettez les étoiles de côté pour que les étapes suivantes ne travaillent que le ciel.",
+        "more": "Le flux de travail sans étoiles du traitement du ciel profond : les étoiles sont extraites ici, Lumière, Courbes, Couleur et Détail poussent ensuite la nébuleuse ou la galaxie sans gonfler ni blanchir les étoiles, et l'étape Étoiles les remet. Laissez à 0 pour garder les étoiles dans l'image tout du long."
       }
     },
     "milestones": {
@@ -191,7 +204,10 @@
     "slider_tip": "Astuce : double-cliquez sur un curseur pour le remettre au neutre.",
     "auto_astro_hint": "Analyse votre photo et règle chaque étape pour vous.",
     "auto_astro_done": "C'est fait - chaque étape est réglée. Ajustez-en une si vous voulez, ou passez directement à l'export.",
-    "presets_hint": "Ou partez d'un rendu pensé pour votre sujet."
+    "presets_hint": "Ou partez d'un rendu pensé pour votre sujet.",
+    "starless_banner": "Vous travaillez le ciel sans ses étoiles. Elles reviennent à l'étape Étoiles.",
+    "starless_banner_action": "Aller aux Étoiles",
+    "stars_not_back": "Votre image n'a plus d'étoiles : elles ont été mises de côté sans être remises."
   },
   "export_panel": {
     "filename_label": "Nom du fichier",
@@ -434,11 +450,11 @@
       },
       "starRemoval": {
         "label": "Retirer les étoiles",
-        "hint": "Extrait les étoiles pour que tous les autres réglages n'agissent que sur la nébuleuse."
+        "hint": "Extrait les étoiles pour que Lumière, Courbes, Couleur et Détail ne travaillent que le ciel ; l'étape Étoiles les remet."
       },
       "starRecombine": {
         "label": "Rétablir les étoiles",
-        "hint": "Réincorpore les étoiles retirées à la fin en fondu écran : 0 garde l'image sans étoiles, 100 les rétablit pleinement."
+        "hint": "Fond (mode écran) les étoiles séparées sur le ciel retouché : 0 laisse l'image sans étoiles, 100 les rétablit à pleine intensité."
       },
       "sharpness": {
         "label": "Netteté",
@@ -495,33 +511,32 @@
   "stars_panel": {
     "reduce": {
       "heading": "Réduire les étoiles",
-      "help": "Réduit chaque étoile sur place - rapide, et toutes les étoiles sont gardées."
+      "help": "Réduit chaque étoile sur place, pour faire ressortir les nébulosités faibles."
     },
     "remove": {
-      "heading": "Retirer les étoiles",
-      "help": "Extrait les étoiles pour que les autres étapes ne touchent que la nébuleuse ; le second curseur les fait revenir à la fin.",
+      "heading": "Mettre les étoiles de côté",
+      "help": "0 les garde dans l'image. Plus haut les extrait, et les étapes du ciel travaillent alors sans elles.",
       "engine": {
         "aria": "Moteur de suppression d'étoiles",
         "classic": "Classique",
         "starnet2": "StarNet2",
-        "hint": "Utilise le modèle StarNet2 installé sur le serveur. La première passe sur une nouvelle image peut être longue ; les réglages de détection ci-dessous ne s'appliquent pas."
+        "hint": "Utilise le modèle StarNet2 installé sur le serveur. La première passe sur une nouvelle image peut être longue ; les réglages de détection ci-dessus ne sont pas utilisés."
       }
     },
     "detection": {
       "heading": "Quels points sont des étoiles",
-      "help": "Les deux outils ci-dessus s'en servent. Activez le masque d'étoiles pour vérifier ce qui est détecté."
-    }
-  },
-  "detail_panel": {
-    "denoise": {
-      "heading": "Réduction du bruit",
-      "engine": {
-        "aria": "Moteur de débruitage",
-        "classic": "Classique",
-        "deepsnr": "DeepSNR",
-        "hint": "Utilise le modèle DeepSNR installé sur le serveur, appliqué tôt (avant l'étirement des tons). La première passe sur une nouvelle image peut être longue."
-      }
-    }
+      "help": "Activez le masque d'étoiles pour vérifier ce qui est détecté."
+    },
+    "back": {
+      "heading": "Remettre les étoiles",
+      "help": "Fond les étoiles sur le ciel retouché : 0 laisse l'image sans étoiles, 100 les remet à pleine intensité."
+    },
+    "reduce_layer": {
+      "heading": "Réduire les étoiles",
+      "help": "Agit sur les seules étoiles séparées, avant leur retour - le ciel en dessous n'est pas touché."
+    },
+    "not_separated": "Les étoiles n'ont pas été mises de côté, il n'y a donc rien à remettre. Pour travailler le ciel sans elles, utilisez Séparer les étoiles.",
+    "detection_link": "Quels points sont des étoiles : réglé dans Séparer les étoiles"
   },
   "histogram": {
     "aria_label": "Histogramme RVB",
@@ -932,6 +947,26 @@
       "calibration": "Calibration",
       "settings": "Réglages",
       "result": "Résultat"
+    }
+  },
+  "noise_panel": {
+    "engine": {
+      "aria": "Moteur de débruitage",
+      "classic": "Classique",
+      "deepsnr": "DeepSNR",
+      "hint": "Utilise le modèle DeepSNR installé sur le serveur, appliqué tôt (avant l'étirement des tons). La première passe sur une nouvelle image peut être longue."
+    },
+    "heading": "Réduction du bruit",
+    "help": "Le grain de luminosité, puis le bruit de couleur."
+  },
+  "sky_panel": {
+    "background": {
+      "heading": "Fond de ciel",
+      "help": "Vignetage, dégradé de pollution lumineuse et brume - corrigés en premier."
+    },
+    "colour": {
+      "heading": "Balance des couleurs",
+      "help": "Lue sur le fond nettoyé : rendez le ciel neutre, puis retirez toute dominante verte."
     }
   }
 }

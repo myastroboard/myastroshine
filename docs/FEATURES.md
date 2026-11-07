@@ -62,9 +62,14 @@ both enforced. Anything else is rejected with `415 UNSUPPORTED_FORMAT`.
 
 Three panes: the **workflow rail** on the left, the active step's **inspector**
 in the middle, and a **pinned before/after preview** on the right. The rail
-groups the steps into **Prepare**, **Enhance** and **Finish**, each step with an
-icon and a one-line plain-language subtitle. The steps run in the same order as
-the backend pipeline, so working top to bottom gives predictable results. Each
+groups the steps into **Prepare** (framing, sky, noise, separate stars),
+**Enhance** (light, curves, colour, detail) and **Finish** (stars), each step with
+an icon and a one-line plain-language subtitle. The order is the one
+astrophotographers process in - corrections first, noise before anything
+amplifies it, stars set aside around the sky work and put back after it (see
+[ALGORITHMS.md "Editing workflow"](ALGORITHMS.md#editing-workflow)) - and it is
+exactly the backend pipeline's order, so working top to bottom gives predictable
+results. Each
 step shows a dot on the rail once its values leave the default, and every
 inspector ends on a **Next step** button. Every change re-renders the preview
 automatically (debounced).
@@ -104,21 +109,43 @@ carried through.)
 
 ### 2. Clean the sky
 
-Corrections to the raw signal, before any creative grading:
+Corrections to the data, before any creative grading, in two groups and in the
+order astrophotographers apply them:
 
-- **White balance** - temperature (2000-8000 K) and tint.
-- **Vignette correction** - lifts the corners against lens falloff (a generic
-  radial model, not a per-lens profile).
-- **Light-pollution gradient** - flattens smooth light-pollution / sky-glow gradients.
-- **Remove haze** - dark-channel-prior haze removal for contrast lost to a veiling
-  glow.
+- **Background** - **vignette correction** (lifts the corners against lens
+  falloff; a generic radial model, not a per-lens profile), **light-pollution
+  gradient** (flattens smooth sky-glow gradients) and **remove haze**
+  (dark-channel-prior haze removal for contrast lost to a veiling glow).
+- **Colour balance** - read on that flattened background: **temperature**
+  (2000-8000 K) and **tint**, then **remove green cast** (SCNR).
 
-### 3. Light
+### 3. Noise
+
+**Denoise** (brightness grain) and **colour noise reduction** (Cr/Cb only -
+colour speckle tolerates far more smoothing than brightness detail). Early on
+purpose: every brightness and contrast change after it would amplify the grain,
+the sharpening of the Detail step must not see it, and the star separation of the
+next step is cleaner on denoised data. With the DeepSNR engine installed, a
+picker chooses it here.
+
+### 4. Separate stars
+
+Optional, the first half of the **starless workflow**: **which points are stars**
+(**Catch fainter stars** / **Largest star size**, previewable as a live "N
+sources" overlay), then **remove stars** lifts them out of the sky. The next four
+steps then work on the nebula or galaxy alone - the rail titles them "Enhance -
+stars set aside" and each says so - until the Stars step puts the stars back. The
+classical reconstruction handles a nebula or galaxy over a normal star field
+well; a dense Milky Way field is its known ceiling - that is what the StarNet2
+engine is for (a picker chooses it here when installed). Left at 0, the stars stay
+in the picture all the way.
+
+### 5. Light
 
 Overall tone: **exposure**, **contrast**, **highlights**, **shadows**, and the
 narrower, more aggressive **whites** / **blacks** clipping-point controls.
 
-### 4. Curves
+### 6. Curves
 
 An interactive curve graph - drag points to reshape, double-click to add or
 remove one. A **master RGB** curve plus independent **red / green / blue** curves
@@ -126,37 +153,28 @@ for grading or a colour cast a single white-balance gain can't reach. Points mak
 a smooth monotone spline, never a faceted polyline, and never overshoot into
 crushed shadows or blown highlights.
 
-### 5. Colour
+### 7. Colour
 
 **Saturation** scales all colour; **vibrance** boosts the muted colours while
 protecting the already-saturated ones.
 
-### 6. Detail
+### 8. Detail
 
-Local texture, once tone and colour are settled: **clarity** (micro-contrast),
-**denoise** (luma), **colour noise reduction** (Cr/Cb only - colour speckle
-tolerates far more smoothing than brightness detail), and **sharpness**.
+Local texture, once tone and colour are settled: **clarity** (micro-contrast) and
+**sharpness** - noise-aware, so the grain left after the Noise step is not
+sharpened.
 
-### 7. Stars
+### 9. Stars
 
-Two independent tools, sharing one detector (**Catch fainter stars** / **Largest
-star size**, previewable as a live "N sources detected" overlay):
+The second half of the starless workflow, after the sky work:
 
-- **Reduce stars** - shrink detected stars in place. Each star erodes toward its own
-  local background, so it can't crush to a black dot or bloat into a flat disc.
-- **Remove stars** - split the stars out right after the background
-  corrections; every creative stage then works on the nebula alone, and **bring
-  stars back** screen-blends them in at the end (0 = fully starless, 100 = full
-  strength). The classical reconstruction handles a nebula or galaxy over a
-  normal star field well; a dense Milky Way field is its known ceiling - that is
-  what the StarNet2 engine is for.
-
-### 8. 3D effect
-
-**Depth Shift** adds a parallax sense of 3D to a single frame. Pick a focal point
-on the preview (click), then open the viewer for an interactive parallax preview.
-Depth is estimated from image detail (stars and structure read as near, smooth
-sky as far); the focal point pulls the chosen spot forward too.
+- **Put the stars back** (stars separated only) - screen-blends the stars over
+  the edited sky (0 = starless, 100 = full strength). The Export step warns when
+  the stars were set aside and never put back.
+- **Shrink stars** - with the stars separated, it works on the stars layer alone
+  before it goes back; otherwise each detected star erodes toward its own local
+  background where it is, so it can't crush to a black dot or bloat into a flat
+  disc.
 
 ### Style
 
@@ -183,6 +201,13 @@ the gallery opens on the matching chip.
 Styles only rework the light the camera recorded: no added stars, no fake
 detail. Changing only the style re-renders in a moment (the rest
 of the edit is kept), and applying a preset or Auto Astro keeps the chosen style.
+
+### 3D effect
+
+**Depth Shift** adds a parallax sense of 3D to a single frame. Pick a focal point
+on the preview (click), then open the viewer for an interactive parallax preview.
+Depth is estimated from image detail (stars and structure read as near, smooth
+sky as far); the focal point pulls the chosen spot forward too.
 
 ### Export
 

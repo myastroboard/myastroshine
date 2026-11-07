@@ -114,6 +114,30 @@ export function StarIcon(props: IconProps) {
   );
 }
 
+/** Noise: a scatter of grain, fading out toward a clean corner. */
+export function GrainIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3.5" y="3.5" width="17" height="17" rx="2.5" />
+      <path
+        d="M7 7h.01M10.5 7h.01M14 7h.01M7 10.5h.01M10.5 10.5h.01M7 14h.01M8.8 8.8h.01M12.3 8.8h.01M8.8 12.3h.01"
+        strokeWidth={2.2}
+      />
+    </Icon>
+  );
+}
+
+/** Separate stars: a star lifted off its layer - the starless split. */
+export function StarSplitIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 2.5l1.8 3.8 4.2.5-3.1 2.9.8 4.1L12 11.8l-3.7 2 .8-4.1L6 6.8l4.2-.5z" />
+      <path d="M3.5 17.5 12 21l8.5-3.5" />
+      <path d="M3.5 14.5 6 15.5M20.5 14.5 18 15.5" />
+    </Icon>
+  );
+}
+
 /** Depth Shift: two offset planes, a parallax hint. */
 export function DepthIcon(props: IconProps) {
   return (

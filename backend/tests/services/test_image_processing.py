@@ -363,6 +363,86 @@ def test_apply_parameters_star_removal_reports_split_and_recombine_steps(
     assert steps.index("star_removal") < steps.index("contrast") < steps.index("star_recombine")
 
 
+def _step_names(
+    service: ImageProcessingService, params: ProcessingParameters, **kwargs: object
+) -> list[str]:
+    image, _ = _nebula_star_field()
+    steps: list[str] = []
+    service.apply_parameters(image, params, lambda name, _pct: steps.append(name), **kwargs)  # type: ignore[arg-type]
+    return steps
+
+
+def test_apply_parameters_runs_in_the_editor_rail_order(service: ImageProcessingService) -> None:
+    """The pipeline is the rail, step for step: framing, the sky (background
+    before colour, the green cast last), noise, then light, curves, colour,
+    detail, and the stars last - so what the user sets in an earlier step is
+    never applied after a later one."""
+    steps = _step_names(service, ProcessingParameters(contrast=1.2))
+    rail = [
+        "geometry",
+        "vignette_correction",
+        "gradient_reduction",
+        "dehaze",
+        "color_correction",
+        "green_removal",
+        "denoise",
+        "chroma_denoise",
+        "exposure",
+        "contrast",
+        "highlights_shadows",
+        "whites_blacks",
+        "tone_curve",
+        "channel_curves",
+        "saturation",
+        "vibrance",
+        "clarity",
+        "sharpness",
+        "star_reduction",
+    ]
+    assert steps == rail
+
+
+def test_apply_parameters_denoises_before_separating_the_stars(
+    service: ImageProcessingService,
+) -> None:
+    """Noise comes before the split and every tone stage; the stars come back last."""
+    steps = _step_names(service, ProcessingParameters(star_removal=80, star_recombine=100))
+    assert steps.index("chroma_denoise") < steps.index("star_removal") < steps.index("exposure")
+    assert steps[-1] == "star_recombine"
+    assert "star_reduction" not in steps  # the stars layer is shrunk inside the recombine
+
+
+def test_star_reduction_shrinks_the_separated_stars_before_they_go_back(
+    service: ImageProcessingService,
+) -> None:
+    image, stars = _nebula_star_field()
+    params = ProcessingParameters(star_removal=100, star_recombine=100, star_sensitivity=70)
+
+    full = service.apply_parameters(image, params)
+    reduced = service.apply_parameters(image, params.model_copy(update={"star_reduction": 80}))
+
+    assert _star_flux(reduced, stars) < _star_flux(full, stars)
+
+
+def test_deepsnr_takes_the_denoise_slot_of_an_ordinary_image(
+    service: ImageProcessingService,
+) -> None:
+    """The engine runs where the classical denoise would - ahead of the split -
+    and the classical denoise never runs as well."""
+    calls: list[bool] = []
+
+    def engine(image: np.ndarray, linear: bool) -> np.ndarray:
+        calls.append(linear)
+        return image
+
+    params = ProcessingParameters(denoise=40, star_removal=80)
+    steps = _step_names(service, params, denoise_stage=engine)
+
+    assert calls == [False]
+    assert steps.count("denoise") == 1
+    assert steps.index("denoise") < steps.index("star_removal")
+
+
 def test_geometry_default_is_identity(
     service: ImageProcessingService, sample_image: np.ndarray
 ) -> None:

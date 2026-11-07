@@ -91,6 +91,34 @@ describe('EditorRail', () => {
     expect(depthButton.querySelector('[aria-label="changed from default"]')).toBeInTheDocument();
   });
 
+  it('follows the astro workflow: separate the stars, enhance the sky, then the stars', () => {
+    renderRail();
+
+    const labels = screen.getAllByRole('button').map((button) => button.textContent ?? '');
+    const at = (label: string) => labels.findIndex((text) => text.startsWith(label));
+    expect(at('Clean the sky')).toBeLessThan(at('Noise'));
+    expect(at('Noise')).toBeLessThan(at('Separate stars'));
+    expect(at('Separate stars')).toBeLessThan(at('Light'));
+    expect(at('Detail')).toBeLessThan(at('Stars'));
+    expect(at('Stars')).toBeLessThan(at('Style'));
+  });
+
+  it('titles the enhance phase as starless while the stars are set aside', () => {
+    const { rerender } = renderRail();
+    expect(screen.queryByText('Enhance - stars set aside')).not.toBeInTheDocument();
+
+    rerender(
+      <EditorRail
+        activeStep="light"
+        onStepChange={vi.fn()}
+        parameters={{ ...DEFAULT_PARAMETERS, starRemoval: 60 }}
+        focalPoint={null}
+        isStack={false}
+      />,
+    );
+    expect(screen.getByText('Enhance - stars set aside')).toBeInTheDocument();
+  });
+
   it('groups the steps under phase headings with a plain-language subtitle each', () => {
     renderRail();
 

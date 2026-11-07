@@ -6,11 +6,13 @@ import {
   DepthIcon,
   DownloadIcon,
   FocusIcon,
+  GrainIcon,
   LayersIcon,
   PaletteIcon,
   SkyIcon,
   SparkleIcon,
   StarIcon,
+  StarSplitIcon,
   SunIcon,
   WandIcon,
   type IconProps,
@@ -18,6 +20,7 @@ import {
 import { useTranslation } from '@/hooks/useTranslation';
 import {
   editorStepsFor,
+  starsSeparated,
   stepIsModified,
   type EditorPhase,
   type EditorStepId,
@@ -35,6 +38,8 @@ export const STEP_ICONS: Record<EditorStepId, ComponentType<IconProps>> = {
   start: SparkleIcon,
   frame: CropIcon,
   sky: SkyIcon,
+  noise: GrainIcon,
+  starless: StarSplitIcon,
   light: SunIcon,
   curves: CurveIcon,
   colour: PaletteIcon,
@@ -94,7 +99,13 @@ export function EditorRail({
           <div key={step.id} className="contents">
             {newPhase && index > 0 && TITLED_PHASES.has(step.phase) && (
               <span className="eyebrow hidden px-2.5 pb-1 pt-3 lg:block" aria-hidden>
-                {t(`editor.rail.phase.${step.phase}`)}
+                {/* With the stars separated, say so where it applies: the
+                    Enhance steps work on the sky alone until "Stars". */}
+                {t(
+                  step.phase === 'enhance' && starsSeparated(parameters)
+                    ? 'editor.rail.phase.enhance_starless'
+                    : `editor.rail.phase.${step.phase}`,
+                )}
               </span>
             )}
             {newPhase && index > 0 && !TITLED_PHASES.has(step.phase) && (

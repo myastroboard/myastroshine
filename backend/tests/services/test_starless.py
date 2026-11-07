@@ -8,6 +8,7 @@ import pytest
 
 from app.services.star_detection import StarDetectionService
 from app.services.starless import StarlessService
+from app.utils.math_utils import to_uint8
 
 
 @pytest.fixture
@@ -91,3 +92,35 @@ def test_recombine_screen_blend_only_brightens_and_never_clips(service: Starless
     assert out.dtype == np.uint8
     assert int(out.max()) <= 255
     assert (out >= starless).all()
+
+
+def _stars_layer(dtype: type) -> np.ndarray:
+    """A stars-only layer: a few discs of starlight on black."""
+    layer = np.zeros((80, 80, 3), dtype=np.float32)
+    for x, y, radius in [(20, 20, 4), (60, 25, 3), (40, 60, 5)]:
+        cv2.circle(layer, (x, y), radius, (0.9, 0.9, 0.9), -1)
+    return to_uint8(layer * 255) if dtype is np.uint8 else layer
+
+
+def test_reduce_layer_zero_returns_the_layer_untouched(service: StarlessService) -> None:
+    layer = _stars_layer(np.float32)
+    assert service.reduce_layer(layer, 0) is layer
+
+
+@pytest.mark.parametrize("dtype", [np.uint8, np.float32])
+def test_reduce_layer_shrinks_and_dims_every_star(service: StarlessService, dtype: type) -> None:
+    """The stars-only layer is shrunk with no detection: less lit area, less flux,
+    stronger with the amount, and nothing appears on the black around them."""
+    layer = _stars_layer(dtype)
+    light = service.reduce_layer(layer, 30)
+    strong = service.reduce_layer(layer, 100)
+
+    half = 0.5 if dtype is np.float32 else 128
+
+    def lit(image: np.ndarray) -> int:
+        return int((image.astype(np.float32).max(axis=2) > half).sum())
+
+    assert light.dtype == layer.dtype
+    assert lit(strong) < lit(light) < lit(layer)
+    assert float(strong.astype(np.float32).sum()) < float(light.astype(np.float32).sum())
+    assert not strong[0:5, 0:5].any()

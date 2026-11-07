@@ -70,9 +70,10 @@ describe('MilestoneTimeline', () => {
       '1 - Light',
     );
     // Three steps changed: the chip spells out two, the full name keeps all.
-    const chip = screen.getByRole('button', { name: 'Go back to 2 - Colour, Detail, Stars' });
-    expect(chip).toHaveTextContent('2 - Colour, Detail, ...');
-    expect(chip).toHaveAttribute('title', '2 - Colour, Detail, Stars');
+    // ...in workflow order: noise before colour, the stars last.
+    const chip = screen.getByRole('button', { name: 'Go back to 2 - Noise, Colour, Stars' });
+    expect(chip).toHaveTextContent('2 - Noise, Colour, ...');
+    expect(chip).toHaveAttribute('title', '2 - Noise, Colour, Stars');
   });
 
   it('falls back to a plain number when a point changed nothing', () => {

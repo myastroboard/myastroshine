@@ -33,15 +33,16 @@ runs just as well standalone, in a web browser.
 
 ## What it does
 
-- **Automatic enhancement** - a workflow-ordered editor: framing, background
-  corrections (white balance, vignette, light-pollution gradient, dehaze), tone,
-  master + per-channel **curves**, colour, detail (clarity, luma / colour
-  denoise, sharpen).
+- **Automatic enhancement** - an editor in the order astrophotographers
+  process: framing, sky corrections (vignette, light-pollution gradient, dehaze,
+  then white balance and green cast), luma / colour denoise, optional star
+  separation, tone, master + per-channel **curves**, colour, detail (clarity,
+  sharpen), then the stars.
 - **One-click Auto Astro** - measures the sky, the object, the noise and the stars
   and applies an edit that showcases the picture, never clipping the sky. Plus five
   built-in **presets** and your own.
-- **Star handling** - shrink stars in place, or lift them out entirely (starless
-  workflow) and screen-blend them back at the end.
+- **Star handling** - shrink stars in place, or set them aside before the sky
+  work (starless workflow), then shrink the stars layer and screen-blend it back.
 - **Geometry** - rotate, flip, straighten, crop, before the pixel pipeline runs.
 - **Depth Shift** - a multi-layer parallax effect that gives a single frame a
   sense of 3D depth, with a pickable focal point.
