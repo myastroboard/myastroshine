@@ -250,7 +250,7 @@ def _decode_raw(data: bytes) -> np.ndarray:
     try:
         with rawpy.imread(io.BytesIO(data)) as raw:
             rgb = raw.postprocess(use_camera_wb=True, output_bps=8)
-    except rawpy.LibRawError as exc:  # type: ignore[attr-defined]
+    except rawpy.LibRawError as exc:
         raise UnsupportedImageError(f"Could not decode RAW file: {exc}") from exc
     return cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
 

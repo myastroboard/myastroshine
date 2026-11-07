@@ -125,7 +125,7 @@ describe('DepthShiftViewer', () => {
     );
 
     const stage = container.querySelector('.overflow-hidden') as HTMLElement;
-    expect(stage.style.aspectRatio).toBe(`${16 / 9} / 1`);
+    expect(stage.style.aspectRatio).toBe('1.77778 / 1'); // 16:9, CSSOM serializes numbers to 6 significant digits
     expect(stage.style.maxWidth).toBe('');
   });
 
@@ -173,7 +173,7 @@ describe('DepthShiftViewer', () => {
     );
 
     const stage = container.querySelector('.overflow-hidden') as HTMLElement;
-    expect(stage.style.aspectRatio).toBe(`${16 / 9} / 1`);
+    expect(stage.style.aspectRatio).toBe('1.77778 / 1'); // 16:9, CSSOM serializes numbers to 6 significant digits
   });
 
   it('keeps layers added after mount at rest until the pointer moves again', () => {
@@ -197,7 +197,7 @@ describe('DepthShiftViewer', () => {
     );
 
     const images = container.querySelectorAll('img');
-    expect((images[images.length - 1] as HTMLImageElement).style.transform).toBe('translate(0px, 0px)');
+    expect((images[images.length - 1] as HTMLImageElement).style.transform).toBe('translate(0px)'); // CSSOM drops a zero second translate argument
   });
 });
 

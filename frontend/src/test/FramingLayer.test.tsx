@@ -190,7 +190,7 @@ describe('FramingLayer', () => {
 
     const img = container.querySelector('img') as HTMLImageElement;
     // odd turn: baseW/baseH swap to dimensions.height/width (3000/4000).
-    expect(img.style.width).toBe(`${(4000 / 3000) * 100}%`);
+    expect(img.style.width).toBe('133.333%'); // 4000/3000, CSSOM serializes numbers to 6 significant digits
     expect(img.style.height).toBe(`${(3000 / 4000) * 100}%`);
   });
 
