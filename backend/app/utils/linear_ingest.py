@@ -296,14 +296,14 @@ def _ingest_raw(data: bytes) -> LinearFrame:
 
     try:
         with rawpy.imread(io.BytesIO(data)) as raw:
-            camera_processed = raw.raw_type == rawpy.RawType.Stack  # type: ignore[attr-defined]
+            camera_processed = raw.raw_type == rawpy.RawType.Stack
             rgb16 = raw.postprocess(
                 gamma=(1, 1),
                 no_auto_bright=True,
                 use_camera_wb=True,
                 output_bps=16,
             )
-    except rawpy.LibRawError as exc:  # type: ignore[attr-defined]
+    except rawpy.LibRawError as exc:
         raise UnsupportedImageError(f"Could not decode RAW file: {exc}") from exc
 
     metadata = {"image_type": "Light"}
@@ -348,8 +348,8 @@ def is_linear_dng(data: bytes) -> bool:
 
     try:
         with rawpy.imread(io.BytesIO(data)) as raw:
-            return bool(raw.raw_type == rawpy.RawType.Stack)  # type: ignore[attr-defined]
-    except rawpy.LibRawError:  # type: ignore[attr-defined]
+            return bool(raw.raw_type == rawpy.RawType.Stack)
+    except rawpy.LibRawError:
         return False
 
 

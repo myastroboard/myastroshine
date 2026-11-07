@@ -264,7 +264,7 @@ describe('ImagePreview', () => {
     fireEvent.load(processedImg); // jsdom defaults naturalWidth/Height to 0
 
     const stage = container.querySelector('.cursor-ew-resize') as HTMLElement;
-    expect(stage.style.aspectRatio).toBe(`${16 / 9} / 1`);
+    expect(stage.style.aspectRatio).toBe('1.77778 / 1'); // 16:9, CSSOM serializes numbers to 6 significant digits
   });
 
   it('stops a pointer-down on the zoom controls from starting a divider drag', () => {
