@@ -237,7 +237,7 @@ jobs:
           } > release_notes.md
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v3.0.3
+        uses: softprops/action-gh-release@v3.0.4
         with:
           body_path: release_notes.md
           generate_release_notes: false
