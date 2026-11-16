@@ -2,7 +2,7 @@
 name = "myastroshine-backend"
 version = "0.1.0"
 description = "MyAstroShine - astronomical image processing engine"
-requires-python = ">=3.14"
+requires-python = ">=3.15"
 license = { text = "AGPL-3.0-or-later" }
 
 [tool.ruff]
@@ -27,7 +27,7 @@ extend-immutable-calls = [
 "tests/*" = ["PLR2004", "S101", "PLC0415", "S603", "S105"]
 
 [tool.mypy]
-python_version = "3.14"
+python_version = "3.15"
 packages = ["app"]
 strict = true
 plugins = ["pydantic.mypy"]
