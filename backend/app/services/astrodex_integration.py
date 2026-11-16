@@ -39,7 +39,10 @@ def _b64url_encode(raw: bytes) -> str:
 def _b64url_decode(segment: str) -> bytes:
     padding = "=" * (-len(segment) % 4)
     try:
-        return base64.urlsafe_b64decode(segment + padding)
+        # validate=True: reject characters outside the URL-safe alphabet instead of
+        # silently dropping them (urlsafe_b64decode discards them, and from Python
+        # 3.15 no longer trips a padding error on what is left).
+        return base64.b64decode(segment + padding, altchars=b"-_", validate=True)
     except (binascii.Error, ValueError) as exc:
         raise UnauthorizedError("Malformed handoff token") from exc
 

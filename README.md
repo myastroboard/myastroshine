@@ -149,7 +149,7 @@ The docs index is [docs/README.md](docs/README.md).
 
 ## Technology
 
-- **Backend** - FastAPI, Python 3.14, OpenCV, Pillow, NumPy, astropy (FITS),
+- **Backend** - FastAPI, Python 3.15, OpenCV, Pillow, NumPy, astropy (FITS),
   rawpy/libraw (camera RAW)
 - **Frontend** - React 19, TypeScript, Vite, Tailwind CSS v4
 - **Jobs** - in-process background threads, progress over WebSockets (no queue or Redis)

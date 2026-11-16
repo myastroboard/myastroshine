@@ -7,7 +7,7 @@ shared by every MyAstroBoard repository.
 
 ## Development environment
 
-- Python 3.14, Node.js 24+, Docker Desktop 4.0+
+- Python 3.15, Node.js 24+, Docker Desktop 4.0+
 - See `README.md` for backend and frontend setup.
 
 ## Docker

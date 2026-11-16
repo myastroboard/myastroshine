@@ -103,9 +103,18 @@ def test_decode_claims_rejects_a_payload_that_is_not_a_json_object() -> None:
         decode_handoff_claims(f"{array_payload}.sig")
 
 
-def test_b64url_decode_rejects_invalid_base64() -> None:
+@pytest.mark.parametrize("segment", ["!!!not-base64!!!", "a!b!c!d!", "YWJj!", "YW Jj"])
+def test_b64url_decode_rejects_invalid_base64(segment: str) -> None:
+    """A segment with characters outside the URL-safe alphabet is rejected, not
+    decoded with those characters silently dropped."""
     with pytest.raises(UnauthorizedError, match="Malformed"):
-        _b64url_decode("!!!not-base64!!!")
+        _b64url_decode(segment)
+
+
+def test_b64url_decode_accepts_url_safe_alphabet_without_padding() -> None:
+    """The ``-`` and ``_`` characters decode, and the stripped padding is restored."""
+    assert _b64url_decode("-_8") == b"\xfb\xff"
+    assert _b64url_decode("YWJjZA") == b"abcd"
 
 
 def test_enhanced_signature_is_hex_and_covers_the_image() -> None:

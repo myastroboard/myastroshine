@@ -16,11 +16,13 @@ original Keep a Changelog headings.
 
 ### Fixes
 
-- None.
+- Astrodex handoff tokens with characters outside the base64url alphabet are rejected again
+  (the check relied on a padding error that Python 3.15 no longer raises).
 
 ### Breaking changes
 
-- None.
+- The backend now runs on Python 3.15 (Docker images and CI); running it from source needs
+  Python 3.15 or later.
 
 ## 0.6.2 (2026-11-07)
 

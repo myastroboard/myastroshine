@@ -3,7 +3,7 @@
 # myastroboard/.github; backend/pyproject.toml extends this with backend-specific settings.
 
 extend = ".github/org/ruff.base.toml"
-target-version = "py314"
+target-version = "py315"
 
 [lint]
 extend-select = ["SIM", "PL", "S", "RUF"]

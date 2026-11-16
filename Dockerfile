@@ -28,7 +28,7 @@ RUN npm run build
 # need it rebuilt for older x86-64 CPUs. Only the wheels reach the image: the
 # compiler stays here.
 # ---------------------------------------------------------------------------
-FROM python:3.14-slim AS python-wheels
+FROM python:3.15-slim AS python-wheels
 
 ARG TARGETARCH
 # PyPI's NumPy wheels need x86-64-v2 (SSE4.2/POPCNT) and die with SIGILL on an
@@ -51,7 +51,7 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then       set -e;       for pkg in $REBUILD
 # docker-compose.dev.yml builds (Vite's dev server serves the frontend live in
 # dev, so it does not need the frontend-builder stage above).
 # ---------------------------------------------------------------------------
-FROM python:3.14-slim AS backend
+FROM python:3.15-slim AS backend
 
 ARG APP_VERSION=0.0.0-dev
 ENV APP_VERSION=${APP_VERSION}
