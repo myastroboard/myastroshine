@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, TypedDict
 
 import cv2
 import numpy as np
@@ -37,6 +37,19 @@ from app.utils.starlet import starlet_transform
 logger = get_logger(__name__)
 
 Scene = Literal["deep_sky", "landscape", "bright_on_black"]
+
+
+class _ToneCurves(TypedDict, total=False):
+    """The curve fields of a :class:`ProcessingParameters` Auto Astro sets."""
+
+    curve_points: list[CurvePoint]
+    blue_curve_points: list[CurvePoint]
+    green_curve_points: list[CurvePoint]
+    red_curve_points: list[CurvePoint]
+
+
+#: The per-channel curve fields, in the BGR order of the image's channels.
+_CHANNEL_CURVES = ("blue_curve_points", "green_curve_points", "red_curve_points")
 
 _COLOR_NDIM = 3
 _LEVELS = 255.0
@@ -322,7 +335,9 @@ def _parameters(
 ) -> ProcessingParameters:
     """The parameter set; the channel curves only with a ``probe`` of the sky as
     the tone curve will meet it (``None``: the master curve alone)."""
-    curves, gain = ({}, 1.0) if scene == "bright_on_black" else _tone_curves(measured, probe)
+    curves, gain = (
+        (_ToneCurves(), 1.0) if scene == "bright_on_black" else _tone_curves(measured, probe)
+    )
 
     chroma_noise = measured.chroma_noise * gain
     chroma_denoise = int(
@@ -357,9 +372,7 @@ def _parameters(
     )
 
 
-def _tone_curves(
-    measured: Measurements, probe: _SkyProbe | None
-) -> tuple[dict[str, list[CurvePoint]], float]:
+def _tone_curves(measured: Measurements, probe: _SkyProbe | None) -> tuple[_ToneCurves, float]:
     """The master tone curve, plus a per-channel curve for each channel whose sky
     is off neutral - and the curve's gain from the sky to the object (1 for no curve).
 
@@ -391,7 +404,7 @@ def _tone_curves(
     steepest = sky_y + _MAX_CURVE_GAIN * (object_x - sky_x)
     object_y = min(round(lifted), _WHITE - 1, round(steepest))
     master = [(0, 0), (sky_x, sky_y), (object_x, object_y), (_WHITE, _WHITE)]
-    curves: dict[str, list[CurvePoint]] = {"curve_points": _points(master)}
+    curves: _ToneCurves = {"curve_points": _points(master)}
 
     gain = (object_y - sky_y) / (object_x - sky_x)
     if probe is None:
@@ -400,12 +413,12 @@ def _tone_curves(
     levels = [probe.level(channel, lut) for channel in range(3)]
     neutral = float(np.dot(levels, _LUMA_BGR))  # the grey of the same brightness
     target = round(neutral)
-    for channel, (name, level) in enumerate(zip(("blue", "green", "red"), levels, strict=True)):
+    for channel, (field, level) in enumerate(zip(_CHANNEL_CURVES, levels, strict=True)):
         if abs(level - neutral) < 1.0 or not 0 < target < _WHITE:
             continue
         source = _channel_source(probe, channel, lut, target)
         if source != target:
-            curves[f"{name}_curve_points"] = _points([(0, 0), (source, target), (_WHITE, _WHITE)])
+            curves[field] = _points([(0, 0), (source, target), (_WHITE, _WHITE)])
     return curves, gain
 
 

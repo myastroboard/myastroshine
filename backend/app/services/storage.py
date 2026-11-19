@@ -61,8 +61,7 @@ def _pack_frame(data: np.ndarray, source_bit_depth: int) -> np.ndarray:
     """Frame data (nominal ``[0, 1]`` float) -> the compact on-disk dtype."""
     if source_bit_depth >= _FLOAT_STORE_BIT_DEPTH:
         return data.astype(np.float32)
-    packed: np.ndarray = np.rint(np.clip(data, 0.0, 1.0) * _FRAME_STORE_SCALE).astype(np.uint16)
-    return packed
+    return np.rint(np.clip(data, 0.0, 1.0) * _FRAME_STORE_SCALE).astype(np.uint16)
 
 
 def _unpack_frame(stored: np.ndarray) -> np.ndarray:
@@ -70,8 +69,7 @@ def _unpack_frame(stored: np.ndarray) -> np.ndarray:
     scale = {np.dtype(np.uint16): _FRAME_STORE_SCALE, np.dtype(np.uint8): _UINT8_MAX}.get(
         stored.dtype, 1.0
     )
-    out: np.ndarray = stored.astype(np.float32) / scale
-    return out
+    return stored.astype(np.float32) / scale
 
 
 class StorageService:
@@ -173,8 +171,7 @@ class StorageService:
                 return None
             if json.loads(key_path.read_text(encoding="utf-8")).get("key") != key:
                 return None
-        image: np.ndarray = np.load(path)
-        return image
+        return np.load(path)
 
     def starless_path(self, session_id: str) -> Path:
         return self.session_dir(session_id) / "starless.jpg"
@@ -250,8 +247,7 @@ class StorageService:
         path = self._frame_sky_matte_path(stack_id, index)
         if not path.exists():
             return None
-        matte: np.ndarray = np.load(path)
-        return matte
+        return np.load(path)
 
     def stack_thumb_path(self, stack_id: str, index: int) -> Path:
         return self.stack_frames_dir(stack_id) / f"{index:0{_FRAME_INDEX_WIDTH}d}_thumb.jpg"
@@ -421,8 +417,7 @@ class StorageService:
         return tuple(int(n) for n in composite.shape)
 
     def load_stack_composite(self, stack_id: str) -> np.ndarray:
-        composite: np.ndarray = np.load(self.stack_composite_path(stack_id))
-        return composite
+        return np.load(self.stack_composite_path(stack_id))
 
     def stack_sky_mask_path(self, stack_id: str) -> Path:
         """A nightscape's sky mask (``uint8``, 255 = sky), when the composite has one."""
@@ -453,8 +448,7 @@ class StorageService:
         path = self.stack_sky_mask_path(stack_id)
         if not path.exists():
             return None
-        mask: np.ndarray = np.load(path)
-        return mask
+        return np.load(path)
 
     def delete_stack(self, stack_id: str) -> None:
         path = self.stack_dir(stack_id)

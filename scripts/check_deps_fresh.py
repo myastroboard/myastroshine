@@ -31,7 +31,7 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 try:
     from packaging.version import InvalidVersion, Version
@@ -114,7 +114,7 @@ def load_ignores(cli_ignores: list[str]) -> set[str]:
 # --------------------------------------------------------------------------- #
 
 
-def _get_json(url: str) -> dict:
+def _get_json(url: str) -> dict[str, Any]:
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
         return json.load(response)

@@ -27,9 +27,9 @@ import subprocess
 import tempfile
 import threading
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import cv2
 import numpy as np
@@ -192,7 +192,11 @@ def _read_output(path: Path, dtype: np.dtype) -> np.ndarray | None:
     if dtype == np.float32:
         try:
             with fits.open(path, memmap=False) as hdul:
-                data = next((h.data for h in hdul if h.data is not None), None)
+                # astropy is untyped and its HDUList.__getitem__ also returns an HDUList (for a
+                # slice), so pyright reads each HDU as one; iterating it yields single HDUs.
+                data = next(
+                    (h.data for h in cast("Iterable[Any]", hdul) if h.data is not None), None
+                )
         except OSError:
             return None
         if data is None:
@@ -208,8 +212,7 @@ def _read_output(path: Path, dtype: np.dtype) -> np.ndarray | None:
         top = _int_max(dtype)
         scale = top / _int_max(result.dtype) if result.dtype.kind == "u" else 1.0
         result = np.clip(np.rint(result.astype(np.float64) * scale), 0, top).astype(dtype)
-    typed: np.ndarray = result
-    return typed
+    return result
 
 
 def _run_blocking(cmd: list[str], name: str) -> None:

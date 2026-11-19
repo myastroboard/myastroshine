@@ -8,7 +8,6 @@ backend (MiDaS) is planned for v0.2. See docs/ALGORITHMS.md.
 from __future__ import annotations
 
 import math
-from typing import cast
 
 import cv2
 import numpy as np
@@ -62,7 +61,7 @@ class DepthMapService:
         depth = to_uint8(gradient_depth * 255.0)
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
         closed = cv2.morphologyEx(depth, cv2.MORPH_CLOSE, kernel)
-        return cast("np.ndarray", cv2.GaussianBlur(closed, (21, 21), 0))
+        return cv2.GaussianBlur(closed, (21, 21), 0)
 
     def generate_parallax_layers(
         self, image: np.ndarray, depth_map: np.ndarray, num_layers: int = 7

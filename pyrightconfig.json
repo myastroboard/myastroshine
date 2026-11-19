@@ -1,16 +1,11 @@
 {
-  "include": ["backend/app", "backend/tests", "backend/migrations", "scripts"],
-  "exclude": [
-    "**/node_modules",
-    "**/__pycache__",
-    "**/.venv",
-    "**/venv",
-    "**/data",
-    "frontend",
-    "initial_plan"
-  ],
+  "extends": ".github/org/pyright.base.json",
+  // backend/tests is out of scope (see AGENTS.md section 11): 1096 findings there, 860
+  // of them unannotated pytest fixture parameters, most of the rest mocks.
+  "include": ["backend/app", "backend/migrations", "scripts"],
+  "exclude": ["**/__pycache__", "**/.venv", "**/data"],
   "extraPaths": ["backend"],
   "pythonVersion": "3.15",
-  "typeCheckingMode": "standard",
-  "reportMissingModuleSource": "none"
+  "venvPath": ".",
+  "venv": ".venv"
 }

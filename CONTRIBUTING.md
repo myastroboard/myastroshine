@@ -137,7 +137,7 @@ Run from `backend/`:
 ```bash
 ruff format .          # formatter (config shared from ../ruff.toml)
 ruff check .           # linter
-mypy app               # type checker
+(cd .. && pyright)     # type checker, from the repo root (see ../pyrightconfig.json)
 pytest                 # test suite (target: 85%+ coverage)
 ```
 

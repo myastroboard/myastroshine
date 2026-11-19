@@ -69,8 +69,7 @@ def _unchanged(value: float, default: float) -> bool:
 
 def _to_u8(image: np.ndarray) -> np.ndarray:
     """BGR float32 ``[0, 1]`` -> BGR uint8, for a stage that is uint8-native."""
-    packed: np.ndarray = np.clip(np.rint(image * 255.0), 0, 255).astype(np.uint8)
-    return packed
+    return np.clip(np.rint(image * 255.0), 0, 255).astype(np.uint8)
 
 
 def _to_f32(image: np.ndarray) -> np.ndarray:
@@ -93,8 +92,7 @@ def _dtype_flexible[M: Callable[..., np.ndarray]](method: M) -> M:
     ) -> np.ndarray:
         if image.dtype == np.uint8:
             return _to_u8(method(self, _to_f32(image), *args, **kwargs))
-        result: np.ndarray = method(self, image, *args, **kwargs)
-        return result
+        return method(self, image, *args, **kwargs)
 
     return cast("M", wrapper)
 
@@ -195,7 +193,7 @@ class ImageProcessingService:
             if scale < 1.0
             else gain_small
         )
-        return cast("np.ndarray", np.clip(image * gain[:, :, np.newaxis], 0.0, 1.0))
+        return np.clip(image * gain[:, :, np.newaxis], 0.0, 1.0)
 
     @_dtype_flexible
     def apply_gradient_reduction(self, image: np.ndarray, amount: int) -> np.ndarray:
@@ -257,7 +255,7 @@ class ImageProcessingService:
         img = image
         height, width = image.shape[:2]
         scale = _DEHAZE_ESTIMATE_MAX_SIZE / max(height, width)
-        small = (
+        small: np.ndarray = (
             cv2.resize(
                 image, (round(width * scale), round(height * scale)), interpolation=cv2.INTER_AREA
             )
@@ -283,7 +281,7 @@ class ImageProcessingService:
         )[:, :, np.newaxis]
 
         recovered = (img - atmospheric_light) / transmission + atmospheric_light
-        return cast("np.ndarray", np.clip(recovered, 0.0, 1.0))
+        return np.clip(recovered, 0.0, 1.0)
 
     @_dtype_flexible
     def apply_contrast(self, image: np.ndarray, contrast: float) -> np.ndarray:
@@ -404,8 +402,7 @@ class ImageProcessingService:
         sat = (peak - np.minimum(np.minimum(blue, green), red)) / np.maximum(peak, 1e-6)
         factor = (1.0 + (1.0 - sat) * (vibrance - 1.0))[:, :, np.newaxis]
         luma = (image @ _LUMA_BGR)[:, :, np.newaxis]
-        boosted: np.ndarray = np.clip(luma + (image - luma) * factor, 0.0, 1.0)
-        return boosted
+        return np.clip(luma + (image - luma) * factor, 0.0, 1.0)
 
     @_dtype_flexible
     def apply_green_removal(self, image: np.ndarray, amount: int) -> np.ndarray:
@@ -550,7 +547,7 @@ class ImageProcessingService:
                 1.0,
                 thickness=-1,
             )
-        star_mask = cast("np.ndarray", cv2.GaussianBlur(star_mask, (0, 0), sigmaX=1.2))
+        star_mask = cv2.GaussianBlur(star_mask, (0, 0), sigmaX=1.2)
         weight = np.clip(star_mask * (0.4 + 0.6 * strength), 0.0, 1.0)[:, :, np.newaxis]
 
         small = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
@@ -561,7 +558,7 @@ class ImageProcessingService:
         reduced = np.maximum(eroded, local_background)
 
         blended = image * (1.0 - weight) + reduced * weight
-        return cast("np.ndarray", np.clip(blended, 0.0, 1.0))
+        return np.clip(blended, 0.0, 1.0)
 
     @_dtype_flexible
     def apply_sharpness(self, image: np.ndarray, sharpness: float) -> np.ndarray:
@@ -576,7 +573,7 @@ class ImageProcessingService:
             return image
         if sharpness < 1.0:
             radius = round((1.0 - sharpness) * 8) * 2 + 1
-            return cast("np.ndarray", cv2.GaussianBlur(image, (radius, radius), 0))
+            return cv2.GaussianBlur(image, (radius, radius), 0)
         y, cr, cb = cv2.split(cv2.cvtColor(image, cv2.COLOR_BGR2YCrCb))
         y = enhance_detail(y, (sharpness - 1.0) * _SHARPEN_GAIN, _SHARPEN_LAYERS)
         out = cv2.cvtColor(cv2.merge([y, cr, cb]), cv2.COLOR_YCrCb2BGR)

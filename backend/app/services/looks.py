@@ -121,8 +121,7 @@ def _zero_luma(tint: np.ndarray) -> np.ndarray:
     """Remove the luma component of a tint and normalise it to unit length."""
     weights = _LUMA_BGR / float(_LUMA_BGR @ _LUMA_BGR)
     neutral = tint - float(tint @ _LUMA_BGR) * weights
-    unit: np.ndarray = (neutral / float(np.linalg.norm(neutral))).astype(np.float32)
-    return unit
+    return (neutral / float(np.linalg.norm(neutral))).astype(np.float32)
 
 
 _SHADOW_TINT = _zero_luma(_TEAL)
@@ -149,14 +148,12 @@ def _blur(
     """
     sigma = max(min_px, fraction * _diagonal(image))
     if region is None:
-        blurred: np.ndarray = cv2.GaussianBlur(image, (0, 0), sigmaX=sigma)
-        return blurred
+        return cv2.GaussianBlur(image, (0, 0), sigmaX=sigma)
     weight = region.astype(np.float32)
     norm = np.maximum(cv2.GaussianBlur(weight, (0, 0), sigmaX=sigma), _TINY)
     if image.ndim == 3:  # noqa: PLR2004 - a colour image
         weight, norm = weight[:, :, np.newaxis], norm[:, :, np.newaxis]
-    normalised: np.ndarray = cv2.GaussianBlur(image * weight, (0, 0), sigmaX=sigma) / norm
-    return normalised
+    return cv2.GaussianBlur(image * weight, (0, 0), sigmaX=sigma) / norm
 
 
 def _sky_level(luma: np.ndarray, fraction: float, region: Region) -> np.ndarray:
@@ -174,22 +171,18 @@ def _sky_level(luma: np.ndarray, fraction: float, region: Region) -> np.ndarray:
 
 
 def _clip01(image: np.ndarray) -> np.ndarray:
-    clipped: np.ndarray = np.clip(image, 0.0, 1.0)
-    return clipped
+    return np.clip(image, 0.0, 1.0)
 
 
 def _luma(image: np.ndarray) -> np.ndarray:
-    luma: np.ndarray = image @ _LUMA_BGR
-    return luma
+    return image @ _LUMA_BGR
 
 
 def _sample(values: np.ndarray, region: Region) -> np.ndarray:
     """``values``' pixels inside ``region`` - all of them without one, or when it is tiny."""
     if region is None or int(np.count_nonzero(region)) < _MIN_REGION_PIXELS:
-        flat: np.ndarray = values.reshape(-1, *values.shape[2:])
-        return flat
-    picked: np.ndarray = values[region]
-    return picked
+        return values.reshape(-1, *values.shape[2:])
+    return values[region]
 
 
 def _object_mask(luma: np.ndarray, region: Region = None) -> np.ndarray:
@@ -368,8 +361,7 @@ def _peaks(luma: np.ndarray, sigma: float) -> np.ndarray:
     peak = luma - cv2.GaussianBlur(luma, (0, 0), sigmaX=sigma)
     noise = float(np.median(np.abs(peak))) * _MAD_TO_SIGMA
     cut = _STAR_NOISE_SIGMAS * max(noise, _TINY)
-    mask: np.ndarray = np.clip((peak - cut) / cut, 0.0, 1.0)
-    return mask
+    return np.clip((peak - cut) / cut, 0.0, 1.0)
 
 
 def _star_mask(luma: np.ndarray) -> np.ndarray:
@@ -379,15 +371,13 @@ def _star_mask(luma: np.ndarray) -> np.ndarray:
     Two scales: the typical star, and three times wider for the few bright
     stars whose halo is larger than the typical radius (see :func:`_bright_peaks`).
     """
-    mask: np.ndarray = np.maximum(_peaks(luma, _star_radius(luma)), _bright_peaks(luma))
-    return mask
+    return np.maximum(_peaks(luma, _star_radius(luma)), _bright_peaks(luma))
 
 
 def _grow(mask: np.ndarray, radius: float) -> np.ndarray:
     size = 2 * int(np.ceil(2.0 * radius)) + 1
     grown = cv2.dilate(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (size, size)))
-    blurred: np.ndarray = cv2.GaussianBlur(grown, (0, 0), sigmaX=radius)
-    return blurred
+    return cv2.GaussianBlur(grown, (0, 0), sigmaX=radius)
 
 
 def _bright_peaks(luma: np.ndarray) -> np.ndarray:
@@ -399,8 +389,7 @@ def _bright_peaks(luma: np.ndarray) -> np.ndarray:
     radius = _BRIGHT_STAR_SCALE * _star_radius(luma)
     cores = (luma >= np.percentile(luma, _BRIGHT_STAR_CORE_PERCENTILE)).astype(np.float32)
     near_core = np.clip(_grow(cores, radius), 0.0, 1.0)
-    bright: np.ndarray = _peaks(luma, radius) * near_core
-    return bright
+    return _peaks(luma, radius) * near_core
 
 
 def _star_shield(luma: np.ndarray) -> np.ndarray:
@@ -410,8 +399,7 @@ def _star_shield(luma: np.ndarray) -> np.ndarray:
         _grow(_peaks(luma, radius), radius),
         _grow(_bright_peaks(luma), _BRIGHT_STAR_SCALE * radius),
     )
-    clipped: np.ndarray = np.clip(shield, 0.0, 1.0)
-    return clipped
+    return np.clip(shield, 0.0, 1.0)
 
 
 def star_glow(image: np.ndarray, strength: float, region: Region = None) -> np.ndarray:

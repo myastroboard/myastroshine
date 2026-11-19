@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import cast
 
 import cv2
 import numpy as np
@@ -78,7 +77,7 @@ class StarDetectionService:
         max_radius = 1.5 + (max_size / 100.0) * 20.0  # mirrors detect()'s own mapping
         size = max(_STAR_KERNEL_SIZE, round(max_radius * 2) | 1)
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (size, size))
-        return cast("np.ndarray", cv2.morphologyEx(image, cv2.MORPH_OPEN, kernel))
+        return cv2.morphologyEx(image, cv2.MORPH_OPEN, kernel)
 
     def detect(self, image: np.ndarray, sensitivity: int, max_size: int) -> list[StarSource]:
         """Detect stars in ``image`` (BGR or grayscale ``uint8``).

@@ -134,8 +134,7 @@ class CalibrationService:
         if npy_path.exists() and meta_path.exists():
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
             if meta.get("source_count") == len(indices):
-                cached: np.ndarray = np.load(npy_path)
-                return cached
+                return np.load(npy_path)
 
         paths = [self.storage.cal_frame_path(stack_id, kind, i) for i in indices]
         master = _reduce_stack(paths, _MASTER_METHOD)
@@ -167,8 +166,7 @@ class CalibrationService:
             and meta_path.exists()
             and json.loads(meta_path.read_text(encoding="utf-8")).get("counts") == counts
         ):
-            loaded: np.ndarray = np.load(path)
-            return loaded
+            return np.load(path)
 
         reference = dark if dark is not None else flat
         assert reference is not None  # noqa: S101 - guarded above
@@ -281,22 +279,21 @@ def _scaled_dark(masters: CalibrationMasters, light_exposure_s: float | None) ->
     if bias is not None and light_exposure_s and dark_exp and dark_exp > 0:
         ratio = float(light_exposure_s) / float(dark_exp)
         if abs(ratio - 1.0) > _TINY:
-            scaled: np.ndarray = bias + (dark - bias) * ratio
-            return scaled
+            return bias + (dark - bias) * ratio
     return dark
 
 
 def _flat_field(masters: CalibrationMasters) -> np.ndarray:
     """The master flat, its own dark (or the bias) removed and normalised to 1."""
     reference = masters.dark_flat if masters.dark_flat is not None else masters.bias
-    field = masters.flat.astype(np.float32, copy=True)  # type: ignore[union-attr]
+    # The one caller checks masters.flat is not None first.
+    field = masters.flat.astype(np.float32, copy=True)  # pyright: ignore[reportOptionalMemberAccess]
     if reference is not None:
         field = field - reference
     mean = float(np.mean(field))
     if abs(mean) > _TINY:
         field = field / mean
-    clamped: np.ndarray = np.maximum(field, _MIN_FLAT_FIELD)
-    return clamped
+    return np.maximum(field, _MIN_FLAT_FIELD)
 
 
 # -- bad pixels ------------------------------------------------------------
@@ -368,6 +365,7 @@ def _wh(shape: tuple[int, ...]) -> str:
 
 def _as_float(value: object) -> float | None:
     try:
-        return float(value)  # type: ignore[arg-type]
+        # Any header value: float() raising on a non-number is caught below.
+        return float(value)  # pyright: ignore[reportArgumentType]
     except TypeError, ValueError:
         return None

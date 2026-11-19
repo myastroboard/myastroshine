@@ -23,7 +23,7 @@
 ## Checklist
 
 - [ ] Branch is `<type>/...` (`feature/`, `fix/`, `chore/`, `docs/`, ...), rebased on the latest `main`
-- [ ] Backend green: `ruff format . && ruff check . && mypy app && pytest`
+- [ ] Backend green: `ruff format . && ruff check . && pytest`, and `pyright` from the repo root
 - [ ] Frontend green: `npm run lint && npm run typecheck && npm test && npm run build`
 - [ ] Tests added or updated for the change
 - [ ] `CHANGELOG.md` bullet under `## [Unreleased]` (required for `feature/` and `fix/` branches) and `docs/` updated for any user-facing change

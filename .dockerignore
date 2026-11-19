@@ -19,7 +19,6 @@ backend/.venv/
 backend/venv/
 backend/.pytest_cache/
 backend/.ruff_cache/
-backend/.mypy_cache/
 backend/.coverage
 backend/.coverage.*
 backend/htmlcov/

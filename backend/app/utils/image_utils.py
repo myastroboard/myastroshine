@@ -10,7 +10,9 @@ import io
 import math
 import struct
 import zlib
+from collections.abc import Iterable
 from pathlib import Path
+from typing import Any, cast
 
 import cv2
 import numpy as np
@@ -116,8 +118,7 @@ def _stretch_plane_f32(data: np.ndarray, params: tuple[float, float, float, floa
     normalized = np.nan_to_num(np.clip((data.astype(np.float32) - low) / (high - low), 0, 1))
     clipped = np.clip((normalized - black_point) / max(1e-6, 1.0 - black_point), 0, 1)
     stretched = _midtone_transfer(clipped, balance)
-    result: np.ndarray = np.clip(stretched, 0.0, 1.0).astype(np.float32)
-    return result
+    return np.clip(stretched, 0.0, 1.0).astype(np.float32)
 
 
 def _apply_stretch(data: np.ndarray, params: tuple[float, float, float, float]) -> np.ndarray:
@@ -201,7 +202,9 @@ def _decode_fits(data: bytes) -> np.ndarray:
 
     try:
         with fits.open(io.BytesIO(data)) as hdul:
-            hdu = next((h for h in hdul if h.is_image and h.shape), None)
+            # astropy is untyped and its HDUList.__getitem__ also returns an HDUList (for a
+            # slice), so pyright reads each HDU as one; iterating it yields single HDUs.
+            hdu = next((h for h in cast("Iterable[Any]", hdul) if h.is_image and h.shape), None)
             if hdu is None:
                 raise UnsupportedImageError("FITS file has no image data")
             # hdu.shape reads NAXISn straight from the header, before ever

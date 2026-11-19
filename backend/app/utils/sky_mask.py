@@ -135,8 +135,7 @@ def _read_ifd(data: bytes, order: str, offset: int) -> dict[int, list[int] | byt
 
 
 def _u32(order: str, raw: bytes) -> int:
-    value: int = struct.unpack(order + "I", raw)[0]
-    return value
+    return struct.unpack(order + "I", raw)[0]
 
 
 def _orient(image: np.ndarray, orientation: int) -> np.ndarray:

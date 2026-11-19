@@ -239,10 +239,11 @@ def refine_warp(
 
     terms = _warp_terms(ref_pts[:, 0] / width, ref_pts[:, 1] / height)
     keep = np.ones(len(ref_pts), dtype=bool)
-    for _ in range(_WARP_REJECT_ITERATIONS):
-        coeffs_x, *_ = np.linalg.lstsq(terms[keep], src_pts[keep, 0], rcond=None)
-        coeffs_y, *_ = np.linalg.lstsq(terms[keep], src_pts[keep, 1], rcond=None)
-        residual = np.hypot(terms @ coeffs_x - src_pts[:, 0], terms @ coeffs_y - src_pts[:, 1])
+    # Fit, reject, refit: the last rejection pass keeps the fit it was made from.
+    coeffs_x, coeffs_y, residual = _fit_warp(terms, src_pts, keep)
+    for iteration in range(_WARP_REJECT_ITERATIONS):
+        if iteration:
+            coeffs_x, coeffs_y, residual = _fit_warp(terms, src_pts, keep)
         spread = float(np.median(np.abs(residual[keep] - np.median(residual[keep])))) * 1.4826
         keep = residual <= float(np.median(residual[keep])) + _WARP_REJECT_SIGMA * spread
         if keep.sum() < _WARP_MIN_PAIRS:
@@ -279,6 +280,17 @@ def _warp_terms(x: np.ndarray, y: np.ndarray) -> np.ndarray:
         [x**i * y**j for i in range(_WARP_DEGREE + 1) for j in range(_WARP_DEGREE + 1 - i)],
         axis=-1,
     )
+
+
+def _fit_warp(
+    terms: np.ndarray, src_pts: np.ndarray, keep: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """The least-squares polynomial (x and y coefficients) fitted on the ``keep``
+    pairs, and the residual of every pair against it."""
+    coeffs_x, *_ = np.linalg.lstsq(terms[keep], src_pts[keep, 0], rcond=None)
+    coeffs_y, *_ = np.linalg.lstsq(terms[keep], src_pts[keep, 1], rcond=None)
+    residual = np.hypot(terms @ coeffs_x - src_pts[:, 0], terms @ coeffs_y - src_pts[:, 1])
+    return coeffs_x, coeffs_y, residual
 
 
 def _mutual_nearest(a: np.ndarray, b: np.ndarray, radius: float) -> np.ndarray:

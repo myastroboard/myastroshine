@@ -4,15 +4,6 @@
   "python.testing.cwd": "${workspaceFolder}/backend",
   "python.testing.pytestArgs": ["tests"],
 
-  // These target the "ms-python.mypy-type-checker" extension specifically (see
-  // .vscode/extensions.json) - a different mypy extension (e.g. matangover.mypy)
-  // has its own, incompatible setting names and will silently ignore these,
-  // falling back to searching for a config from the *workspace root* - there is
-  // none there (it's backend/pyproject.toml), so it runs with mypy's bare
-  // defaults instead: no strict mode, no pydantic plugin, no tests.* override.
-  "mypy-type-checker.cwd": "${workspaceFolder}/backend",
-  "mypy-type-checker.args": ["--config-file=${workspaceFolder}/backend/pyproject.toml"],
-
   "[python]": {
     "editor.defaultFormatter": "charliermarsh.ruff",
     "editor.formatOnSave": true

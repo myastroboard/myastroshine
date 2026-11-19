@@ -23,7 +23,7 @@ import logging.handlers
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import structlog
 from structlog.types import EventDict, Processor
@@ -170,7 +170,7 @@ def configure_logging(*, force: bool = False) -> None:
 def get_logger(name: str) -> structlog.stdlib.BoundLogger:
     """Return a bound logger for ``name`` (typically ``__name__``)."""
     configure_logging()
-    return cast("structlog.stdlib.BoundLogger", structlog.get_logger(name))
+    return structlog.get_logger(name)
 
 
 def apply_runtime_log_levels() -> None:
