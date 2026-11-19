@@ -594,8 +594,7 @@ def devignette(linear: np.ndarray, sky_mask: np.ndarray | None = None) -> np.nda
         coarse_gain.astype(np.float32), (width, height), interpolation=cv2.INTER_LINEAR
     )
     logger.info("vignetting corrected", corners=[round(c, 3) for c in corners])
-    corrected: np.ndarray = linear * gain
-    return corrected
+    return linear * gain
 
 
 def flatten_sky_colour(linear: np.ndarray, sky_mask: np.ndarray | None = None) -> np.ndarray:
@@ -688,8 +687,7 @@ def _normalised_radius(height: int, width: int) -> np.ndarray:
     yy, xx = np.mgrid[0:height, 0:width].astype(np.float32)
     x_norm = (xx - (width - 1) / 2) / (width / 2)
     y_norm = (yy - (height - 1) / 2) / (height / 2)
-    radius: np.ndarray = np.hypot(x_norm, y_norm) / math.sqrt(2.0)
-    return radius
+    return np.hypot(x_norm, y_norm) / math.sqrt(2.0)
 
 
 def _fit_cos4_strength(radii: np.ndarray, levels: np.ndarray) -> float:
@@ -720,8 +718,7 @@ def sky_weight(sky_mask: np.ndarray) -> np.ndarray:
     radius = round(2 * sigma)
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * radius + 1, 2 * radius + 1))
     grown = cv2.dilate(sky_mask.astype(np.uint8), kernel).astype(np.float32)
-    weight: np.ndarray = cv2.GaussianBlur(grown, (0, 0), sigma)
-    return weight
+    return cv2.GaussianBlur(grown, (0, 0), sigma)
 
 
 def _border_weight(size: int) -> np.ndarray:
@@ -754,8 +751,7 @@ def _border_residual(samples: np.ndarray, surface: np.ndarray, keep: np.ndarray)
         cv2.GaussianBlur(mask, (0, 0), sigma) + _TINY
     )
     smoothed = cv2.GaussianBlur(filled, (0, 0), sigma)
-    correction: np.ndarray = smoothed * _border_weight(samples.shape[0])
-    return correction
+    return smoothed * _border_weight(samples.shape[0])
 
 
 def _dilate(mask: np.ndarray) -> np.ndarray:
@@ -779,13 +775,11 @@ def _poly_terms(x: np.ndarray, y: np.ndarray, degree: int) -> np.ndarray:
 def _fit_poly2d(x: np.ndarray, y: np.ndarray, z: np.ndarray, degree: int) -> np.ndarray:
     terms = _poly_terms(x.ravel(), y.ravel(), degree)
     coeffs, *_ = np.linalg.lstsq(terms, z.ravel(), rcond=None)
-    result: np.ndarray = coeffs
-    return result
+    return coeffs
 
 
 def _eval_poly2d(x: np.ndarray, y: np.ndarray, coeffs: np.ndarray, degree: int) -> np.ndarray:
-    surface: np.ndarray = (_poly_terms(x, y, degree) @ coeffs).astype(np.float32)
-    return surface
+    return (_poly_terms(x, y, degree) @ coeffs).astype(np.float32)
 
 
 # -- 3. colour calibration -----------------------------------------------

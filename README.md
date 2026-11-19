@@ -124,7 +124,8 @@ npm run dev                     # Vite dev server on :3000
 ### Checks (what CI runs)
 
 ```bash
-cd backend  && ruff format --check . && ruff check . && mypy app && pytest
+cd backend  && ruff format --check . && ruff check . && pytest
+pyright                                # type checker, from the repo root
 cd frontend && npm run lint && npm run typecheck && npm test && npm run build
 python scripts/check_deps_fresh.py     # every dependency pinned to its latest release
 python scripts/validate_i18n.py        # if you touched frontend UI text

@@ -16,8 +16,6 @@ dark rings round bright stars that Richardson-Lucy is known for.
 
 from __future__ import annotations
 
-from typing import cast
-
 import cv2
 import numpy as np
 
@@ -123,7 +121,7 @@ def _local_background(plane: np.ndarray, sigma: float) -> np.ndarray:
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (reach, reach))
     opened = cv2.morphologyEx(plane, cv2.MORPH_OPEN, kernel)
     smooth = cv2.GaussianBlur(opened, (0, 0), sigmaX=reach / 2.0)
-    return cast("np.ndarray", smooth + float(np.median(plane - smooth)))
+    return smooth + float(np.median(plane - smooth))
 
 
 def _deconvolve_plane(
@@ -137,7 +135,7 @@ def _deconvolve_plane(
     noise = max(highpass_noise(plane), _EPS)
     background = _local_background(plane, sigma)
     delta = np.maximum(sharpened - plane, (background - _DERING_SIGMAS * noise) - plane)
-    return cast("np.ndarray", plane + weight * delta)
+    return plane + weight * delta
 
 
 def deconvolve(linear: np.ndarray, amount: int) -> np.ndarray:
@@ -169,7 +167,9 @@ def deconvolve(linear: np.ndarray, amount: int) -> np.ndarray:
 
     noise = max(highpass_noise(luma), _EPS)
     above = cv2.GaussianBlur(luma - _local_background(luma, sigma), (0, 0), max(sigma, 1.0))
-    weight = np.clip((above / noise - (_SIGNAL_SIGMA - _SIGNAL_RAMP)) / _SIGNAL_RAMP, 0.0, 1.0)
+    weight: np.ndarray = np.clip(
+        (above / noise - (_SIGNAL_SIGMA - _SIGNAL_RAMP)) / _SIGNAL_RAMP, 0.0, 1.0
+    )
     reach = 2 * round(_FOOTPRINT_SIGMAS * sigma) + 1
     weight = cv2.dilate(weight, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (reach, reach)))
     # Feathered: a hard footprint edge shows as a disc round each bright star.
@@ -182,5 +182,4 @@ def deconvolve(linear: np.ndarray, amount: int) -> np.ndarray:
         _deconvolve_plane(np.ascontiguousarray(data[..., c]), sigma, iterations, weight)
         for c in range(_COLOR_NDIM)
     ]
-    out: np.ndarray = np.stack(planes, axis=-1).astype(np.float32)
-    return out
+    return np.stack(planes, axis=-1).astype(np.float32)

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import math
 from collections.abc import Sequence
-from typing import cast
 
 import numpy as np
 
@@ -25,12 +24,12 @@ def normalize_01(array: np.ndarray) -> np.ndarray:
     hi = float(arr.max())
     if hi - lo < _FLAT_EPS:
         return np.zeros_like(arr)
-    return cast("np.ndarray", (arr - lo) / (hi - lo))
+    return (arr - lo) / (hi - lo)
 
 
 def to_uint8(array: np.ndarray) -> np.ndarray:
     """Clip to 0-255 and cast to ``uint8``."""
-    return cast("np.ndarray", np.clip(array, 0, 255).astype(np.uint8))
+    return np.clip(array, 0, 255).astype(np.uint8)
 
 
 def kelvin_to_rgb_gain(temperature: int) -> tuple[float, float, float]:
@@ -124,4 +123,4 @@ def curve_points_to_lut(points: Sequence[tuple[int, int]]) -> np.ndarray:
     h01 = -2 * t3 + 3 * t2
     h11 = t3 - t2
     values = h00 * y0 + h10 * h * m0 + h01 * y1 + h11 * h * m1
-    return cast("np.ndarray", np.clip(values, 0, 255).astype(np.uint8))
+    return np.clip(values, 0, 255).astype(np.uint8)

@@ -747,8 +747,7 @@ def _drizzle_keep(
         & (y_ref >= -edge)
         & (y_ref < ref_height - edge)
     )
-    result: np.ndarray = agrees & in_bounds
-    return result
+    return agrees & in_bounds
 
 
 def _as_rgb(frame: LinearFrame) -> np.ndarray:

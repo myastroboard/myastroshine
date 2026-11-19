@@ -288,7 +288,7 @@ AppArmor must allow executing it (the broad `file,` rule does, see section 4).
 ### 3.6 `.dockerignore`
 
 The board's `.dockerignore` was itself gitignored by mistake, so local builds baked
-nested `backend/*/.mypy_cache` into the image. MyAstroShine's repo has `backend/data/`,
+nested `backend/*/` tool caches into the image. MyAstroShine's repo has `backend/data/`,
 `backend/test-results/`, `tmp/images test/*.fit`, `frontend/node_modules`... Check the
 `.dockerignore` exists, is committed, and that `docker build` context stays small.
 

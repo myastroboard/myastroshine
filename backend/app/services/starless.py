@@ -10,8 +10,6 @@ what sits under the stars and the recombination. See docs/ALGORITHMS.md
 
 from __future__ import annotations
 
-from typing import cast
-
 import cv2
 import numpy as np
 
@@ -135,10 +133,7 @@ class StarlessService:
         small = cv2.GaussianBlur(small, (0, 0), sigmaX=_ESTIMATE_SMOOTH_SIGMA)
 
         if scale < 1.0:
-            return cast(
-                "np.ndarray",
-                cv2.resize(small, (width, height), interpolation=cv2.INTER_LINEAR),
-            )
+            return cv2.resize(small, (width, height), interpolation=cv2.INTER_LINEAR)
         return small
 
     @staticmethod
@@ -163,7 +158,7 @@ class StarlessService:
             cv2.MORPH_ELLIPSE, (_EXCESS_DILATE_PX * 2 + 1, _EXCESS_DILATE_PX * 2 + 1)
         )
         bloated = cv2.morphologyEx(bloated, cv2.MORPH_CLOSE, smooth)
-        return cast("np.ndarray", cv2.max(mask, bloated))
+        return cv2.max(mask, bloated)
 
     def reduce_layer(self, stars_layer: np.ndarray, amount: int) -> np.ndarray:
         """Shrink every star of a stars-only layer (``amount`` 0-100), before it
@@ -186,7 +181,7 @@ class StarlessService:
         reduced = layer * (1.0 - weight) + eroded * weight
         if stars_layer.dtype == np.uint8:
             return to_uint8(reduced)
-        return cast("np.ndarray", np.clip(reduced, 0.0, 1.0).astype(np.float32))
+        return np.clip(reduced, 0.0, 1.0).astype(np.float32)
 
     def recombine(
         self, starless: np.ndarray, stars_layer: np.ndarray, recombine_amount: int

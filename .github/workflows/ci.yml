@@ -24,7 +24,10 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - run: ruff format --check .
       - run: ruff check .
-      - run: mypy app
+      # pyrightconfig.json sits at the repo root and names a local .venv; CI has none,
+      # so point pyright at the interpreter the requirements were installed into.
+      - run: pyright --pythonpath "$(which python)"
+        working-directory: .
       - run: pytest
         env:
           # The dependency-freshness check runs on its own schedule, not on every PR.

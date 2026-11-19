@@ -91,7 +91,10 @@ Do not report a change as complete until the project check set passes:
 - [ ] `pytest` (backend) / `npm test` (frontend)
 - [ ] `ruff format --check .` and `ruff check .` (from repo root; `ruff.toml` extends
       `.github/org/ruff.base.toml`)
-- [ ] `mypy app` (backend)
+- [ ] `pyright` (from repo root; `pyrightconfig.json` extends `.github/org/pyright.base.json`).
+      Scope: `backend/app`, `backend/migrations` and `scripts`. `backend/tests` stays out: of
+      its 1096 findings, 860 are unannotated pytest fixture parameters and most of the rest
+      are mocks passed in place of real types, which would drown real findings.
 - [ ] `npm run lint` and `npm run typecheck` (frontend)
 - [ ] `python scripts/check_deps_fresh.py` passes (no dependency left behind)
 - [ ] `python scripts/validate_i18n.py` passes if you touched frontend UI text

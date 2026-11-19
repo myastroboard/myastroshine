@@ -130,8 +130,7 @@ def adaptive_stretch(
         out = out * (1.0 - fade) + out.max(axis=2, keepdims=True) * fade
 
     final = np.clip(out, 0.0, 1.0).astype(np.float32)
-    bgr: np.ndarray = cv2.merge([final[..., 2], final[..., 1], final[..., 0]])  # RGB -> BGR
-    return bgr
+    return cv2.merge([final[..., 2], final[..., 1], final[..., 0]])  # RGB -> BGR
 
 
 def _fit_gamut(rgb: np.ndarray, luma: np.ndarray) -> np.ndarray:
@@ -146,8 +145,7 @@ def _fit_gamut(rgb: np.ndarray, luma: np.ndarray) -> np.ndarray:
     over = peak > 1.0
     headroom = np.clip(1.0 - luma, 0.0, None)
     keep = np.where(over, headroom / np.maximum(peak - luma, _TINY), 1.0)
-    result: np.ndarray = luma + (rgb - luma) * keep
-    return result
+    return luma + (rgb - luma) * keep
 
 
 def _sky_noise(
@@ -183,8 +181,7 @@ def _sky_noise(
 
 def _mtf(x: np.ndarray, balance: float) -> np.ndarray:
     """Midtones transfer function: ``(0,0)``, ``(balance, 0.5)``, ``(1,1)``."""
-    result: np.ndarray = ((balance - 1.0) * x) / ((2.0 * balance - 1.0) * x - balance)
-    return result
+    return ((balance - 1.0) * x) / ((2.0 * balance - 1.0) * x - balance)
 
 
 def _mtf_balance(x: float, target: float) -> float:
@@ -229,8 +226,7 @@ def _shoulder(u: np.ndarray, u_max: float, rate: float) -> np.ndarray:
     span = 1.0 - knee
     over = np.clip(u - knee, 0.0, None)
     rolled = knee + span * np.log1p(rate * over) / np.log1p(rate * (u_max - knee))
-    result: np.ndarray = np.where(u > knee, rolled, u)
-    return result
+    return np.where(u > knee, rolled, u)
 
 
 def _shoulder_rate(u_max: float) -> float:

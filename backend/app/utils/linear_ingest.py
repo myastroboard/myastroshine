@@ -29,7 +29,9 @@ from __future__ import annotations
 
 import io
 import math
+from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
+from typing import Any, cast
 
 import cv2
 import numpy as np
@@ -232,7 +234,9 @@ def _ingest_fits(data: bytes) -> LinearFrame:
 
     try:
         with fits.open(io.BytesIO(data)) as hdul:
-            hdu = next((h for h in hdul if h.is_image and h.shape), None)
+            # astropy is untyped and its HDUList.__getitem__ also returns an HDUList (for a
+            # slice), so pyright reads each HDU as one; iterating it yields single HDUs.
+            hdu = next((h for h in cast("Iterable[Any]", hdul) if h.is_image and h.shape), None)
             if hdu is None:
                 raise UnsupportedImageError("FITS file has no image data")
             # Header-only size guard before touching hdu.data (a 2880-byte header
@@ -514,8 +518,7 @@ def _to_unit_float(array: np.ndarray) -> np.ndarray:
     else:
         scale = _FULL_SCALE.get(np.dtype(array.dtype), float(np.iinfo(array.dtype).max))
         scaled = array.astype(np.float32) / scale
-    result: np.ndarray = np.nan_to_num(scaled.astype(np.float32), nan=0.0)
-    return result
+    return np.nan_to_num(scaled.astype(np.float32), nan=0.0)
 
 
 def _bit_depth_of(dtype: np.dtype) -> int:
@@ -528,5 +531,4 @@ def _srgb_to_linear(x: np.ndarray) -> np.ndarray:
     """Approximate sRGB EOTF - the best guess at linearising an 8-bit preview."""
     linear = x / _SRGB_LINEAR_SLOPE
     gamma = ((x + _SRGB_OFFSET) / _SRGB_SCALE) ** _SRGB_GAMMA
-    result: np.ndarray = np.where(x <= _SRGB_LINEAR_CUTOFF, linear, gamma).astype(np.float32)
-    return result
+    return np.where(x <= _SRGB_LINEAR_CUTOFF, linear, gamma).astype(np.float32)
