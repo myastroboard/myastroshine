@@ -2,7 +2,7 @@
 # Pins are kept at the latest release; scripts/check_deps_fresh.py enforces this.
 
 # Web framework
-fastapi==0.163.1
+fastapi==0.165.0
 uvicorn[standard]==0.54.0
 python-multipart==0.0.34
 websockets==17.4
@@ -12,16 +12,16 @@ pydantic==2.14.3
 pydantic-settings==2.16.3
 
 # Image processing
-opencv-python-headless==5.0.0.93
+opencv-python-headless==5.1.0.95
 Pillow==13.0.0
 numpy==2.5.5
 
 # FITS + camera RAW input (backend/app/utils/image_utils.py: decode_image)
-astropy==8.0.2
+astropy==8.0.3
 rawpy==0.28.0
 
 # Database
-SQLAlchemy==2.1.8
+SQLAlchemy==2.1.9
 alembic==1.20.1
 
 # HTTP client (AstroDex webhooks, GitHub release checks)
