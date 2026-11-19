@@ -12,5 +12,6 @@
 # `typescript >=4.8.4 <6.1.0` peer dependency (still true as of 8.73.0), so ESLint
 # would break against TS 6.1+ / 7.x. Held at 6.0.x - the highest that peer range
 # allows. Bump to 7 together with typescript-eslint once it ships TS 7 support.
+# PIN: see DEPENDENCY_PINS.md
 typescript
 
